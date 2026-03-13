@@ -5,9 +5,7 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 **Key Enhanced Features:**
 - **Modern Cinematic UI**: Glassmorphism, beautiful gradients, and fully dynamic layout components.
 - **Improved Reader Experience**: Better rendering and spacing for novel reading.
-- **Fixes for Modern Android**: Support for Android 15 (SDK 35), fixed coil integrations, and resolved resource linking errors.
 - **Refined Navigation & Views**: Upgraded search bars, floating navigation bars, and immersive reading mode.
-- **Support for more providers**: NovelFire, WtrLabProvider, and others have been updated or fixed.
 
 **Original Project:** https://github.com/LagradOst/QuickNovel
 
