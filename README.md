@@ -7,6 +7,11 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 - **Improved Reader Experience**: Better rendering and spacing for novel reading.
 - **Refined Navigation & Views**: Upgraded search bars, floating navigation bars, and immersive reading mode.
 
+## Screenshots
+
+| <img src="./app/assets/NeoQN%20(1).png" width="250"/> | <img src="./app/assets/NeoQN%20(2).png" width="250"/> | <img src="./app/assets/NeoQN%20(3).png" width="250"/> | <img src="./app/assets/NeoQN%20(4).png" width="250"/> |
+|:---:|:---:|:---:|:---:|
+| [Write description here] | [Write description here] | [Write description here] | [Write description here] |
 **Original Project:** https://github.com/LagradOst/QuickNovel
 
 **Discord:** https://discord.gg/5Hus6fM
