@@ -111,7 +111,7 @@ import kotlin.reflect.KProperty
 
 const val DEF_FONT_SIZE: Int = 14
 const val DEF_HORIZONTAL_PAD: Int = 20
-const val DEF_VERTICAL_PAD: Int = 0
+const val DEF_VERTICAL_PAD: Int = 10
 
 class PreferenceDelegate<T : Any>(
     val key: String, val default: T, private val klass: KClass<T>

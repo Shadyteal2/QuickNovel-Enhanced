@@ -232,7 +232,6 @@
                 android:background="@color/colorPrimary" />
 
         <FrameLayout
-
                 android:visibility="visible"
                 android:id="@+id/read_overlay"
                 android:orientation="horizontal"

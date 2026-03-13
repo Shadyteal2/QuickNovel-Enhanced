@@ -10,6 +10,9 @@ import androidx.fragment.app.viewModels
 import com.lagradost.quicknovel.databinding.FragmentHomeBinding
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
+import com.lagradost.quicknovel.util.UIHelper.setImage
+import com.lagradost.quicknovel.MainActivity.Companion.loadResult
+import com.lagradost.quicknovel.R
 
 class HomeFragment : Fragment() {
     lateinit var binding: FragmentHomeBinding
@@ -54,6 +57,24 @@ class HomeFragment : Fragment() {
             browseAdapter.submitList(list)
         }
 
+        observe(viewModel.latestHistory) { res ->
+            if (res != null) {
+                binding.homeHeroSection.visibility = View.VISIBLE
+                binding.heroImage.setImage(res.poster)
+                binding.heroTitle.text = res.name
+                binding.homeHeroSection.setOnClickListener {
+                    loadResult(res.source, res.apiName)
+                }
+            } else {
+                binding.homeHeroSection.visibility = View.GONE
+            }
+        }
+
         activity?.fixPaddingStatusbar(binding.homeToolbar)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.updateHistory()
     }
 }

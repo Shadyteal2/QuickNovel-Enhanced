@@ -189,10 +189,7 @@ class DownloadFragment : Fragment() {
 
 
         val adapter = ViewpagerAdapter(viewModel, this) { isScrollingDown ->
-            if (isScrollingDown)
-                binding.downloadFab.shrink()
-            else
-                binding.downloadFab.extend()
+            binding.downloadFabText.isVisible = !isScrollingDown
         }
 
         observe(viewModel.pages) { pages ->

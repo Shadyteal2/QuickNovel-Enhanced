@@ -178,6 +178,20 @@
                 tools:text="Tag" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/mainpage_source_notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/primaryGrayBackground"
+            android:fontFamily="@font/google_sans"
+            android:gravity="center"
+            android:padding="4dp"
+            android:text="Visual fidelity limited by NovelFull source"
+            android:textColor="?attr/grayTextColor"
+            android:textSize="10sp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
     </com.google.android.material.appbar.AppBarLayout>
 
     <com.lagradost.quicknovel.widget.AutofitRecyclerView
@@ -190,6 +204,7 @@
         android:paddingStart="8dp"
         android:paddingTop="5dp"
         android:paddingEnd="8dp"
+        android:paddingBottom="130dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         app:spanCount="3" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

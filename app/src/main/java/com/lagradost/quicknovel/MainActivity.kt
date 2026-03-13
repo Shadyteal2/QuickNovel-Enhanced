@@ -5,6 +5,9 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.os.Bundle
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.os.Build
 import android.view.Menu
 import android.view.MenuItem
 import android.view.WindowManager
@@ -14,6 +17,7 @@ import androidx.activity.viewModels
 import androidx.annotation.IdRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavController
@@ -481,7 +485,7 @@ class MainActivity : AppCompatActivity() {
         ).contains(destination.id)
 
         binding?.apply {
-            navView.isVisible = isNavVisible
+            navBarContainer.isVisible = isNavVisible
         }
     }
 
@@ -495,6 +499,7 @@ class MainActivity : AppCompatActivity() {
         mainActivity = this
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         CommonActivity.loadThemes(this)
@@ -503,6 +508,14 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            binding?.navBarBlurView?.setRenderEffect(
+                RenderEffect.createBlurEffect(
+                    30f, 30f, Shader.TileMode.CLAMP
+                )
+            )
+        }
 
         setUpBackup()
 
@@ -527,10 +540,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         val navView: BottomNavigationView = findViewById(R.id.nav_view)
-
-        val rippleColor = ColorStateList.valueOf(getResourceColor(R.attr.colorPrimary, 0.1f))
-        navView.itemRippleColor = rippleColor
-        navView.itemActiveIndicatorColor = rippleColor
 
         navView.setOnItemSelectedListener { item ->
             onNavDestinationSelected(

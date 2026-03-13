@@ -17,31 +17,55 @@
                 android:layout_height="match_parent"
                 android:layout_width="match_parent">
 
-            <com.google.android.material.bottomnavigation.BottomNavigationView
-                    android:id="@+id/nav_view"
-                    android:layout_height="70dp"
-                    android:layout_width="0dp"
-                    app:labelVisibilityMode="unlabeled"
-                    android:background="?attr/primaryGrayBackground"
-
-                    app:itemIconTint="@color/item_select_color"
-                    app:itemTextColor="@color/item_select_color"
-
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintLeft_toLeftOf="parent"
-                    app:layout_constraintRight_toRightOf="parent"
-                    app:menu="@menu/bottom_nav_menu" />
-
             <fragment
                     android:id="@+id/nav_host_fragment"
                     android:name="androidx.navigation.fragment.NavHostFragment"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="0dp"
                     app:defaultNavHost="true"
-                    app:layout_constraintBottom_toTopOf="@+id/nav_view"
-                    app:layout_constraintTop_toTopOf="parent"
                     app:navGraph="@navigation/mobile_navigation"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
+
+            <FrameLayout
+                    android:id="@+id/nav_bar_container"
+                    android:layout_width="0dp"
+                    android:layout_height="80dp"
+                    android:layout_marginHorizontal="30dp"
+                    android:layout_marginBottom="30dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:background="@drawable/floating_nav_border"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent">
+
+                <!-- Dedicated blur background to keep icons sharp -->
+                <View
+                        android:id="@+id/nav_bar_blur_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:outlineProvider="background"
+                        android:clipToOutline="true"
+                        android:background="@drawable/floating_nav_background" />
+
+                <com.google.android.material.bottomnavigation.BottomNavigationView
+                        android:id="@+id/nav_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="80dp"
+                        android:layout_gravity="center"
+                        android:background="@android:color/transparent"
+                        android:theme="@style/FloatingNavTheme"
+                        app:elevation="0dp"
+                        app:labelVisibilityMode="unlabeled"
+                        app:itemRippleColor="?attr/colorControlHighlight"
+                        app:itemIconSize="24dp"
+                        app:itemIconTint="@color/item_select_color"
+                        app:itemTextColor="@color/item_select_color"
+                        app:menu="@menu/bottom_nav_menu" />
+            </FrameLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </FrameLayout>

@@ -2129,14 +2129,15 @@ object BookDownloader2 {
 
 
 
-                if (coverBytes != null) {
+                val finalCoverBytes = coverBytes
+                if (finalCoverBytes != null) {
                     // Store the image and override it
                     val filepath = BookDownloader2Helper.getFilenameIMG(sApiName, sAuthor, sName)
                     val posterFilepath =
                         filesDir.toString() + filepath
                     val pFile = File(posterFilepath)
                     pFile.parentFile?.mkdirs()
-                    pFile.writeBytes(coverBytes)
+                    pFile.writeBytes(finalCoverBytes)
                 }
 
             } catch (t: Throwable) {

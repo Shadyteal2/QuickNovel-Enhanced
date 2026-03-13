@@ -13,7 +13,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginBottom="10dp"
-            android:elevation="0dp"
+            app:cardElevation="4dp"
             app:cardCornerRadius="@dimen/roundedImageRadius"
             android:backgroundTint="?attr/boxItemBackground"
             android:clickable="true"

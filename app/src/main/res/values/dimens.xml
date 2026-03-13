@@ -17,7 +17,7 @@
 <resources>
     <dimen name="roundedTextBorderRadius">2dp</dimen>
     <dimen name="roundedTextBorderWidth">0dp</dimen>
-    <dimen name="roundedImageRadius">7dp</dimen>
+    <dimen name="roundedImageRadius">24dp</dimen>
     <dimen name="navbarHeight">0dp</dimen>
     <dimen name="screenEdgeMargin">24dp</dimen>
 

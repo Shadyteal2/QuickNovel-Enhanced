@@ -130,10 +130,10 @@ class NovelFireProvider:  MainAPI() {
 
 
         // Extract title
-        val title = infoDiv.selectFirst("h1.novel-title")?.text() ?: ""
+        val title = document.selectFirst("h1.novel-title")?.text() ?: ""
 
         // Extract author
-        val author = infoDiv.selectFirst("div.author > a")?.text() ?: ""
+        val author = document.selectFirst("div.author > a")?.text() ?: ""
 
         // Extract description/synopsis
         val synopsis = document.selectFirst("meta[itemprop=description]")?.attr("content") ?: ""
@@ -148,7 +148,7 @@ class NovelFireProvider:  MainAPI() {
                 it.text().trim().takeIf { text ->  !text.isEmpty() }
             }
 
-            infoDiv.select("div.header-stats span").map{span ->
+            infoDiv.select("div.header-stats span").forEach{span ->
                 if(span.text().contains("Status")){
                     setStatus(span.selectFirst("strong")?.text())
                 }

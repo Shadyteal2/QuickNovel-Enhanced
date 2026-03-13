@@ -15,6 +15,11 @@
   ~ limitations under the License.
   -->
 <resources>
+    <attr name="marginVertical" format="dimension" />
+    <attr name="navigationBarHeight" format="dimension" />
+    <attr name="floatingNavBackground" format="color" />
+    <attr name="floatingNavStroke" format="color" />
+
     <declare-styleable name="FlowLayout_Layout">
         <attr name="itemSpacing" format="dimension" />
     </declare-styleable>

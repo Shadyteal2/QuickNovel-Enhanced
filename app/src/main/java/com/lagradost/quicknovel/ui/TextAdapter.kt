@@ -705,17 +705,17 @@ class TextAdapter(
             is SingleLoadingBinding -> {
                 config.setArgs(binding.text, CONFIG_COLOR or CONFIG_FONT or CONFIG_FONT_BOLD)
                 config.setArgs(binding.loadingBar)
-                binding.root.minimumHeight = config.toolbarHeight
+                // binding.root.minimumHeight = config.toolbarHeight
             }
 
             is SingleFailedBinding -> {
                 config.setArgs(binding.root, CONFIG_COLOR or CONFIG_FONT or CONFIG_FONT_BOLD)
-                binding.root.minHeight = config.toolbarHeight
+                // binding.root.minHeight = config.toolbarHeight
             }
 
             is SingleFinishedChapterBinding -> {
                 config.setArgs(binding.root, CONFIG_COLOR or CONFIG_FONT or CONFIG_FONT_BOLD)
-                binding.root.minHeight = config.toolbarHeight
+                // binding.root.minHeight = config.toolbarHeight
             }
 
             is SingleLoadBinding -> {

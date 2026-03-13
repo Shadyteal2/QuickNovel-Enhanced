@@ -76,63 +76,88 @@
                 app:tabTextAppearance="@style/TabNoCaps"
                 app:tabTextColor="?attr/textColor" />
     </com.google.android.material.appbar.AppBarLayout>-->
-    <FrameLayout
+    <LinearLayout
+            android:orientation="vertical"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-                android:background="?attr/primaryBlackBackground"
-                android:id="@+id/swipe_container"
-                android:layout_width="match_parent"
-                app:layout_behavior="@string/appbar_scrolling_view_behavior"
-                android:layout_height="match_parent">
-            <androidx.viewpager2.widget.ViewPager2
-                    android:id="@+id/viewpager"
-                    android:paddingBottom="40dp"
-                    android:clipToPadding="false"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    tools:listitem="@layout/viewpager_page" />
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            android:layout_height="match_parent">
 
         <com.google.android.material.tabs.TabLayout
                 android:id="@+id/bookmark_tabs"
                 style="@style/Theme.Widget.Tabs"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:layout_gravity="bottom"
+                android:layout_height="45dp"
                 android:background="?attr/primaryGrayBackground"
                 android:descendantFocusability="blocksDescendants"
                 android:focusable="false"
-                android:paddingHorizontal="5dp"
-                app:layout_scrollFlags="noScroll"
-                app:tabGravity="center"
+                android:paddingHorizontal="10dp"
+                app:tabGravity="fill"
                 app:tabIndicator="@drawable/indicator_background"
                 app:tabIndicatorColor="?attr/white"
                 app:tabIndicatorGravity="center"
-                app:tabIndicatorHeight="30dp"
+                app:tabIndicatorHeight="32dp"
                 app:tabMode="scrollable"
                 app:tabSelectedTextColor="?attr/primaryBlackBackground"
                 app:tabTextAppearance="@style/TabNoCaps"
                 app:tabTextColor="?attr/textColor" />
 
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-                android:id="@+id/download_fab"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end|bottom"
-                app:elevation="0dp"
-                android:textStyle="bold"
+        <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
 
-                app:backgroundTint="?attr/primaryGrayBackground"
-                app:tint="?attr/textColor"
-                android:textColor="?attr/textColor"
-                app:iconTint="?attr/textColor"
-                app:icon="@drawable/ic_sort_24dp"
-                android:text="@string/mainpage_sort_by_button_text"
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                    android:background="?attr/primaryBlackBackground"
+                    android:id="@+id/swipe_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+                <androidx.viewpager2.widget.ViewPager2
+                        android:id="@+id/viewpager"
+                        android:paddingBottom="130dp"
+                        android:clipToPadding="false"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        tools:listitem="@layout/viewpager_page" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-                android:contentDescription="@string/mainpage_sort_by_button_text"
-                android:layout_marginEnd="16dp"
-                android:layout_marginBottom="56dp" />
-    </FrameLayout>
+            <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/download_fab_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="end|bottom"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginBottom="140dp"
+                    app:cardCornerRadius="28dp"
+                    app:cardElevation="12dp"
+                    app:backgroundTint="@null"
+                    android:background="@drawable/button_gradient">
+
+                <LinearLayout
+                        android:id="@+id/download_fab"
+                        android:layout_width="wrap_content"
+                        android:layout_height="56dp"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:paddingHorizontal="20dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackgroundBorderless">
+
+                    <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_sort_24dp"
+                            app:tint="@color/white" />
+
+                    <TextView
+                            android:id="@+id/download_fab_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="@string/mainpage_sort_by_button_text"
+                            android:textColor="@color/white"
+                            android:textStyle="bold"
+                            android:textSize="14sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </FrameLayout>
+    </LinearLayout>
 </LinearLayout>

@@ -1,9 +1,19 @@
-# QuickNovel
+# NeoQN (QuickNovel-Enhanced)
 Adfree FOSS Android app for downloading novels. It also functions as an Epub reader.
+This project is an enhanced fork of the original QuickNovel app, introducing a fully revamped, modern, and beautiful UI, alongside critical bug fixes.
+
+**Key Enhanced Features:**
+- **Modern Cinematic UI**: Glassmorphism, beautiful gradients, and fully dynamic layout components.
+- **Improved Reader Experience**: Better rendering and spacing for novel reading.
+- **Fixes for Modern Android**: Support for Android 15 (SDK 35), fixed coil integrations, and resolved resource linking errors.
+- **Refined Navigation & Views**: Upgraded search bars, floating navigation bars, and immersive reading mode.
+- **Support for more providers**: NovelFire, WtrLabProvider, and others have been updated or fixed.
+
+**Original Project:** https://github.com/LagradOst/QuickNovel
 
 **Discord:** https://discord.gg/5Hus6fM
 
-**Download:** https://github.com/LagradOst/QuickNovel/releases
+**Download origin:** https://github.com/LagradOst/QuickNovel/releases
 
 **Providers used:** 
 
@@ -35,10 +45,6 @@ Adfree FOSS Android app for downloading novels. It also functions as an Epub rea
 - https://wtr-lab.com
 - https://www.wuxiabox.com/
 
-**Screenshoots:**
-
-<img src="./.github/home.jpg" height="400"/><img src="./.github/search.jpg" height="400"/><img src="./.github/downloads.jpg" height="400"/><img src="./.github/result.jpg" height="400"/><img src="./.github/reader.jpg" height="400"/>
-
 **Legal notice:**
 
 Any legal issues regarding the content on this application should be taken up with the actual file hosts and providers themselves as we are not affiliated with them.
@@ -47,7 +53,7 @@ In case of copyright infringement, please directly contact the responsible parti
 
 The app is purely for educational and personal use.
 
-QuickNovel does not host any content on the app, and has no control over what media is put up or taken down. QuickNovel functions like any other search engine, such as Google. QuickNovel does not host, upload or manage any videos, films or content. It simply crawls, aggregates and displayes links in a convenient, user-friendly interface.
+NeoQN does not host any content on the app, and has no control over what media is put up or taken down. NeoQN functions like any other search engine, such as Google. NeoQN does not host, upload or manage any videos, films or content. It simply crawls, aggregates and displayes links in a convenient, user-friendly interface.
 
-It merely scrapes 3rd-party websites that are publicly accessable via any regular web browser. It is the responsibility of user to avoid any actions that might violate the laws governing his/her locality. Use QuickNovel at your own risk.
+It merely scrapes 3rd-party websites that are publicly accessable via any regular web browser. It is the responsibility of user to avoid any actions that might violate the laws governing his/her locality. Use NeoQN at your own risk.
 

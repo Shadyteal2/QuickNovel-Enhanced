@@ -265,16 +265,16 @@ class ResultViewModel : ViewModel() {
 
     fun switchTab(index: Int?, position: Int?) {
         val newPos = index ?: return
-        currentTabPosition.postValue(position ?: return)
+        val tabId = position ?: return
+        currentTabPosition.postValue(tabId)
         currentTabIndex.postValue(newPos)
-        if (newPos == 1 && currentReviews.isEmpty()) {
+        if (tabId == 1 && currentReviews.isEmpty()) {
             loadMoreReviews(verify = false)
         }
-        if (newPos == 3) {
+        if (tabId == 3) {
             reorderChapters()
         } else {
-            // clears the chapters to avoid flicker
-            chapters.postValue(null)
+            // chapters.postValue(null)
         }
     }
 
@@ -295,7 +295,7 @@ class ResultViewModel : ViewModel() {
 
     private var cachedChapters: HashMap<ChapterData, Int> = hashMapOf()
 
-    private fun chapterIndex(chapter: ChapterData): Int? {
+    fun chapterIndex(chapter: ChapterData): Int? {
         return cachedChapters[chapter]
     }
 
