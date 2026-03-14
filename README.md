@@ -13,9 +13,9 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 
 ## Screenshots
 
-| <img src="./app/assets/NeoQN%20(1).png" width="250"/> | <img src="./app/assets/NeoQN%20(2).png" width="250"/> | <img src="./app/assets/NeoQN%20(3).png" width="250"/> | <img src="./app/assets/NeoQN%20(4).png" width="250"/> |
-|:---:|:---:|:---:|:---:|
-| **Library with Custom BG** | **Immersive Reader** | **Enhanced Search** | **'Flashbang' Light Mode** |
+| <img src="./app/assets/NeoQN%20(5).png" width="250"/> | <img src="./app/assets/NeoQN%20(6).png" width="250"/> | <img src="./app/assets/NeoQN%20(7).png" width="250"/> | <img src="./app/assets/NeoQN%20(8).png" width="250"/> | <img src="./app/assets/NeoQN%20(9).png" width="250"/> |
+|:---:|:---:|:---:|:---:|:---:|
+| **Library with Custom BG** | **Source Explorer** | **History** | **Settings** |**Novels Library**|
 
 **Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
 
