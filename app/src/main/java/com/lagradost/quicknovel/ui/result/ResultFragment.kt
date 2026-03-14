@@ -175,6 +175,25 @@ class ResultFragment : Fragment() {
                 resultChaptersInfoHolder.isVisible = false
                 resultQuickstream.isVisible = false
             }
+
+            val currentNote = resultNotesEdittext.text.toString()
+            val savedNote = viewModel.getNote() ?: ""
+            if (currentNote != savedNote) {
+                resultNotesEdittext.setText(savedNote)
+            }
+            
+            val isDropped = viewModel.readState.value == ReadType.DROPPED
+            resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
+            resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else requireContext().colorFromAttribute(R.attr.colorPrimary)
+            resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else requireContext().colorFromAttribute(R.attr.colorPrimary)))
+
+            // Use a tag to avoid adding multiple listeners to the same view
+            if (resultNotesEdittext.tag == null) {
+                resultNotesEdittext.tag = true
+                resultNotesEdittext.doOnTextChanged { text: CharSequence?, _, _, _ ->
+                    viewModel.updateNote(text?.toString())
+                }
+            }
         }
         
         // Populate chapter count in its tab if available
@@ -520,6 +539,15 @@ class ResultFragment : Fragment() {
                 0, 0, 0,
                 if (state == ReadType.NONE) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
+
+            // Update notes UI when read status changes
+            novelTabBinding?.apply {
+                val isDropped = state == ReadType.DROPPED
+                resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
+                val primaryColor = requireContext().colorFromAttribute(R.attr.colorPrimary)
+                resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else primaryColor
+                resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else primaryColor))
+            }
         }
 
         observeNullable(viewModel.chapters) { chapters ->
