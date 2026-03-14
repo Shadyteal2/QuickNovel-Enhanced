@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView
+        android:textStyle="bold"
+        android:paddingBottom="7.5dp"
+        android:paddingTop="7.5dp"
+        android:fontFamily="serif"
+        android:lineSpacingExtra="3sp"
+        android:gravity="center"
+        tools:text="@string/exampleTXT"
+        android:textSize="16sp"
+        android:textColor="@color/readerTextColor"
+        android:clickable="false"
+        android:focusable="false"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools" />

@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Navegación Principal / Títulos de Pestañas -->
+    <string name="app_name">QuickNovel</string>
+    <string name="title_home">Explorar</string>
+    <string name="title_search">Buscar</string>
+    <string name="title_download">Biblioteca</string>
+    <string name="title_history">Historial</string>
+    <string name="title_settings">Ajustes</string>
+
+    <!-- Información de la Novela / Detalles -->
+    <string name="synopsis">Sinopsis</string>
+    <string name="tags">Etiquetas</string>
+    <string name="views">Vistas</string>
+    <string name="no_author">Autor desconocido</string>
+    <string name="no_data">Sin información</string>
+    <string name="info">Información</string>
+    <string name="home_more_info">Más información</string>
+    <string name="battery_format">%d%%</string>
+    <string name="novel">Novela</string>
+    <string name="reviews">Reseñas</string>
+    <string name="related">Relacionado</string>
+    <string name="rating_format">Formato de puntuación</string>
+    <string name="overall_rating_format">General %s</string>
+    <string name="votes_format">%d Votos</string>
+    <string name="novel_imagecover_descript">Portada de la novela</string>
+    <string name="background_image_descript">Fondo de la novela</string>
+    <string name="poster_descript">Póster</string>
+    <string name="shadow_descript">Sombra</string>
+    <string name="has_read">Has leído</string>
+    <string name="chapter">Capítulo</string>
+    <string name="chapters">Capítulos</string>
+
+    <!-- Búsqueda y Proveedores -->
+    <string name="search">Búsqueda</string>
+    <string name="search_hint">Buscar novelas…</string>
+    <string name="search_downloads">Buscar mis novelas…</string>
+    <string name="advanced_search">Búsqueda avanzada</string>
+    <string name="advanced_search_desc">Muestra los resultados de búsqueda separados por proveedor</string>
+    <string name="search_providers">Proveedores</string>
+    <string name="search_roviders">Proveedores</string>
+    <string name="change_providers_descript">Cambiar proveedor</string>
+    <string name="poster_open_source_descript">Ver fuente original</string>
+    <string name="back_to_search">Volver a buscar</string>
+    <string name="no_chapters_found">No se encontraron capítulos</string>
+
+    <!-- Descargas y Gestión de Archivos -->
+    <string name="downloads_text">Descargas</string>
+    <string name="download">Descargar</string>
+    <string name="download_text">Descargar</string>
+    <string name="download_from_chapter">Descarga parcial</string>
+    <string name="download_path_key">download_path_key</string>
+    <string name="download_path_pref">Ruta de descarga</string>
+    <string name="download_started">Descarga iniciada</string>
+    <string name="download_failed">Error en descarga</string>
+    <string name="downloaded">Descargado</string>
+    <string name="re_downloaded">Volver a descargar</string>
+    <string name="generate_epub">Generar EPUB</string>
+    <string name="generating_epub">Generando EPUB</string>
+    <string name="import_epub">Importar un libro</string>
+    <string name="tab_downloads">Descargas</string>
+
+    <!-- Acciones de Usuario -->
+    <string name="open_text">Leer</string>
+    <string name="read_epub">Leer libro</string>
+    <string name="update_text">Actualizar</string>
+    <string name="update">Actualizar</string>
+    <string name="delete">Borrar</string>
+    <string name="remove">Eliminar</string>
+    <string name="clear">Limpiar</string>
+    <string name="save">Guardar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="ok">Aceptar</string>
+    <string name="close">Cerrar</string>
+    <string name="done">Hecho</string>
+    <string name="manage">Gestionar</string>
+    <string name="pause">Pausar</string>
+    <string name="resume">Reanudar</string>
+    <string name="stop">Detener</string>
+    <string name="result_share">Compartir</string>
+    <string name="open_in_browser">Navegar</string>
+    <string name="history_more_options">Más opciones</string>
+    <string name="clear_history">Borrar historial</string>
+    <string name="remove_history">Eliminar historial</string>
+    <string name="dont_show_again">No volver a mostrar</string>
+
+    <!-- Estados de Lectura (Bookmark) -->
+    <string name="type_reading">Leyendo</string>
+    <string name="type_on_hold">En espera</string>
+    <string name="type_completed">Completado</string>
+    <string name="type_dropped">Abandonado</string>
+    <string name="type_plan_to_read">Planeo leer</string>
+    <string name="type_none">Ninguno</string>
+
+    <!-- Interfaz del Lector -->
+    <string name="read_action_settings">Ajustes</string>
+    <string name="read_action_chapters">Capítulos</string>
+    <string name="read_action_chapters_formatted" formatted="true">%d Capítulos</string>
+    <string name="select_chapter">Seleccionar capítulo</string>
+    <string name="reload_chapter">Recargar capítulo</string>
+    <string name="reload_chapter_format">Recargando capítulo %s</string>
+    <string name="latest_format">Último: %s</string>
+    <string name="chapter_format" formatted="true">Capítulo %s</string>
+    <string name="read_display_settings">Ajustes de pantalla</string>
+    <string name="read_text_size">Tamaño de texto</string>
+    <string name="bigger_font">Fuente más grande</string>
+    <string name="smaller_font">Fuente más pequeña</string>
+    <string name="reader_font">Fuente del lector</string>
+    <string name="text_font">Fuente del texto</string>
+    <string name="font">Fuente</string>
+    <string name="read_color">Tema de lectura</string>
+    <string name="background_color">Color de fondo</string>
+    <string name="text_color">Color del texto</string>
+    <string name="reading_color">Color de lectura (TTS)</string>
+    <string name="text_size">Tamaño del texto</string>
+    <string name="text_padding">Margen lateral</string>
+    <string name="text_padding_top">Margen superior</string>
+    <string name="bionic_reading">Lectura biónica</string>
+    <string name="selectable_text">Texto seleccionable</string>
+    <string name="show_authors_notes">Mostrar notas del autor</string>
+    <string name="home_expanded_hide">Ocultar</string>
+    <string name="download_format_key">download_format</string>
+    <string name="exampleTXT">this is <annotation key="rounded">a regular</annotation> paragraph.</string>
+    <string name="paragraph_spacing">Espacio entre parrafos</string>
+    <string name="more_spacing">Más espacio</string>
+    <string name="less_spacing">Menos espacio</string>
+
+    <!-- Comportamiento del Lector -->
+    <string name="scroll_type">Tipo de desplazamiento</string>
+    <string name="inf_scroll">Desplazamiento infinito</string>
+    <string name="button_scroll">Botones de capítulos</string>
+    <string name="overscroll_scroll">Efecto de rebote (Overscroll)</string>
+    <string name="scroll_with_volume_keys">Desplazarse con teclas de volumen</string>
+    <string name="keep_screen_active">Mantener pantalla encendida</string>
+    <string name="twelve_hour_time">Formato 12 horas</string>
+    <string name="show_battery">Mostrar batería</string>
+    <string name="show_time">Mostrar hora</string>
+
+    <!-- Rotación de Pantalla -->
+    <string name="read_action_screen_rotation">Rotar pantalla</string>
+    <string name="default_text">Por defecto</string>
+    <string name="rotation_type">Modo de rotación</string>
+    <string name="rotation_free">Libre</string>
+    <string name="rotation_portrait">Vertical</string>
+    <string name="rotation_landscape">Horizontal</string>
+    <string name="rotation_force_portrait">Vertical bloqueado</string>
+    <string name="rotation_force_landscape">Horizontal bloqueado</string>
+
+    <!-- Texto a Voz (TTS) -->
+    <string name="read_action_tts">Lectura en voz alta</string>
+    <string name="text_to_speech">Lectura en voz alta</string>
+    <string name="tts_voice_title">Voz de lectura (TTS)</string>
+    <string name="tts_locale">Idioma</string>
+    <string name="tts_voice">Voz</string>
+    <string name="start_chapter">Capitulos salteados</string>
+    <string name="tts_speed">Velocidad de voz</string>
+    <string name="tts_pitch">Tono de voz</string>
+    <string name="lock_tts">Bloquear área de lectura TTS</string>
+    <string name="text_to_speech_channel_description">Notificación del lector de voz</string>
+    <string name="sleep_timer">Temporizador</string>
+    <string name="sleep_format">%d min</string>
+    <string name="sleep_format_stop">La lectura parará en %d min</string>
+    <string name="got_null_data">No hay información</string>
+
+
+
+    <!-- Traducción -->
+    <string name="google_translate">Traductor de Google</string>
+    <string name="online_translate">Traducción online</string>
+    <string name="download_ml">Descargar modelo de traducción</string>
+    <string name="download_ml_long">Para traducir localmente se necesita descargar el modelo (~30MB)</string>
+    <string name="translating">Traduciendo: </string>
+    <string name="unable_to_download_language">No se pudo descargar el lenguaje</string>
+
+
+    <!-- Configuración y Sistema -->
+    <string name="general">General</string>
+    <string name="general_settings">Ajustes generales</string>
+    <string name="locale_settings">Idioma de la aplicación</string>
+    <string name="provider_lang_settings">Idiomas del proveedor</string>
+    <string name="theme_key">theme_key</string>
+    <string name="theme">Tema</string>
+    <string name="primary_color_key">primary_color_key</string>
+    <string name="primary_color_settings">Color principal</string>
+    <string name="library_display_mode">Estilo de la biblioteca</string>
+    <string name="grid_view">Cuadrícula</string>
+    <string name="list_view">Lista</string>
+    <string name="show_app_updates">Mostrar actualizaciones</string>
+    <string name="show_app_updates_desc">Buscar actualizaciones automáticamente al iniciar</string>
+    <string name="external_reader">Lector externo</string>
+    <string name="external_reader_desc">Utilizar una aplicación externa para leer</string>
+    <string name="remove_bloat">Eliminar contenido innecesario</string>
+    <string name="remove_bloat_desc">Elimina el título y traductor de las páginas (aumenta carga)</string>
+    <string name="check_for_update">Buscar actualizaciones</string>
+    <string name="new_update_found_format">¡Nueva actualización disponible!\n %s -> %s</string>
+    <string name="no_update_found">No hay actualización</string>
+
+    <!-- Copias de Seguridad (Backup) -->
+    <string name="backup_settings">Copia de seguridad</string>
+    <string name="restore_settings">Restaurar datos desde copia de seguridad</string>
+    <string name="backup_success">Copia de seguridad realizada con éxito</string>
+    <string name="backup_failed">Fallo al respaldar, verifique permisos de almacenamiento</string>
+    <string name="restore_success">Copia de seguridad cargada con éxito</string>
+    <string name="restore_failed_format" formatted="true">Error al restaurar desde %s</string>
+    <string name="backup_failed_error_format">Error al realizar copia de seguridad %s</string>
+
+    <!-- Filtros y Ordenamiento -->
+    <string name="home_title_text">Explorar</string>
+    <string name="mainpage_filter">Filtro</string>
+    <string name="filter_dialog_filter">Aplicar</string>
+    <string name="filter_dialog_sort_by">Ordenar por</string>
+    <string name="filter_dialog_order_by">Ordenar por:</string>
+    <string name="filter_dialog_general">General</string>
+    <string name="filter_dialog_genre">Género</string>
+    <string name="mainpage_sort_by_button_text">Ordenar</string>
+    <string name="sort_apply">Aplicar</string>
+    <string name="sort_cancel">Cancelar</string>
+    <string name="sort_downloads_descript">Ordenar descargas</string>
+    <string name="default_sort">Por defecto</string>
+    <string name="recently_sort">Abierto recientemente</string>
+    <string name="alpha_sort">Alfabético</string>
+    <string name="alpha_sort_az">Alfabético (A-Z)</string>
+    <string name="alpha_sort_za">Alfabético (Z-A)</string>
+    <string name="download_sort">Número de descargas</string>
+    <string name="download_sort_hl">Descargas (mayor a menor)</string>
+    <string name="download_sort_lh">Descargas (menor a mayor)</string>
+    <string name="download_perc">Porcentaje descargado</string>
+    <string name="download_perc_hl">Descargado (mayor a menor)</string>
+    <string name="download_perc_lh">Descargado (menor a mayor)</string>
+    <string name="recently_updated_sort">Actualizado recientemente</string>
+    <string name="chapter_sort">Capítulo</string>
+
+    <!-- Errores y Estados -->
+    <string name="loading">Cargando…</string>
+    <string name="loading_format" formatted="true">Cargando %s…</string>
+    <string name="reload_error">Error de conexión.</string>
+    <string name="error_loading_novel">Error al cargar la novela</string>
+    <string name="error_loading_chapter">Error al cargar el capítulo</string>
+    <string name="no_chapters">Sin capítulos</string>
+    <string name="no_more_chapters">No hay más capítulos</string>
+    <string name="error_outside_chapter">Posición inválida (fuera del capítulo)</string>
+    <string name="nothing_read_recently">No has leído nada recientemente</string>
+    <string name="ongoing">En curso</string>
+    <string name="paused">Pausado</string>
+    <string name="stopped">Detenido</string>
+    <string name="failed">Falló</string>
+    <string name="dropped">Abandonado</string>
+    <string name="stubbed">Recortado (Stubbed)</string>
+    <string name="long_download_time">Cuidado, esta fuente es lenta. Se recomienda lectura en línea.</string>
+    <string name="quickstream_novel_text">Leer en línea</string>
+    <string name="stream_read">Leer en línea</string>
+    <string name="permission_error">Se nececitan permisos</string>
+
+
+    <!-- Diálogos de Confirmación -->
+    <string name="remove_from_history_format">¿Estás seguro de que quieres eliminar %s del historial?</string>
+    <string name="permanently_delete_format">¿Estás seguro de eliminar permanentemente %s?</string>
+    <string name="remove_all_history">¿Estás seguro? Se perderá todo el historial.</string>
+
+    <!-- Sistema y Miscelánea -->
+    <string name="toast_copied">¡Copiado al portapapeles!</string>
+    <string name="clipboard_too_large">Texto demasiado largo para el portapapeles.</string>
+    <string name="clipboard_permission_error">Error de permisos al acceder al portapapeles.</string>
+    <string name="clipboard_unknown_error">Error desconocido al copiar datos.</string>
+    <string name="show_log_cat">Ver registros (Logcat) 🐈</string>
+    <string name="unread">Sin leer</string>
+    <string name="bookmark">Marcador</string>
+    <string name="read">Leído</string>
+    <string name="bookmarks">Marcadores</string>
+    <string name="monke_eating">Mono comiendo</string>
+    <string name="user_image_avatar">Avatar de usuario</string>
+    <string name="browse_list_icon">Icono de lista</string>
+    <string name="reset_value">Restaurar valores por defecto</string>
+    <string name="copylog">Copiar registro</string>
+    <string name="history">Historial</string>
+    <string name="explore">Explorar</string>
+    <string name="provider_list_key">provider_list</string>
+    <string name="search_providers_list_key">search_providers_list</string>
+    <string name="auto_update_key">auto_update</string>
+    <string name="external_reader_key">external_reader</string>
+    <string name="remove_external_key">remove_external</string>
+    <string name="manual_check_update_key">manual_check_update</string>
+    <string name="backup_key">backup_key</string>
+    <string name="rating_format_key">rating_format</string>
+    <string name="grid_format_key">grid_format</string>
+    <string name="download_open_action">Abrir</string>
+    <string name="download_read_action">Leer</string>
+    <string name="download_update_action">Actualizar</string>
+    <string name="download_delete_action">Borrar</string>
+    <string name="reviews_to_top">Arriba</string>
+    <string name="completed">Completado</string>
+    <string name="more_info">Más información</string>
+    <string name="connection_timeout">Tiempo de espera agotado Por favor, inténtalo de nuevo más tarde.</string>
+    <string name="cannot_conect">No se pudo conectar al servidor, inténtalo de nuevo más tarde.</string>
+    <string name="error_loading">"Error al cargar, por favor inténtalo de nuevo más tarde."</string>
+    <string name="operation_no_implemented">" Esta operación no está implementada."</string>
+    <string name="conection_error">Error de conección.</string>
+    <string name="unknown">Desconocido</string>
+</resources>
