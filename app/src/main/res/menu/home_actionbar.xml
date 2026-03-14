@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<menu>
-    <!--<item
-            android:id="@+id/action_goto_search"
-            android:icon="@drawable/search_icon"
-            app:showAsAction="always"
-            android:title="@string/title_search"/>-->
-</menu>

@@ -1,7 +1,0 @@
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <gradient
-            android:startColor="?attr/floatingNavBackground"
-            android:endColor="?attr/floatingNavBackground"
-            android:type="linear" />
-    <corners android:radius="40dp" />
-</shape>
