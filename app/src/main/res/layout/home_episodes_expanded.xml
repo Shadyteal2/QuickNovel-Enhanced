@@ -4,7 +4,7 @@
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:orientation="vertical"
         android:layout_width="match_parent"
-        android:background="?attr/primaryBlackBackground"
+        android:background="@android:color/transparent"
         android:layout_height="wrap_content">
 
     <FrameLayout

@@ -16,7 +16,7 @@
             android:id="@+id/home_toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/primaryGrayBackground"
+            android:background="#33000000"
             android:paddingTop="@dimen/navbarHeight"
             app:layout_scrollFlags="scroll|enterAlways"
             app:menu="@menu/home_actionbar"
@@ -71,15 +71,12 @@
                         android:orientation="vertical"
                         android:padding="20dp">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
                             android:background="@drawable/rounded_text_bg"
                             android:paddingHorizontal="8dp"
                             android:paddingVertical="4dp"
                             android:text="Editor's Choice"
                             android:textAllCaps="true"
-                            android:textColor="@color/white"
+                            android:textColor="?attr/textColor"
                             android:textSize="10sp"
                             android:textStyle="bold" />
 
@@ -90,7 +87,11 @@
                             android:layout_marginTop="8dp"
                             android:fontFamily="@font/google_sans"
                             android:text="Continue Your Adventure"
-                            android:textColor="@color/white"
+                            android:textColor="?attr/textColor"
+                            android:shadowColor="#B4000000"
+                            android:shadowDx="1.2"
+                            android:shadowDy="1.2"
+                            android:shadowRadius="1.5"
                             android:textSize="22sp"
                             android:textStyle="bold" />
 
@@ -100,7 +101,11 @@
                             android:layout_height="wrap_content"
                             android:alpha="0.8"
                             android:text="Dive back into your last read story"
-                            android:textColor="@color/white"
+                            android:textColor="?attr/textColor"
+                            android:shadowColor="#B4000000"
+                            android:shadowDx="1.2"
+                            android:shadowDy="1.2"
+                            android:shadowRadius="1.5"
                             android:textSize="14sp" />
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>

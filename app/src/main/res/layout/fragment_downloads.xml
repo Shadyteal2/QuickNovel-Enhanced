@@ -1,18 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:id="@+id/downloadRoot"
-        android:background="?attr/primaryGrayBackground"
+        android:background="@android:color/transparent"
         android:orientation="vertical">
 
     <FrameLayout
             android:visibility="visible"
             android:layout_height="40dp"
             android:layout_margin="10dp"
-            android:background="@drawable/search_background"
+            android:background="?attr/searchBarBackground"
             android:layout_width="match_parent">
 
         <androidx.appcompat.widget.SearchView
@@ -86,7 +85,7 @@
                 style="@style/Theme.Widget.Tabs"
                 android:layout_width="match_parent"
                 android:layout_height="45dp"
-                android:background="?attr/primaryGrayBackground"
+                android:background="#33000000"
                 android:descendantFocusability="blocksDescendants"
                 android:focusable="false"
                 android:paddingHorizontal="10dp"
@@ -105,7 +104,7 @@
                 android:layout_height="match_parent">
 
             <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-                    android:background="?attr/primaryBlackBackground"
+                    android:background="@android:color/transparent"
                     android:id="@+id/swipe_container"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent">

@@ -13,8 +13,8 @@
             android:id="@+id/backgroundCard"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:cardBackgroundColor="?attr/primaryBlackBackground"
-            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="?attr/boxItemBackground"
+            app:cardCornerRadius="@dimen/roundedImageRadius"
             app:cardElevation="2dp">
 
             <ImageView
@@ -45,7 +45,11 @@
                 android:paddingLeft="6dp"
                 android:paddingRight="6dp"
                 android:paddingBottom="8dp"
-                android:textColor="@color/white"
+                android:textColor="?attr/textColor"
+                android:shadowColor="#B4000000"
+                android:shadowDx="1.2"
+                android:shadowDy="1.2"
+                android:shadowRadius="1.5"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 tools:text="Novel Title" />

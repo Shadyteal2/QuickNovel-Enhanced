@@ -16,8 +16,17 @@ import com.lagradost.quicknovel.MainActivity.Companion.loadResult
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.ResultCached
+import android.content.SharedPreferences
+import androidx.preference.PreferenceManager
+import com.lagradost.quicknovel.DataStore.getSharedPrefs
 
 class HistoryViewModel : ViewModel() {
+    private val historyListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key?.startsWith(HISTORY_FOLDER) == true) {
+            updateHistory()
+        }
+    }
+
     private fun updateHistory() {
         ioSafe {
             val list = ArrayList<ResultCached>()
@@ -33,7 +42,15 @@ class HistoryViewModel : ViewModel() {
     }
 
     init {
+        val context = activity ?: com.lagradost.quicknovel.BaseApplication.context
+        context?.getSharedPrefs()?.registerOnSharedPreferenceChangeListener(historyListener)
         updateHistory()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        val context = activity ?: com.lagradost.quicknovel.BaseApplication.context
+        context?.getSharedPrefs()?.unregisterOnSharedPreferenceChangeListener(historyListener)
     }
 
     val cards: MutableLiveData<ArrayList<ResultCached>> by lazy {

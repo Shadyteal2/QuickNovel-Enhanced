@@ -7,3 +7,10 @@
 /captures
 .externalNativeBuild
 .cxx
+.gradle/
+.gradle-home/
+build/
+*.class
+*.jar
+*.lock
+*.bins

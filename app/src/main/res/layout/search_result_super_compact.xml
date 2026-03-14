@@ -15,7 +15,7 @@
             android:layout_marginBottom="10dp"
             app:cardElevation="4dp"
             app:cardCornerRadius="@dimen/roundedImageRadius"
-            android:backgroundTint="?attr/boxItemBackground"
+            app:cardBackgroundColor="?attr/boxItemBackground"
             android:clickable="true"
             android:focusable="true"
             android:baselineAligned="false">
@@ -49,7 +49,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textSize="17sp"
-                    android:textColor="@color/textColor"
+                    android:textColor="?attr/textColor"
+                    android:shadowColor="#B4000000"
+                    android:shadowDx="1.2"
+                    android:shadowDy="1.2"
+                    android:shadowRadius="1.5"
                     android:id="@+id/imageText"
                     android:textStyle="normal"
                     android:maxLines="3" />

@@ -5,7 +5,7 @@
     android:id="@+id/mainpageRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/primaryBlackBackground">
+    android:background="@android:color/transparent">
 
 
     <LinearLayout
@@ -77,7 +77,7 @@
             android:id="@+id/mainpage_toolbar"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="?attr/primaryGrayBackground"
+            android:background="#33000000"
             android:gravity="center"
             android:padding="10dp"
             app:layout_scrollFlags="scroll|enterAlways">
@@ -157,7 +157,7 @@
             android:id="@+id/mainpage_sortby_holder"
             android:layout_width="match_parent"
             android:layout_height="50dp"
-            android:background="?attr/primaryGrayBackground"
+            android:background="#33000000"
             android:gravity="center"
             android:orientation="horizontal"
             app:layout_scrollFlags="scroll|enterAlways">
@@ -182,7 +182,7 @@
             android:id="@+id/mainpage_source_notice"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/primaryGrayBackground"
+            android:background="#33000000"
             android:fontFamily="@font/google_sans"
             android:gravity="center"
             android:padding="4dp"

@@ -5,7 +5,7 @@
     android:id="@+id/result_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/primaryBlackBackground"
+    android:background="@android:color/transparent"
     android:clickable="true"
     android:focusable="true">
 
@@ -383,7 +383,7 @@
                     android:id="@+id/result_download_card"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/white_card">
+                    android:background="@android:color/transparent">
 
                     <LinearLayout
                         android:id="@+id/result_scroll_padding"
@@ -400,19 +400,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="80dp"
                             android:layout_marginTop="16dp"
-                            android:clipToOutline="true">
-
-                            <!-- Glass Background -->
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/glass_card_background" />
-
-                            <!-- Glass Border -->
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/glass_card_border" />
+                            android:clipToOutline="true"
+                            android:background="@drawable/bar_background_rounded">
 
                             <LinearLayout
                                 android:layout_width="match_parent"
@@ -422,7 +411,7 @@
                                 <TextView
                                     android:id="@+id/result_bookmark"
                                     style="@style/TextButton"
-                                    android:background="?android:attr/selectableItemBackground"
+                                    android:background="@drawable/ripple_masked_rounded"
                                     android:contentDescription="@string/bookmark"
                                     android:fontFamily="@font/google_sans"
                                     android:text="@string/bookmark"
@@ -431,7 +420,7 @@
                                 <TextView
                                     android:id="@+id/result_openinbrower"
                                     style="@style/TextButton"
-                                    android:background="?android:attr/selectableItemBackground"
+                                    android:background="@drawable/ripple_masked_rounded"
                                     android:contentDescription="@string/result_share"
                                     android:fontFamily="@font/google_sans"
                                     android:text="@string/open_in_browser"
@@ -440,7 +429,7 @@
                                 <TextView
                                     android:id="@+id/result_share"
                                     style="@style/TextButton"
-                                    android:background="?android:attr/selectableItemBackground"
+                                    android:background="@drawable/ripple_masked_rounded"
                                     android:contentDescription="@string/result_share"
                                     android:fontFamily="@font/google_sans"
                                     android:text="@string/result_share"
@@ -480,7 +469,7 @@
                             android:id="@+id/result_viewpager"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
-                            android:background="@drawable/white_card"
+                            android:background="@android:color/transparent"
                             android:minHeight="500dp" />
 
             </LinearLayout>

@@ -19,7 +19,7 @@
             app:cardCornerRadius="@dimen/roundedImageRadius"
             android:id="@+id/backgroundCard"
             android:foreground="?android:attr/selectableItemBackgroundBorderless"
-            app:cardBackgroundColor="?attr/primaryGrayBackground">
+            app:cardBackgroundColor="?attr/boxItemBackground">
         <!-- USING CROP RATIO (182/268), centerCrop for fill -->
         <ImageView
                 android:duplicateParentState="true"
@@ -36,7 +36,7 @@
                 android:background="@drawable/download_add_bg"
                 android:layout_margin="5dp"
                 android:id="@+id/imageTextMore"
-                android:textColor="@color/textColor"
+                android:textColor="?attr/textColor"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />
 
@@ -48,7 +48,7 @@
             android:layout_margin="5dp"
             android:padding="4dp"
             android:background="@drawable/download_chapterprogress_bg"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/white"
             tools:text="10/100" />
 
 
@@ -76,8 +76,8 @@
                 android:layout_height="25dp"
                 android:layout_margin="5dp"
                 style="@style/Widget.AppCompat.ProgressBar"
-                android:foregroundTint="@color/white"
-                android:progressTint="@color/white"
+                android:foregroundTint="?attr/colorPrimary"
+                android:progressTint="?attr/colorPrimary"
                 android:layout_gravity="top|start" />
     </androidx.cardview.widget.CardView>
 
@@ -95,6 +95,10 @@
             android:paddingEnd="5dp"
             android:paddingBottom="5dp"
             android:textColor="?attr/textColor"
+            android:shadowColor="#B4000000"
+            android:shadowDx="1.2"
+            android:shadowDy="1.2"
+            android:shadowRadius="1.5"
             android:textSize="13sp"
             tools:text="The Perfect Run\nThe Perfect Run" />
 </LinearLayout>

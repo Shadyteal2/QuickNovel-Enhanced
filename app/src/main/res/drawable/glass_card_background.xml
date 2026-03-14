@@ -4,5 +4,5 @@
         android:startColor="?attr/floatingNavBackground"
         android:endColor="?attr/floatingNavBackground"
         android:type="linear" />
-    <corners android:radius="16dp" />
+    <corners android:radius="@dimen/roundedImageRadius" />
 </shape>
