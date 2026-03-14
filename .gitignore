@@ -12,5 +12,6 @@
 build/
 *.class
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 *.lock
 *.bins
