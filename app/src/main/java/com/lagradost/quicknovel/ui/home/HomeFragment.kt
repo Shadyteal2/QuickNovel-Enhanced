@@ -40,13 +40,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             browseAdapter.submitList(list)
         }
 
-<<<<<<< HEAD
         val settingsManager = androidx.preference.PreferenceManager.getDefaultSharedPreferences(requireContext())
         val hasBackground = !settingsManager.getString(getString(com.lagradost.quicknovel.R.string.background_image_key), null).isNullOrBlank()
         if (hasBackground) {
             binding.homeRoot.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             binding.homeToolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-=======
+        }
+
         observe(viewModel.latestHistory) { res ->
             if (res != null) {
                 binding.homeHeroSection.visibility = View.VISIBLE
@@ -58,7 +58,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             } else {
                 binding.homeHeroSection.visibility = View.GONE
             }
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
         }
 
         activity?.fixPaddingStatusbar(binding.homeToolbar)

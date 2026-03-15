@@ -211,13 +211,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri == null) return@registerForActivityResult
             val context = context ?: return@registerForActivityResult
-<<<<<<< HEAD
             val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-
-=======
-            
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
             context.contentResolver.takePersistableUriPermission(uri, flags)
 
             PreferenceManager.getDefaultSharedPreferences(context)
