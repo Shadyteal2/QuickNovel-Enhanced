@@ -51,8 +51,9 @@ import com.lagradost.quicknovel.util.toPx
 
 const val MAX_SYNO_LENGH = 300
 
-class ResultFragment : Fragment() {
-    lateinit var binding: FragmentResultBinding
+class ResultFragment : BaseFragment<FragmentResultBinding>(
+    BindingCreator.Inflate(FragmentResultBinding::inflate)
+) {
     private val viewModel: ResultViewModel by viewModels()
 
     private var novelTabBinding: ResultNovelTabBinding? = null
@@ -71,14 +72,7 @@ class ResultFragment : Fragment() {
 
     val repo get() = viewModel.repo
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View {
-        binding = FragmentResultBinding.inflate(inflater)
-        return binding.root
-    }
+
 
     private fun setupGridView() {
         // Only for recommendations which are removed now, keeping it empty for potential future use or removing if fully unused
