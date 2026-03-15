@@ -15,6 +15,11 @@
   ~ limitations under the License.
   -->
 <resources>
+    <attr name="marginVertical" format="dimension" />
+    <attr name="navigationBarHeight" format="dimension" />
+    <attr name="floatingNavBackground" format="color" />
+    <attr name="floatingNavStroke" format="color" />
+
     <declare-styleable name="FlowLayout_Layout">
         <attr name="itemSpacing" format="dimension" />
     </declare-styleable>
@@ -43,5 +48,6 @@
         <attr name="grayTextColor" format="color" />
         <attr name="iconColor" format="color" />
         <attr name="white" format="color" />
+        <attr name="searchBarBackground" format="reference" />
     </declare-styleable>
 </resources>

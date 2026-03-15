@@ -10,26 +10,27 @@
         android:focusable="true"
         android:clickable="true">
 
-    <androidx.cardview.widget.CardView
+    <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginBottom="2dp"
-            app:cardElevation="0dp"
+            app:cardElevation="4dp"
             app:cardCornerRadius="@dimen/roundedImageRadius"
             android:id="@+id/backgroundCard"
             android:foreground="?android:attr/selectableItemBackgroundBorderless"
-            app:cardBackgroundColor="?attr/primaryGrayBackground">
+            app:backgroundTint="@null"
+            android:background="@drawable/button_gradient">
         <!-- USING CROP RATIO (182/268), centerCrop for fill -->
         <ImageView
                 android:src="@drawable/ic_baseline_add_24"
-                app:tint="?attr/textColor"
+                app:tint="@color/white"
                 android:duplicateParentState="true"
                 android:id="@+id/imageView"
                 android:layout_gravity="center"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="@string/poster_descript" />
-    </androidx.cardview.widget.CardView>
+    </com.google.android.material.card.MaterialCardView>
 
     <TextView
             android:id="@+id/imageText"
@@ -44,7 +45,7 @@
             android:paddingTop="5dp"
             android:paddingEnd="5dp"
             android:paddingBottom="5dp"
-            android:textColor="?attr/textColor"
+            android:textColor="@color/white"
             android:textSize="13sp"
             android:text="@string/import_epub" />
 </LinearLayout>

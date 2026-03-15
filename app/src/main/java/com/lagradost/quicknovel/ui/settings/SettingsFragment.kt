@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -15,6 +16,9 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import com.lagradost.quicknovel.APIRepository.Companion.providersActive
 import com.lagradost.quicknovel.CommonActivity
 import com.lagradost.quicknovel.CommonActivity.showToast
@@ -41,6 +45,8 @@ import com.lagradost.quicknovel.util.SingleSelectionHelper.showMultiDialog
 import com.lagradost.quicknovel.util.SubtitleHelper
 import com.lagradost.quicknovel.util.UIHelper.clipboardHelper
 import com.lagradost.quicknovel.util.UIHelper.dismissSafe
+import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
+import com.lagradost.quicknovel.util.toPx
 import com.lagradost.safefile.MediaFileContentType
 import com.lagradost.safefile.SafeFile
 import java.io.BufferedReader
@@ -205,8 +211,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri == null) return@registerForActivityResult
             val context = context ?: return@registerForActivityResult
+<<<<<<< HEAD
             val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
 
+=======
+            
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
             context.contentResolver.takePersistableUriPermission(uri, flags)
 
             PreferenceManager.getDefaultSharedPreferences(context)
@@ -313,6 +324,22 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     showToast(R.string.no_update_found, Toast.LENGTH_SHORT)
                 }
             }
+            return@setOnPreferenceClickListener true
+        }
+
+        getPref(R.string.background_image_key)?.setOnPreferenceClickListener {
+            try {
+                imagePicker.launch(arrayOf("image/*"))
+            } catch (e: Exception) {
+                logError(e)
+            }
+            return@setOnPreferenceClickListener true
+        }
+
+        getPref(R.string.reset_background_key)?.setOnPreferenceClickListener {
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(it.context)
+            settingsManager.edit().remove(getString(R.string.background_image_key)).apply()
+            showToast(R.string.background_reset_confirmed) // Or a dedicated string if available, but this works
             return@setOnPreferenceClickListener true
         }
 
@@ -596,5 +623,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
             MainActivity.activeAPI = MainActivity.getApiFromName(newValue.toString())
             return@setOnPreferenceChangeListener true
         }*/
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // Fix status bar overlap
+        activity?.fixPaddingStatusbar(view)
+
+        // Fix bottom overlap with floating nav bar
+        listView?.let { recycler ->
+            recycler.clipToPadding = false
+            // 60dp (nav bar) + 30dp (margin) + some extra breathing room
+            val extraPadding = 100.toPx
+            
+            ViewCompat.setOnApplyWindowInsetsListener(recycler) { v, insets ->
+                val navigationBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+                v.updatePadding(bottom = navigationBars.bottom + extraPadding)
+                insets
+            }
+        }
     }
 }

@@ -48,7 +48,8 @@ class ChapterAdapter(val viewModel: ResultViewModel) :
     override fun onBindContent(holder: ViewHolderState<Any>, item: ChapterData, position: Int) {
         val binding = holder.view as? SimpleChapterBinding ?: return
         binding.apply {
-            name.text = item.name
+            val index = viewModel.chapterIndex(item)
+            name.text = if (index != null) "${index + 1}. ${item.name}" else item.name
             releaseDate.text = item.dateOfRelease
             releaseDate.isGone = item.dateOfRelease.isNullOrBlank()
             root.setOnClickListener {

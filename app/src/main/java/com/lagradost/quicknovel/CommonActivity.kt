@@ -172,6 +172,6 @@ object CommonActivity {
 
 
         act.window?.navigationBarColor =
-            act.colorFromAttribute(R.attr.primaryGrayBackground)
+            android.graphics.Color.TRANSPARENT
     }
 }

@@ -9,12 +9,8 @@
         <item name="android:colorEdgeEffect">?attr/textColor</item>
 
         <!--<item name="android:navigationBarColor">?attr/primaryBlackBackground</item>-->
-        <item name="android:statusBarColor">?attr/iconGrayBackground</item>
-
-        <item name="android:scrollbarThumbVertical">@null</item>
-        <item name="android:scrollbarThumbHorizontal">@null</item>
-
-        <item name="android:windowTranslucentStatus">true</item> <!--true-->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="alertDialogTheme">@style/Theme.AlertDialog</item>
 
@@ -57,11 +53,14 @@
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="grayTextColor">@color/grayTextColor</item>
         <item name="primaryGrayBackground">@color/primaryGrayBackground</item>
-        <item name="primaryBlackBackground">@color/primaryBlackBackground</item>
+        <item name="primaryBlackBackground">#121212</item>
+        <item name="floatingNavBackground">#80121212</item> <!-- ~70% alpha dark glass -->
+        <item name="floatingNavStroke">#26FFFFFF</item> <!-- Subtle white glass edge -->
         <item name="iconGrayBackground">@color/iconGrayBackground</item>
-        <item name="boxItemBackground">@color/boxItemBackground</item>
+        <item name="boxItemBackground">#121212</item>
         <item name="iconColor">?attr/textColor</item>
         <item name="white">#FFF</item>
+        <item name="searchBarBackground">@drawable/search_background</item>
 
         <!-- Checkboxes
         <item name="colorControlNormal">?attr/white</item>
@@ -109,7 +108,9 @@
     <style name="AmoledMode">
         <item name="primaryGrayBackground">@color/black</item>
         <item name="primaryBlackBackground">@color/black</item>
-        <item name="iconGrayBackground">@color/primaryBlackBackground</item>
+        <item name="floatingNavBackground">#B3000000</item> <!-- ~70% alpha amoled glass -->
+        <item name="floatingNavStroke">#26FFFFFF</item> <!-- Subtle white glass edge -->
+        <item name="iconGrayBackground">@color/black</item>
         <item name="boxItemBackground">@color/black</item>
         <item name="textColor">@color/textColor</item>
         <item name="grayTextColor">@color/grayTextColor</item>
@@ -137,8 +138,11 @@
         <item name="chipBackgroundColor">?attr/primaryGrayBackground</item>
         <item name="textColor">?attr/textColor</item>
         <item name="android:textColor">?attr/textColor</item>
-
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">13sp</item>
+        <item name="chipStartPadding">12dp</item>
+        <item name="chipEndPadding">12dp</item>
+        <item name="android:minWidth">100dp</item>
+        <item name="rippleColor">?attr/textColor</item>
     </style>
 
     <style name="ChipFilled" parent="@style/Widget.Material3.Chip.Filter">
@@ -196,7 +200,9 @@
         <item name="android:queryHint">@string/search_hint</item>
         <item name="android:background">@color/transparent</item>
         <item name="android:fontFamily">@font/google_sans</item>
-        <!--<item name="collapseIcon">@drawable/search_icon</item>-->
+        <item name="android:textColor">?attr/textColor</item>
+        <item name="android:textColorHint">?attr/grayTextColor</item>
+        <item name="android:editTextColor">?attr/textColor</item>
     </style>
 
     <style name="AppBottomSheetDialogTheme" parent="Theme.Design.Light.BottomSheetDialog">
@@ -297,16 +303,16 @@
         <!--removes shadow-->
         <item name="android:stateListAnimator">@null</item>
 
-        <item name="android:padding">5dp</item>
-        <item name="android:layout_marginStart">5dp</item>
-        <item name="android:layout_marginEnd">5dp</item>
-        <item name="android:layout_height">40dp</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:layout_marginStart">6dp</item>
+        <item name="android:layout_marginEnd">6dp</item>
+        <item name="android:layout_height">48dp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:textAllCaps">false</item>
         <item name="iconGravity">textStart</item>
-        <item name="iconSize">20dp</item>
-        <item name="cornerRadius">@dimen/rounded_button_radius</item>
-        <item name="android:textSize">15sp</item>
+        <item name="iconSize">22dp</item>
+        <item name="cornerRadius">24dp</item>
+        <item name="android:textSize">14sp</item>
 
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
@@ -335,12 +341,14 @@
         <item name="android:textSize">16sp</item>
         <item name="android:layout_weight">1</item>
         <item name="textColor">?attr/textColor</item>
-        <item name="android:layout_height">50dp</item>
+        <item name="android:layout_height">68dp</item>
+        <item name="android:paddingHorizontal">20dp</item>
+        <item name="android:paddingVertical">10dp</item>
 
         <item name="drawableTint">?attr/white</item>
         <!--<item name="drawableBottomCompat">@drawable/arrow_drop_down_24px</item>-->
         <item name="android:layout_width">0dp</item>
-        <item name="android:gravity">center_horizontal</item>
+        <item name="android:gravity">center</item>
         <item name="android:layout_gravity">center_vertical</item>
         <item name="android:layout_margin">0dp</item>
     </style>
@@ -384,18 +392,19 @@
     </style>
 
     <style name="Theme.Widget.Tabs" parent="Widget.MaterialComponents.TabLayout.Colored">
-        <item name="tabRippleColor">?attr/textColor</item>
-
-        <!--<item name="tabGravity">center</item>
-        <item name="backgroundTint">@color/transparent</item>
+        <item name="tabGravity">fill</item>
         <item name="tabIndicator">@drawable/tab_selector</item>
         <item name="tabIndicatorColor">?attr/colorPrimary</item>
-        <item name="tabTextColor">?attr/colorPrimary</item>
-        <item name="tabIndicatorFullWidth">false</item>
+        <item name="tabSelectedTextColor">?attr/colorPrimary</item>
+        <item name="tabTextColor">?attr/grayTextColor</item>
+        <item name="tabIndicatorFullWidth">true</item>
         <item name="tabIndicatorHeight">3dp</item>
         <item name="tabInlineLabel">true</item>
-        <item name="tabMinWidth">75dp</item>
-        <item name="tabMode">scrollable</item>-->
+        <item name="tabMode">fixed</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="tabPaddingStart">20dp</item>
+        <item name="tabPaddingEnd">20dp</item>
     </style>
 
 
@@ -405,9 +414,12 @@
         <item name="iconGrayBackground">@color/lightGrayBackground</item>
         <item name="boxItemBackground">@color/lightItemBackground</item>
         <item name="textColor">@color/lightTextColor</item>
+        <item name="floatingNavBackground">#E6FFFFFF</item> <!-- Clean white glass -->
+        <item name="floatingNavStroke">#33000000</item> <!-- Subtle dark edge -->
         <item name="grayTextColor">@color/lightGrayTextColor</item>
         <item name="white">#000</item>
         <item name="colorOnPrimary">@color/blackText</item>
+        <item name="searchBarBackground">@drawable/search_background_light</item>
     </style>
 
     <style name="OverlayPrimaryColorParty">
@@ -485,6 +497,7 @@
         <item name="colorPrimaryDark">#4704A3</item>
         <item name="colorAccent">#7125DB</item>
         <item name="colorOnPrimary">#7125DB</item>
+        <!-- android:colorAccent is intentionally colorPrimaryPurple to match user's previous preference -->
         <item name="android:colorAccent">@color/colorPrimaryPurple</item>
     </style>
 
@@ -494,6 +507,7 @@
         <item name="colorPrimaryDark">#007363</item>
         <item name="colorAccent">#39C1AE</item>
         <item name="colorOnPrimary">#39C1AE</item>
+        <!-- Needed for leanback fuckery -->
         <item name="android:colorAccent">@color/colorPrimaryGreen</item>
     </style>
 
@@ -503,6 +517,7 @@
         <item name="colorPrimaryDark">#319B5A</item>
         <item name="colorAccent">#51C57E</item>
         <item name="colorOnPrimary">#51C57E</item>
+        <!-- Needed for leanback fuckery -->
         <item name="android:colorAccent">@color/colorPrimaryGreenApple</item>
     </style>
 
@@ -610,5 +625,15 @@
         <item name="android:layout_marginStart">30dp</item>
         <item name="android:layout_marginEnd">30dp</item>
         <item name="android:layout_gravity">center_vertical</item>
+    </style>
+
+    <style name="FloatingNavTheme" parent="ThemeOverlay.AppCompat">
+        <!-- Sustainable spacing for Material 3 navigation -->
+        <item name="itemPaddingTop">8dp</item>
+        <item name="itemPaddingBottom">12dp</item>
+        <item name="navigationBarHeight">60dp</item>
+        <!-- Use color overrides to hide the M3 pill indicator safely without using missing attributes -->
+        <item name="colorPrimaryContainer">@android:color/transparent</item>
+        <item name="colorOnPrimaryContainer">?attr/textColor</item>
     </style>
 </resources>

@@ -45,7 +45,7 @@ class Apis {
         val apis: List<MainAPI> = arrayOf(
             //AllProvider(),
             AllNovelProvider(),
-            AnnasArchive(),
+            //AnnasArchive(), // Broken/Offline
             //AzynovelProvider(), // dont exist anymore
             //BestLightNovelProvider(), //dont exist anymore
             //ComrademaoProvider(), // domain sold/down?
@@ -55,22 +55,23 @@ class Apis {
             FanMtlnProvider(),
             GraycityProvider(),
             HiraethTranslationProvider(),
-            IndoWebNovelProvider(),
-            KolNovelProvider(),
+            //IndoWebNovelProvider(),
+            //KolNovelProvider(),
             LibReadProvider(),
             //LightNovelPubProvider(), // Got cloudflare, but probably bypassable
             LightNovelTranslationsProvider(),
-            MeioNovelProvider(),
+            //MeioNovelProvider(),
             //MNovelFreeProvider(), // same as NovelFullVipProvider
-            MoreNovelProvider(), // cloudflare?
+            //MoreNovelProvider(), // cloudflare?
             MtlNovelProvider(),
             NovelBinProvider(),
             NovelFullNETProvider(),
+
             NovelFullProvider(),
             NovelFireProvider(),
             //NovelPassionProvider(), // Site gone
             NovelsOnlineProvider(),
-            NovLoveProvider(),
+            //NovLoveProvider(),
             PawReadProver(),
             //RanobesProvider(), // custom capcha
             //ReadAnyBookProvider(), // Books locked behind login
@@ -79,15 +80,16 @@ class Apis {
             ReadNovelFullProvider(),
             //RewayatArProvider(), // removed url
             RoyalRoadProvider(),
-            SakuraNovelProvider(), // cloudflare?
-            ScribblehubProvider(),
+            //SakuraNovelProvider(), // cloudflare?
+            //ScribblehubProvider(),
             //WuxiaWorldOnlineProvider(), // Site does not work
             //WuxiaWorldSiteProvider(),
             //WattpadProvider(), // they have randomized the css classes
-            WtrLabProvider(),
+            //WtrLabProvider(),
             WuxiaBoxProvider(),
             ReadOnlineFreeBookProvider()
         ).sortedBy { it.name }
+
 
         fun getApiFromName(name: String): APIRepository {
             return getApiFromNameOrNull(name) ?: APIRepository(apis[1])

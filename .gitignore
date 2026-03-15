@@ -7,3 +7,11 @@
 /captures
 .externalNativeBuild
 .cxx
+.gradle/
+.gradle-home/
+build/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.lock
+*.bins

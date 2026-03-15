@@ -101,6 +101,8 @@ class MainPageFragment : BaseFragment<FragmentMainpageBinding>(
             defTag
         )
 
+        binding.mainpageSourceNotice.isVisible = apiName.contains("NovelFull", ignoreCase = true)
+
         searchExitIcon = binding.mainSearch.findViewById(androidx.appcompat.R.id.search_close_btn)
         searchMagIcon = binding.mainSearch.findViewById(androidx.appcompat.R.id.search_mag_icon)
         searchMagIcon.scaleX = 0.65f

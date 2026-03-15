@@ -91,8 +91,6 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private fun hideSystemUI() {
-
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, binding.readerContainer).let { controller ->
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior =
@@ -129,7 +127,6 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private fun showSystemUI() {
-        WindowCompat.setDecorFitsSystemWindows(window, true)
         WindowInsetsControllerCompat(
             window,
             binding.readerContainer
@@ -691,6 +688,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         CommonActivity.loadThemes(this)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         super.onCreate(savedInstanceState)
         readActivity = this
         binding = ReadMainBinding.inflate(layoutInflater)
@@ -866,7 +864,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 val validChapter =
                     currentChapter != null && currentChapter >= 0 && currentChapter < titles.size
                 if (validChapter) {
-                    builderSingle.setTitle(titles[currentChapter].asString(this)) //  "Select Chapter"
+                    builderSingle.setTitle(titles[currentChapter!!].asString(this)) //  "Select Chapter"
                 } else {
                     builderSingle.setTitle(R.string.select_chapter)
                 }
@@ -886,7 +884,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
                 dialog.listView.choiceMode = AbsListView.CHOICE_MODE_SINGLE
                 if (validChapter) {
-                    dialog.listView.setSelection(currentChapter)
+                    dialog.listView.setSelection(currentChapter!!)
                     dialog.listView.setItemChecked(currentChapter, true)
                 }
             }

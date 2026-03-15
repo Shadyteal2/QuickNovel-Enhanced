@@ -65,7 +65,7 @@ class InAppUpdater {
 
         private suspend fun Activity.getAppUpdate(): Update {
             try {
-                val url = "https://api.github.com/repos/LagradOst/QuickNovel/releases/latest"
+                val url = "https://api.github.com/repos/Shadyteal2/QuickNovel-Enhanced/releases/latest"
                 val headers = mapOf("Accept" to "application/vnd.github.v3+json")
                 val response =
                     mapper.readValue<GithubRelease>(app.get(url, headers = headers).text)
@@ -88,7 +88,9 @@ class InAppUpdater {
 //                                )?.groupValues?.get(2)
 //                            }
 //                    }).toList().lastOrNull()
-                val foundAsset = response.assets.getOrNull(0)
+                val foundAsset = response.assets.find { it.content_type == "application/vnd.android.package-archive" }
+                    ?: response.assets.find { it.name.endsWith(".apk") }
+                    ?: response.assets.getOrNull(0)
                 val currentVersion = packageName?.let {
                     packageManager.getPackageInfo(
                         it,

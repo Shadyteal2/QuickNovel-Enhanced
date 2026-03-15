@@ -7,7 +7,7 @@
             android:title="@string/title_download"/>
     <item
             android:id="@+id/navigation_search"
-            android:icon="@drawable/search_icon"
+            android:icon="@drawable/ic_baseline_search_24"
             android:title="@string/title_search"/>
     <item
             android:id="@+id/navigation_history"
@@ -15,6 +15,6 @@
             android:title="@string/title_history"/>
     <item
             android:id="@+id/navigation_settings"
-            android:icon="@drawable/ic_outline_settings_24"
+            android:icon="@drawable/ic_baseline_settings_24"
             android:title="@string/title_settings"/>
 </menu>

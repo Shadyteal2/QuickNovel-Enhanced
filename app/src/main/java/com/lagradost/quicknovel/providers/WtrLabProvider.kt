@@ -96,14 +96,14 @@ class WtrLabProvider : MainAPI() {
             synopsis = doc.selectFirst(".desc-wrap")?.text()
             posterUrl = fixUrlNull(doc.selectFirst(".image-wrap > img")?.attr("src"))
             val details = doc.select("div.detail-buttons div")
-            details.map{div ->
+            details.forEach { div ->
                 if(div.text().contains("Views")){
                     val text = div.ownText().split(" ")
                     this.views = text.getOrNull(2)?.trim()?.toIntOrNull()
                     setStatus(text.getOrNull(0)?.trim())
                 }
             }
-            val ratingElement = details.selectFirst("div.rating")
+            val ratingElement = doc.selectFirst("div.detail-buttons div.rating")
             val ratingText = ratingElement?.text()
 
             peopleVoted = ratingText?.let { text ->

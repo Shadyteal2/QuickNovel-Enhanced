@@ -11,36 +11,38 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.core.view.doOnNextLayout
 import androidx.core.view.isVisible
 import androidx.core.view.postDelayed
 import androidx.core.widget.NestedScrollView
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
+<<<<<<< HEAD
 import androidx.recyclerview.widget.GridLayoutManager
+=======
+import androidx.recyclerview.widget.RecyclerView
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipDrawable
 import com.google.android.material.tabs.TabLayout
+<<<<<<< HEAD
+=======
+import com.google.android.material.tabs.TabLayoutMediator
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 import com.lagradost.quicknovel.CommonActivity
 import com.lagradost.quicknovel.DownloadState
 import com.lagradost.quicknovel.LoadResponse
 import com.lagradost.quicknovel.MainActivity.Companion.navigate
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.StreamResponse
-import com.lagradost.quicknovel.databinding.ChapterDialogBinding
-import com.lagradost.quicknovel.databinding.ChapterFilterPopupBinding
-import com.lagradost.quicknovel.databinding.FragmentResultBinding
+import com.lagradost.quicknovel.databinding.*
 import com.lagradost.quicknovel.mvvm.Resource
-import com.lagradost.quicknovel.mvvm.debugException
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
 import com.lagradost.quicknovel.ui.BaseFragment
 import com.lagradost.quicknovel.ui.ReadType
-import com.lagradost.quicknovel.ui.SortingMethodAdapter
 import com.lagradost.quicknovel.ui.mainpage.MainAdapter
 import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
-import com.lagradost.quicknovel.ui.setRecycledViewPool
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showBottomDialog
 import com.lagradost.quicknovel.util.UIHelper
@@ -61,17 +63,21 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
 ) {
     private val viewModel: ResultViewModel by viewModels()
 
+    private var novelTabBinding: ResultNovelTabBinding? = null
+    private var chaptersTabBinding: ResultChaptersTabBinding? = null
+
+    private var chapterAdapter: ChapterAdapter? = null
+
     companion object {
         fun newInstance(url: String, apiName: String, startAction: Int = 0): Bundle =
             Bundle().apply {
-                //println(data)
                 putString("url", url)
                 putString("apiName", apiName)
                 putInt("startAction", startAction)
             }
-
     }
 
+<<<<<<< HEAD
     override fun fixLayout(view: View) {
         val compactView = false //activity?.getGridIsCompact() ?: return
         val spanCountLandscape = if (compactView) 2 else 6
@@ -83,6 +89,26 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
             binding?.relatedList?.spanCount = spanCountPortrait
         }
         binding?.resultHolder?.post { // BUG FIX
+=======
+    val repo get() = viewModel.repo
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        binding = FragmentResultBinding.inflate(inflater)
+        return binding.root
+    }
+
+    private fun setupGridView() {
+        // Only for recommendations which are removed now, keeping it empty for potential future use or removing if fully unused
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        binding.resultHolder.post {
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
             updateScrollHeight()
         }
     }
@@ -95,9 +121,14 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
     @SuppressLint("NotifyDataSetChanged")
     override fun onResume() {
         super.onResume()
+<<<<<<< HEAD
         //only if really is onResume
         if (viewModel.isResume) {
             (binding?.chapterList?.adapter as? ChapterAdapter)?.notifyDataSetChanged()
+=======
+        if(viewModel.isResume){
+            chapterAdapter?.notifyDataSetChanged()
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
             viewModel.isResume = false
         }
 
@@ -117,6 +148,7 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
 
 
     private fun updateScrollHeight() {
+<<<<<<< HEAD
         val binding = binding ?: return
         val displayMetrics = context?.resources?.displayMetrics ?: return
         val total = displayMetrics.heightPixels - binding.resultDownloadCard.height
@@ -130,28 +162,114 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
             )
         }
         val parameter = binding.chapterList.layoutParams
+=======
+        val displayMetrics = resources.displayMetrics
+        val parameter = binding.resultViewpager.layoutParams
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
         parameter.height =
             displayMetrics.heightPixels - binding.viewsAndRating.height - binding.resultTabs.height - binding.resultScrollPadding.paddingTop
 
-        binding.chapterList.layoutParams = parameter
-        //ViewGroup.LayoutParams(binding.chapterList.layoutParams.width,displayMetrics.heightPixels)
-        /*binding.hiddenView.apply {
-            setPadding(
-                paddingLeft,
-                paddingTop,
-                paddingRight,
-                maxOf(0, total)
-            )
-        }*/
+        binding.resultViewpager.layoutParams = parameter
     }
 
+    private fun updateTabData() {
+        val loadResponse = viewModel.loadResponse.value
+        if (loadResponse !is Resource.Success) return
+        val res = loadResponse.value
+
+        novelTabBinding?.apply {
+            downloadWarning.isVisible = (repo?.rateLimitTime ?: 0) > 2000
+
+            resultRatingVotedCount.text = getString(R.string.no_data)
+            res.rating?.let { rating ->
+                resultRating.text = context?.getRating(rating)
+                val votes = res.peopleVoted
+                if (votes != null) {
+                    resultRatingVotedCount.text = getString(R.string.votes_format).format(votes)
+                }
+            }
+            resultViews.text = res.views?.let { views -> humanReadableByteCountSI(views) }
+                ?: getString(R.string.no_data)
+
+            resultTag.removeAllViews()
+            res.tags?.forEach { tag ->
+                val chip = Chip(requireContext())
+                val chipDrawable = ChipDrawable.createFromAttributes(requireContext(), null, 0, R.style.ChipFilled)
+                chip.setChipDrawable(chipDrawable)
+                chip.text = tag
+                chip.isClickable = false
+                
+                val tagIndex = repo?.tags?.indexOfFirst { it.first == tag }?.takeIf { it != -1 }
+                if (tagIndex != null) {
+                    chip.isClickable = true
+                    chip.setOnClickListener {
+                        val currentApi = repo ?: return@setOnClickListener
+                        activity?.navigate(
+                            R.id.global_to_navigation_mainpage,
+                            MainPageFragment.newInstance(currentApi.name, tag = tagIndex)
+                        )
+                    }
+                }
+                chip.setTextColor(requireContext().colorFromAttribute(R.attr.textColor))
+                resultTag.addView(chip)
+            }
+
+            res.synopsis?.let { synopsis ->
+                val syno = if (synopsis.length > MAX_SYNO_LENGH) {
+                    synopsis.substring(0, MAX_SYNO_LENGH) + "..."
+                } else {
+                    synopsis
+                }
+                resultSynopsisText.text = syno.html()
+            } ?: run {
+                resultSynopsisText.text = "..."
+            }
+
+            if (res is StreamResponse) {
+                resultChaptersInfoHolder.isVisible = true
+                resultChapters.text = res.data.size.toString()
+                resultChaptersInfo.text = if (res.data.size == 1) getString(R.string.chapter) else getString(R.string.chapters)
+                resultQuickstream.isVisible = true
+            } else {
+                resultChaptersInfoHolder.isVisible = false
+                resultQuickstream.isVisible = false
+            }
+
+            val currentNote = resultNotesEdittext.text.toString()
+            val savedNote = viewModel.getNote() ?: ""
+            if (currentNote != savedNote) {
+                resultNotesEdittext.setText(savedNote)
+            }
+            
+            val isDropped = viewModel.readState.value == ReadType.DROPPED
+            resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
+            resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else requireContext().colorFromAttribute(R.attr.colorPrimary)
+            resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else requireContext().colorFromAttribute(R.attr.colorPrimary)))
+
+            // Use a tag to avoid adding multiple listeners to the same view
+            if (resultNotesEdittext.tag == null) {
+                resultNotesEdittext.tag = true
+                resultNotesEdittext.doOnTextChanged { text: CharSequence?, _, _, _ ->
+                    viewModel.updateNote(text?.toString())
+                }
+            }
+        }
+        
+        // Populate chapter count in its tab if available
+        chaptersTabBinding?.apply {
+           // If we need extra population logic here
+        }
+    }
 
 
     private fun newState(loadResponse: Resource<LoadResponse>?) {
         if (loadResponse == null) return
+<<<<<<< HEAD
         val binding = binding ?: return
         //activity?.window?.navigationBarColor =
         //    requireContext().colorFromAttribute(R.attr.bitDarkerGrayBackground)
+=======
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
         when (loadResponse) {
             is Resource.Failure -> {
@@ -177,8 +295,6 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                 val res = loadResponse.value
 
                 binding.apply {
-                    downloadWarning.isVisible = (repo?.rateLimitTime ?: 0) > 2000
-
                     res.image?.let { img ->
                         resultEmptyView.setOnClickListener {
                             UIHelper.showImage(it.context, img)
@@ -190,6 +306,7 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
 
                     resultTitle.text = res.name
                     resultAuthor.text = res.author ?: getString(R.string.no_author)
+<<<<<<< HEAD
 
                     resultRatingVotedCount.text = getString(R.string.no_data)
                     res.rating?.let { rating ->
@@ -248,91 +365,31 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
 
                     //viewsAndRating.isVisible = res.views != null || res.peopleVoted != null
 
+=======
+                    
+                    resultStickyTitle.text = res.name
+                    resultStickyAuthor.text = res.author ?: getString(R.string.no_author)
+                    
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
                     val readStatusText = res.status?.resource?.let { getString(it) } ?: ""
                     resultStatus.text = readStatusText
                     resultStatus.isVisible = readStatusText.isNotBlank()
-
-                    resultTag.removeAllViews()
-                    if (res.tags == null && res.status == null) {
-                        // resultTagHolder.isVisible = false
-                    } else {
-                        // resultTagHolder.isGone = res.tags.isNullOrEmpty()
-                        resultTag.apply {
-
-                            val map =
-                                api?.tags?.mapIndexed { i, (value, _) -> value to i }
-                                    ?.associate { it } ?: emptyMap()
-
-                            res.tags?.forEach { tag ->
-                                val chip = Chip(context)
-                                val chipDrawable = ChipDrawable.createFromAttributes(
-                                    context,
-                                    null,
-                                    0,
-                                    R.style.ChipFilled
-                                )
-                                chip.setChipDrawable(chipDrawable)
-                                chip.text = tag
-                                chip.isChecked = false
-                                chip.isCheckable = false
-                                chip.isFocusable = false
-                                chip.isClickable = false
-
-                                map[tag]?.let { index ->
-                                    chip.isClickable = true
-                                    chip.setOnClickListener {
-                                        val api = repo
-                                        if (api != null)
-                                            activity?.navigate(
-                                                R.id.global_to_navigation_mainpage,
-                                                MainPageFragment.newInstance(
-                                                    api.name,
-                                                    tag = index
-                                                )
-                                            )
-                                    }
-                                }
-
-                                chip.setTextColor(context.colorFromAttribute(R.attr.textColor))
-                                addView(chip)
-                            }
-                        }
-                    }
-                    res.synopsis?.let { synopsis ->
-                        val syno = if (synopsis.length > MAX_SYNO_LENGH) {
-                            synopsis.substring(0, MAX_SYNO_LENGH) + "..."
-                        } else {
-                            synopsis
-                        }
-
-                        var isExpanded = false
-                        resultSynopsisText.setOnClickListener {
-                            isExpanded = !isExpanded
-                            resultSynopsisText.text =
-                                if (isExpanded) res.synopsis.html() else syno.html()
-                        }
-                        resultSynopsisText.text = syno.html()
-                    } ?: run {
-                        resultSynopsisText.text = "..."
-                    }
-
+                    
                     if (res is StreamResponse) {
-                        resultChaptersInfoHolder.isVisible = true
-                        resultChapters.text = res.data.size.toString()
-                        resultChaptersInfo.text =
-                            if (res.data.size == 1) getString(R.string.chapter) else getString(R.string.chapters)
-                        resultQuickstream.isVisible = true
+                        resultTotalChapters.text = res.data.size.toString()
                         resultTotalChapters.isVisible = true
-                        if (res.data.isNotEmpty()) {
-                            resultTotalChapters.text =
-                                getString(R.string.latest_format).format(res.data.last().name)
-                        } else {
-                            resultTotalChapters.text = getString(R.string.no_chapters)
-                        }
                     } else {
-                        resultChaptersInfoHolder.isVisible = false
                         resultTotalChapters.isVisible = false
-                        resultQuickstream.isVisible = false
+                    }
+
+                    resultBack.setColorFilter(Color.WHITE)
+                    
+                    updateTabData()
+
+                    val target = viewModel.currentTabIndex.value
+                    if (target != null) {
+                        resultTabs.getTabAt(target)?.select()
+                        resultViewpager.setCurrentItem(target, false)
                     }
                     val currentNote = resultNotesEdittext.text?.toString()
                     val savedNote = viewModel.getNote() ?: ""
@@ -345,6 +402,7 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                     resultLoadingError.isVisible = false
                     resultHolder.isVisible = true
                     resultPosterBlur.isVisible = true
+<<<<<<< HEAD
                     resultHolder.doOnNextLayout {
                         updateScrollHeight()
                     }
@@ -357,6 +415,9 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                             }
                         }
                     }
+=======
+                    resultHolder.post { updateScrollHeight() }
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
                 }
             }
         }
@@ -364,137 +425,91 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
 
     private fun doAction(action: Int) {
         when (action) {
-            R.string.resume -> {
-                viewModel.download()
-            }
-
-            R.string.download -> {
-                viewModel.downloadFrom(null)
-            }
-
-            R.string.re_downloaded -> {
-                viewModel.download()
-            }
-
+            R.string.resume -> viewModel.download()
+            R.string.download -> viewModel.downloadFrom(null)
+            R.string.re_downloaded -> viewModel.download()
             R.string.download_from_chapter -> {
-                val chapters =
-                    ((viewModel.loadResponse.value as? Resource.Success)?.value as? StreamResponse)?.data
-                        ?: return
-
+                val chapters = ((viewModel.loadResponse.value as? Resource.Success)?.value as? StreamResponse)?.data ?: return
                 val act = CommonActivity.activity ?: return
-
-                val builder: AlertDialog.Builder =
-                    AlertDialog.Builder(act, R.style.AlertDialogCustom)
-
-                val binding = ChapterDialogBinding.inflate(layoutInflater, null, false)
-                val dialogClickListener =
-                    DialogInterface.OnClickListener { _, which ->
-                        when (which) {
-                            DialogInterface.BUTTON_POSITIVE -> {
-                                viewModel.downloadFrom(
-                                    binding.chapterEdit.text?.toString()?.toIntOrNull()
-                                )
-                            }
-
-                            DialogInterface.BUTTON_NEGATIVE -> {
-                            }
-                        }
+                val builder: AlertDialog.Builder = AlertDialog.Builder(act, R.style.AlertDialogCustom)
+                val diagBinding = ChapterDialogBinding.inflate(layoutInflater, null, false)
+                val dialogClickListener = DialogInterface.OnClickListener { _, which ->
+                    if (which == DialogInterface.BUTTON_POSITIVE) {
+                        viewModel.downloadFrom(diagBinding.chapterEdit.text?.toString()?.toIntOrNull())
                     }
-
-                builder.setView(binding.root)
+                }
+                builder.setView(diagBinding.root)
                     .setTitle(R.string.download_from_chapter)
                     .setPositiveButton(R.string.download, dialogClickListener)
                     .setNegativeButton(R.string.cancel, dialogClickListener)
                     .show()
-
-                binding.chapterEdit.doOnTextChanged { text, _, _, _ ->
+                diagBinding.chapterEdit.doOnTextChanged { text, _, _, _ ->
                     val parsedInt = text?.toString()?.toIntOrNull()
                     if (parsedInt == null || parsedInt < 0 || parsedInt >= chapters.size) {
-                        binding.chapterEdit.error = act.getString(R.string.error_outside_chapter)
+                        diagBinding.chapterEdit.error = act.getString(R.string.error_outside_chapter)
                     } else {
-                        binding.chapterEdit.error = null
+                        diagBinding.chapterEdit.error = null
                     }
                 }
             }
-
-            R.string.delete -> {
-                viewModel.deleteAlert()
-            }
-
-            R.string.pause -> {
-                viewModel.pause()
-            }
-
-            R.string.stop -> {
-                viewModel.stop()
-            }
+            R.string.delete -> viewModel.deleteAlert()
+            R.string.pause -> viewModel.pause()
+            R.string.stop -> viewModel.stop()
         }
     }
 
     private fun getActions(): List<Int>? {
         val items = mutableListOf<Int>()
-        val progressState =
-            viewModel.downloadState.value ?: return null
-        val canDownload =
-            progressState.progress < progressState.total
-        val canPartialDownload =
-            progressState.downloaded < progressState.total && progressState.total > 1
+        val progressState = viewModel.downloadState.value ?: return null
+        val canDownload = progressState.progress < progressState.total
+        val canPartialDownload = progressState.downloaded < progressState.total && progressState.total > 1
 
         when (progressState.state) {
             DownloadState.IsPaused -> {
                 items.add(R.string.resume)
                 items.add(R.string.stop)
             }
-
             DownloadState.IsDownloading -> {
                 items.add(R.string.pause)
                 items.add(R.string.stop)
             }
-
             DownloadState.IsDone -> {
                 if (canPartialDownload) {
                     items.add(R.string.download_from_chapter)
                 }
             }
-
-            DownloadState.IsPending -> {
-            }
-
+            DownloadState.IsPending -> {}
             DownloadState.IsFailed, DownloadState.IsStopped -> {
-                if (canDownload) {
-                    items.add(R.string.re_downloaded)
-                }
-
-                if (canPartialDownload) {
-                    items.add(R.string.download_from_chapter)
-                }
+                if (canDownload) items.add(R.string.re_downloaded)
+                if (canPartialDownload) items.add(R.string.download_from_chapter)
             }
-
             DownloadState.Nothing -> {
-                if (canDownload) {
-                    items.add(R.string.download)
-                }
-
-                if (canPartialDownload) {
-                    items.add(R.string.download_from_chapter)
-                }
+                if (canDownload) items.add(R.string.download)
+                if (canPartialDownload) items.add(R.string.download_from_chapter)
             }
         }
-
-        if (progressState.progress > 0) {
-            items.add(R.string.delete)
-        }
+        if (progressState.progress > 0) items.add(R.string.delete)
         return items
     }
 
+<<<<<<< HEAD
     override fun onBindingCreated(binding: FragmentResultBinding, savedInstanceState: Bundle?) {
         val url = savedInstanceState?.getString("url") ?: arguments?.getString("url")
         ?: throw NotImplementedError()
         val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName")
         ?: throw NotImplementedError()
+=======
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        val url = savedInstanceState?.getString("url") ?: arguments?.getString("url") ?: throw NotImplementedError()
+        val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
         activity?.window?.decorView?.clearFocus()
-        hideKeyboard()
+        binding.resultTitle.isSelected = true
+
+        binding.resultSourceNotice.isVisible = apiName.contains("NovelFull", ignoreCase = true)
 
         if (viewModel.loadResponse.value == null)
             viewModel.initState(apiName, url)
@@ -502,6 +517,7 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
         binding.apply {
             activity?.fixPaddingStatusbar(resultInfoHeader)
 
+<<<<<<< HEAD
             resultNotesEdittext.doOnTextChanged { text: CharSequence?, _, _, _ ->
                 viewModel.updateNote(text?.toString())
             }
@@ -525,6 +541,11 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                 resultReviews.smoothScrollToPosition(0) // NEEDS THIS TO RESET VELOCITY
                 resultMainscroll.smoothScrollTo(0, 0)
             }
+=======
+            resultReloadConnectionerror.setOnClickListener { viewModel.initState(apiName, url) }
+            resultOpeninbrower.setOnClickListener { viewModel.openInBrowser() }
+            resultReloadConnectionOpenInBrowser.setOnClickListener { viewModel.openInBrowser() }
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
             val backParameter = resultBack.layoutParams as CoordinatorLayout.LayoutParams
             backParameter.setMargins(
@@ -534,12 +555,9 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                 backParameter.bottomMargin
             )
             resultBack.layoutParams = backParameter
+            resultBack.setOnClickListener { activity?.onBackPressedDispatcher?.onBackPressed() }
 
-            resultBack.setOnClickListener {
-                activity?.onBackPressedDispatcher?.onBackPressed()
-                //activity?.onBackPressed()
-                //    (activity as? AppCompatActivity)?.backPressed()
-            }
+            activity?.fixPaddingStatusbar(resultStickyHeader)
 
             val parameter = resultEmptyView.layoutParams as LinearLayout.LayoutParams
             parameter.setMargins(
@@ -550,10 +568,9 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
             )
             resultEmptyView.layoutParams = parameter
 
-            resultShare.setOnClickListener {
-                viewModel.share()
-            }
+            resultShare.setOnClickListener { viewModel.share() }
 
+<<<<<<< HEAD
             val reviewAdapter = ReviewAdapter()
             resultReviews.setRecycledViewPool(ReviewAdapter.sharedPool)
             resultReviews.adapter = reviewAdapter
@@ -577,18 +594,125 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
 
                     is Resource.Failure -> {
                         debugException { "This should never happened" }
+=======
+            // Using indices 0 (Novel) and 3 (Chapters) for tabIds to maintain existing mapping but filter to only two tabs
+            resultViewpager.adapter = ResultFragmentAdapter(
+                tabIds = listOf(0, 3),
+                bindingGetter = { tabView, tabId ->
+                    when (tabId) {
+                        0 -> {
+                            novelTabBinding = ResultNovelTabBinding.bind(tabView)
+                            novelTabBinding?.apply {
+                                resultSynopsisText.setOnClickListener {
+                                    val res = (viewModel.loadResponse.value as? Resource.Success)?.value ?: return@setOnClickListener
+                                    val syno = if (res.synopsis?.length ?: 0 > MAX_SYNO_LENGH) {
+                                        res.synopsis?.substring(0, MAX_SYNO_LENGH) + "..."
+                                    } else {
+                                        res.synopsis
+                                    }
+                                    val isExpanded = resultSynopsisText.text.length > (syno?.length ?: 0)
+                                    resultSynopsisText.text = if (!isExpanded) res.synopsis?.html() else syno?.html()
+                                }
+                                resultDownloadGenerateEpub.setOnClickListener { viewModel.readEpub() }
+                                resultDownloadBtt.setOnClickListener { v ->
+                                    val actions = getActions()
+                                    if (actions == null) {
+                                        viewModel.downloadOrPause()
+                                    } else if (actions.size == 1) {
+                                        doAction(actions[0])
+                                    } else if (actions.contains(R.string.download) || actions.contains(R.string.pause)) {
+                                        viewModel.downloadOrPause()
+                                    } else {
+                                        v.popupMenu(actions.map { it to it }, null) { doAction(itemId) }
+                                    }
+                                }
+                                resultDownloadBtt.setOnLongClickListener { v ->
+                                    val items = getActions() ?: return@setOnLongClickListener true
+                                    v.popupMenu(items.map { it to it }, null) { doAction(itemId) }
+                                    true
+                                }
+                                resultQuickstream.setOnClickListener { viewModel.streamRead() }
+                            }
+                            updateTabData()
+                        }
+                        3 -> {
+                            chaptersTabBinding = ResultChaptersTabBinding.bind(tabView)
+                            chaptersTabBinding?.apply {
+                                val adapter = ChapterAdapter(viewModel)
+                                chapterAdapter = adapter
+                                chapterList.adapter = adapter
+                                
+                                viewModel.chapters.value?.let { chapters ->
+                                    if (chapters.size > 300) {
+                                        adapter.submitIncomparableList(chapters)
+                                    } else {
+                                        adapter.submitList(chapters)
+                                    }
+                                }
+                                chaptersFab.setOnClickListener {
+                                    val act = activity ?: return@setOnClickListener
+                                    val bottomSheetDialog = BottomSheetDialog(act)
+                                    val filterBinding = ChapterFilterPopupBinding.inflate(act.layoutInflater, null, false)
+                                    bottomSheetDialog.setContentView(filterBinding.root)
+                                    
+                                    val filterTab = filterBinding.filterTabs.newTab().setText(getString(R.string.mainpage_filter))
+                                    val sortTab = filterBinding.filterTabs.newTab().setText(getString(R.string.mainpage_sort_by_button_text))
+                                    filterBinding.filterTabs.addTab(filterTab)
+                                    filterBinding.filterTabs.addTab(sortTab)
+                                    filterBinding.filterTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+                                        override fun onTabSelected(tab: TabLayout.Tab?) {
+                                            filterBinding.filterContent.isVisible = tab?.position == 0
+                                            filterBinding.sortContent.isVisible = tab?.position == 1
+                                        }
+                                        override fun onTabUnselected(tab: TabLayout.Tab?) = Unit
+                                        override fun onTabReselected(tab: TabLayout.Tab?) = Unit
+                                    })
+                                    
+                                    filterBinding.filterBookmarked.isChecked = ResultViewModel.filterChapterByBookmarked
+                                    filterBinding.filterRead.isChecked = ResultViewModel.filterChapterByRead
+                                    filterBinding.filterUnread.isChecked = ResultViewModel.filterChapterByUnread
+                                    filterBinding.filterDownloaded.isChecked = ResultViewModel.filterChapterByDownloads
+                                    
+                                    filterBinding.filterBookmarked.setOnCheckedChangeListener { _, isChecked ->
+                                        ResultViewModel.filterChapterByBookmarked = isChecked
+                                        viewModel.reorderChapters()
+                                    }
+                                    filterBinding.filterRead.setOnCheckedChangeListener { _, isChecked ->
+                                        ResultViewModel.filterChapterByRead = isChecked
+                                        viewModel.reorderChapters()
+                                    }
+                                    filterBinding.filterUnread.setOnCheckedChangeListener { _, isChecked ->
+                                        ResultViewModel.filterChapterByUnread = isChecked
+                                        viewModel.reorderChapters()
+                                    }
+                                    filterBinding.filterDownloaded.setOnCheckedChangeListener { _, isChecked ->
+                                        ResultViewModel.filterChapterByDownloads = isChecked
+                                        viewModel.reorderChapters()
+                                    }
+                                    bottomSheetDialog.show()
+                                }
+                            }
+                            updateTabData()
+                        }
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
                     }
                 }
-            }
+            )
 
-            resultTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-                override fun onTabSelected(tab: TabLayout.Tab?) {
-                    viewModel.switchTab(tab?.id, resultTabs.selectedTabPosition)
+            TabLayoutMediator(resultTabs, resultViewpager) { tab, position ->
+                tab.text = when (position) {
+                    0 -> getString(R.string.novel)
+                    1 -> getString(R.string.read_action_chapters)
+                    else -> ""
                 }
+            }.attach()
 
-                override fun onTabUnselected(tab: TabLayout.Tab?) {}
-
-                override fun onTabReselected(tab: TabLayout.Tab?) {}
+            resultViewpager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+                override fun onPageSelected(position: Int) {
+                    // Map positions: 0 -> 0 (Novel), 1 -> 3 (Chapters)
+                    val tabId = if (position == 0) 0 else 3
+                    viewModel.switchTab(position, tabId)
+                }
             })
 
             resultBookmark.setOnClickListener { view ->
@@ -602,55 +726,12 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                     viewModel.bookmark(ReadType.entries[selected].prefValue)
                 }
             }
-
-            resultDownloadGenerateEpub.setOnClickListener {
-                viewModel.readEpub()
-            }
-
-            resultDownloadBtt.setOnLongClickListener { v ->
-                val items = getActions() ?: return@setOnLongClickListener true
-                v.popupMenu(items.map { it to it }, null) {
-                    doAction(itemId)
-                }
-                return@setOnLongClickListener true
-            }
-
-            resultDownloadBtt.setOnClickListener { v ->
-                val actions = getActions()
-                if (actions == null) {
-                    viewModel.downloadOrPause()
-                    return@setOnClickListener
-                }
-                if (actions.size == 1) {
-                    doAction(actions[0])
-                } else if (actions.contains(R.string.download) || actions.contains(R.string.pause)) {
-                    viewModel.downloadOrPause()
-                } else {
-                    v.popupMenu(actions.map { it to it }, null) {
-                        doAction(itemId)
-                    }
-                }
-            }
-
-            resultQuickstream.setOnClickListener {
-                viewModel.streamRead()
-            }
-
-            /*downloadDeleteTrashFromResult.setOnClickListener {
-                viewModel.deleteAlert()
-            }*/
         }
 
+        observe(viewModel.loadResponse) { newState(it) }
+
         observe(viewModel.currentTabIndex) { pos ->
-            binding.apply {
-                resultNovelHolder.isVisible = 0 == pos
-                // hiddenView.isGone = 0 == pos
-                resultReviewsholder.isVisible = 1 == pos
-                reviewsFab.isVisible = 1 == pos
-                chaptersFab.isVisible = 3 == pos
-                resultRelatedholder.isVisible = 2 == pos
-                resultChapterholder.isVisible = 3 == pos
-            }
+            binding.resultViewpager.setCurrentItem(pos, true)
         }
 
         observe(viewModel.currentTabPosition) { pos ->
@@ -660,14 +741,13 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
         }
 
         observe(viewModel.readState) { state ->
-            binding.resultBookmark.setText(if (state == ReadType.NONE) R.string.bookmark else state.stringRes)
+            val stringRes = if (state == ReadType.NONE) R.string.bookmark else state.stringRes
+            binding.resultBookmark.text = getString(stringRes)
             binding.resultBookmark.setCompoundDrawablesWithIntrinsicBounds(
-                0,
-                0,
-                0,
+                0, 0, 0,
                 if (state == ReadType.NONE) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
-                //if (it == ReadType.NONE) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
+<<<<<<< HEAD
 
             // Update notes UI when read status changes
             binding.apply {
@@ -680,195 +760,115 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
             }
         }
         observe(viewModel.loadResponse, ::newState)
+=======
+>>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
-        binding.chapterList.apply {
-            setRecycledViewPool(ChapterAdapter.sharedPool)
-            val mainPageAdapter = ChapterAdapter(viewModel)
-            adapter = mainPageAdapter
-            setHasFixedSize(true)
+            // Update notes UI when read status changes
+            novelTabBinding?.apply {
+                val isDropped = state == ReadType.DROPPED
+                resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
+                val primaryColor = requireContext().colorFromAttribute(R.attr.colorPrimary)
+                resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else primaryColor
+                resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else primaryColor))
+            }
         }
 
         observeNullable(viewModel.chapters) { chapters ->
-            (binding.chapterList.adapter as? ChapterAdapter)?.let { adapter ->
+            chapterAdapter?.let { adapter ->
                 if (chapters == null || chapters.size > 300) {
-                    // if we have too many it takes a long time to diff
                     adapter.submitIncomparableList(chapters)
                 } else {
                     adapter.submitList(chapters)
                 }
             }
-        }
 
-        binding.chaptersFab.setOnClickListener { _ ->
-            val act = activity ?: return@setOnClickListener
-            val bottomSheetDialog = BottomSheetDialog(act)
-            val binding = ChapterFilterPopupBinding.inflate(act.layoutInflater, null, false)
-            bottomSheetDialog.setContentView(binding.root)
-
-            val filterTab = binding.filterTabs.newTab().setText(getString(R.string.mainpage_filter))
-            val sortTab = binding.filterTabs.newTab()
-                .setText(getString(R.string.mainpage_sort_by_button_text))
-            binding.filterTabs.addTab(filterTab)
-            binding.filterTabs.addTab(sortTab)
-            binding.filterTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-                override fun onTabSelected(tab: TabLayout.Tab?) {
-                    val position = tab?.position
-                    binding.filterContent.isVisible = position == 0
-                    binding.sortContent.isVisible = position == 1
+            val streamResponse = (viewModel.loadResponse.value as? Resource.Success)?.value as? StreamResponse
+            if (streamResponse != null && !chapters.isNullOrEmpty()) {
+                val total = chapters.size
+                val readCount = chapters.count { viewModel.hasReadChapter(it) }
+                novelTabBinding?.apply {
+                    if (readCount > 0) {
+                        resultProgressLayout.isVisible = true
+                        val progress = (readCount * 100) / total
+                        resultProgressBar.progress = progress
+                        resultProgressText.text = getString(R.string.latest_format).format("$progress% Read ($readCount/$total)")
+                    } else {
+                        resultProgressLayout.isVisible = false
+                    }
                 }
-
-                override fun onTabUnselected(tab: TabLayout.Tab?) = Unit
-                override fun onTabReselected(tab: TabLayout.Tab?) = Unit
-            })
-            binding.filterTabs.selectTab(filterTab)
-
-            binding.filterBookmarked.isChecked = ResultViewModel.filterChapterByBookmarked
-            binding.filterRead.isChecked = ResultViewModel.filterChapterByRead
-            binding.filterUnread.isChecked = ResultViewModel.filterChapterByUnread
-            binding.filterDownloaded.isChecked = ResultViewModel.filterChapterByDownloads
-
-            binding.filterBookmarked.setOnCheckedChangeListener { _, isChecked ->
-                ResultViewModel.filterChapterByBookmarked = isChecked
-                viewModel.reorderChapters()
             }
-
-            binding.filterRead.setOnCheckedChangeListener { _, isChecked ->
-                ResultViewModel.filterChapterByRead = isChecked
-                viewModel.reorderChapters()
-            }
-
-            binding.filterUnread.setOnCheckedChangeListener { _, isChecked ->
-                ResultViewModel.filterChapterByUnread = isChecked
-                viewModel.reorderChapters()
-            }
-
-            binding.filterDownloaded.setOnCheckedChangeListener { _, isChecked ->
-                ResultViewModel.filterChapterByDownloads = isChecked
-                viewModel.reorderChapters()
-            }
-
-            val adapter =
-                SortingMethodAdapter(ResultViewModel.sortChapterBy) { item, position, newId ->
-                    binding.sortContent.adapter?.notifyItemRangeChanged(
-                        0,
-                        ResultViewModel.chapterSortingMethods.size
-                    )
-                    ResultViewModel.sortChapterBy = newId
-                    viewModel.reorderChapters()
-                }
-            adapter.submitList(ResultViewModel.chapterSortingMethods.toList())
-            binding.sortContent.adapter = adapter
-            bottomSheetDialog.show()
         }
 
         observe(viewModel.downloadState) { progressState ->
-            if (progressState == null) {
-                //binding.downloadDeleteTrashFromResult.isVisible = false
-                return@observe
-            }
-            //val hasDownload = progressState.progress > 0
+            if (progressState == null) return@observe
+            
+            novelTabBinding?.apply {
+                resultDownloadProgressText.text = "${progressState.progress}/${progressState.total}"
 
-            /*binding.downloadDeleteTrashFromResult.apply {
-                isVisible = hasDownload
-                isClickable = hasDownload
-            }*/
-            binding.resultDownloadProgressText.text =
-                "${progressState.progress}/${progressState.total}"
+                resultDownloadProgressBarNotDownloaded.apply {
+                    max = progressState.total.toInt() * 100
+                    val animation: ObjectAnimator = ObjectAnimator.ofInt(
+                        this, "progress", this.progress,
+                        (progressState.progress - progressState.downloaded).toInt() * 100
+                    )
+                    animation.duration = 500
+                    animation.setAutoCancel(true)
+                    animation.interpolator = DecelerateInterpolator()
+                    animation.start()
+                }
 
-            binding.resultDownloadProgressBarNotDownloaded.apply {
-                println("progressState: ${progressState}")
-                max = progressState.total.toInt() * 100
-                val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                    this,
-                    "progress",
-                    this.progress,
-                    (progressState.progress - progressState.downloaded).toInt() * 100
-                )
-                animation.duration = 500
-                animation.setAutoCancel(true)
-                animation.interpolator = DecelerateInterpolator()
-                animation.start()
-            }
+                resultDownloadProgressBar.apply {
+                    max = progressState.total.toInt() * 100
+                    val animation: ObjectAnimator = ObjectAnimator.ofInt(
+                        this, "progress", this.progress,
+                        progressState.progress.toInt() * 100
+                    )
+                    animation.duration = 500
+                    animation.setAutoCancel(true)
+                    animation.interpolator = DecelerateInterpolator()
+                    animation.start()
+                }
 
-            binding.resultDownloadProgressBar.apply {
-                max = progressState.total.toInt() * 100
+                val ePubGeneration = progressState.progress > 0
+                resultDownloadGenerateEpub.apply {
+                    isClickable = ePubGeneration
+                    alpha = if (ePubGeneration) 1f else 0.5f
+                }
 
-                val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                    this,
-                    "progress",
-                    this.progress,
-                    progressState.progress.toInt() * 100
-                )
-                animation.duration = 500
-                animation.setAutoCancel(true)
-                animation.interpolator = DecelerateInterpolator()
-                animation.start()
-            }
+                val canDownload = progressState.progress < progressState.total
+                val canClick = progressState.total > 0
+                resultDownloadBtt.apply {
+                    isClickable = canClick
+                    alpha = if (canClick) 1f else 0.5f
 
-            val ePubGeneration = progressState.progress > 0
-            binding.resultDownloadGenerateEpub.apply {
-                isClickable = ePubGeneration
-                alpha = if (ePubGeneration) 1f else 0.5f
-            }
-
-            val canDownload =
-                progressState.progress < progressState.total
-
-            val canClick = progressState.total > 0
-            binding.resultDownloadBtt.apply {
-                isClickable = canClick
-                alpha = if (canClick) 1f else 0.5f
-
-                //iconSize = 30.toPx
-                setText(
-                    when (progressState.state) {
-                        DownloadState.IsDone -> R.string.manage
-                        DownloadState.IsDownloading -> R.string.pause
-                        DownloadState.IsPaused -> R.string.resume
-                        DownloadState.IsFailed -> R.string.re_downloaded
-                        DownloadState.IsStopped -> R.string.downloaded
-                        DownloadState.Nothing -> if (canDownload) {
-                            R.string.download
-                        } else {
-                            R.string.manage
+                    setText(
+                        when (progressState.state) {
+                            DownloadState.IsDone -> R.string.manage
+                            DownloadState.IsDownloading -> R.string.pause
+                            DownloadState.IsPaused -> R.string.resume
+                            DownloadState.IsFailed -> R.string.re_downloaded
+                            DownloadState.IsStopped -> R.string.downloaded
+                            DownloadState.Nothing -> if (canDownload) R.string.download else R.string.manage
+                            DownloadState.IsPending -> R.string.loading
                         }
-
-                        DownloadState.IsPending -> R.string.loading
-                    }
-                )
-                setIconResource(
-                    when (progressState.state) {
-                        DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
-                        DownloadState.IsPaused -> R.drawable.netflix_play
-                        DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
-                        DownloadState.IsDone -> R.drawable.ic_outline_settings_24
-                        DownloadState.Nothing -> if (canDownload) {
-                            R.drawable.netflix_download
-                        } else {
-                            R.drawable.ic_outline_settings_24
+                    )
+                    setIconResource(
+                        when (progressState.state) {
+                            DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
+                            DownloadState.IsPaused -> R.drawable.netflix_play
+                            DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
+                            DownloadState.IsDone -> R.drawable.ic_outline_settings_24
+                            DownloadState.Nothing -> if (canDownload) R.drawable.netflix_download else R.drawable.ic_outline_settings_24
+                            else -> R.drawable.netflix_download
                         }
-
-                        else -> R.drawable.netflix_download
-                    }
-                )
+                    )
+                }
             }
         }
 
-
-        //result_container.setBackgroundColor(requireContext().colorFromAttribute(R.attr.bitDarkerGrayBackground))
-
         binding.resultMainscroll.setOnScrollChangeListener { v: NestedScrollView, _, scrollY, _, oldScrollY ->
-            val arr = IntArray(2)
-            binding.resultScrollPadding.getLocationOnScreen(arr)
-            /*context?.resources?.displayMetrics?.let { displayMetrics->
-                binding.scrollHolder.setPadding(0, (displayMetrics.heightPixels - arr[1]),0,0)
-                println("scrolled: ${binding.scrollHolder.paddingTop}")
-
-            }*/
-            if (viewModel.isInReviews()) {
-                binding.reviewsFab.alpha = scrollY / 50.toPx.toFloat()
-            }
-
+            // Removed reviewsFab alpha logic since it's gone
+            
             val scrollFade = maxOf(0f, 1 - scrollY / 170.toPx.toFloat())
             binding.resultInfoHeader.apply {
                 alpha = scrollFade
@@ -882,14 +882,16 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                 isEnabled = crossFade > 0
             }
 
-            //REVIEWS
-            val dy = scrollY - oldScrollY
-            if (dy > 0) { //check for scroll down
+            val stickyFade = minOf(1f, scrollY / 170.toPx.toFloat())
+            binding.resultStickyHeader.alpha = stickyFade
+
+            /*val dy = scrollY - oldScrollY
+            if (dy > 0) {
                 val max = (v.getChildAt(0).measuredHeight - v.measuredHeight)
                 if (scrollY >= max) {
                     viewModel.loadMoreReviews()
                 }
-            }
+            }*/
         }
     }
 }
