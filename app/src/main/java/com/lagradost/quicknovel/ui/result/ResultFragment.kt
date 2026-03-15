@@ -1,34 +1,28 @@
 package com.lagradost.quicknovel.ui.result
 
 import android.animation.ObjectAnimator
-import android.annotation.SuppressLint
 import android.content.DialogInterface
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.isVisible
-import androidx.core.view.postDelayed
 import androidx.core.widget.NestedScrollView
 import androidx.core.widget.doOnTextChanged
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-<<<<<<< HEAD
-import androidx.recyclerview.widget.GridLayoutManager
-=======
 import androidx.recyclerview.widget.RecyclerView
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipDrawable
 import com.google.android.material.tabs.TabLayout
-<<<<<<< HEAD
-=======
 import com.google.android.material.tabs.TabLayoutMediator
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 import com.lagradost.quicknovel.CommonActivity
 import com.lagradost.quicknovel.DownloadState
 import com.lagradost.quicknovel.LoadResponse
@@ -39,7 +33,6 @@ import com.lagradost.quicknovel.databinding.*
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
-import com.lagradost.quicknovel.ui.BaseFragment
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.mainpage.MainAdapter
 import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
@@ -58,9 +51,8 @@ import com.lagradost.quicknovel.util.toPx
 
 const val MAX_SYNO_LENGH = 300
 
-class ResultFragment : BaseFragment<FragmentResultBinding>(
-    BindingCreator.Inflate(FragmentResultBinding::inflate)
-) {
+class ResultFragment : Fragment() {
+    lateinit var binding: FragmentResultBinding
     private val viewModel: ResultViewModel by viewModels()
 
     private var novelTabBinding: ResultNovelTabBinding? = null
@@ -77,19 +69,6 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
             }
     }
 
-<<<<<<< HEAD
-    override fun fixLayout(view: View) {
-        val compactView = false //activity?.getGridIsCompact() ?: return
-        val spanCountLandscape = if (compactView) 2 else 6
-        val spanCountPortrait = if (compactView) 1 else 3
-        val orientation = resources.configuration.orientation
-        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            binding?.relatedList?.spanCount = spanCountLandscape
-        } else {
-            binding?.relatedList?.spanCount = spanCountPortrait
-        }
-        binding?.resultHolder?.post { // BUG FIX
-=======
     val repo get() = viewModel.repo
 
     override fun onCreateView(
@@ -108,27 +87,14 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         binding.resultHolder.post {
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
             updateScrollHeight()
         }
     }
 
-    //private lateinit var viewModel: ResultViewModel
-
-    val repo get() = viewModel.repo
-
-
-    @SuppressLint("NotifyDataSetChanged")
     override fun onResume() {
         super.onResume()
-<<<<<<< HEAD
-        //only if really is onResume
-        if (viewModel.isResume) {
-            (binding?.chapterList?.adapter as? ChapterAdapter)?.notifyDataSetChanged()
-=======
         if(viewModel.isResume){
             chapterAdapter?.notifyDataSetChanged()
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
             viewModel.isResume = false
         }
 
@@ -137,35 +103,17 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                 colorFromAttribute(R.attr.primaryBlackBackground)
         }
 
-        binding?.apply {
-            val currentNote = resultNotesEdittext.text?.toString()
-            val savedNote = viewModel.getNote() ?: ""
-            if (currentNote != savedNote) {
-                resultNotesEdittext.setText(savedNote)
+        val savedNote = viewModel.getNote() ?: ""
+        novelTabBinding?.resultNotesEdittext?.let { et ->
+            if (et.text?.toString() != savedNote) {
+                et.setText(savedNote)
             }
         }
     }
 
-
     private fun updateScrollHeight() {
-<<<<<<< HEAD
-        val binding = binding ?: return
-        val displayMetrics = context?.resources?.displayMetrics ?: return
-        val total = displayMetrics.heightPixels - binding.resultDownloadCard.height
-
-        binding.resultNovelHolder.apply {
-            setPadding(
-                paddingLeft,
-                paddingTop,
-                paddingRight,
-                maxOf(0, total)
-            )
-        }
-        val parameter = binding.chapterList.layoutParams
-=======
         val displayMetrics = resources.displayMetrics
         val parameter = binding.resultViewpager.layoutParams
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
         parameter.height =
             displayMetrics.heightPixels - binding.viewsAndRating.height - binding.resultTabs.height - binding.resultScrollPadding.paddingTop
 
@@ -235,24 +183,7 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                 resultQuickstream.isVisible = false
             }
 
-            val currentNote = resultNotesEdittext.text.toString()
-            val savedNote = viewModel.getNote() ?: ""
-            if (currentNote != savedNote) {
-                resultNotesEdittext.setText(savedNote)
-            }
-            
-            val isDropped = viewModel.readState.value == ReadType.DROPPED
-            resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
-            resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else requireContext().colorFromAttribute(R.attr.colorPrimary)
-            resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else requireContext().colorFromAttribute(R.attr.colorPrimary)))
-
-            // Use a tag to avoid adding multiple listeners to the same view
-            if (resultNotesEdittext.tag == null) {
-                resultNotesEdittext.tag = true
-                resultNotesEdittext.doOnTextChanged { text: CharSequence?, _, _, _ ->
-                    viewModel.updateNote(text?.toString())
-                }
-            }
+            // Notes text restoration managed by onResume and LiveData observer
         }
         
         // Populate chapter count in its tab if available
@@ -261,15 +192,8 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
         }
     }
 
-
     private fun newState(loadResponse: Resource<LoadResponse>?) {
         if (loadResponse == null) return
-<<<<<<< HEAD
-        val binding = binding ?: return
-        //activity?.window?.navigationBarColor =
-        //    requireContext().colorFromAttribute(R.attr.bitDarkerGrayBackground)
-=======
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
         when (loadResponse) {
             is Resource.Failure -> {
@@ -306,71 +230,10 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
 
                     resultTitle.text = res.name
                     resultAuthor.text = res.author ?: getString(R.string.no_author)
-<<<<<<< HEAD
-
-                    resultRatingVotedCount.text = getString(R.string.no_data)
-                    res.rating?.let { rating ->
-                        resultRating.text = context?.getRating(rating)
-                        val votes = res.peopleVoted
-                        if (votes != null) {
-                            resultRatingVotedCount.text =
-                                getString(R.string.votes_format).format(votes)
-                        }
-                    }
-                    resultViews.text =
-                        res.views?.let { views -> humanReadableByteCountSI(views) }
-                            ?: getString(R.string.no_data)
-
-                    resultBack.setColorFilter(Color.WHITE)
-                    resultTabs.removeAllTabs()
-                    resultTabs.isVisible = false
-                    val hasRelated = !res.related.isNullOrEmpty()
-                    val hasChapters =
-                        res is StreamResponse && res.data.isNotEmpty() // this was removed because of lag, because of shitty android
-                    val api = repo
-
-                    if (api != null && (api.hasReviews || hasRelated || hasChapters)) {
-                        resultTabs.isVisible = true
-                        resultTabs.addTab(resultTabs.newTab().setText(R.string.novel).setId(0))
-                        if (api.hasReviews) {
-                            resultTabs.addTab(
-                                resultTabs.newTab().setText(R.string.reviews).setId(1)
-                            )
-                        }
-                        if (hasRelated) {
-                            resultTabs.addTab(
-                                resultTabs.newTab().setText(R.string.related).setId(2)
-                            )
-                            relatedList.apply {
-                                setRecycledViewPool(MainAdapter.sharedPool)
-                                val mainPageAdapter = MainAdapter(this, 0)
-                                adapter = mainPageAdapter
-                                mainPageAdapter.submitList(res.related)
-                            }
-                            fixLayout(binding.root)
-                        }
-                        if (hasChapters) {
-                            resultTabs.addTab(
-                                resultTabs.newTab().setText(R.string.read_action_chapters).setId(3)
-                            )
-                        }
-                    }
-                    val target = viewModel.currentTabIndex.value
-                    if (target != null) {
-                        resultTabs.getTabAt(target)?.let { new ->
-                            resultTabs.selectTab(new)
-                        }
-                    }
-
-
-                    //viewsAndRating.isVisible = res.views != null || res.peopleVoted != null
-
-=======
                     
                     resultStickyTitle.text = res.name
                     resultStickyAuthor.text = res.author ?: getString(R.string.no_author)
                     
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
                     val readStatusText = res.status?.resource?.let { getString(it) } ?: ""
                     resultStatus.text = readStatusText
                     resultStatus.isVisible = readStatusText.isNotBlank()
@@ -391,33 +254,12 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                         resultTabs.getTabAt(target)?.select()
                         resultViewpager.setCurrentItem(target, false)
                     }
-                    val currentNote = resultNotesEdittext.text?.toString()
-                    val savedNote = viewModel.getNote() ?: ""
-                    if (currentNote != savedNote) {
-                        resultNotesEdittext.setText(savedNote)
-                    }
 
                     resultLoading.isVisible = false
-
                     resultLoadingError.isVisible = false
                     resultHolder.isVisible = true
                     resultPosterBlur.isVisible = true
-<<<<<<< HEAD
-                    resultHolder.doOnNextLayout {
-                        updateScrollHeight()
-                    }
-                    resultHolder.post {
-                        updateScrollHeight()
-                        resultHolder.post {
-                            updateScrollHeight()
-                            resultHolder.post {
-                                updateScrollHeight()
-                            }
-                        }
-                    }
-=======
                     resultHolder.post { updateScrollHeight() }
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
                 }
             }
         }
@@ -492,19 +334,11 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
         return items
     }
 
-<<<<<<< HEAD
-    override fun onBindingCreated(binding: FragmentResultBinding, savedInstanceState: Bundle?) {
-        val url = savedInstanceState?.getString("url") ?: arguments?.getString("url")
-        ?: throw NotImplementedError()
-        val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName")
-        ?: throw NotImplementedError()
-=======
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         val url = savedInstanceState?.getString("url") ?: arguments?.getString("url") ?: throw NotImplementedError()
         val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
         activity?.window?.decorView?.clearFocus()
         binding.resultTitle.isSelected = true
@@ -517,35 +351,9 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
         binding.apply {
             activity?.fixPaddingStatusbar(resultInfoHeader)
 
-<<<<<<< HEAD
-            resultNotesEdittext.doOnTextChanged { text: CharSequence?, _, _, _ ->
-                viewModel.updateNote(text?.toString())
-            }
-
-
-            //resultOpeninbrowerText.text = apiName //""// resultUrl
-
-            resultReloadConnectionerror.setOnClickListener {
-                viewModel.initState(apiName, url)
-            }
-
-            resultOpeninbrower.setOnClickListener {
-                viewModel.openInBrowser()
-            }
-
-            resultReloadConnectionOpenInBrowser.setOnClickListener {
-                viewModel.openInBrowser()
-            }
-
-            reviewsFab.setOnClickListener {
-                resultReviews.smoothScrollToPosition(0) // NEEDS THIS TO RESET VELOCITY
-                resultMainscroll.smoothScrollTo(0, 0)
-            }
-=======
             resultReloadConnectionerror.setOnClickListener { viewModel.initState(apiName, url) }
             resultOpeninbrower.setOnClickListener { viewModel.openInBrowser() }
             resultReloadConnectionOpenInBrowser.setOnClickListener { viewModel.openInBrowser() }
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
             val backParameter = resultBack.layoutParams as CoordinatorLayout.LayoutParams
             backParameter.setMargins(
@@ -570,69 +378,13 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
 
             resultShare.setOnClickListener { viewModel.share() }
 
-<<<<<<< HEAD
-            val reviewAdapter = ReviewAdapter()
-            resultReviews.setRecycledViewPool(ReviewAdapter.sharedPool)
-            resultReviews.adapter = reviewAdapter
-            resultReviews.layoutManager = GridLayoutManager(context, 1)
-
-            observe(viewModel.reviews) { reviews ->
-                when (reviews) {
-                    is Resource.Success -> {
-                        resultviewReviewsLoading.isVisible = false
-                        resultviewReviewsLoadingShimmer.startShimmer()
-                        resultReviews.isVisible = true
-                        // fuck jvm, we have to do a copy because otherwise it won't fucking register
-                        reviewAdapter.submitList(reviews.value.map { it.copy() })
-                    }
-
-                    is Resource.Loading -> {
-                        resultviewReviewsLoadingShimmer.stopShimmer()
-                        resultviewReviewsLoading.isVisible = true
-                        resultReviews.isVisible = false
-                    }
-
-                    is Resource.Failure -> {
-                        debugException { "This should never happened" }
-=======
             // Using indices 0 (Novel) and 3 (Chapters) for tabIds to maintain existing mapping but filter to only two tabs
             resultViewpager.adapter = ResultFragmentAdapter(
                 tabIds = listOf(0, 3),
                 bindingGetter = { tabView, tabId ->
                     when (tabId) {
                         0 -> {
-                            novelTabBinding = ResultNovelTabBinding.bind(tabView)
-                            novelTabBinding?.apply {
-                                resultSynopsisText.setOnClickListener {
-                                    val res = (viewModel.loadResponse.value as? Resource.Success)?.value ?: return@setOnClickListener
-                                    val syno = if (res.synopsis?.length ?: 0 > MAX_SYNO_LENGH) {
-                                        res.synopsis?.substring(0, MAX_SYNO_LENGH) + "..."
-                                    } else {
-                                        res.synopsis
-                                    }
-                                    val isExpanded = resultSynopsisText.text.length > (syno?.length ?: 0)
-                                    resultSynopsisText.text = if (!isExpanded) res.synopsis?.html() else syno?.html()
-                                }
-                                resultDownloadGenerateEpub.setOnClickListener { viewModel.readEpub() }
-                                resultDownloadBtt.setOnClickListener { v ->
-                                    val actions = getActions()
-                                    if (actions == null) {
-                                        viewModel.downloadOrPause()
-                                    } else if (actions.size == 1) {
-                                        doAction(actions[0])
-                                    } else if (actions.contains(R.string.download) || actions.contains(R.string.pause)) {
-                                        viewModel.downloadOrPause()
-                                    } else {
-                                        v.popupMenu(actions.map { it to it }, null) { doAction(itemId) }
-                                    }
-                                }
-                                resultDownloadBtt.setOnLongClickListener { v ->
-                                    val items = getActions() ?: return@setOnLongClickListener true
-                                    v.popupMenu(items.map { it to it }, null) { doAction(itemId) }
-                                    true
-                                }
-                                resultQuickstream.setOnClickListener { viewModel.streamRead() }
-                            }
+                            onBindingCreated(tabView)
                             updateTabData()
                         }
                         3 -> {
@@ -694,7 +446,6 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                             }
                             updateTabData()
                         }
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
                     }
                 }
             )
@@ -747,29 +498,24 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                 0, 0, 0,
                 if (state == ReadType.NONE) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
-<<<<<<< HEAD
-
-            // Update notes UI when read status changes
-            binding.apply {
-                val isDropped = state == ReadType.DROPPED
-                resultNotesHeader.text = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
-                val primaryColor = context?.colorFromAttribute(R.attr.colorPrimary) ?: Color.TRANSPARENT
-
-                resultNotesUnderline.setBackgroundColor(if (isDropped) Color.RED else primaryColor)
-
-            }
-        }
-        observe(viewModel.loadResponse, ::newState)
-=======
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
             // Update notes UI when read status changes
             novelTabBinding?.apply {
                 val isDropped = state == ReadType.DROPPED
-                resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
-                val primaryColor = requireContext().colorFromAttribute(R.attr.colorPrimary)
-                resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else primaryColor
-                resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else primaryColor))
+                resultNotesHeader.text = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
+                val accentColor = context?.colorFromAttribute(R.attr.colorPrimary) ?: Color.DKGRAY
+                resultNotesHeader.setTextColor(if (isDropped) Color.RED else accentColor)
+                resultNotesUnderline.setBackgroundColor(if (isDropped) Color.RED else context?.colorFromAttribute(R.attr.textColor) ?: Color.BLACK)
+            }
+        }
+
+        observeNullable(viewModel.userNote) { note ->
+            novelTabBinding?.apply {
+                val current = resultNotesEdittext.text?.toString() ?: ""
+                val saved = note ?: ""
+                if (current != saved) {
+                    resultNotesEdittext.setText(saved)
+                }
             }
         }
 
@@ -892,6 +638,67 @@ class ResultFragment : BaseFragment<FragmentResultBinding>(
                     viewModel.loadMoreReviews()
                 }
             }*/
+        }
+    }
+
+
+    private fun onBindingCreated(tabView: View) {
+        val binding = ResultNovelTabBinding.bind(tabView)
+        novelTabBinding = binding
+        
+        binding.apply {
+            resultSynopsisText.setOnClickListener {
+                val res = (viewModel.loadResponse.value as? Resource.Success)?.value ?: return@setOnClickListener
+                val syno = if (res.synopsis?.length ?: 0 > MAX_SYNO_LENGH) {
+                    res.synopsis?.substring(0, MAX_SYNO_LENGH) + "..."
+                } else {
+                    res.synopsis
+                }
+                val isExpanded = resultSynopsisText.text.length > (syno?.length ?: 0)
+                resultSynopsisText.text = if (!isExpanded) res.synopsis?.html() else syno?.html()
+            }
+            resultDownloadGenerateEpub.setOnClickListener { viewModel.readEpub() }
+            resultDownloadBtt.setOnClickListener { v ->
+                val actions = getActions()
+                if (actions == null) {
+                    viewModel.downloadOrPause()
+                } else if (actions.size == 1) {
+                    doAction(actions[0])
+                } else if (actions.contains(R.string.download) || actions.contains(R.string.pause)) {
+                    viewModel.downloadOrPause()
+                } else {
+                    v.popupMenu(actions.map { it to it }, null) { doAction(itemId) }
+                }
+            }
+            resultDownloadBtt.setOnLongClickListener { v ->
+                val items = getActions() ?: return@setOnLongClickListener true
+                v.popupMenu(items.map { it to it }, null) { doAction(itemId) }
+                true
+            }
+            resultQuickstream.setOnClickListener { viewModel.streamRead() }
+
+            // Initial Notes Population
+            val currentNote = resultNotesEdittext.text?.toString() ?: ""
+            val savedNote = viewModel.getNote() ?: ""
+            if (currentNote != savedNote) {
+                resultNotesEdittext.setText(savedNote)
+            }
+
+            // Setup Notes Update Trigger
+            resultNotesEdittext.doOnTextChanged { text, _, _, _ ->
+                if (viewModel.hasLoaded) {
+                    viewModel.updateNote(text?.toString())
+                }
+            }
+
+            // Keyboard Scrolling Focus Listener
+            resultNotesEdittext.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    this@ResultFragment.binding.resultMainscroll.postDelayed({
+                        this@ResultFragment.binding.resultMainscroll.smoothScrollTo(0, resultNotesLayout.top)
+                    }, 200)
+                }
+            }
         }
     }
 }

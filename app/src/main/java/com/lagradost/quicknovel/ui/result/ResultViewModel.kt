@@ -214,8 +214,9 @@ class ResultViewModel : ViewModel() {
     private lateinit var load: LoadResponse
     private var loadId: Int = 0
     private var loadUrl: String = ""
-    private var hasLoaded: Boolean = false
-    private var userNote: String? = null
+    var hasLoaded: Boolean = false
+    val userNote: MutableLiveData<String?> = MutableLiveData(null)
+
 
     val loadResponse: MutableLiveData<Resource<LoadResponse>?> =
         MutableLiveData<Resource<LoadResponse>?>()
@@ -492,13 +493,7 @@ class ResultViewModel : ViewModel() {
                     load.rating,
                     (load as? StreamResponse)?.data?.size ?: 1,
                     System.currentTimeMillis(),
-<<<<<<< HEAD
                     synopsis = load.synopsis
-
-=======
-                    synopsis = load.synopsis,
-                    userNote = userNote
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
                 )
             )
         }
@@ -558,38 +553,27 @@ class ResultViewModel : ViewModel() {
                 load.rating,
                 totalChapters,
                 System.currentTimeMillis(),
-<<<<<<< HEAD
                 synopsis = load.synopsis
-
-=======
-                synopsis = load.synopsis,
-                userNote = userNote
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
             )
         )
     }
 
-    fun getNote(): String? = userNote
+    fun getNote(): String? = userNote.value
 
     private var updateNoteJob: Job? = null
     fun updateNote(note: String?) {
-        userNote = note
-        updateNoteJob?.cancel()
-        updateNoteJob = viewModelScope.launch {
-            delay(500) // Debounce 500ms
+        userNote.postValue(note)
+        viewModelScope.launch {
+            if (note.isNullOrBlank()) {
+                removeKey("RESULT_USER_NOTE", loadId.toString())
+            } else {
+                setKey("RESULT_USER_NOTE", loadId.toString(), NoteWrapper(note))
+            }
             loadMutex.withLock {
                 if (!hasLoaded) return@launch
-<<<<<<< HEAD
-                setKey("RESULT_USER_NOTE", loadId.toString(), note)
                 updateBookmarkData(force = true)
                 addToHistory()
             }
-
-=======
-                updateBookmarkData(force = true)
-                addToHistory()
-            }
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
         }
     }
 
@@ -754,16 +738,14 @@ class ResultViewModel : ViewModel() {
             DOWNLOAD_EPUB_LAST_ACCESS, tid.toString(), System.currentTimeMillis()
         )
         reCacheChapters()
+
+        val savedWrapper = getKey<NoteWrapper>("RESULT_USER_NOTE", tid.toString())
+        val note = savedWrapper?.note
+        userNote.value = note
+
         updateBookmarkData()
 
         hasLoaded = true
-<<<<<<< HEAD
-        userNote = getKey<String>("RESULT_USER_NOTE", tid.toString())
-
-=======
-        userNote = getKey<ResultCached>(RESULT_BOOKMARK, tid.toString())?.userNote 
-            ?: getKey<ResultCached>(HISTORY_FOLDER, tid.toString())?.userNote
->>>>>>> 5bb838d8046f5d610a9d13067b2f6501ceb79b0c
 
         // insert a download progress if not found
         insertZeroData()
@@ -824,3 +806,5 @@ class ResultViewModel : ViewModel() {
         }
     }
 }
+
+data class NoteWrapper(val note: String? = "")
