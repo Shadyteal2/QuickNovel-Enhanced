@@ -41,13 +41,8 @@ android {
 
     buildFeatures.buildConfig true
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_19
-        targetCompatibility JavaVersion.VERSION_19
-    }
-
-    kotlinOptions {
-        jvmTarget = "19"
+    kotlin {
+        jvmToolchain(19)
     }
     namespace 'com.lagradost.quicknovel'
 }
