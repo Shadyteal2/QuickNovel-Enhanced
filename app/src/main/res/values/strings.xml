@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">QuickNovel</string>
+    <string name="app_name">NeoQN</string>
     <string name="title_search">Search</string>
     <string name="title_history">History</string>
     <string name="title_settings">Settings</string>
@@ -45,7 +45,7 @@
     <string name="tags">Tags</string>
     <string name="views">Views</string>
     <string name="delete">Delete</string>
-    <string name="open_in_browser">Open In Browser</string>
+    <string name="open_in_browser">Open In</string>
     <string name="select_chapter">Select Chapter</string>
     <string name="poster_descript">Poster</string>
     <string name="sort_downloads_descript">Sort Downloads</string>
@@ -64,9 +64,6 @@
     <string name="remove_bloat_desc">Removes the title and translator from all pages, will cause longer generation time</string>
     <string name="check_for_update">Check for Update</string>
     <string name="translating">Translating</string>
-
-
-
 
 
     <string name="filter_dialog_sort_by">Sort by</string>
@@ -296,10 +293,8 @@
     <string name="paragraph_spacing">Paragraph spacing</string>
     <string name="more_spacing">More Spacing</string>
     <string name="less_spacing">Less Spacing</string>
-    <string name="unable_to_inflate">UI was unable to be created correctly, this is a MAJOR BUG and should be reported immediately %s</string>
-    <string name="appearance_background">Appearance &amp; Background</string>
-    <string name="appearance_background_by_shady_title">Appearance &amp; Background - By Shady</string>
 
+    <string name="appearance_background">Appearance &amp; Background</string>
     <string name="background_image">Custom Background Image</string>
     <string name="background_image_summary">Pick a custom image for the app background</string>
     <string name="background_blur">Background Blur</string>
@@ -312,6 +307,4 @@
     <string name="reset_background_key" translatable="false">reset_background</string>
     <string name="background_reset_confirmed">Background has been reset to default</string>
     <string name="by_shady">By Shady</string>
-    <string name="notes">Notes</string>
-    <string name="dropped_reason">Why did you drop this novel?</string>
 </resources>

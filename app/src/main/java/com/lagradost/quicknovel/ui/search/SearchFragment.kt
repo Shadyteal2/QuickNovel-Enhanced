@@ -3,17 +3,19 @@ package com.lagradost.quicknovel.ui.search
 import android.app.Dialog
 import android.content.res.Configuration
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ImageView
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.CommonActivity.activity
 import com.lagradost.quicknovel.HomePageList
 import com.lagradost.quicknovel.databinding.FragmentSearchBinding
@@ -21,7 +23,6 @@ import com.lagradost.quicknovel.databinding.HomeEpisodesExpandedBinding
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
-import com.lagradost.quicknovel.ui.BaseFragment
 import com.lagradost.quicknovel.ui.home.BrowseAdapter
 import com.lagradost.quicknovel.ui.home.HomeViewModel
 import com.lagradost.quicknovel.ui.setRecycledViewPool
@@ -29,11 +30,11 @@ import com.lagradost.quicknovel.ui.settings.SettingsFragment
 import com.lagradost.quicknovel.util.Event
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 
-class SearchFragment : BaseFragment<FragmentSearchBinding>(
-    BindingCreator.Inflate(FragmentSearchBinding::inflate)
-) {
+class SearchFragment : Fragment() {
+    lateinit var binding: FragmentSearchBinding
     private val viewModel: SearchViewModel by viewModels()
     private val homeViewModel: HomeViewModel by viewModels()
+
 
     companion object {
         val configEvent = Event<Int>()
@@ -77,7 +78,20 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
         }
     }
 
-    override fun fixLayout(view: View) {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        activity?.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+        )
+
+        binding = FragmentSearchBinding.inflate(inflater)
+        return binding.root
+    }
+
+    private fun fixGrid() {
         val compactView = false//activity?.getGridIsCompact() ?: false
         val spanCountLandscape = if (compactView) 2 else 6
         val spanCountPortrait = if (compactView) 1 else 3
@@ -89,18 +103,21 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             spanCountPortrait
         }
 
-        binding?.homeBrowselist?.spanCount = currentSpan
-        binding?.searchAllRecycler?.spanCount = currentSpan
+        binding.homeBrowselist.spanCount = currentSpan
+        binding.searchAllRecycler.spanCount = currentSpan
         configEvent.invoke(currentSpan)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        fixGrid()
     }
 
     lateinit var searchExitIcon: ImageView
     lateinit var searchMagIcon: ImageView
 
-    override fun onBindingCreated(binding: FragmentSearchBinding, savedInstanceState: Bundle?) {
-        activity?.window?.setSoftInputMode(
-            WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
-        )
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
         val settingsManager = context?.let { PreferenceManager.getDefaultSharedPreferences(it) }
         val isAdvancedSearch = settingsManager?.getBoolean("advanced_search", true) == true
@@ -157,7 +174,8 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                 binding.searchMasterRecycler.isVisible = isAdvancedSearch
                 masterAdapter.submitList(list.map {
                     HomePageList(
-                        it.apiName, if (it.data is Resource.Success) it.data.value else emptyList()
+                        it.apiName,
+                        if (it.data is Resource.Success) it.data.value else emptyList()
                     )
                 })
             }
@@ -165,15 +183,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
         activity?.fixPaddingStatusbar(binding.searchToolbar)
 
-        val hasBackground = settingsManager?.getString(getString(R.string.background_image_key), null).isNullOrBlank() == false
-        if (hasBackground) {
-            binding.searchRoot.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.searchAllRecycler.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.homeBrowselist.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.searchMasterRecycler.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.searchToolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        }
-
+        fixGrid()
         binding.searchLoadingBar.alpha = 0f
         searchExitIcon = binding.mainSearch.findViewById(androidx.appcompat.R.id.search_close_btn)
         searchMagIcon = binding.mainSearch.findViewById(androidx.appcompat.R.id.search_mag_icon)
@@ -211,6 +221,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             }
         }*/
         //binding.mainSearch.onActionViewExpanded()
+
 
 
         val browseAdapter = BrowseAdapter()

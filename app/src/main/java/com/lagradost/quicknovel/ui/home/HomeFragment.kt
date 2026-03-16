@@ -1,34 +1,51 @@
 package com.lagradost.quicknovel.ui.home
 
 import android.content.res.Configuration
+import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.lagradost.quicknovel.databinding.FragmentHomeBinding
 import com.lagradost.quicknovel.mvvm.observe
-import com.lagradost.quicknovel.ui.BaseFragment
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.MainActivity.Companion.loadResult
 import com.lagradost.quicknovel.R
 
-class HomeFragment : BaseFragment<FragmentHomeBinding>(
-    BindingCreator.Inflate(FragmentHomeBinding::inflate)
-) {
+class HomeFragment : Fragment() {
+    lateinit var binding: FragmentHomeBinding
     private val viewModel: HomeViewModel by viewModels()
 
-    override fun fixLayout(view: View) {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        binding = FragmentHomeBinding.inflate(inflater)
+        return binding.root
+    }
+
+    private fun setupGridView() {
         val compactView = false
         val spanCountLandscape = if (compactView) 2 else 6
         val spanCountPortrait = if (compactView) 1 else 3
         val orientation = resources.configuration.orientation
         if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            binding?.homeBrowselist?.spanCount = spanCountLandscape
+            binding.homeBrowselist.spanCount = spanCountLandscape
         } else {
-            binding?.homeBrowselist?.spanCount = spanCountPortrait
+            binding.homeBrowselist.spanCount = spanCountPortrait
         }
     }
 
-    override fun onBindingCreated(binding: FragmentHomeBinding) {
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        setupGridView()
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        setupGridView()
         val browseAdapter = BrowseAdapter()
         binding.homeBrowselist.apply {
             adapter = browseAdapter
@@ -38,13 +55,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
         observe(viewModel.homeApis) { list ->
             browseAdapter.submitList(list)
-        }
-
-        val settingsManager = androidx.preference.PreferenceManager.getDefaultSharedPreferences(requireContext())
-        val hasBackground = !settingsManager.getString(getString(com.lagradost.quicknovel.R.string.background_image_key), null).isNullOrBlank()
-        if (hasBackground) {
-            binding.homeRoot.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.homeToolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
 
         observe(viewModel.latestHistory) { res ->

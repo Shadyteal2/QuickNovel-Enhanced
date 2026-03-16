@@ -1,12 +1,23 @@
 package com.lagradost.quicknovel.ui.download
 
+import android.R.attr.fragment
 import android.annotation.SuppressLint
+import android.content.res.Configuration
+import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.activity.result.launch
 import androidx.appcompat.widget.SearchView
+import androidx.core.view.doOnAttach
+import androidx.core.view.isGone
 import androidx.core.view.isVisible
-import androidx.fragment.app.viewModels
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -28,18 +39,20 @@ import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.databinding.FragmentDownloadsBinding
 import com.lagradost.quicknovel.databinding.SortBottomSheetBinding
 import com.lagradost.quicknovel.mvvm.observe
-import com.lagradost.quicknovel.ui.BaseFragment
 import com.lagradost.quicknovel.ui.SortingMethodAdapter
 import com.lagradost.quicknovel.ui.UiImage
 import com.lagradost.quicknovel.ui.img
+import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
-    BindingCreator.Inflate(FragmentDownloadsBinding::inflate)
-) {
-    private val viewModel: DownloadViewModel by viewModels()
+class DownloadFragment : Fragment() {
+    private lateinit var viewModel: DownloadViewModel
+    lateinit var binding: FragmentDownloadsBinding
 
     data class DownloadData(
         @JsonProperty("source")
@@ -93,9 +106,9 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
         val lastDownloaded: Long?,
     ) {
         val image by lazy {
-            if (isImported) {
+            if(isImported) {
                 val bitmap = BookDownloader2Helper.getCachedBitmap(activity, apiName, author, name)
-                if (bitmap != null) {
+                if(bitmap != null) {
                     return@lazy UiImage.Bitmap(bitmap)
                 }
             }
@@ -106,13 +119,28 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
             return id
         }
 
-        val isImported: Boolean get() = (apiName == IMPORT_SOURCE || apiName == IMPORT_SOURCE_PDF)
+        val isImported: Boolean get() = (apiName == IMPORT_SOURCE || apiName ==IMPORT_SOURCE_PDF)
     }
 
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        viewModel = ViewModelProvider(activity ?: this)[DownloadViewModel::class.java]
+        binding = FragmentDownloadsBinding.inflate(inflater)
+        return binding.root
+        //return inflater.inflate(R.layout.fragment_downloads, container, false)
+    }
 
     @SuppressLint("NotifyDataSetChanged")
-    override fun fixLayout(view: View) {
-        (binding?.viewpager?.adapter as? ViewpagerAdapter)?.notifyDataSetChanged()
+    private fun setupGridView() {
+        (binding.viewpager.adapter as? ViewpagerAdapter)?.notifyDataSetChanged()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        setupGridView()
     }
 
     // https://stackoverflow.com/a/67441735/13746422
@@ -132,18 +160,12 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
     lateinit var searchExitIcon: ImageView
     lateinit var searchMagIcon: ImageView
 
-    override fun onBindingCreated(binding: FragmentDownloadsBinding) {
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         viewModel.loadAllData(true)
         // activity?.fixPaddingStatusbar(binding.downloadToolbar)
         activity?.fixPaddingStatusbar(binding.downloadRoot)
-
-        val settingsManager = androidx.preference.PreferenceManager.getDefaultSharedPreferences(requireContext())
-        val hasBackground = !settingsManager.getString(getString(com.lagradost.quicknovel.R.string.background_image_key), null).isNullOrBlank()
-        if (hasBackground) {
-            binding.downloadRoot.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.swipeContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.bookmarkTabs.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        }
         //viewModel = ViewModelProviders.of(activity!!).get(DownloadViewModel::class.java)
 
 
@@ -255,24 +277,25 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
             setColorSchemeColors(context.colorFromAttribute(R.attr.colorPrimary))
             setProgressBackgroundColorSchemeColor(context.colorFromAttribute(R.attr.primaryGrayBackground))
             setOnRefreshListener {
-                if (isOnDownloads) {
+                if(isOnDownloads){
                     viewModel.refresh()
                     isRefreshing = false
 
-                } else {
+                }
+                else{
                     viewModel.refreshReadingProgress()
                 }
             }
         }
 
         observe(viewModel.isRefreshing) { refreshing ->
-            if (refreshing != binding.swipeContainer.isRefreshing) {
+            if(refreshing != binding.swipeContainer.isRefreshing){
                 binding.swipeContainer.isRefreshing = refreshing
             }
         }
 
 
-        lifecycleScope.launch {
+        lifecycleScope.launch{
             viewModel.refresh.collect { tab ->
                 (binding.viewpager.adapter as? ViewpagerAdapter)?.updateProgressOfPage(tab)
             }
@@ -282,9 +305,8 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
         binding.viewpager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
-                val currentTab = getKey(DOWNLOAD_SETTINGS, CURRENT_TAB, null) ?: 1
-                binding.swipeContainer.isRefreshing =
-                    viewModel.activeRefreshTabs.contains(currentTab)
+                val currentTab = getKey(DOWNLOAD_SETTINGS, CURRENT_TAB, null)?:1
+                binding.swipeContainer.isRefreshing =  viewModel.activeRefreshTabs.contains(currentTab)
             }
 
             override fun onPageScrollStateChanged(state: Int) {
@@ -293,8 +315,10 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
             }
         })
         binding.swipeContainer.setOnChildScrollUpCallback { parent, child ->
-            return@setOnChildScrollUpCallback !canSwip// true = can't Swip, false = can swip
+            return@setOnChildScrollUpCallback  !canSwip// true = can't Swip, false = can swip
         }
+
+        setupGridView()
 
         /*binding.downloadCardSpace.apply {
             itemAnimator?.changeDuration = 0

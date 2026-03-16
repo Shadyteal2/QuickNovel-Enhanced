@@ -282,20 +282,18 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         finish()
     }
 
-    val mBatInfoReceiver: BroadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(ctxt: Context?, intent: Intent) {
-            val batteryPct: Float = run {
-                val level: Int = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale: Int = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                level * 100 / scale.toFloat()
-            }
-            binding.readBattery.text =
-                binding.readBattery.context?.getString(R.string.battery_format)
-                    ?.format(batteryPct.toInt())
-        }
-    }
-
     private fun registerBattery() {
+        val mBatInfoReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctxt: Context?, intent: Intent) {
+                val batteryPct: Float = run {
+                    val level: Int = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale: Int = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    level * 100 / scale.toFloat()
+                }
+                binding.readBattery.text =
+                    getString(R.string.battery_format).format(batteryPct.toInt())
+            }
+        }
         this.registerReceiver(mBatInfoReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     }
 
@@ -675,7 +673,6 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
     override fun onDestroy() {
         viewModel.stopTTS()
-        this.unregisterReceiver(mBatInfoReceiver)
         super.onDestroy()
     }
 
@@ -685,7 +682,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
 
+
+
     @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
+
     override fun onCreate(savedInstanceState: Bundle?) {
         CommonActivity.loadThemes(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -761,6 +761,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 updateTextAdapterConfig()
             }
         }
+
         observe(viewModel.isTextSelectableLive) { isTextSelectable ->
             if (textAdapter.changeTextSelectable(isTextSelectable)) {
                 updateTextAdapterConfig()
@@ -1367,23 +1368,23 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             binding.readLanguage.setOnClickListener { _ ->
                 ioSafe {
-                    val tts = viewModel.ttsSession?.requireTTS() ?: return@ioSafe
-
-                    runOnUiThread {
-                        val languages = mutableListOf<Locale?>(null).apply {
-                            addAll(tts.availableLanguages?.filterNotNull() ?: emptySet())
+                    viewModel.ttsSession.requireTTS({ tts ->
+                        runOnUiThread {
+                            val languages = mutableListOf<Locale?>(null).apply {
+                                addAll(tts.availableLanguages?.filterNotNull() ?: emptySet())
+                            }
+                            val ctx = binding.readLanguage.context ?: return@runOnUiThread
+                            ctx.showDialog(
+                                languages.map {
+                                    it?.displayName ?: ctx.getString(R.string.default_text)
+                                },
+                                languages.indexOf(tts.voice?.locale),
+                                ctx.getString(R.string.tts_locale), false, {}
+                            ) { index ->
+                                viewModel.setTTSLanguage(languages.getOrNull(index))
+                            }
                         }
-                        val ctx = binding.readLanguage.context ?: return@runOnUiThread
-                        ctx.showDialog(
-                            languages.map {
-                                it?.displayName ?: ctx.getString(R.string.default_text)
-                            },
-                            languages.indexOf(tts.voice?.locale),
-                            ctx.getString(R.string.tts_locale), false, {}
-                        ) { index ->
-                            viewModel.setTTSLanguage(languages.getOrNull(index))
-                        }
-                    }
+                    }, action = { false })
                 }
             }
 
@@ -1435,38 +1436,38 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             binding.readVoice.setOnClickListener {
                 ioSafe {
-                    val tts = viewModel.ttsSession?.requireTTS() ?: return@ioSafe
+                    viewModel.ttsSession.requireTTS({ tts ->
+                        runOnUiThread {
+                            val matchAgainst = tts.voice.locale
+                            val ctx = binding.readLanguage.context ?: return@runOnUiThread
+                            val voices =
+                                mutableListOf<Pair<String, Voice?>>(ctx.getString(R.string.default_text) to null).apply {
+                                    val voices =
+                                        tts.voices.filter { it != null && it.locale == matchAgainst }
+                                            .map {
+                                                // ${"★".repeat(it.quality / 100) }
+                                                ("${it.name} ${
+                                                    if (it.isNetworkConnectionRequired) {
+                                                        "(☁)"
+                                                    } else {
+                                                        ""
+                                                    }
+                                                }") to it
+                                            }
 
-                    runOnUiThread {
-                        val matchAgainst = tts.voice.locale
-                        val ctx = binding.readLanguage.context ?: return@runOnUiThread
-                        val voices =
-                            mutableListOf<Pair<String, Voice?>>(ctx.getString(R.string.default_text) to null).apply {
-                                val voices =
-                                    tts.voices.filter { it != null && it.locale == matchAgainst }
-                                        .map {
-                                            // ${"★".repeat(it.quality / 100) }
-                                            ("${it.name} ${
-                                                if (it.isNetworkConnectionRequired) {
-                                                    "(☁)"
-                                                } else {
-                                                    ""
-                                                }
-                                            }") to it
-                                        }
+                                    addAll(voices.sortedBy { (name, _) -> name })
+                                }
 
-                                addAll(voices.sortedBy { (name, _) -> name })
+                            ctx.showDialog(
+                                voices.map { it.first },
+                                voices.map { it.second }.indexOf(tts.voice),
+                                ctx.getString(R.string.tts_locale), false, {}
+                            ) { index ->
+                                val voice = voices.getOrNull(index)?.second
+                                viewModel.setTTSVoice(voice)
                             }
-
-                        ctx.showDialog(
-                            voices.map { it.first },
-                            voices.map { it.second }.indexOf(tts.voice),
-                            ctx.getString(R.string.tts_locale), false, {}
-                        ) { index ->
-                            val voice = voices.getOrNull(index)?.second
-                            viewModel.setTTSVoice(voice)
                         }
-                    }
+                    }, action = { false })
                 }
             }
 

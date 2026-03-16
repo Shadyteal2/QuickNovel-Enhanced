@@ -53,8 +53,6 @@ import com.lagradost.quicknovel.ui.download.SortingMethod
 import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.ResultCached
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -214,9 +212,7 @@ class ResultViewModel : ViewModel() {
     private lateinit var load: LoadResponse
     private var loadId: Int = 0
     private var loadUrl: String = ""
-    var hasLoaded: Boolean = false
-    val userNote: MutableLiveData<String?> = MutableLiveData(null)
-
+    private var hasLoaded: Boolean = false
 
     val loadResponse: MutableLiveData<Resource<LoadResponse>?> =
         MutableLiveData<Resource<LoadResponse>?>()
@@ -535,9 +531,10 @@ class ResultViewModel : ViewModel() {
             BookDownloader2.deleteNovel(load.author, load.name, apiName)
         }
     }
-    private fun updateBookmarkData(force: Boolean = false) {
+
+    private fun updateBookmarkData() {
         // dont update data if preview because that data is from cache
-        if (!force && !isGetLoaded && getKey<ResultCached>(RESULT_BOOKMARK, loadId.toString()) != null) {
+        if (!isGetLoaded && getKey<ResultCached>(RESULT_BOOKMARK, loadId.toString()) != null) {
             return
         }
         val totalChapters = (load as? StreamResponse)?.data?.size ?: 1
@@ -558,32 +555,13 @@ class ResultViewModel : ViewModel() {
         )
     }
 
-    fun getNote(): String? = userNote.value
-
-    private var updateNoteJob: Job? = null
-    fun updateNote(note: String?) {
-        userNote.postValue(note)
-        viewModelScope.launch {
-            if (note.isNullOrBlank()) {
-                removeKey("RESULT_USER_NOTE", loadId.toString())
-            } else {
-                setKey("RESULT_USER_NOTE", loadId.toString(), NoteWrapper(note))
-            }
-            loadMutex.withLock {
-                if (!hasLoaded) return@launch
-                updateBookmarkData(force = true)
-                addToHistory()
-            }
-        }
-    }
-
     fun bookmark(state: Int) = viewModelScope.launch {
         loadMutex.withLock {
             if (!hasLoaded) return@launch
             setKey(
                 RESULT_BOOKMARK_STATE, loadId.toString(), state
             )
-            updateBookmarkData(force = true)
+            updateBookmarkData()
         }
 
         readState.postValue(ReadType.fromSpinner(state))
@@ -738,11 +716,6 @@ class ResultViewModel : ViewModel() {
             DOWNLOAD_EPUB_LAST_ACCESS, tid.toString(), System.currentTimeMillis()
         )
         reCacheChapters()
-
-        val savedWrapper = getKey<NoteWrapper>("RESULT_USER_NOTE", tid.toString())
-        val note = savedWrapper?.note
-        userNote.value = note
-
         updateBookmarkData()
 
         hasLoaded = true
@@ -806,5 +779,3 @@ class ResultViewModel : ViewModel() {
         }
     }
 }
-
-data class NoteWrapper(val note: String? = "")

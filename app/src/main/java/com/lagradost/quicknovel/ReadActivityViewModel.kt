@@ -380,11 +380,9 @@ class RegularBook(val data: EpubBook) : AbstractBook() {
                     so it can’t find other resources for some reason. Since the code is already huge,
                     I have no idea where that happens, so I resort to a sketchy fix.
                 */
-                builder.append(
-                    ref.resource.reader.readText()
-                        .replace(Regex("""src="(?!OEBPS/|http)"""), "src=\"OEBPS/")
-                )
-            } catch (t: Throwable) {
+                builder.append(ref.resource.reader.readText().replace(Regex("""src="(?!OEBPS/|http)"""), "src=\"OEBPS/"))
+            }
+            catch (t: Throwable){
                 logError(t)
             }
         }
@@ -946,8 +944,7 @@ class ReadActivityViewModel : ViewModel() {
                     loading.invoke(Triple(spans[i].index, i, spans.size))
                     val batch = spans.subList(i, minOf(i + batchSize, spans.size))
                     val combinedText = batch.joinToString(separator) { it.text.toString() }
-                    val translatedBatch =
-                        onlineTranslate(combinedText, currentSettings.from, currentSettings.to)
+                    val translatedBatch = onlineTranslate(combinedText, currentSettings.from,currentSettings.to)
                     val translatedParagraphs = translatedBatch.split(separator)
 
                     for (j in batch.indices) {
@@ -971,7 +968,7 @@ class ReadActivityViewModel : ViewModel() {
                 }
             } else {
                 val translator = mlTranslator
-                if (translator == null) {
+                if(translator == null) {
                     return text to spans
                 }
                 // --- Offline mode ---
@@ -1057,8 +1054,7 @@ class ReadActivityViewModel : ViewModel() {
             val lower = cIndex - chapterPaddingBottom
             val upper = cIndex + chapterPaddingTop
 
-            val keys =
-                chapterData.keys.toTypedArray() // deep copy it to avoid ConcurrentModificationException
+            val keys = chapterData.keys.toTypedArray() // deep copy it to avoid ConcurrentModificationException
 
             // remove all irrelevant cache so we do not translate outdated shit
             for (key in keys) {
@@ -1299,7 +1295,7 @@ class ReadActivityViewModel : ViewModel() {
 
     // ========================================  TTS STUFF ========================================
 
-    var ttsSession: TTSSession? = null
+    lateinit var ttsSession: TTSSession
 
     private fun initTTSSession(context: Context) {
         runOnMainThread {
@@ -1326,15 +1322,14 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun setTTSLanguage(locale: Locale?) {
-        ttsSession?.setLanguage(locale)
+        ttsSession.setLanguage(locale)
     }
 
     fun setTTSVoice(voice: Voice?) {
-        ttsSession?.setVoice(voice)
+        ttsSession.setVoice(voice)
     }
 
     fun pauseTTS() {
-        val ttsSession = ttsSession ?: return
         if (!ttsSession.ttsInitialized()) return
         if (currentTTSStatus == TTSHelper.TTSStatus.IsRunning) {
             currentTTSStatus = TTSHelper.TTSStatus.IsPaused
@@ -1346,13 +1341,11 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun forwardsTTS() {
-        val ttsSession = ttsSession ?: return
         if (!ttsSession.ttsInitialized()) return
         pendingTTSSkip += 1
     }
 
     fun backwardsTTS() {
-        val ttsSession = ttsSession ?: return
         if (!ttsSession.ttsInitialized()) return
         pendingTTSSkip -= 1
     }
@@ -1381,7 +1374,6 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     suspend fun startTTSThread() = coroutineScope {
-        val ttsSession = ttsSession ?: return@coroutineScope
         try {
             val ttsStartTime = System.currentTimeMillis()
             var ttsEndTime = ttsStartTime + ttsTimer
@@ -1423,7 +1415,7 @@ class ReadActivityViewModel : ViewModel() {
                 loadIndividualChapter(index)
                 while (isActive && currentTTSStatus != TTSHelper.TTSStatus.IsStopped) {
                     val lines =
-                        when (val currentData = chapterMutex.withLock { chapterData[index] }) {
+                        when (val currentData = chapterMutex.withLock { chapterData[index]}) {
                             null -> {
                                 showToast(R.string.got_null_data)
                                 break
@@ -1466,8 +1458,7 @@ class ReadActivityViewModel : ViewModel() {
 
                     //preload next chapter
                     viewModelScope.launch(Dispatchers.IO) {
-                        val exists =
-                            chapterMutex.withLock { chapterData[index + 1] is Resource.Success }
+                        val exists = chapterMutex.withLock { chapterData[index + 1] is Resource.Success }
                         if (!exists)
                             loadIndividualChapter(index + 1)
                     }
@@ -1595,7 +1586,6 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun parseAction(input: TTSHelper.TTSActionType): Boolean {
-        val ttsSession = ttsSession ?: return false
 
         // validate that the action makes sense
         if (
@@ -1748,10 +1738,8 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     override fun onCleared() {
-        println("onCleared===${System.currentTimeMillis()}")
         lastChangeIndex?.let { setScrollKeys(it) }
-        ttsSession?.release()
-        ttsSession = null
+        ttsSession.release()
         mlTranslator?.close()
         mlTranslator = null
         super.onCleared()
@@ -1783,14 +1771,14 @@ class ReadActivityViewModel : ViewModel() {
     var ttsSpeed: Float
         get() = ttsSpeedKey
         set(value) {
-            ttsSession?.setSpeed(value)
+            ttsSession.setSpeed(value)
             ttsSpeedKey = value
         }
 
     var ttsPitch: Float
         get() = ttsPitchKey
         set(value) {
-            ttsSession?.setPitch(value)
+            ttsSession.setPitch(value)
             ttsPitchKey = value
         }
 
@@ -2042,24 +2030,24 @@ class ReadActivityViewModel : ViewModel() {
         val srcTranslit: String? = null
     )
 
-    suspend fun onlineTranslate(text: String, from: String, to: String): String {
+    suspend fun onlineTranslate(text: String,from:String, to: String): String {
         val baseUrl = "https://translate.googleapis.com/translate_a/single"
         if (text.trim().isBlank()) return ""
 
         var retryNumber = 0
         val maxRetry = 5
-        while (retryNumber < maxRetry) {
-            try {
+        while (retryNumber < maxRetry){
+            try{
                 // Google returns: [ [[trans, orig, ...], [trans, orig, ...]], ... ]
                 return MainActivity.app.get(
                     "$baseUrl?client=gtx&sl=$from&tl=$to&dt=t&q=${Uri.encode(text)}"
-                )
-                    .parsed<GoogleTranslationResponse>().sentences.joinToString("") { (trans, _) -> trans }
-            } catch (t: Throwable) {
+                ).parsed<GoogleTranslationResponse>().sentences.joinToString("") { (trans, _) -> trans }
+            }
+            catch (t: Throwable){
                 retryNumber++
-                if (retryNumber >= maxRetry)
+                if(retryNumber >= maxRetry)
                     throw t
-                delay(500L * (2.0.pow(retryNumber).toLong()))
+                delay( 500L * (2.0.pow(retryNumber).toLong()))
             }
         }
         return ""

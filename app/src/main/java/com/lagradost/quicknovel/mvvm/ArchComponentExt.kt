@@ -1,22 +1,12 @@
 package com.lagradost.quicknovel.mvvm
 
 import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.core.view.doOnAttach
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.findViewTreeLifecycleOwner
-import androidx.viewbinding.ViewBinding
 import com.lagradost.quicknovel.BuildConfig
 import com.lagradost.quicknovel.ErrorLoadingException
 import com.lagradost.quicknovel.MLException
-import com.lagradost.quicknovel.ui.BaseFragment
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -52,39 +42,12 @@ inline fun debugWarning(assert: () -> Boolean, message: () -> String) {
     }
 }
 
-fun <T> ComponentActivity.observe(liveData: LiveData<T>, action: (t: T) -> Unit) {
-    liveData.removeObservers(this)
+fun <T> LifecycleOwner.observe(liveData: LiveData<T>, action: (t: T) -> Unit) {
     liveData.observe(this) { it?.let { t -> action(t) } }
 }
 
-fun <T> ComponentActivity.observeNullable(liveData: LiveData<T>, action: (t: T) -> Unit) {
-    liveData.removeObservers(this)
-    liveData.observe(this, action)
-}
-
-fun <T, V : ViewBinding> BaseFragment<V>.observe(liveData: LiveData<T>, action: (t: T) -> Unit) {
-    observeNullable(liveData) { t -> t?.run(action) }
-}
-
-/**
- * Attaches an observable to the root binding, instead of the fragment. This is more efficient as
- * it will not call observe if the view is in the background.
- * */
-fun <T, V : ViewBinding> BaseFragment<V>.observeNullable(
-    liveData: LiveData<T>, action: (t: T) -> Unit
-) {
-    val root = this.binding?.root
-    if (root == null) {
-        liveData.removeObservers(this)
-        liveData.observe(this, action)
-    } else {
-        root.doOnAttach { view ->
-            // On attach should make findViewTreeLifecycleOwner non null, but use "this" just in case
-            val owner: LifecycleOwner = view.findViewTreeLifecycleOwner() ?: this@observeNullable
-            liveData.removeObservers(owner)
-            liveData.observe(owner, action)
-        }
-    }
+fun <T> LifecycleOwner.observeNullable(liveData: LiveData<T>, action: (t: T) -> Unit) {
+    liveData.observe(this) { action(it) }
 }
 
 sealed class Resource<out T> {
@@ -101,7 +64,8 @@ fun logError(throwable: Throwable) {
     Log.d("ApiError", "-------------------------------------------------------------------")
     Log.d("ApiError", "safeApiCall: " + throwable.localizedMessage)
     Log.d("ApiError", "safeApiCall: " + throwable.message)
-    throwable.printStackTrace()/*try {
+    throwable.printStackTrace()
+    /*try {
         showToast(throwable.stackTraceToString(), Toast.LENGTH_LONG)
     } catch (_ : Throwable) {
 
@@ -119,6 +83,15 @@ fun <T> safe(apiCall: () -> T): T? {
 }
 
 suspend fun <T> safeAsync(apiCall: suspend () -> T): T? {
+    return try {
+        apiCall.invoke()
+    } catch (throwable: Throwable) {
+        logError(throwable)
+        return null
+    }
+}
+
+suspend fun <T> suspendSafeApiCall(apiCall: suspend () -> T): T? {
     return try {
         apiCall.invoke()
     } catch (throwable: Throwable) {
