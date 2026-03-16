@@ -8,6 +8,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lagradost.quicknovel.APIRepository
+import kotlinx.coroutines.Job
 import com.lagradost.quicknovel.BaseApplication.Companion.context
 import com.lagradost.quicknovel.BaseApplication.Companion.getKey
 import com.lagradost.quicknovel.BaseApplication.Companion.removeKey
@@ -570,7 +571,7 @@ class ResultViewModel : ViewModel() {
             }
             loadMutex.withLock {
                 if (!hasLoaded) return@launch
-                updateBookmarkData(force = true)
+                updateBookmarkData()
                 addToHistory()
             }
         }

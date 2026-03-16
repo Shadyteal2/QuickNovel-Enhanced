@@ -499,10 +499,10 @@ class ResultFragment : Fragment() {
             // Update notes UI when read status changes
             novelTabBinding?.apply {
                 val isDropped = state == ReadType.DROPPED
-                resultNotesHeader.text = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
-                val accentColor = context?.colorFromAttribute(R.attr.colorPrimary) ?: Color.DKGRAY
-                resultNotesHeader.setTextColor(if (isDropped) Color.RED else accentColor)
-                resultNotesUnderline.setBackgroundColor(if (isDropped) Color.RED else context?.colorFromAttribute(R.attr.textColor) ?: Color.BLACK)
+                resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
+                val primaryColor = requireContext().colorFromAttribute(R.attr.colorPrimary)
+                resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else primaryColor
+                resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else primaryColor))
             }
         }
 

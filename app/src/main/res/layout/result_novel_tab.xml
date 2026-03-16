@@ -124,6 +124,29 @@
         android:layout_margin="0dp"
         android:orientation="vertical">
 
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/result_notes_layout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="10dp"
+            android:hint="@string/notes"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:hintTextColor="?attr/colorPrimary">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/result_notes_edittext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:minLines="1"
+                android:maxLines="6"
+                android:scrollbars="vertical"
+                android:textColor="?attr/textColor" />
+        </com.google.android.material.textfield.TextInputLayout>
+
         <TextView
             android:id="@+id/download_warning"
             android:layout_width="wrap_content"
@@ -230,46 +253,7 @@
             android:gravity="center"
             android:text="@string/quickstream_novel_text"
             app:iconSize="20dp" />
-        <LinearLayout
-            android:id="@+id/result_notes_layout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="10dp"
-            android:layout_marginHorizontal="10dp">
-            
-            <TextView
-                android:id="@+id/result_notes_header"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/notes"
-                android:textColor="?attr/colorAccent"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-                
-            <EditText
-                android:id="@+id/result_notes_edittext"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/notes"
-                android:background="@null"
-                android:paddingStart="0dp"
-                android:paddingEnd="0dp"
-                android:gravity="top|start"
-                android:inputType="textMultiLine"
-                android:minLines="1"
-                android:maxLines="6"
-                android:scrollbars="vertical"
-                android:textColor="?attr/textColor" />
-                
-            <View
-                android:id="@+id/result_notes_underline"
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:alpha="0.2"
-                android:background="?attr/textColor"/>
-        </LinearLayout>
+
 
         <!-- Progress Layout from ResultFragment code -->
         <LinearLayout
