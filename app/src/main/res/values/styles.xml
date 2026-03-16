@@ -60,6 +60,7 @@
         <item name="boxItemBackground">#121212</item>
         <item name="iconColor">?attr/textColor</item>
         <item name="white">#FFF</item>
+        <item name="searchBarBackground">@drawable/search_background</item>
 
         <!-- Checkboxes
         <item name="colorControlNormal">?attr/white</item>
@@ -199,7 +200,9 @@
         <item name="android:queryHint">@string/search_hint</item>
         <item name="android:background">@color/transparent</item>
         <item name="android:fontFamily">@font/google_sans</item>
-        <!--<item name="collapseIcon">@drawable/search_icon</item>-->
+        <item name="android:textColor">?attr/textColor</item>
+        <item name="android:textColorHint">?attr/grayTextColor</item>
+        <item name="android:editTextColor">?attr/textColor</item>
     </style>
 
     <style name="AppBottomSheetDialogTheme" parent="Theme.Design.Light.BottomSheetDialog">
@@ -345,7 +348,7 @@
         <item name="drawableTint">?attr/white</item>
         <!--<item name="drawableBottomCompat">@drawable/arrow_drop_down_24px</item>-->
         <item name="android:layout_width">0dp</item>
-        <item name="android:gravity">center_horizontal</item>
+        <item name="android:gravity">center</item>
         <item name="android:layout_gravity">center_vertical</item>
         <item name="android:layout_margin">0dp</item>
     </style>
@@ -411,11 +414,12 @@
         <item name="iconGrayBackground">@color/lightGrayBackground</item>
         <item name="boxItemBackground">@color/lightItemBackground</item>
         <item name="textColor">@color/lightTextColor</item>
-        <item name="floatingNavBackground">#E6DADADA</item> <!-- 90% alpha cloudy gray for visibility -->
-        <item name="floatingNavStroke">#66000000</item> <!-- 40% alpha dark edge for sharp definition -->
+        <item name="floatingNavBackground">#E6FFFFFF</item> <!-- Clean white glass -->
+        <item name="floatingNavStroke">#33000000</item> <!-- Subtle dark edge -->
         <item name="grayTextColor">@color/lightGrayTextColor</item>
         <item name="white">#000</item>
         <item name="colorOnPrimary">@color/blackText</item>
+        <item name="searchBarBackground">@drawable/search_background_light</item>
     </style>
 
     <style name="OverlayPrimaryColorParty">
@@ -625,12 +629,11 @@
 
     <style name="FloatingNavTheme" parent="ThemeOverlay.AppCompat">
         <!-- Sustainable spacing for Material 3 navigation -->
-        <item name="itemPaddingTop">0dp</item>
-        <item name="itemPaddingBottom">0dp</item>
-        <item name="navigationBarHeight">80dp</item>
+        <item name="itemPaddingTop">8dp</item>
+        <item name="itemPaddingBottom">12dp</item>
+        <item name="navigationBarHeight">60dp</item>
         <!-- Use color overrides to hide the M3 pill indicator safely without using missing attributes -->
         <item name="colorPrimaryContainer">@android:color/transparent</item>
         <item name="colorOnPrimaryContainer">?attr/textColor</item>
-        <item name="itemRippleColor">?attr/colorControlHighlight</item>
     </style>
 </resources>

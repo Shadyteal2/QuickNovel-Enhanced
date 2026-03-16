@@ -16,7 +16,7 @@
                 app:menu="@menu/history_actionbar"
                 android:paddingTop="@dimen/navbarHeight"
                 app:title="@string/history"
-                android:background="?attr/primaryGrayBackground"
+                android:background="#33000000"
                 app:navigationIconTint="?attr/iconColor"
                 app:titleTextColor="?attr/textColor"
                 app:layout_scrollFlags="scroll|enterAlways"

@@ -78,13 +78,27 @@ import com.lagradost.quicknovel.util.UIHelper.html
 import com.lagradost.quicknovel.util.UIHelper.popupMenu
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.safefile.SafeFile
+import android.view.ViewGroup
+import androidx.interpolator.view.animation.FastOutSlowInInterpolator
+import androidx.viewpager2.adapter.FragmentStateAdapter
+import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.bottomnavigation.BottomNavigationItemView
+import com.google.android.material.bottomnavigation.BottomNavigationMenuView
+import com.lagradost.quicknovel.ui.history.HistoryFragment
+import com.lagradost.quicknovel.ui.settings.SettingsFragment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.content.SharedPreferences
 import okhttp3.OkHttpClient
 import java.lang.ref.WeakReference
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
+import kotlin.math.abs
 import kotlin.reflect.KClass
+import android.net.Uri
+import coil3.load
+import coil3.request.crossfade
+import coil3.asDrawable
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -325,6 +339,15 @@ class MainActivity : AppCompatActivity() {
 
     private val viewModel: ResultViewModel by viewModels()
 
+    private val backgroundListener = SharedPreferences.OnSharedPreferenceChangeListener { _: SharedPreferences, key: String? ->
+        if (key == getString(R.string.background_image_key) ||
+            key == getString(R.string.background_blur_key) ||
+            key == getString(R.string.background_dim_key)
+        ) {
+            updateGlobalBackground()
+        }
+    }
+
     private fun hidePreviewPopupDialog() {
         viewModel.clear()
         bottomPreviewPopup.dismissSafe(this)
@@ -473,19 +496,20 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun updateNavBar(destination: NavDestination) {
-        //this.hideKeyboard()
-
-        val isNavVisible = listOf(
-            R.id.navigation_mainpage,
-            R.id.navigation_homepage,
-            R.id.navigation_history,
+        val tabIds = listOf(
             R.id.navigation_download,
             R.id.navigation_search,
+            R.id.navigation_history,
             R.id.navigation_settings,
-        ).contains(destination.id)
+        )
+        val isTab = tabIds.contains(destination.id)
 
         binding?.apply {
-            navBarContainer.isVisible = isNavVisible
+            navBarContainer.isVisible = isTab || destination.id == R.id.navigation_homepage || destination.id == R.id.navigation_mainpage
+            mainViewpager.isVisible = isTab
+            // Since navHostFragment is a <fragment> tag, it might not be directly in the binding
+            // Depending on the version of view binding, it might be there or we might need to find it
+            findViewById<android.view.View>(R.id.nav_host_fragment)?.isVisible = !isTab
         }
     }
 
@@ -508,6 +532,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
+        
+        updateGlobalBackground()
+        settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             binding?.navBarBlurView?.setRenderEffect(
@@ -526,26 +553,113 @@ class MainActivity : AppCompatActivity() {
         navController.addOnDestinationChangedListener { _: NavController, navDestination: NavDestination, bundle: Bundle? ->
             // Intercept search and add a query
             updateNavBar(navDestination)
-            /*if (navDestination.matchDestination(R.id.navigation_search) && !nextSearchQuery.isNullOrBlank()) {
-                bundle?.apply {
-                    this.putString(SearchFragment.SEARCH_QUERY, nextSearchQuery)
-                }
-            }
 
-            if (isTvSettings()) {
-                if (navDestination.matchDestination(R.id.navigation_home)) {
-                    attachBackPressedCallback()
-                } else detachBackPressedCallback()
-            }*/
+            // Background visibility scope
+            val hideBackgroundOn = listOf<Int>(
+                // R.id.global_to_navigation_results,
+                // R.id.navigation_results,
+            )
+            val shouldHide = hideBackgroundOn.contains(navDestination.id)
+            
+            binding?.apply {
+                val settingsManager = PreferenceManager.getDefaultSharedPreferences(this@MainActivity)
+                val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
+                val hasBackground = !imageUri.isNullOrBlank()
+
+                appBackgroundImage.isVisible = hasBackground && !shouldHide
+                appBackgroundDim.isVisible = hasBackground && !shouldHide
+                appBackgroundLightScrim.isVisible = hasBackground && !shouldHide
+            }
         }
 
         val navView: BottomNavigationView = findViewById(R.id.nav_view)
+        
+        // Programmatically disable clipping on BottomNavigationItemViews
+        navView.apply {
+            val menuView = getChildAt(0) as? BottomNavigationMenuView
+            menuView?.apply {
+                clipChildren = false
+                clipToPadding = false
+                for (i in 0 until childCount) {
+                    val itemView = getChildAt(i) as? BottomNavigationItemView
+                    itemView?.apply {
+                        clipChildren = false
+                        clipToPadding = false
+                    }
+                }
+            }
+        }
+
+        val tabs = listOf(
+            R.id.navigation_download,
+            R.id.navigation_search,
+            R.id.navigation_history,
+            R.id.navigation_settings,
+        )
+
+        binding?.mainViewpager?.apply {
+            adapter = object : FragmentStateAdapter(this@MainActivity) {
+                override fun getItemCount(): Int = tabs.size
+                override fun createFragment(position: Int) = when (tabs[position]) {
+                    R.id.navigation_download -> DownloadFragment()
+                    R.id.navigation_search -> SearchFragment()
+                    R.id.navigation_history -> HistoryFragment()
+                    R.id.navigation_settings -> SettingsFragment()
+                    else -> DownloadFragment()
+                }
+            }
+            isUserInputEnabled = true // Enable swiping
+            
+            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                override fun onPageSelected(position: Int) {
+                    navView.selectedItemId = tabs[position]
+                    // Fade in indicator if it was hidden
+                    binding?.navIndicator?.animate()?.alpha(1f)?.setDuration(200)?.start()
+                }
+
+                override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
+                    binding?.apply {
+                        val width = navView.width
+                        if (width > 0) {
+                            val tabEntries = tabs.size
+                            val tabWidth = width / tabEntries
+                            val indicatorWidth = navIndicator.width
+                            val centerX = tabWidth / 2f
+                            val startX = position * tabWidth + centerX - indicatorWidth / 2f
+                            
+                            // 1:1 tracking with interpolation
+                            val currentX = startX + tabWidth * FastOutSlowInInterpolator().getInterpolation(positionOffset)
+                            navIndicator.translationX = currentX
+                        }
+                    }
+                }
+
+                override fun onPageScrollStateChanged(state: Int) {
+                    if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                        // Subtly fade alpha when idle
+                        binding?.navIndicator?.animate()?.alpha(0.6f)?.setDuration(1000)?.start()
+                    } else {
+                        binding?.navIndicator?.animate()?.alpha(1f)?.setDuration(200)?.start()
+                    }
+                }
+            })
+        }
 
         navView.setOnItemSelectedListener { item ->
-            onNavDestinationSelected(
-                item,
-                navController = navController
-            )
+            val index = tabs.indexOf(item.itemId)
+            if (index != -1) {
+                // If we are currently showing a non-tab screen (like results), navigate back to a tab
+                if (binding?.mainViewpager?.isVisible == false) {
+                    onNavDestinationSelected(item, navController)
+                }
+                binding?.mainViewpager?.currentItem = index
+                true
+            } else {
+                onNavDestinationSelected(
+                    item,
+                    navController = navController
+                )
+            }
         }
 
         //val navController = findNavController(R.id.nav_host_fragment)
@@ -765,5 +879,47 @@ class MainActivity : AppCompatActivity() {
     fun test() {
         // val response = app.get("https://ranobes.net/up/a-bored-lich/936969-1.html")
         // println(response.text)
+    }
+
+    fun updateGlobalBackground() {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+        val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
+        val blur = settingsManager.getInt(getString(R.string.background_blur_key), 0)
+        val dim = settingsManager.getInt(getString(R.string.background_dim_key), 0)
+        val isLightTheme = settingsManager.getString(getString(R.string.theme_key), "AmoledLight") == "Light"
+
+        binding?.apply {
+            if (imageUri.isNullOrBlank()) {
+                appBackgroundImage.isVisible = false
+                appBackgroundDim.isVisible = false
+                appBackgroundLightScrim.isVisible = false
+                return@apply
+            }
+
+            appBackgroundImage.isVisible = true
+            appBackgroundDim.isVisible = true
+            appBackgroundLightScrim.isVisible = true
+
+            appBackgroundImage.load(Uri.parse(imageUri)) {
+                crossfade(true)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (blur > 0) {
+                    appBackgroundImage.setRenderEffect(
+                        RenderEffect.createBlurEffect(
+                            blur.toFloat(),
+                            blur.toFloat(),
+                            Shader.TileMode.CLAMP
+                        )
+                    )
+                } else {
+                    appBackgroundImage.setRenderEffect(null)
+                }
+            }
+
+            appBackgroundDim.alpha = dim / 100f
+            appBackgroundLightScrim.alpha = if (isLightTheme) 0.25f else 0f
+        }
     }
 }

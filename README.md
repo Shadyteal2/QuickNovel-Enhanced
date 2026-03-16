@@ -3,22 +3,25 @@ Adfree FOSS Android app for downloading novels. It also functions as an Epub rea
 This project is an enhanced fork of the original QuickNovel app, introducing a fully revamped, modern, and beautiful UI, alongside critical bug fixes.
 
 **Key Enhanced Features:**
-- **Modern Cinematic UI**: Glassmorphism, beautiful gradients, and fully dynamic layout components.
-- **Improved Reader Experience**: Better rendering and spacing for novel reading.
+- **Custom Background Engine**: Personalize your library and search screens with any image. Includes adjustable **Blur** and **Dim** settings.
+- **Premium Glassmorphism UI**: Floating navigation, translucent cards, beautiful gradients, and smooth micro-animations.
+- **Advanced Theme System**: Optimized themes including the new **'Flashbang' Light Theme** with dynamic readability adjustments.
+- **Universal Text Readability**: Subtle shadows and theme-aware color attributes ensure text pops against any background.
+- **Improved Reader Experience**: Refined typography, optimized spacing, and immersive reading modes.
 - **Fixes for Modern Android**: Support for Android 15 (SDK 35), fixed coil integrations, and resolved resource linking errors.
-- **Refined Navigation & Views**: Upgraded search bars, floating navigation bars, and immersive reading mode.
-- **Support for more providers**: NovelFire, WtrLabProvider, and others have been updated or fixed.
+- **Optimized In-App Updater**: Direct integration with the NeoQN repository for faster and more reliable updates.
+- **Support for More Providers**: NovelFire, WtrLabProvider, and others have been updated or fixed.
 
 ## Screenshots
 
 | <img src="./app/assets/NeoQN%20(1).png" width="250"/> | <img src="./app/assets/NeoQN%20(2).png" width="250"/> | <img src="./app/assets/NeoQN%20(3).png" width="250"/> | <img src="./app/assets/NeoQN%20(4).png" width="250"/> |
 |:---:|:---:|:---:|:---:|
-| [Write description here] | [Write description here] | [Write description here] | [Write description here] |
-**Original Project:** https://github.com/LagradOst/QuickNovel
+| **Library with Custom BG** | **Immersive Reader** | **Enhanced Search** | **'Flashbang' Light Mode** |
+**Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
 
-**Discord:** https://discord.gg/5Hus6fM
+**Discord:** [Join the community](https://discord.gg/5Hus6fM)
 
-**Download origin:** https://github.com/LagradOst/QuickNovel/releases
+**Download Releases:** [Get the latest APK](https://github.com/Shadyteal2/QuickNovel-Enhanced/releases)
 
 **Providers used:** 
 
