@@ -33,6 +33,7 @@ import kotlin.math.roundToInt
 class AnyAdapter(
     private val resView: AutofitRecyclerView,
     private val downloadViewModel: DownloadViewModel,
+    private val isDownloadsPage: Boolean = false,
 ) : NoStateAdapter<Any>(
     diffCallback = BaseDiffCallback(
         itemSame = { a, b ->
@@ -70,23 +71,33 @@ class AnyAdapter(
 
 
     override fun onCreateFooter(parent: ViewGroup): ViewHolderState<Any> {
-        val compact = parent.context.getDownloadIsCompact()
+        if (isDownloadsPage) {
+            val compact = parent.context.getDownloadIsCompact()
 
-        return ViewHolderState(
-            if (compact) {
-                DownloadImportBinding.inflate(
+            return ViewHolderState(
+                if (compact) {
+                    DownloadImportBinding.inflate(
+                        LayoutInflater.from(parent.context),
+                        parent,
+                        false
+                    )
+                } else {
+                    DownloadImportCardBinding.inflate(
+                        LayoutInflater.from(parent.context),
+                        parent,
+                        false
+                    )
+                }
+            )
+        } else {
+            return ViewHolderState(
+                com.lagradost.quicknovel.databinding.EmptySpacer180dpBinding.inflate(
                     LayoutInflater.from(parent.context),
                     parent,
                     false
                 )
-            } else {
-                DownloadImportCardBinding.inflate(
-                    LayoutInflater.from(parent.context),
-                    parent,
-                    false
-                )
-            }
-        )
+            )
+        }
     }
 
     override fun onClearView(holder: ViewHolderState<Any>) {
@@ -106,6 +117,7 @@ class AnyAdapter(
     }
 
     override fun onBindFooter(holder: ViewHolderState<Any>) {
+        if (!isDownloadsPage) return
         when (val binding = holder.view) {
             is DownloadImportBinding -> {
                 binding.backgroundCard.setOnClickListener {
@@ -188,13 +200,15 @@ class AnyAdapter(
                     historyPlay.setOnClickListener {
                         downloadViewModel.stream(card)
                     }
-                    imageView.setOnClickListener {
-                        downloadViewModel.load(card)
+                    backgroundCard.setOnClickListener { view ->
+                        view.postDelayed({
+                            downloadViewModel.load(card)
+                        }, 50)
                     }
                     historyDelete.setOnClickListener {
                         downloadViewModel.deleteAlert(card)
                     }
-                    imageView.setOnLongClickListener { view ->
+                    backgroundCard.setOnLongClickListener { view ->
                         hideKeyboard(view)
                         downloadViewModel.showMetadata(card)
                         return@setOnLongClickListener true
@@ -258,8 +272,10 @@ class AnyAdapter(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     coverHeight
                                 )
-                                setOnClickListener {
-                                    downloadViewModel.load(item)
+                                setOnClickListener { view ->
+                                    view.postDelayed({
+                                        downloadViewModel.load(item)
+                                    }, 50)
                                 }
                                 setOnLongClickListener { view ->
                                     hideKeyboard(view)

@@ -18,7 +18,8 @@
             app:cardCornerRadius="@dimen/roundedImageRadius"
             app:cardBackgroundColor="?attr/boxItemBackground"
             android:clickable="true"
-            android:focusable="true">
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
         <!-- USING CROP RATIO (182/268), centerCrop for fill -->
 
         <androidx.cardview.widget.CardView

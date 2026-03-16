@@ -143,9 +143,10 @@ class ViewpagerAdapter(
                     setRecycledViewPool(AnyAdapter.sharedPool)
                     adapter = AnyAdapter(
                         this,
-                        downloadViewModel
+                        downloadViewModel,
+                        isDownloadsPage = position == 0
                     ).apply {
-                        footers = if(position == 0) 1 else 0
+                        footers = 1
                         collectionsOfRecyclerView[position] = WeakReference(binding.pageRecyclerview)
                         setHasStableIds(true)
                         submitList(item.items)
@@ -156,7 +157,7 @@ class ViewpagerAdapter(
                     collectionsOfRecyclerView[position] = WeakReference(binding.pageRecyclerview)
                 }
                 (adapter as? AnyAdapter)?.apply {
-                    footers = if(position == 0) 1 else 0
+                    footers = 1
                     submitList(item.items)
                 }
                 // scrollToPosition(0)

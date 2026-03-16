@@ -38,6 +38,7 @@ import com.lagradost.nicehttp.ignoreAllSSLErrors
 import com.lagradost.quicknovel.APIRepository.Companion.providersActive
 import com.lagradost.quicknovel.BookDownloader2.openQuickStream
 import com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE
+import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
 import com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE_PDF
 import com.lagradost.quicknovel.BookDownloader2Helper.checkWrite
 import com.lagradost.quicknovel.BookDownloader2Helper.createQuickStream
@@ -165,12 +166,33 @@ class MainActivity : AppCompatActivity() {
             (activity as? AppCompatActivity)?.loadResult(url, apiName, startAction)
         }
 
-        fun Activity?.navigate(@IdRes navigation: Int, arguments: Bundle? = null) {
+        fun Activity?.navigate(@IdRes navigation: Int, arguments: Bundle? = null, options: NavOptions? = null) {
             try {
                 if (this is FragmentActivity) {
                     val navHostFragment =
                         supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment?
-                    navHostFragment?.navController?.navigate(navigation, arguments)
+
+                    if (navigation == R.id.global_to_navigation_mainpage) {
+                        // Clear outer SupportFragmentManager
+                        supportFragmentManager.fragments.firstOrNull { it is MainPageFragment }?.let {
+                            supportFragmentManager.beginTransaction()
+                                .setReorderingAllowed(true)
+                                .remove(it)
+                                .commitNowAllowingStateLoss()
+                        }
+
+                        // Clear child FragmentManager
+                        val childFragments = navHostFragment?.childFragmentManager?.fragments
+                        val oldFragment = childFragments?.firstOrNull { it is MainPageFragment }
+                        if (oldFragment != null) {
+                            navHostFragment.childFragmentManager.beginTransaction()
+                                .setReorderingAllowed(true)
+                                .remove(oldFragment)
+                                .commitNowAllowingStateLoss()
+                        }
+                    }
+
+                    navHostFragment?.navController?.navigate(navigation, arguments, options)
                 }
             } catch (t: Throwable) {
                 logError(t)
@@ -646,6 +668,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         navView.setOnItemSelectedListener { item ->
+            navView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             val index = tabs.indexOf(item.itemId)
             if (index != -1) {
                 // If we are currently showing a non-tab screen (like results), navigate back to a tab
@@ -673,10 +696,17 @@ class MainActivity : AppCompatActivity() {
             .setPopExitAnim(R.anim.nav_pop_exit)
             .setPopUpTo(navController.graph.startDestinationId, false)
             .build()
-        /*
-                navView.setOnNavigationItemReselectedListener { item ->
-                    return@setOnNavigationItemReselectedListener
-                }*/
+        navView.setOnItemReselectedListener { item ->
+            val index = tabs.indexOf(item.itemId)
+            if (index != -1) {
+                if (binding?.mainViewpager?.isVisible == false) {
+                    // Explicit inclusive pop using integer literal (1) for POP_BACKSTACK_INCLUSIVE
+                    supportFragmentManager.popBackStack(null, 1)
+                    navController.popBackStack(navController.graph.startDestinationId, false)
+                }
+                binding?.mainViewpager?.currentItem = index
+            }
+        }
         /*navView.setOnNavigationItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.navigation_homepage -> {
