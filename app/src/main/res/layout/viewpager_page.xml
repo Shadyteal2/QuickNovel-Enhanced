@@ -6,6 +6,6 @@
     android:paddingTop="5dp"
     android:paddingLeft="5dp"
     android:paddingRight="5dp"
-    android:paddingBottom="170dp"
+    android:paddingBottom="0dp"
     android:clipToPadding="false"
     android:focusable="false" />

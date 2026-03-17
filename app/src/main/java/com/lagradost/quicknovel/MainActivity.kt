@@ -538,6 +538,15 @@ class MainActivity : AppCompatActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateLocale() // android fucks me by chaining lang when rotating the phone
+        
+        val tabs = listOf(
+            R.id.navigation_download,
+            R.id.navigation_search,
+            R.id.navigation_history,
+            R.id.navigation_settings,
+        )
+        val currentItem = tabs.getOrNull(binding?.mainViewpager?.currentItem ?: 0) ?: return
+        syncIndicator(currentItem)
     }
 
     var binding: ActivityMainBinding? = null
@@ -641,17 +650,15 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
                     binding?.apply {
-                        val width = navView.width
-                        if (width > 0) {
-                            val tabEntries = tabs.size
-                            val tabWidth = width / tabEntries
-                            val indicatorWidth = navIndicator.width
-                            val centerX = tabWidth / 2f
-                            val startX = position * tabWidth + centerX - indicatorWidth / 2f
-                            
-                            // 1:1 tracking with interpolation
-                            val currentX = startX + tabWidth * FastOutSlowInInterpolator().getInterpolation(positionOffset)
-                            navIndicator.translationX = currentX
+                        val itemViewCurrent = navView.findViewById<android.view.View>(tabs[position])
+                        val itemViewNext = if (position + 1 < tabs.size) navView.findViewById<android.view.View>(tabs[position + 1]) else itemViewCurrent
+
+                        if (itemViewCurrent != null && itemViewNext != null) {
+                            val currentCenterX = itemViewCurrent.left + itemViewCurrent.width / 2f
+                            val nextCenterX = itemViewNext.left + itemViewNext.width / 2f
+
+                            val currentX = currentCenterX + (nextCenterX - currentCenterX) * androidx.interpolator.view.animation.FastOutSlowInInterpolator().getInterpolation(positionOffset)
+                            navIndicator.translationX = currentX - navIndicator.width / 2f
                         }
                     }
                 }
@@ -675,7 +682,10 @@ class MainActivity : AppCompatActivity() {
                 if (binding?.mainViewpager?.isVisible == false) {
                     onNavDestinationSelected(item, navController)
                 }
-                binding?.mainViewpager?.currentItem = index
+                if (binding?.mainViewpager?.currentItem != index) {
+                    binding?.mainViewpager?.setCurrentItem(index, false)
+                }
+                syncIndicator(item.itemId)
                 true
             } else {
                 onNavDestinationSelected(
@@ -707,30 +717,15 @@ class MainActivity : AppCompatActivity() {
                 binding?.mainViewpager?.currentItem = index
             }
         }
-        /*navView.setOnNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.navigation_homepage -> {
-                    navController.navigate(R.id.navigation_homepage, null, navOptions)
-                }
-
-                R.id.navigation_search -> {
-                    navController.navigate(R.id.navigation_search, null, navOptions)
-                }
-
-                R.id.navigation_download -> {
-                    navController.navigate(R.id.navigation_download, null, navOptions)
-                }
-
-                R.id.navigation_history -> {
-                    navController.navigate(R.id.navigation_history, null, navOptions)
-                }
-
-                R.id.navigation_settings -> {
-                    navController.navigate(R.id.navigation_settings, null, navOptions)
-                }
+        
+        navView.post {
+            val firstItem = tabs.getOrNull(binding?.mainViewpager?.currentItem ?: 0) ?: return@post
+            val itemView = navView.findViewById<android.view.View>(firstItem)
+            if (itemView != null) {
+                binding?.navIndicator?.translationX = (itemView.left + itemView.width / 2f) - (binding?.navIndicator?.width ?: 0) / 2f
             }
-            true
-        }*/
+        }
+
 
         observe(viewModel.readState) {
             bottomPreviewBinding?.apply {
@@ -951,5 +946,30 @@ class MainActivity : AppCompatActivity() {
             appBackgroundDim.alpha = dim / 100f
             appBackgroundLightScrim.alpha = if (isLightTheme) 0.25f else 0f
         }
+    }
+
+    private fun syncIndicator(itemId: Int) {
+        val navView = binding?.navView ?: return
+        val navIndicator = binding?.navIndicator ?: return
+        val navBarContainer = binding?.navBarContainer ?: return
+
+        navIndicator.postDelayed({
+            val itemView = navView.findViewById<android.view.View>(itemId) ?: return@postDelayed
+            val itemLocation = IntArray(2)
+            itemView.getLocationInWindow(itemLocation)
+
+            val containerLocation = IntArray(2)
+            navBarContainer.getLocationInWindow(containerLocation)
+
+            val relativeX = itemLocation[0] - containerLocation[0]
+            val centerX = relativeX + itemView.width / 2f
+            val targetX = centerX - navIndicator.width / 2f
+
+            android.animation.ObjectAnimator.ofFloat(navIndicator, "translationX", targetX).apply {
+                duration = 200
+                start()
+            }
+            navView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+        }, 50)
     }
 }

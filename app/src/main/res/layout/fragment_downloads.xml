@@ -4,7 +4,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:id="@+id/downloadRoot"
-        android:background="@android:color/transparent"
+        android:fitsSystemWindows="false"
         android:orientation="vertical">
 
     <FrameLayout
@@ -110,8 +110,6 @@
                     android:layout_height="match_parent">
                 <androidx.viewpager2.widget.ViewPager2
                         android:id="@+id/viewpager"
-                        android:paddingBottom="130dp"
-                        android:clipToPadding="false"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         tools:listitem="@layout/viewpager_page" />
@@ -170,8 +168,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="end|bottom"
-                    android:layout_marginEnd="16dp"
-                    android:layout_marginBottom="140dp"
+                    android:layout_marginEnd="@dimen/download_fab_margin_end"
+                    android:layout_marginBottom="@dimen/download_fab_margin_bottom"
                     app:cardCornerRadius="28dp"
                     app:cardElevation="12dp"
                     app:backgroundTint="@null"

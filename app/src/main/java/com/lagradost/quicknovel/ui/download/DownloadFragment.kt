@@ -38,6 +38,7 @@ import com.lagradost.quicknovel.DownloadState
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.databinding.FragmentDownloadsBinding
 import com.lagradost.quicknovel.databinding.SortBottomSheetBinding
+import com.lagradost.quicknovel.util.SettingsHelper.getDownloadIsCompact
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.ui.SortingMethodAdapter
 import com.lagradost.quicknovel.ui.UiImage
@@ -53,6 +54,8 @@ import kotlinx.coroutines.withContext
 class DownloadFragment : Fragment() {
     private lateinit var viewModel: DownloadViewModel
     lateinit var binding: FragmentDownloadsBinding
+
+
 
     data class DownloadData(
         @JsonProperty("source")
@@ -133,14 +136,39 @@ class DownloadFragment : Fragment() {
         //return inflater.inflate(R.layout.fragment_downloads, container, false)
     }
 
+    override fun onResume() {
+        super.onResume()
+        setupGridView()
+    }
+
     @SuppressLint("NotifyDataSetChanged")
     private fun setupGridView() {
-        (binding.viewpager.adapter as? ViewpagerAdapter)?.notifyDataSetChanged()
+        val adapter = (binding.viewpager.adapter as? ViewpagerAdapter) ?: return
+        for ((_, ref) in adapter.collectionsOfRecyclerView) {
+            val rv = ref.get() ?: continue
+            val compactView = rv.context.getDownloadIsCompact()
+
+            val spanCountLandscape = if (compactView) 2 else 6
+            val spanCountPortrait = if (compactView) 1 else 3
+            val orientation = rv.resources.configuration.orientation
+            rv.spanCount = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                spanCountLandscape
+            } else {
+                spanCountPortrait
+            }
+
+            (rv.adapter as? AnyAdapter)?.notifyDataSetChanged()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         setupGridView()
+        binding.downloadFabContainer.visibility = if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            View.GONE
+        } else {
+            View.VISIBLE
+        }
     }
 
     // https://stackoverflow.com/a/67441735/13746422

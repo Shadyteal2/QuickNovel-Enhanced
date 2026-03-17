@@ -98,10 +98,7 @@ class ResultFragment : Fragment() {
             viewModel.isResume = false
         }
 
-        activity?.apply {
-            window?.navigationBarColor =
-                colorFromAttribute(R.attr.primaryBlackBackground)
-        }
+
         val savedNote = viewModel.getNote() ?: ""
         novelTabBinding?.resultNotesEdittext?.let { et ->
             if (et.text?.toString() != savedNote) {
@@ -153,7 +150,8 @@ class ResultFragment : Fragment() {
                         val currentApi = repo ?: return@setOnClickListener
                         activity?.navigate(
                             R.id.global_to_navigation_mainpage,
-                            MainPageFragment.newInstance(currentApi.name, tag = tagIndex)
+                            MainPageFragment.newInstance(currentApi.name, tag = tagIndex),
+                            options = com.lagradost.quicknovel.MainActivity.navOptions
                         )
                     }
                 }
