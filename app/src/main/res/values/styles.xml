@@ -69,6 +69,16 @@
          -->
     </style>
 
+    <!-- Custom Splash Theme to bypass Android 12+ system splash icon -->
+    <style name="SplashTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowSplashScreenBackground">#000000</item>
+        <!-- Use transparent so only the black screen blips before our full animation -->
+        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">#000000</item>
+    </style>
+
     <style name="TabNoCaps" parent="TextAppearance.Design.Tab">
         <item name="textAllCaps">false</item>
         <item name="fontFamily">@font/google_sans</item>
