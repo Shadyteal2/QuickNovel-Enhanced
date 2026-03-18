@@ -38,6 +38,7 @@ import com.lagradost.quicknovel.DownloadState
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.databinding.FragmentDownloadsBinding
 import com.lagradost.quicknovel.databinding.SortBottomSheetBinding
+import com.lagradost.quicknovel.util.SettingsHelper.getDownloadIsCompact
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.ui.SortingMethodAdapter
 import com.lagradost.quicknovel.ui.UiImage
@@ -53,6 +54,8 @@ import kotlinx.coroutines.withContext
 class DownloadFragment : Fragment() {
     private lateinit var viewModel: DownloadViewModel
     lateinit var binding: FragmentDownloadsBinding
+
+
 
     data class DownloadData(
         @JsonProperty("source")
@@ -133,14 +136,39 @@ class DownloadFragment : Fragment() {
         //return inflater.inflate(R.layout.fragment_downloads, container, false)
     }
 
+    override fun onResume() {
+        super.onResume()
+        setupGridView()
+    }
+
     @SuppressLint("NotifyDataSetChanged")
     private fun setupGridView() {
-        (binding.viewpager.adapter as? ViewpagerAdapter)?.notifyDataSetChanged()
+        val adapter = (binding.viewpager.adapter as? ViewpagerAdapter) ?: return
+        for ((_, ref) in adapter.collectionsOfRecyclerView) {
+            val rv = ref.get() ?: continue
+            val compactView = rv.context.getDownloadIsCompact()
+
+            val spanCountLandscape = if (compactView) 2 else 6
+            val spanCountPortrait = if (compactView) 1 else 3
+            val orientation = rv.resources.configuration.orientation
+            rv.spanCount = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                spanCountLandscape
+            } else {
+                spanCountPortrait
+            }
+
+            (rv.adapter as? AnyAdapter)?.notifyDataSetChanged()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         setupGridView()
+        binding.downloadFabContainer.visibility = if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            View.GONE
+        } else {
+            View.VISIBLE
+        }
     }
 
     // https://stackoverflow.com/a/67441735/13746422
@@ -202,7 +230,116 @@ class DownloadFragment : Fragment() {
         }
 
         binding.viewpager.adapter = adapter
-        //binding.viewpager.reduceDragSensitivity()
+        binding.viewpager.isUserInputEnabled = false // Disable smooth swiping
+        
+        val dotsHolder = binding.pillDotsHolder
+        var initialTouchX = 0f
+        var initialPillX = 0f
+        var currentSelectedIndex = 0
+        var isDragging = false
+
+        for (i in 0 until dotsHolder.childCount) {
+            dotsHolder.getChildAt(i).setOnClickListener { view ->
+                binding.viewpager.setCurrentItem(i, false) // Fast switch
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            }
+        }
+
+        binding.travelerIcon.setOnTouchListener { view, event ->
+            val maxOffset = binding.libraryPillMenu.width - view.width
+            val stepSize = if (maxOffset > 0) maxOffset.toFloat() / 5f else 0f
+
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    view.parent.requestDisallowInterceptTouchEvent(true)
+                    initialTouchX = event.rawX
+                    initialPillX = view.translationX
+                    isDragging = true
+                    true
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - initialTouchX
+                    var newX = initialPillX + dx
+                    newX = newX.coerceIn(0f, maxOffset.toFloat())
+                    view.translationX = newX
+
+                    if (stepSize > 0) {
+                        val index = (newX / stepSize).coerceIn(0f, 5f).toInt()
+                        if (index != currentSelectedIndex) {
+                            currentSelectedIndex = index
+                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                            
+                            // Highlight dot
+                            for (i in 0 until dotsHolder.childCount) {
+                                val dot = (dotsHolder.getChildAt(i) as? android.view.ViewGroup)?.getChildAt(0)
+                                if (dot != null) {
+                                    if (i == index) {
+                                        dot.alpha = 1.0f
+                                        dot.scaleX = 1.25f
+                                        dot.scaleY = 1.25f
+                                    } else {
+                                        dot.alpha = 0.4f
+                                        dot.scaleX = 1.0f
+                                        dot.scaleY = 1.0f
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    view.parent.requestDisallowInterceptTouchEvent(false)
+                    isDragging = false
+                    if (stepSize > 0) {
+                        val targetX = currentSelectedIndex * stepSize
+                        android.animation.ObjectAnimator.ofFloat(view, "translationX", targetX).apply {
+                            duration = 200
+                            interpolator = android.view.animation.OvershootInterpolator(1.2f)
+                            start()
+                        }
+                        binding.viewpager.setCurrentItem(currentSelectedIndex, false) // Fast switch
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        binding.viewpager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                if (isDragging) return // Don't override user drag offset
+                
+                currentSelectedIndex = position
+                binding.travelerIcon.post {
+                    val maxOffset = binding.libraryPillMenu.width - binding.travelerIcon.width
+                    if (maxOffset > 0) {
+                        val stepSize = maxOffset.toFloat() / 5f
+                        val targetX = position * stepSize
+                        android.animation.ObjectAnimator.ofFloat(binding.travelerIcon, "translationX", targetX).apply {
+                            duration = 250
+                            interpolator = android.view.animation.OvershootInterpolator(1.1f)
+                            start()
+                        }
+                    }
+                }
+
+                for (i in 0 until dotsHolder.childCount) {
+                    val dot = (dotsHolder.getChildAt(i) as? android.view.ViewGroup)?.getChildAt(0)
+                    if (dot != null) {
+                        if (i == position) {
+                            dot.alpha = 1.0f
+                            dot.scaleX = 1.25f
+                            dot.scaleY = 1.25f
+                        } else {
+                            dot.alpha = 0.4f
+                            dot.scaleX = 1.0f
+                            dot.scaleY = 1.0f
+                        }
+                    }
+                }
+            }
+        })
 
         binding.bookmarkTabs.apply {
             val tabs = mutableListOf(R.string.tab_downloads)

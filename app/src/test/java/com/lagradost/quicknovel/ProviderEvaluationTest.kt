@@ -95,7 +95,7 @@ class ProviderEvaluationTest {
                     continue
                 }
                 
-                if (loadResult !is StreamResponse && loadResult !is SearchResponse) {
+                if (loadResult !is StreamResponse && loadResult !is LoadResponse) {
                      println("❌ ${api.name} FAILED: Load returned unknown type")
                      broken.add(api.name)
                      continue

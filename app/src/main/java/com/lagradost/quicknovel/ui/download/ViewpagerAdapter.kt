@@ -123,6 +123,13 @@ class ViewpagerAdapter(
 
         binding.pageRecyclerview.tag = position
         binding.pageRecyclerview.apply {
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
+                val navInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                val sliderOffset = (158 * resources.displayMetrics.density).toInt()
+                v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, navInsets.bottom + sliderOffset)
+                insets
+            }
+
             val compactView = binding.root.context.getDownloadIsCompact()
 
             val spanCountLandscape = if (compactView) 2 else 6
@@ -145,7 +152,7 @@ class ViewpagerAdapter(
                         this,
                         downloadViewModel
                     ).apply {
-                        footers = if(position == 0) 1 else 0
+                        footers = if (position == 0) 1 else 0
                         collectionsOfRecyclerView[position] = WeakReference(binding.pageRecyclerview)
                         setHasStableIds(true)
                         submitList(item.items)
@@ -156,7 +163,7 @@ class ViewpagerAdapter(
                     collectionsOfRecyclerView[position] = WeakReference(binding.pageRecyclerview)
                 }
                 (adapter as? AnyAdapter)?.apply {
-                    footers = if(position == 0) 1 else 0
+                    footers = if (position == 0) 1 else 0
                     submitList(item.items)
                 }
                 // scrollToPosition(0)

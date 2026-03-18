@@ -307,4 +307,6 @@
     <string name="reset_background_key" translatable="false">reset_background</string>
     <string name="background_reset_confirmed">Background has been reset to default</string>
     <string name="by_shady">By Shady</string>
+    <string name="notes">Notes</string>
+    <string name="dropped_reason">Why did you drop this novel?</string>
 </resources>

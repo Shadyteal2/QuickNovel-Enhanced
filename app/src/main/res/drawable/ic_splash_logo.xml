@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="280dp"
+    android:height="280dp"
+    android:viewportWidth="280"
+    android:viewportHeight="280">
+
+    <!-- Left Book Outline -->
+    <path
+        android:name="path_outline_left"
+        android:pathData="M 60,60 Q 60,50 70,50 L 135,50 Q 140,50 140,55 L 140,210 Q 140,215 135,220 L 70,220 Q 60,220 60,210 Z"
+        android:strokeWidth="8"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:trimPathEnd="0" />
+
+    <!-- Right Book Outline -->
+    <path
+        android:name="path_outline_right"
+        android:pathData="M 220,60 Q 220,50 210,50 L 145,50 Q 140,50 140,55 L 140,210 Q 140,215 145,220 L 210,220 Q 220,220 220,210 Z"
+        android:strokeWidth="8"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:trimPathEnd="0" />
+
+    <!-- Center Spine -->
+    <path
+        android:name="path_spine"
+        android:pathData="M 140,50 L 140,220"
+        android:strokeWidth="4"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000"
+        android:trimPathEnd="0" />
+
+    <!-- Left Page Lines -->
+    <path
+        android:name="line_left_0"
+        android:pathData="M 75,85 Q 105,80 130,85"
+        android:strokeWidth="6"
+        android:strokeColor="#3b82f6"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:trimPathEnd="0" />
+        
+    <path
+        android:name="line_left_1"
+        android:pathData="M 75,115 Q 105,110 130,115"
+        android:strokeWidth="6"
+        android:strokeColor="#3b82f6"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:trimPathEnd="0" />
+        
+    <path
+        android:name="line_left_2"
+        android:pathData="M 75,145 Q 105,140 130,145"
+        android:strokeWidth="6"
+        android:strokeColor="#3b82f6"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:trimPathEnd="0" />
+
+    <!-- Right Page Lines -->
+    <path
+        android:name="line_right_0"
+        android:pathData="M 150,85 Q 180,80 205,85"
+        android:strokeWidth="6"
+        android:strokeColor="#3b82f6"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:trimPathEnd="0" />
+        
+    <path
+        android:name="line_right_1"
+        android:pathData="M 150,115 Q 180,110 205,115"
+        android:strokeWidth="6"
+        android:strokeColor="#3b82f6"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:trimPathEnd="0" />
+        
+    <path
+        android:name="line_right_2"
+        android:pathData="M 150,145 Q 180,140 205,145"
+        android:strokeWidth="6"
+        android:strokeColor="#3b82f6"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:trimPathEnd="0" />
+
+    <!-- Bookmark Ribbon -->
+    <group android:name="group_ribbon">
+        <path
+            android:name="path_ribbon"
+            android:pathData="M 130,220 L 130,240 L 140,230 L 150,240 L 150,220"
+            android:strokeWidth="2"
+            android:strokeColor="#3b82f6"
+            android:fillColor="#3b82f6" />
+    </group>
+
+</vector>

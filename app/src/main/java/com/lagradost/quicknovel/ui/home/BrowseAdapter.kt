@@ -43,7 +43,8 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
             browseBackground.setOnClickListener {
                 activity?.navigate(
                     R.id.global_to_navigation_mainpage,
-                    MainPageFragment.newInstance(item.name)
+                    MainPageFragment.newInstance(item.name),
+                    options = com.lagradost.quicknovel.MainActivity.navOptions
                 )
             }
         }

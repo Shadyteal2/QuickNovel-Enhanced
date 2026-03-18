@@ -106,9 +106,11 @@ class AnyAdapter(
     }
 
     override fun onBindFooter(holder: ViewHolderState<Any>) {
+        val compact = resView.context.getDownloadIsCompact()
         when (val binding = holder.view) {
             is DownloadImportBinding -> {
                 binding.backgroundCard.setOnClickListener {
+                    binding.backgroundCard.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                     downloadViewModel.importEpub()
                 }
             }
@@ -116,13 +118,21 @@ class AnyAdapter(
             is DownloadImportCardBinding -> {
                 binding.backgroundCard.apply {
                     setOnClickListener {
+                        performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                         downloadViewModel.importEpub()
                     }
-                    val coverHeight: Int = (resView.itemWidth / 0.68).roundToInt()
-                    layoutParams = LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        coverHeight
-                    )
+                    if (!compact) {
+                        val coverHeight: Int = (resView.itemWidth / 0.68).roundToInt()
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            coverHeight
+                        )
+                    } else {
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        )
+                    }
                 }
             }
         }
@@ -130,7 +140,8 @@ class AnyAdapter(
 
     override fun onCreateCustomContent(parent: ViewGroup, viewType: Int): ViewHolderState<Any> {
         val compact = parent.context.getDownloadIsCompact()
-        val binding = when (viewType) {
+        val baseType = if (viewType >= 1000) viewType - 1000 else viewType
+        val binding = when (baseType) {
             RESULT_CACHED -> {
                 if (compact) {
                     HistoryResultCompactBinding.inflate(
@@ -188,13 +199,15 @@ class AnyAdapter(
                     historyPlay.setOnClickListener {
                         downloadViewModel.stream(card)
                     }
-                    imageView.setOnClickListener {
-                        downloadViewModel.load(card)
+                    backgroundCard.setOnClickListener { view ->
+                        view.postDelayed({
+                            downloadViewModel.load(card)
+                        }, 50)
                     }
                     historyDelete.setOnClickListener {
                         downloadViewModel.deleteAlert(card)
                     }
-                    imageView.setOnLongClickListener { view ->
+                    backgroundCard.setOnLongClickListener { view ->
                         hideKeyboard(view)
                         downloadViewModel.showMetadata(card)
                         return@setOnLongClickListener true
@@ -258,8 +271,10 @@ class AnyAdapter(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     coverHeight
                                 )
-                                setOnClickListener {
-                                    downloadViewModel.load(item)
+                                setOnClickListener { view ->
+                                    view.postDelayed({
+                                        downloadViewModel.load(item)
+                                    }, 50)
                                 }
                                 setOnLongClickListener { view ->
                                     hideKeyboard(view)
@@ -398,10 +413,12 @@ class AnyAdapter(
     }
 
     override fun customContentViewType(item: Any): Int {
+        val compact = resView.context.getDownloadIsCompact()
+        val offset = if (compact) 1000 else 0
         if (item is ResultCached) {
-            return RESULT_CACHED
+            return RESULT_CACHED + offset
         } else if (item is DownloadFragment.DownloadDataLoaded) {
-            return DOWNLOAD_DATA_LOADED
+            return DOWNLOAD_DATA_LOADED + offset
         }
         throw NotImplementedError()
     }

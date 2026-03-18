@@ -8,6 +8,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lagradost.quicknovel.APIRepository
+import kotlinx.coroutines.Job
 import com.lagradost.quicknovel.BaseApplication.Companion.context
 import com.lagradost.quicknovel.BaseApplication.Companion.getKey
 import com.lagradost.quicknovel.BaseApplication.Companion.removeKey
@@ -212,7 +213,9 @@ class ResultViewModel : ViewModel() {
     private lateinit var load: LoadResponse
     private var loadId: Int = 0
     private var loadUrl: String = ""
-    private var hasLoaded: Boolean = false
+    var hasLoaded: Boolean = false
+    val userNote: MutableLiveData<String?> = MutableLiveData(null)
+
 
     val loadResponse: MutableLiveData<Resource<LoadResponse>?> =
         MutableLiveData<Resource<LoadResponse>?>()
@@ -555,6 +558,24 @@ class ResultViewModel : ViewModel() {
         )
     }
 
+    fun getNote(): String? = userNote.value
+
+    private var updateNoteJob: Job? = null
+    fun updateNote(note: String?) {
+        userNote.postValue(note)
+        viewModelScope.launch {
+            if (note.isNullOrBlank()) {
+                removeKey("RESULT_USER_NOTE", loadId.toString())
+            } else {
+                setKey("RESULT_USER_NOTE", loadId.toString(), NoteWrapper(note))
+            }
+            loadMutex.withLock {
+                if (!hasLoaded) return@launch
+                updateBookmarkData()
+                addToHistory()
+            }
+        }
+    }
     fun bookmark(state: Int) = viewModelScope.launch {
         loadMutex.withLock {
             if (!hasLoaded) return@launch
@@ -716,6 +737,11 @@ class ResultViewModel : ViewModel() {
             DOWNLOAD_EPUB_LAST_ACCESS, tid.toString(), System.currentTimeMillis()
         )
         reCacheChapters()
+
+        val savedWrapper = getKey<NoteWrapper>("RESULT_USER_NOTE", tid.toString())
+        val note = savedWrapper?.note
+        userNote.value = note
+
         updateBookmarkData()
 
         hasLoaded = true
@@ -779,3 +805,5 @@ class ResultViewModel : ViewModel() {
         }
     }
 }
+
+data class NoteWrapper(val note: String? = "")

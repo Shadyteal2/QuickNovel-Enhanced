@@ -124,6 +124,29 @@
         android:layout_margin="0dp"
         android:orientation="vertical">
 
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/result_notes_layout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="10dp"
+            android:hint="@string/notes"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:hintTextColor="?attr/colorPrimary">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/result_notes_edittext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:minLines="1"
+                android:maxLines="6"
+                android:scrollbars="vertical"
+                android:textColor="?attr/textColor" />
+        </com.google.android.material.textfield.TextInputLayout>
+
         <TextView
             android:id="@+id/download_warning"
             android:layout_width="wrap_content"
@@ -230,6 +253,7 @@
             android:gravity="center"
             android:text="@string/quickstream_novel_text"
             app:iconSize="20dp" />
+
 
         <!-- Progress Layout from ResultFragment code -->
         <LinearLayout

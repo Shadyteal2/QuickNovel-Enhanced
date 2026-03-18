@@ -12,11 +12,5 @@
 build/
 *.class
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
 *.lock
 *.bins
-
-# Temp scripts and logs
-/*.py
-/*.txt
-/*.patch

@@ -38,6 +38,7 @@ import com.lagradost.nicehttp.ignoreAllSSLErrors
 import com.lagradost.quicknovel.APIRepository.Companion.providersActive
 import com.lagradost.quicknovel.BookDownloader2.openQuickStream
 import com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE
+import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
 import com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE_PDF
 import com.lagradost.quicknovel.BookDownloader2Helper.checkWrite
 import com.lagradost.quicknovel.BookDownloader2Helper.createQuickStream
@@ -165,12 +166,33 @@ class MainActivity : AppCompatActivity() {
             (activity as? AppCompatActivity)?.loadResult(url, apiName, startAction)
         }
 
-        fun Activity?.navigate(@IdRes navigation: Int, arguments: Bundle? = null) {
+        fun Activity?.navigate(@IdRes navigation: Int, arguments: Bundle? = null, options: NavOptions? = null) {
             try {
                 if (this is FragmentActivity) {
                     val navHostFragment =
                         supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment?
-                    navHostFragment?.navController?.navigate(navigation, arguments)
+
+                    if (navigation == R.id.global_to_navigation_mainpage) {
+                        // Clear outer SupportFragmentManager
+                        supportFragmentManager.fragments.firstOrNull { it is MainPageFragment }?.let {
+                            supportFragmentManager.beginTransaction()
+                                .setReorderingAllowed(true)
+                                .remove(it)
+                                .commitNowAllowingStateLoss()
+                        }
+
+                        // Clear child FragmentManager
+                        val childFragments = navHostFragment?.childFragmentManager?.fragments
+                        val oldFragment = childFragments?.firstOrNull { it is MainPageFragment }
+                        if (oldFragment != null) {
+                            navHostFragment.childFragmentManager.beginTransaction()
+                                .setReorderingAllowed(true)
+                                .remove(oldFragment)
+                                .commitNowAllowingStateLoss()
+                        }
+                    }
+
+                    navHostFragment?.navController?.navigate(navigation, arguments, options)
                 }
             } catch (t: Throwable) {
                 logError(t)
@@ -516,6 +538,15 @@ class MainActivity : AppCompatActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateLocale() // android fucks me by chaining lang when rotating the phone
+        
+        val tabs = listOf(
+            R.id.navigation_download,
+            R.id.navigation_search,
+            R.id.navigation_history,
+            R.id.navigation_settings,
+        )
+        val currentItem = tabs.getOrNull(binding?.mainViewpager?.currentItem ?: 0) ?: return
+        syncIndicator(currentItem)
     }
 
     var binding: ActivityMainBinding? = null
@@ -619,17 +650,15 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
                     binding?.apply {
-                        val width = navView.width
-                        if (width > 0) {
-                            val tabEntries = tabs.size
-                            val tabWidth = width / tabEntries
-                            val indicatorWidth = navIndicator.width
-                            val centerX = tabWidth / 2f
-                            val startX = position * tabWidth + centerX - indicatorWidth / 2f
-                            
-                            // 1:1 tracking with interpolation
-                            val currentX = startX + tabWidth * FastOutSlowInInterpolator().getInterpolation(positionOffset)
-                            navIndicator.translationX = currentX
+                        val itemViewCurrent = navView.findViewById<android.view.View>(tabs[position])
+                        val itemViewNext = if (position + 1 < tabs.size) navView.findViewById<android.view.View>(tabs[position + 1]) else itemViewCurrent
+
+                        if (itemViewCurrent != null && itemViewNext != null) {
+                            val currentCenterX = itemViewCurrent.left + itemViewCurrent.width / 2f
+                            val nextCenterX = itemViewNext.left + itemViewNext.width / 2f
+
+                            val currentX = currentCenterX + (nextCenterX - currentCenterX) * androidx.interpolator.view.animation.FastOutSlowInInterpolator().getInterpolation(positionOffset)
+                            navIndicator.translationX = currentX - navIndicator.width / 2f
                         }
                     }
                 }
@@ -646,13 +675,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         navView.setOnItemSelectedListener { item ->
+            navView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             val index = tabs.indexOf(item.itemId)
             if (index != -1) {
                 // If we are currently showing a non-tab screen (like results), navigate back to a tab
                 if (binding?.mainViewpager?.isVisible == false) {
                     onNavDestinationSelected(item, navController)
                 }
-                binding?.mainViewpager?.currentItem = index
+                if (binding?.mainViewpager?.currentItem != index) {
+                    binding?.mainViewpager?.setCurrentItem(index, false)
+                }
+                syncIndicator(item.itemId)
                 true
             } else {
                 onNavDestinationSelected(
@@ -673,34 +706,26 @@ class MainActivity : AppCompatActivity() {
             .setPopExitAnim(R.anim.nav_pop_exit)
             .setPopUpTo(navController.graph.startDestinationId, false)
             .build()
-        /*
-                navView.setOnNavigationItemReselectedListener { item ->
-                    return@setOnNavigationItemReselectedListener
-                }*/
-        /*navView.setOnNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.navigation_homepage -> {
-                    navController.navigate(R.id.navigation_homepage, null, navOptions)
+        navView.setOnItemReselectedListener { item ->
+            val index = tabs.indexOf(item.itemId)
+            if (index != -1) {
+                if (binding?.mainViewpager?.isVisible == false) {
+                    // Explicit inclusive pop using integer literal (1) for POP_BACKSTACK_INCLUSIVE
+                    supportFragmentManager.popBackStack(null, 1)
+                    navController.popBackStack(navController.graph.startDestinationId, false)
                 }
-
-                R.id.navigation_search -> {
-                    navController.navigate(R.id.navigation_search, null, navOptions)
-                }
-
-                R.id.navigation_download -> {
-                    navController.navigate(R.id.navigation_download, null, navOptions)
-                }
-
-                R.id.navigation_history -> {
-                    navController.navigate(R.id.navigation_history, null, navOptions)
-                }
-
-                R.id.navigation_settings -> {
-                    navController.navigate(R.id.navigation_settings, null, navOptions)
-                }
+                binding?.mainViewpager?.currentItem = index
             }
-            true
-        }*/
+        }
+        
+        navView.post {
+            val firstItem = tabs.getOrNull(binding?.mainViewpager?.currentItem ?: 0) ?: return@post
+            val itemView = navView.findViewById<android.view.View>(firstItem)
+            if (itemView != null) {
+                binding?.navIndicator?.translationX = (itemView.left + itemView.width / 2f) - (binding?.navIndicator?.width ?: 0) / 2f
+            }
+        }
+
 
         observe(viewModel.readState) {
             bottomPreviewBinding?.apply {
@@ -921,5 +946,30 @@ class MainActivity : AppCompatActivity() {
             appBackgroundDim.alpha = dim / 100f
             appBackgroundLightScrim.alpha = if (isLightTheme) 0.25f else 0f
         }
+    }
+
+    private fun syncIndicator(itemId: Int) {
+        val navView = binding?.navView ?: return
+        val navIndicator = binding?.navIndicator ?: return
+        val navBarContainer = binding?.navBarContainer ?: return
+
+        navIndicator.postDelayed({
+            val itemView = navView.findViewById<android.view.View>(itemId) ?: return@postDelayed
+            val itemLocation = IntArray(2)
+            itemView.getLocationInWindow(itemLocation)
+
+            val containerLocation = IntArray(2)
+            navBarContainer.getLocationInWindow(containerLocation)
+
+            val relativeX = itemLocation[0] - containerLocation[0]
+            val centerX = relativeX + itemView.width / 2f
+            val targetX = centerX - navIndicator.width / 2f
+
+            android.animation.ObjectAnimator.ofFloat(navIndicator, "translationX", targetX).apply {
+                duration = 200
+                start()
+            }
+            navView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+        }, 50)
     }
 }

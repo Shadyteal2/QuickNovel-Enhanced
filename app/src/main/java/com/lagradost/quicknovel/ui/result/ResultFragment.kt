@@ -98,9 +98,12 @@ class ResultFragment : Fragment() {
             viewModel.isResume = false
         }
 
-        activity?.apply {
-            window?.navigationBarColor =
-                colorFromAttribute(R.attr.primaryBlackBackground)
+
+        val savedNote = viewModel.getNote() ?: ""
+        novelTabBinding?.resultNotesEdittext?.let { et ->
+            if (et.text?.toString() != savedNote) {
+                et.setText(savedNote)
+            }
         }
     }
 
@@ -147,7 +150,8 @@ class ResultFragment : Fragment() {
                         val currentApi = repo ?: return@setOnClickListener
                         activity?.navigate(
                             R.id.global_to_navigation_mainpage,
-                            MainPageFragment.newInstance(currentApi.name, tag = tagIndex)
+                            MainPageFragment.newInstance(currentApi.name, tag = tagIndex),
+                            options = com.lagradost.quicknovel.MainActivity.navOptions
                         )
                     }
                 }
@@ -175,6 +179,7 @@ class ResultFragment : Fragment() {
                 resultChaptersInfoHolder.isVisible = false
                 resultQuickstream.isVisible = false
             }
+            // Notes text restoration managed by onResume and LiveData observer
         }
         
         // Populate chapter count in its tab if available
@@ -375,38 +380,7 @@ class ResultFragment : Fragment() {
                 bindingGetter = { tabView, tabId ->
                     when (tabId) {
                         0 -> {
-                            novelTabBinding = ResultNovelTabBinding.bind(tabView)
-                            novelTabBinding?.apply {
-                                resultSynopsisText.setOnClickListener {
-                                    val res = (viewModel.loadResponse.value as? Resource.Success)?.value ?: return@setOnClickListener
-                                    val syno = if (res.synopsis?.length ?: 0 > MAX_SYNO_LENGH) {
-                                        res.synopsis?.substring(0, MAX_SYNO_LENGH) + "..."
-                                    } else {
-                                        res.synopsis
-                                    }
-                                    val isExpanded = resultSynopsisText.text.length > (syno?.length ?: 0)
-                                    resultSynopsisText.text = if (!isExpanded) res.synopsis?.html() else syno?.html()
-                                }
-                                resultDownloadGenerateEpub.setOnClickListener { viewModel.readEpub() }
-                                resultDownloadBtt.setOnClickListener { v ->
-                                    val actions = getActions()
-                                    if (actions == null) {
-                                        viewModel.downloadOrPause()
-                                    } else if (actions.size == 1) {
-                                        doAction(actions[0])
-                                    } else if (actions.contains(R.string.download) || actions.contains(R.string.pause)) {
-                                        viewModel.downloadOrPause()
-                                    } else {
-                                        v.popupMenu(actions.map { it to it }, null) { doAction(itemId) }
-                                    }
-                                }
-                                resultDownloadBtt.setOnLongClickListener { v ->
-                                    val items = getActions() ?: return@setOnLongClickListener true
-                                    v.popupMenu(items.map { it to it }, null) { doAction(itemId) }
-                                    true
-                                }
-                                resultQuickstream.setOnClickListener { viewModel.streamRead() }
-                            }
+                            onBindingCreated(tabView)
                             updateTabData()
                         }
                         3 -> {
@@ -520,6 +494,24 @@ class ResultFragment : Fragment() {
                 0, 0, 0,
                 if (state == ReadType.NONE) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
+            // Update notes UI when read status changes
+            novelTabBinding?.apply {
+                val isDropped = state == ReadType.DROPPED
+                resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
+                val primaryColor = requireContext().colorFromAttribute(R.attr.colorPrimary)
+                resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else primaryColor
+                resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else primaryColor))
+            }
+        }
+
+        observeNullable(viewModel.userNote) { note ->
+            novelTabBinding?.apply {
+                val current = resultNotesEdittext.text?.toString() ?: ""
+                val saved = note ?: ""
+                if (current != saved) {
+                    resultNotesEdittext.setText(saved)
+                }
+            }
         }
 
         observeNullable(viewModel.chapters) { chapters ->
@@ -641,6 +633,67 @@ class ResultFragment : Fragment() {
                     viewModel.loadMoreReviews()
                 }
             }*/
+        }
+    }
+
+
+    private fun onBindingCreated(tabView: View) {
+        val binding = ResultNovelTabBinding.bind(tabView)
+        novelTabBinding = binding
+        
+        binding.apply {
+            resultSynopsisText.setOnClickListener {
+                val res = (viewModel.loadResponse.value as? Resource.Success)?.value ?: return@setOnClickListener
+                val syno = if (res.synopsis?.length ?: 0 > MAX_SYNO_LENGH) {
+                    res.synopsis?.substring(0, MAX_SYNO_LENGH) + "..."
+                } else {
+                    res.synopsis
+                }
+                val isExpanded = resultSynopsisText.text.length > (syno?.length ?: 0)
+                resultSynopsisText.text = if (!isExpanded) res.synopsis?.html() else syno?.html()
+            }
+            resultDownloadGenerateEpub.setOnClickListener { viewModel.readEpub() }
+            resultDownloadBtt.setOnClickListener { v ->
+                val actions = getActions()
+                if (actions == null) {
+                    viewModel.downloadOrPause()
+                } else if (actions.size == 1) {
+                    doAction(actions[0])
+                } else if (actions.contains(R.string.download) || actions.contains(R.string.pause)) {
+                    viewModel.downloadOrPause()
+                } else {
+                    v.popupMenu(actions.map { it to it }, null) { doAction(itemId) }
+                }
+            }
+            resultDownloadBtt.setOnLongClickListener { v ->
+                val items = getActions() ?: return@setOnLongClickListener true
+                v.popupMenu(items.map { it to it }, null) { doAction(itemId) }
+                true
+            }
+            resultQuickstream.setOnClickListener { viewModel.streamRead() }
+
+            // Initial Notes Population
+            val currentNote = resultNotesEdittext.text?.toString() ?: ""
+            val savedNote = viewModel.getNote() ?: ""
+            if (currentNote != savedNote) {
+                resultNotesEdittext.setText(savedNote)
+            }
+
+            // Setup Notes Update Trigger
+            resultNotesEdittext.doOnTextChanged { text, _, _, _ ->
+                if (viewModel.hasLoaded) {
+                    viewModel.updateNote(text?.toString())
+                }
+            }
+
+            // Keyboard Scrolling Focus Listener
+            resultNotesEdittext.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    this@ResultFragment.binding.resultMainscroll.postDelayed({
+                        this@ResultFragment.binding.resultMainscroll.smoothScrollTo(0, resultNotesLayout.top)
+                    }, 200)
+                }
+            }
         }
     }
 }
