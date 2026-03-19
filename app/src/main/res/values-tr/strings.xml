@@ -182,7 +182,7 @@
     <string name="related">İlgili</string>
     <string name="votes_format">%d Oy</string>
     <string name="latest_format">En son: %s</string>
-    <string name="new_update_found_format">Yeni güncelleme bulundu!\n %s -> %s</string>
+    <string name="new_update_found_format">Yeni güncelleme bulundu!\n %1$s -> %2$s</string>
     <string name="download_started">İndirme başladı</string>
     <string name="download_failed">İndirme başarısız</string>
     <string name="update">Güncelle</string>
