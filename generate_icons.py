@@ -60,7 +60,7 @@ for density in legacy_sizes:
     # ----------------------------------------------------
     # A. Legacy Icon: Nudge up slightly (0.04)
     # ----------------------------------------------------
-    legacy_canvas = resize_and_pad(img, size, fit_factor=1.0, nudge_up_pct=0.04)
+    legacy_canvas = resize_and_pad(img, size, fit_factor=0.85, nudge_up_pct=0.04)
     legacy_canvas.save(os.path.join(target_dir, "ic_launcher.png"), "PNG")
     
     # B. Legacy Round Icon: Mask circular bounds
@@ -70,9 +70,9 @@ for density in legacy_sizes:
     round_img.save(os.path.join(target_dir, "ic_launcher_round.png"), "PNG")
 
     # ----------------------------------------------------
-    # C. Adaptive Icon Foreground: Nudge up slightly (0.04)
+    # C. Adaptive Icon Foreground: Reduce fit_factor to fit Android safe zone
     # ----------------------------------------------------
-    adaptive_canvas = resize_and_pad(img, adapt_size, fit_factor=0.90, nudge_up_pct=0.04)
+    adaptive_canvas = resize_and_pad(img, adapt_size, fit_factor=0.70, nudge_up_pct=0.0)
     adaptive_canvas.save(os.path.join(target_dir, "ic_launcher_foreground.png"), "PNG")
 
 print("Icons recentered and generated successfully!")

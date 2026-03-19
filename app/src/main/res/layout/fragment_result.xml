@@ -524,4 +524,32 @@
         android:src="@drawable/ic_sharp_clear_24"
         app:tint="?attr/white" />
 
+    <!-- Sticky Chapters FAB -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/result_chapters_fab"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|bottom"
+        android:layout_margin="16dp"
+        android:visibility="gone"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="6dp"
+        app:backgroundTint="@null"
+        android:background="?attr/primaryBlackBackground">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingHorizontal="16dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_baseline_filter_list_24"
+                app:tint="?attr/textColor" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

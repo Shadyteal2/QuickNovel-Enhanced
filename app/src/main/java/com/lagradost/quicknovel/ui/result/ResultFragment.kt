@@ -43,6 +43,10 @@ import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 import com.lagradost.quicknovel.util.UIHelper.getStatusBarHeight
 import com.lagradost.quicknovel.util.UIHelper.hideKeyboard
+import com.lagradost.quicknovel.BaseApplication
+import com.lagradost.quicknovel.EPUB_CURRENT_POSITION_READ_AT
+import com.lagradost.quicknovel.ui.download.REVERSE_CHAPTER_SORT
+import com.lagradost.quicknovel.ui.download.REVERSE_LAST_ACCES_SORT
 import com.lagradost.quicknovel.util.UIHelper.html
 import com.lagradost.quicknovel.util.UIHelper.humanReadableByteCountSI
 import com.lagradost.quicknovel.util.UIHelper.popupMenu
@@ -61,11 +65,12 @@ class ResultFragment : Fragment() {
     private var chapterAdapter: ChapterAdapter? = null
 
     companion object {
-        fun newInstance(url: String, apiName: String, startAction: Int = 0): Bundle =
+        fun newInstance(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null): Bundle =
             Bundle().apply {
                 putString("url", url)
                 putString("apiName", apiName)
                 putInt("startAction", startAction)
+                putString("startChapterUrl", startChapterUrl)
             }
     }
 
@@ -122,6 +127,11 @@ class ResultFragment : Fragment() {
         val res = loadResponse.value
 
         novelTabBinding?.apply {
+            val state = viewModel.readState.value ?: ReadType.NONE
+            resultUpdatesToggle.isVisible = state != ReadType.NONE
+            val isEnabled = viewModel.isSyncEnabledDisplay.value ?: true
+            resultUpdatesToggle.alpha = if (isEnabled) 1.0f else 0.4f
+
             downloadWarning.isVisible = (repo?.rateLimitTime ?: 0) > 2000
 
             resultRatingVotedCount.text = getString(R.string.no_data)
@@ -335,6 +345,8 @@ class ResultFragment : Fragment() {
 
         val url = savedInstanceState?.getString("url") ?: arguments?.getString("url") ?: throw NotImplementedError()
         val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
+        val startAction = savedInstanceState?.getInt("startAction") ?: arguments?.getInt("startAction") ?: 0
+        val startChapterUrl = savedInstanceState?.getString("startChapterUrl") ?: arguments?.getString("startChapterUrl")
 
         activity?.window?.decorView?.clearFocus()
         binding.resultTitle.isSelected = true
@@ -343,6 +355,18 @@ class ResultFragment : Fragment() {
 
         if (viewModel.loadResponse.value == null)
             viewModel.initState(apiName, url)
+
+        var hasTriggeredStart = false
+        observe(viewModel.loadResponse) { res ->
+            if (res is Resource.Success && !hasTriggeredStart && startAction == 2 && startChapterUrl != null) {
+                hasTriggeredStart = true
+                val stream = res.value as? StreamResponse
+                val chapter = stream?.data?.find { it.url == startChapterUrl }
+                if (chapter != null) {
+                    viewModel.streamRead(chapter)
+                }
+            }
+        }
 
         binding.apply {
             activity?.fixPaddingStatusbar(resultInfoHeader)
@@ -374,6 +398,54 @@ class ResultFragment : Fragment() {
 
             resultShare.setOnClickListener { viewModel.share() }
 
+            resultChaptersFab.setOnClickListener { view ->
+                val act = activity ?: return@setOnClickListener
+                val popup = android.widget.PopupMenu(act, view, android.view.Gravity.TOP)
+                popup.menu.add("Filter & Sort")
+                popup.menu.add("Go to Latest Chapter")
+                popup.menu.add("Go to Last Read")
+                
+                popup.setOnMenuItemClickListener { item ->
+                    when (item.title.toString()) {
+                        "Filter & Sort" -> showFilterBottomSheet(act)
+                        "Go to Latest Chapter" -> chaptersTabBinding?.chapterList?.let { list ->
+                             val chapters = viewModel.chapters.value ?: return@setOnMenuItemClickListener true
+                             if (chapters.isNotEmpty()) {
+                                  val sortType = ResultViewModel.sortChapterBy
+                                  val target = if (sortType == REVERSE_CHAPTER_SORT || sortType == REVERSE_LAST_ACCES_SORT) 0 else chapters.size - 1
+                                  list.scrollToPosition(target)
+                             }
+                        }
+                        "Go to Last Read" -> chaptersTabBinding?.chapterList?.let { list ->
+                             val chapters = viewModel.chapters.value ?: return@setOnMenuItemClickListener true
+                             val responseValue = (viewModel.loadResponse.value as? Resource.Success)?.value
+                             val name = (responseValue as? StreamResponse)?.name ?: ""
+                             val index = chapters.indexOfLast { ch ->
+                                  val key = "$name/${chapters.indexOf(ch)}"
+                                  BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, key) != null
+                             }
+                             if (index != -1) {
+                                  list.scrollToPosition(index)
+                             } else {
+                                  com.lagradost.quicknovel.CommonActivity.showToast(act, "No chapters read yet", android.widget.Toast.LENGTH_SHORT)
+                             }
+                        }
+                    }
+                    true
+                }
+                popup.show()
+            }
+
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(resultChaptersFab) { view, insets ->
+                val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                val params = view.layoutParams as androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+                val baseMargin = (16 * (context?.resources?.displayMetrics?.density ?: 1f)).toInt()
+                params.bottomMargin = systemBars.bottom + baseMargin
+                params.rightMargin = systemBars.right + baseMargin
+                view.layoutParams = params
+                insets
+            }
+
             // Using indices 0 (Novel) and 3 (Chapters) for tabIds to maintain existing mapping but filter to only two tabs
             resultViewpager.adapter = ResultFragmentAdapter(
                 tabIds = listOf(0, 3),
@@ -389,6 +461,7 @@ class ResultFragment : Fragment() {
                                 val adapter = ChapterAdapter(viewModel)
                                 chapterAdapter = adapter
                                 chapterList.adapter = adapter
+                                chapterList.setHasFixedSize(true) // Optimize fastscroll lag
                                 
                                 viewModel.chapters.value?.let { chapters ->
                                     if (chapters.size > 300) {
@@ -396,48 +469,6 @@ class ResultFragment : Fragment() {
                                     } else {
                                         adapter.submitList(chapters)
                                     }
-                                }
-                                chaptersFab.setOnClickListener {
-                                    val act = activity ?: return@setOnClickListener
-                                    val bottomSheetDialog = BottomSheetDialog(act)
-                                    val filterBinding = ChapterFilterPopupBinding.inflate(act.layoutInflater, null, false)
-                                    bottomSheetDialog.setContentView(filterBinding.root)
-                                    
-                                    val filterTab = filterBinding.filterTabs.newTab().setText(getString(R.string.mainpage_filter))
-                                    val sortTab = filterBinding.filterTabs.newTab().setText(getString(R.string.mainpage_sort_by_button_text))
-                                    filterBinding.filterTabs.addTab(filterTab)
-                                    filterBinding.filterTabs.addTab(sortTab)
-                                    filterBinding.filterTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-                                        override fun onTabSelected(tab: TabLayout.Tab?) {
-                                            filterBinding.filterContent.isVisible = tab?.position == 0
-                                            filterBinding.sortContent.isVisible = tab?.position == 1
-                                        }
-                                        override fun onTabUnselected(tab: TabLayout.Tab?) = Unit
-                                        override fun onTabReselected(tab: TabLayout.Tab?) = Unit
-                                    })
-                                    
-                                    filterBinding.filterBookmarked.isChecked = ResultViewModel.filterChapterByBookmarked
-                                    filterBinding.filterRead.isChecked = ResultViewModel.filterChapterByRead
-                                    filterBinding.filterUnread.isChecked = ResultViewModel.filterChapterByUnread
-                                    filterBinding.filterDownloaded.isChecked = ResultViewModel.filterChapterByDownloads
-                                    
-                                    filterBinding.filterBookmarked.setOnCheckedChangeListener { _, isChecked ->
-                                        ResultViewModel.filterChapterByBookmarked = isChecked
-                                        viewModel.reorderChapters()
-                                    }
-                                    filterBinding.filterRead.setOnCheckedChangeListener { _, isChecked ->
-                                        ResultViewModel.filterChapterByRead = isChecked
-                                        viewModel.reorderChapters()
-                                    }
-                                    filterBinding.filterUnread.setOnCheckedChangeListener { _, isChecked ->
-                                        ResultViewModel.filterChapterByUnread = isChecked
-                                        viewModel.reorderChapters()
-                                    }
-                                    filterBinding.filterDownloaded.setOnCheckedChangeListener { _, isChecked ->
-                                        ResultViewModel.filterChapterByDownloads = isChecked
-                                        viewModel.reorderChapters()
-                                    }
-                                    bottomSheetDialog.show()
                                 }
                             }
                             updateTabData()
@@ -459,6 +490,9 @@ class ResultFragment : Fragment() {
                     // Map positions: 0 -> 0 (Novel), 1 -> 3 (Chapters)
                     val tabId = if (position == 0) 0 else 3
                     viewModel.switchTab(position, tabId)
+                    
+                    // Toggle parent Chapters FAB visibility
+                    binding.resultChaptersFab.isVisible = position == 1
                 }
             })
 
@@ -494,6 +528,8 @@ class ResultFragment : Fragment() {
                 0, 0, 0,
                 if (state == ReadType.NONE) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
+            novelTabBinding?.resultUpdatesToggle?.isVisible = state != ReadType.NONE
+
             // Update notes UI when read status changes
             novelTabBinding?.apply {
                 val isDropped = state == ReadType.DROPPED
@@ -502,6 +538,10 @@ class ResultFragment : Fragment() {
                 resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else primaryColor
                 resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else primaryColor))
             }
+        }
+
+        observe(viewModel.isSyncEnabledDisplay) { isEnabled ->
+            novelTabBinding?.resultUpdatesToggle?.alpha = if (isEnabled) 1.0f else 0.4f
         }
 
         observeNullable(viewModel.userNote) { note ->
@@ -642,6 +682,11 @@ class ResultFragment : Fragment() {
         novelTabBinding = binding
         
         binding.apply {
+            resultUpdatesToggle.setOnClickListener { 
+                viewModel.toggleSyncEnabled() 
+                val isCurrentlyEnabled = viewModel.isSyncEnabledDisplay.value ?: false
+                com.lagradost.quicknovel.CommonActivity.showToast(if (!isCurrentlyEnabled) "Updates Enabled" else "Updates Disabled")
+            }
             resultSynopsisText.setOnClickListener {
                 val res = (viewModel.loadResponse.value as? Resource.Success)?.value ?: return@setOnClickListener
                 val syno = if (res.synopsis?.length ?: 0 > MAX_SYNO_LENGH) {
@@ -695,5 +740,46 @@ class ResultFragment : Fragment() {
                 }
             }
         }
+    }
+    private fun showFilterBottomSheet(act: android.app.Activity) {
+         val bottomSheetDialog = BottomSheetDialog(act)
+         val filterBinding = com.lagradost.quicknovel.databinding.ChapterFilterPopupBinding.inflate(act.layoutInflater, null, false)
+         bottomSheetDialog.setContentView(filterBinding.root)
+         
+         val filterTab = filterBinding.filterTabs.newTab().setText(getString(R.string.mainpage_filter))
+         val sortTab = filterBinding.filterTabs.newTab().setText(getString(R.string.mainpage_sort_by_button_text))
+         filterBinding.filterTabs.addTab(filterTab)
+         filterBinding.filterTabs.addTab(sortTab)
+         filterBinding.filterTabs.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+             override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab?) {
+                 filterBinding.filterContent.isVisible = tab?.position == 0
+                 filterBinding.sortContent.isVisible = tab?.position == 1
+             }
+             override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab?) = Unit
+             override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab?) = Unit
+         })
+         
+         filterBinding.filterBookmarked.isChecked = ResultViewModel.filterChapterByBookmarked
+         filterBinding.filterRead.isChecked = ResultViewModel.filterChapterByRead
+         filterBinding.filterUnread.isChecked = ResultViewModel.filterChapterByUnread
+         filterBinding.filterDownloaded.isChecked = ResultViewModel.filterChapterByDownloads
+         
+         filterBinding.filterBookmarked.setOnCheckedChangeListener { _, isChecked ->
+             ResultViewModel.filterChapterByBookmarked = isChecked
+             viewModel.reorderChapters()
+         }
+         filterBinding.filterRead.setOnCheckedChangeListener { _, isChecked ->
+             ResultViewModel.filterChapterByRead = isChecked
+             viewModel.reorderChapters()
+         }
+         filterBinding.filterUnread.setOnCheckedChangeListener { _, isChecked ->
+             ResultViewModel.filterChapterByUnread = isChecked
+             viewModel.reorderChapters()
+         }
+         filterBinding.filterDownloaded.setOnCheckedChangeListener { _, isChecked ->
+             ResultViewModel.filterChapterByDownloads = isChecked
+             viewModel.reorderChapters()
+         }
+         bottomSheetDialog.show()
     }
 }

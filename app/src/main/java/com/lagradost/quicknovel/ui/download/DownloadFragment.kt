@@ -263,7 +263,8 @@ class DownloadFragment : Fragment() {
         }
 
         binding.viewpager.adapter = adapter
-        binding.viewpager.isUserInputEnabled = false // Disable smooth swiping
+        binding.viewpager.isUserInputEnabled = true // Enable smooth swiping
+        binding.viewpager.offscreenPageLimit = 1 // Smooth load adjacent sections
         
         val dotsHolder = binding.pillDotsHolder
         var initialTouchX = 0f
@@ -273,7 +274,7 @@ class DownloadFragment : Fragment() {
 
         for (i in 0 until dotsHolder.childCount) {
             dotsHolder.getChildAt(i).setOnClickListener { view ->
-                binding.viewpager.setCurrentItem(i, false) // Fast switch
+                binding.viewpager.setCurrentItem(i, true) // Smooth switch
                 view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
             }
         }
@@ -301,6 +302,7 @@ class DownloadFragment : Fragment() {
                         if (index != currentSelectedIndex) {
                             currentSelectedIndex = index
                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                            binding.viewpager.setCurrentItem(index, true) // Continuous slide updates!
                             
                             // Highlight dot
                             for (i in 0 until dotsHolder.childCount) {
@@ -328,10 +330,10 @@ class DownloadFragment : Fragment() {
                         val targetX = currentSelectedIndex * stepSize
                         android.animation.ObjectAnimator.ofFloat(view, "translationX", targetX).apply {
                             duration = 200
-                            interpolator = android.view.animation.OvershootInterpolator(1.2f)
+                            interpolator = android.view.animation.DecelerateInterpolator()
                             start()
                         }
-                        binding.viewpager.setCurrentItem(currentSelectedIndex, false) // Fast switch
+                        binding.viewpager.setCurrentItem(currentSelectedIndex, true) // Smooth switch
                     }
                     true
                 }
@@ -340,22 +342,22 @@ class DownloadFragment : Fragment() {
         }
 
         binding.viewpager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
+                if (isDragging) return // Don't override user drag offset
+                val maxOffset = binding.libraryPillMenu.width - binding.travelerIcon.width
+                if (maxOffset > 0) {
+                    val stepSize = maxOffset.toFloat() / 5f
+                    val targetX = (position + positionOffset) * stepSize
+                    binding.travelerIcon.translationX = targetX
+                }
+            }
+
             override fun onPageSelected(position: Int) {
                 if (isDragging) return // Don't override user drag offset
                 
                 currentSelectedIndex = position
-                binding.travelerIcon.post {
-                    val maxOffset = binding.libraryPillMenu.width - binding.travelerIcon.width
-                    if (maxOffset > 0) {
-                        val stepSize = maxOffset.toFloat() / 5f
-                        val targetX = position * stepSize
-                        android.animation.ObjectAnimator.ofFloat(binding.travelerIcon, "translationX", targetX).apply {
-                            duration = 250
-                            interpolator = android.view.animation.OvershootInterpolator(1.1f)
-                            start()
-                        }
-                    }
-                }
+                // Highlight dots updated continuously in continuous callback if desired, or here!
+                // But dot updates are fast and simple!
 
                 for (i in 0 until dotsHolder.childCount) {
                     val dot = (dotsHolder.getChildAt(i) as? android.view.ViewGroup)?.getChildAt(0)
