@@ -18,7 +18,10 @@ import androidx.annotation.IdRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -78,6 +81,7 @@ import com.lagradost.quicknovel.util.UIHelper.getResourceColor
 import com.lagradost.quicknovel.util.UIHelper.html
 import com.lagradost.quicknovel.util.UIHelper.popupMenu
 import com.lagradost.quicknovel.util.UIHelper.setImage
+import com.lagradost.quicknovel.util.toPx
 import com.lagradost.safefile.SafeFile
 import android.view.ViewGroup
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
@@ -556,6 +560,8 @@ class MainActivity : AppCompatActivity() {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+// removed early listener
+
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         CommonActivity.loadThemes(this)
         CommonActivity.init(this)
@@ -563,6 +569,49 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
+
+        binding?.let { b ->
+            ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, windowInsets ->
+                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+                val bottomInset = insets.bottom
+
+                b.navBarContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    val threshold = 24.toPx
+                    if (bottomInset > threshold) {
+                        bottomMargin = 30.toPx + bottomInset
+                    } else {
+                        bottomMargin = 30.toPx
+                    }
+                }
+                windowInsets
+            }
+        }
+
+        binding?.let { b ->
+            ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, windowInsets ->
+                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+                val bottomInset = insets.bottom
+
+                b.navBarContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    val threshold = 24.toPx
+                    if (bottomInset > threshold) {
+                        bottomMargin = 30.toPx + bottomInset
+                    } else {
+                        bottomMargin = 30.toPx
+                    }
+                }
+                windowInsets
+            }
+
+            ViewCompat.setOnApplyWindowInsetsListener(b.navView) { _, insets ->
+                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+                WindowInsetsCompat.Builder(insets)
+                    .setInsets(WindowInsetsCompat.Type.systemBars(), androidx.core.graphics.Insets.of(systemBars.left, systemBars.top, systemBars.right, 0))
+                    .setInsets(WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.of(navBars.left, navBars.top, navBars.right, 0))
+                    .build()
+            }
+        }
         
         updateGlobalBackground()
         settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)

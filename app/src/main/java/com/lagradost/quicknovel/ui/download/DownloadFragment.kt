@@ -10,9 +10,12 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.activity.result.launch
 import androidx.appcompat.widget.SearchView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnAttach
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -50,6 +53,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.lagradost.quicknovel.util.toPx
+import android.graphics.Rect
+import android.widget.FrameLayout
 
 class DownloadFragment : Fragment() {
     private lateinit var viewModel: DownloadViewModel
@@ -195,6 +201,33 @@ class DownloadFragment : Fragment() {
         // activity?.fixPaddingStatusbar(binding.downloadToolbar)
         activity?.fixPaddingStatusbar(binding.downloadRoot)
         //viewModel = ViewModelProviders.of(activity!!).get(DownloadViewModel::class.java)
+
+        var initialPillMargin = -1
+        var initialFabMargin = -1
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val bottomInset = insets.bottom
+
+            if (initialPillMargin == -1) {
+                initialPillMargin = (binding.libraryPillMenu.layoutParams as? ViewGroup.MarginLayoutParams)?.bottomMargin ?: 110.toPx
+            }
+            if (initialFabMargin == -1) {
+                initialFabMargin = (binding.downloadFabContainer.layoutParams as? ViewGroup.MarginLayoutParams)?.bottomMargin ?: 180.toPx
+            }
+
+            val threshold = 24.toPx
+            val extraMargin = if (bottomInset > threshold) bottomInset else 0
+
+            binding.libraryPillMenu.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                bottomMargin = initialPillMargin + extraMargin
+            }
+            binding.downloadFabContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                bottomMargin = initialFabMargin + extraMargin
+            }
+
+            windowInsets
+        }
 
 
         searchExitIcon =
