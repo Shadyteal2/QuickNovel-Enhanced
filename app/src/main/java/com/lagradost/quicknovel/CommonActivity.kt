@@ -128,7 +128,7 @@ object CommonActivity {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(act)
 
         val currentTheme =
-            when (settingsManager.getString(act.getString(R.string.theme_key), "AmoledLight")) {
+            when (settingsManager.getString(act.getString(R.string.theme_key), "Amoled")) {
                 "Black" -> R.style.AppTheme
                 "Light" -> R.style.LightMode
                 "Amoled" -> R.style.AmoledMode
@@ -139,7 +139,7 @@ object CommonActivity {
             }
 
         val currentOverlayTheme =
-            when (settingsManager.getString(act.getString(R.string.primary_color_key), "Normal")) {
+            when (settingsManager.getString(act.getString(R.string.primary_color_key), "Banana")) {
                 "Normal" -> R.style.OverlayPrimaryColorNormal
                 "CarnationPink" -> R.style.OverlayPrimaryColorCarnationPink
                 "DarkGreen" -> R.style.OverlayPrimaryColorDarkGreen

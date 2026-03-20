@@ -4,18 +4,22 @@ Adfree FOSS Android app for downloading novels. It also functions as an **Epub r
 This project is an enhanced fork of the original QuickNovel app, introducing a fully revamped, modern, and beautiful UI, alongside critical bug fixes.
 
 **Key Enhanced Features:**
-- **Custom Background Engine**: Personalize your library and search screens with any image. Includes adjustable **Blur** and **Dim** settings for the perfect look.
-- **Premium Glassmorphism UI**: A stunning, edge to edge, modern interface featuring floating navigation, translucent cards, and smooth micro-animations.
-- **Advanced Theme System**: Optimized themes including the modified **'Flashbang' Light Theme** with dynamic readability adjustments and light scrim overlays.
-- **Universal Text Readability**: Subtle shadows and theme-aware color attributes ensure novel titles and UI text pop against any background.
-- **Improved Reader Experience**: Refined typography, optimized spacing, and immersive reading modes for the best viewing experience.
-- **Optimized In-App Updater**: Direct integration with the NeoQN repository for faster and more reliable updates.
+- **Premium Glassmorphism UI**: A stunning, edge-to-edge layout featuring translucent floating navigation, glass-card synopsis containers, and smooth micro-animations.
+- **Dynamic Updates Section**: Easily track novel chapter updates and releases synchronized directly from your timeline shelf.
+- **Advanced Category Management**: Effortlessly create, edit, and re-order custom library categories to organize your reading shelf flawlessly.
+- **Revamped Novel Details Screen**: Fully redesigned header and cover presentation with enhanced text readability and modern item frames.
+- **AMOLED and Light Mode Theme Templates**: Optimized adaptive displays supporting both full black background rendering and polished Light ('Flashbang') themes cleanly.
+- **Material You Dynamic Coloring Support**: Integrates native Monet-compatible dynamic tints for context-aware aesthetic uniformity (Android 12+).
+- **Custom Background Engine**: Personalize sheets with local background images supporting adjustable Blur and Dim framing parameters.
+- **Visual Contrast Readability Overlays**: Shadow layer integrations guarantee adaptive text formatting accurately adapts over high-brightness layouts.
 
 ## Screenshots
 
 | <img src="./app/assets/NeoQN%20(5).png" width="250"/> | <img src="./app/assets/NeoQN%20(6).png" width="250"/> | <img src="./app/assets/NeoQN%20(7).png" width="250"/> | <img src="./app/assets/NeoQN%20(8).png" width="250"/> | <img src="./app/assets/NeoQN%20(9).png" width="250"/> |
 |:---:|:---:|:---:|:---:|:---:|
-| **Library with Custom BG** | **Source Explorer** | **History** | **Settings** |**Novels Library**|
+| **Library with Custom BG** | **Source Explorer** | **History** | **Settings** | **Novels Library** |
+| <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> |
+| **[Screenshot 6]** | **[Screenshot 7]** | **[Screenshot 8]** | **[Screenshot 9]** | **[Screenshot 10]** |
 
 **Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
 

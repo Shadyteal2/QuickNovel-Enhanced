@@ -1077,7 +1077,7 @@ class MainActivity : AppCompatActivity() {
         val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
         val blur = settingsManager.getInt(getString(R.string.background_blur_key), 0)
         val dim = settingsManager.getInt(getString(R.string.background_dim_key), 0)
-        val isLightTheme = settingsManager.getString(getString(R.string.theme_key), "AmoledLight") == "Light"
+        val isLightTheme = settingsManager.getString(getString(R.string.theme_key), "Amoled") == "Light"
 
         binding?.apply {
             if (imageUri.isNullOrBlank()) {

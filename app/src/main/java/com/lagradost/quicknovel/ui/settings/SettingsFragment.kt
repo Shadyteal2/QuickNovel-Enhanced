@@ -458,7 +458,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
 
             val currentLayout =
-                settingsManager.getString(getString(R.string.theme_key), prefValues.first())
+                settingsManager.getString(getString(R.string.theme_key), "Amoled")
 
             activity?.showBottomDialog(
                 prefNames.toList(),
@@ -499,7 +499,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
 
             val currentLayout =
-                settingsManager.getString(getString(R.string.primary_color_key), prefValues.first())
+                settingsManager.getString(getString(R.string.primary_color_key), "Banana")
 
             activity?.showDialog(
                 prefNames.toList(),
