@@ -14,8 +14,8 @@ import com.lagradost.quicknovel.db.UpdateItem
 import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.mvvm.Resource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.withPermit
 
 class UpdatesSyncWorker(
     context: Context,
@@ -32,39 +32,58 @@ class UpdatesSyncWorker(
         dao.deleteOldUpdates(threshold)
 
         try {
-            val keys = getKeys(RESULT_BOOKMARK_STATE)
-            for (key in keys ?: emptyList()) {
-                val id = key.replaceFirst(RESULT_BOOKMARK_STATE, RESULT_BOOKMARK)
-                val cached = getKey<ResultCached>(id) ?: continue
-                android.util.Log.d("UpdatesSyncWorker", "Novel: ${cached.name}, isSyncEnabled: ${cached.isSyncEnabled}")
-                if (!cached.isSyncEnabled) continue
-                
-                val api = Apis.getApiFromNameOrNull(cached.apiName) ?: continue
-                val resource = api.load(cached.source)
-                val response = (resource as? Resource.Success)?.value as? StreamResponse ?: continue
+            val keys = getKeys(RESULT_BOOKMARK_STATE) ?: emptyList()
+            val semaphore = kotlinx.coroutines.sync.Semaphore(5)
+            val itemsToInsert = mutableListOf<UpdateItem>()
 
-                // Take last 10 chapters
-                val lastChapters = response.data.takeLast(10)
-                
-                for (chapter in lastChapters.reversed()) {
-                    if (!dao.exists(chapter.url)) {
-                        val item = UpdateItem(
-                            novelUrl = cached.source,
-                            novelName = cached.name,
-                            chapterUrl = chapter.url,
-                            chapterName = chapter.name,
-                            uploadDate = System.currentTimeMillis(),
-                            apiName = cached.apiName,
-                            posterUrl = cached.poster,
-                            chapterIndex = response.data.indexOf(chapter)
-                        )
-                        dao.insert(item)
-                        newChaptersCount++
-                    } else {
-                        // Optimised break: if this chapter already exists, skip remaining
-                        break
+            kotlinx.coroutines.coroutineScope {
+                val deferreds = keys.map { key ->
+                    async {
+                        semaphore.withPermit {
+                            try {
+                                val id = key.replaceFirst(RESULT_BOOKMARK_STATE, RESULT_BOOKMARK)
+                                val cached = getKey<ResultCached>(id) ?: return@withPermit null
+                                if (!cached.isSyncEnabled) return@withPermit null
+                                
+                                val api = Apis.getApiFromNameOrNull(cached.apiName) ?: return@withPermit null
+                                val resource = api.load(cached.source)
+                                val response = (resource as? Resource.Success)?.value as? StreamResponse ?: return@withPermit null
+
+                                val lastChapters = response.data.takeLast(10)
+                                val currentItems = mutableListOf<UpdateItem>()
+                                for (chapter in lastChapters.reversed()) {
+                                    if (!dao.exists(chapter.url)) {
+                                        currentItems.add(
+                                            UpdateItem(
+                                                novelUrl = cached.source,
+                                                novelName = cached.name,
+                                                chapterUrl = chapter.url,
+                                                chapterName = chapter.name,
+                                                uploadDate = System.currentTimeMillis(),
+                                                apiName = cached.apiName,
+                                                posterUrl = cached.poster,
+                                                chapterIndex = response.data.indexOf(chapter)
+                                            )
+                                        )
+                                    } else {
+                                        break
+                                    }
+                                }
+                                return@withPermit currentItems
+                            } catch (e: Exception) {
+                                return@withPermit null
+                            }
+                        }
                     }
                 }
+                deferreds.awaitAll().filterNotNull().forEach { list ->
+                    itemsToInsert.addAll(list)
+                }
+            }
+
+            for (item in itemsToInsert) {
+                dao.insert(item)
+                newChaptersCount++
             }
             if (newChaptersCount > 0) {
                 val currentCount = com.lagradost.quicknovel.BaseApplication.Companion.getKey<Int>("NEW_UPDATES_COUNT") ?: 0

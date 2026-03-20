@@ -50,6 +50,7 @@ import com.lagradost.quicknovel.ui.download.REVERSE_LAST_ACCES_SORT
 import com.lagradost.quicknovel.util.UIHelper.html
 import com.lagradost.quicknovel.util.UIHelper.humanReadableByteCountSI
 import com.lagradost.quicknovel.util.UIHelper.popupMenu
+import com.lagradost.quicknovel.util.UIHelper.popupMenuCustom
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.util.toPx
 
@@ -171,14 +172,22 @@ class ResultFragment : Fragment() {
             }
 
             res.synopsis?.let { synopsis ->
-                val syno = if (synopsis.length > MAX_SYNO_LENGH) {
-                    synopsis.substring(0, MAX_SYNO_LENGH) + "..."
-                } else {
-                    synopsis
+                resultSynopsisText.text = synopsis.html()
+                
+                var isExpanded = false
+                val toggleExpand = {
+                    isExpanded = !isExpanded
+                    resultSynopsisText.maxLines = if (isExpanded) Integer.MAX_VALUE else 4
+                    resultSynopsisTapMore.isVisible = !isExpanded
+                    resultSynopsisCollapseArrow.rotation = if (isExpanded) 180f else 0f
+                    root.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                 }
-                resultSynopsisText.text = syno.html()
+                synopsisCard.setOnClickListener { toggleExpand() }
+                resultSynopsisCollapseArrow.setOnClickListener { toggleExpand() }
             } ?: run {
                 resultSynopsisText.text = "..."
+                resultSynopsisTapMore.isVisible = false
+                resultSynopsisCollapseArrow.isVisible = false
             }
 
             if (res is StreamResponse) {
@@ -540,16 +549,19 @@ class ResultFragment : Fragment() {
                         3 -> {
                             chaptersTabBinding = ResultChaptersTabBinding.bind(tabView)
                             chaptersTabBinding?.apply {
-                                val adapter = ChapterAdapter(viewModel)
-                                chapterAdapter = adapter
-                                chapterList.adapter = adapter
+                                if (chapterAdapter == null) {
+                                    chapterAdapter = ChapterAdapter(viewModel)
+                                }
+                                if (chapterList.adapter != chapterAdapter) {
+                                    chapterList.adapter = chapterAdapter
+                                }
                                 chapterList.setHasFixedSize(true) // Optimize fastscroll lag
                                 
                                 viewModel.chapters.value?.let { chapters ->
                                     if (chapters.size > 300) {
-                                        adapter.submitIncomparableList(chapters)
+                                        chapterAdapter?.submitIncomparableList(chapters)
                                     } else {
-                                        adapter.submitList(chapters)
+                                        chapterAdapter?.submitList(chapters)
                                     }
                                 }
                             }
@@ -579,14 +591,39 @@ class ResultFragment : Fragment() {
             })
 
             resultBookmark.setOnClickListener { view ->
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                 val context = view.context ?: return@setOnClickListener
-                context.showBottomDialog(
-                    ReadType.entries.map { context.getString(it.stringRes) },
-                    selectedIndex = ReadType.entries.map { it.prefValue }
-                        .indexOf(viewModel.readState.value?.prefValue),
-                    context.getString(R.string.bookmark), false, {}
-                ) { selected ->
-                    viewModel.bookmark(ReadType.entries[selected].prefValue)
+                val json = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+                val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                    .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList<com.lagradost.quicknovel.ui.download.CategoryItem>() }
+                
+                val orderJson = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
+                val order = try { mapper.readValue(orderJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {}) } catch(t: Throwable) { emptyList<Int>() }
+
+                val allCats = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories + customCats
+                val sortedCats = if (order.isNotEmpty()) {
+                    allCats.sortedBy { order.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
+                } else {
+                    allCats
+                }
+
+                val menuItems = mutableListOf<Pair<Int, Any>>()
+                sortedCats.forEach { cat ->
+                     menuItems.add(cat.id to (cat.stringRes ?: cat.name))
+                }
+
+                // Add Unbookmark option if already bookmarked
+                val currentState = com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.RESULT_BOOKMARK_STATE, viewModel.id.value.toString()) ?: -1
+                if (currentState != -1) {
+                     menuItems.add(-1 to "Unbookmark")
+                }
+
+                view.popupMenuCustom(
+                    menuItems,
+                    selectedItemId = currentState
+                ) { menuItem ->
+                    viewModel.bookmark(menuItem.itemId)
                 }
             }
         }
@@ -604,13 +641,36 @@ class ResultFragment : Fragment() {
         }
 
         observe(viewModel.readState) { state ->
-            val stringRes = if (state == ReadType.NONE) R.string.bookmark else state.stringRes
-            binding.resultBookmark.text = getString(stringRes)
+            val context = context ?: return@observe
+            val currentStateId = com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.RESULT_BOOKMARK_STATE, viewModel.id.value.toString()) ?: -1
+            
+            var title = getString(R.string.bookmark)
+            var hasBookmark = false
+
+            if (currentStateId != -1) {
+                val systemCat = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories.find { it.id == currentStateId }
+                if (systemCat != null) {
+                    title = getString(systemCat.stringRes ?: R.string.bookmark)
+                    hasBookmark = true
+                } else {
+                    val json = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+                    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                    val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList() }
+                    val customCat = customCats.find { it.id == currentStateId }
+                    if (customCat != null) {
+                        title = customCat.name
+                        hasBookmark = true
+                    }
+                }
+            }
+
+            binding.resultBookmark.text = title
             binding.resultBookmark.setIconResource(
-                if (state == ReadType.NONE) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
+                if (!hasBookmark) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
             binding.resultBookmark.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_START
-            novelTabBinding?.resultUpdatesToggle?.isVisible = state != ReadType.NONE
+            novelTabBinding?.resultUpdatesToggle?.isVisible = hasBookmark
 
             // Update notes UI when read status changes
             novelTabBinding?.apply {

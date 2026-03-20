@@ -566,33 +566,10 @@ object BookDownloader2Helper {
         val displayName = "${sanitizeFilename(name)}.epub"
         val foundFile = subDir.findFileOrThrow(displayName)
 
-        val externalReader = settingsManager.getBoolean(
-            activity.getString(R.string.external_reader_key),
-            true
-        )
-        if (openInApp ?: !externalReader) {
-            val myIntent = Intent(activity, ReadActivity2::class.java)
-            myIntent.setDataAndType(foundFile.uriOrThrow(), "application/epub+zip")
-            activity.startActivity(myIntent)
-            return
-        }
-
-        val intent = Intent().apply {
-            action = Intent.ACTION_VIEW
-            addFlags(
-                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                        or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                        or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
-                        or Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        }
-
-        val type = "application/epub+zip"
-        intent.setDataAndType(
-            foundFile.uriOrThrow(), type
-        )
-        activity.startActivity(intent)
-        //this.startActivityForResult(intent,1337) // SEE @moonreader
+        // Always open in internal reader view
+        val myIntent = Intent(activity, ReadActivity2::class.java)
+        myIntent.setDataAndType(foundFile.uriOrThrow(), "application/epub+zip")
+        activity.startActivity(myIntent)
     }
 
     private fun Context.getStripHtml(): Boolean {
@@ -602,15 +579,7 @@ object BookDownloader2Helper {
 
     // External readers cant remove the authors notes easily
     private fun Context.getStripAuthorNodes(): Boolean {
-        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-
-        val externalReader = settingsManager.getBoolean(
-            getString(R.string.external_reader_key),
-            true
-        )
-        val authorsNotes = getKey<Boolean>(EPUB_AUTHOR_NOTES) ?: true
-
-        return externalReader && !authorsNotes
+        return false // External reader feature removed
     }
 
     private fun getChapter(
@@ -1144,7 +1113,8 @@ object BookDownloader2 {
         author: String?,
         name: String,
         apiName: String,
-        synopsis: String?
+        synopsis: String?,
+        openInApp: Boolean? = null
     ) {
         showToast(R.string.generating_epub)
         try {
@@ -1164,14 +1134,14 @@ object BookDownloader2 {
         } catch (t: Throwable) {
             showToast(R.string.error_loading_novel)
         }
-        openEpub(name)
+        openEpub(name, openInApp)
     }
 
-    private fun readEpub(author: String?, name: String, apiName: String, synopsis: String?) {
+    private fun readEpub(author: String?, name: String, apiName: String, synopsis: String?, openInApp: Boolean? = null) {
         if (hasEpub(name)) {
-            openEpub(name)
+            openEpub(name, openInApp)
         } else {
-            generateAndReadEpub(author, name, apiName, synopsis)
+            generateAndReadEpub(author, name, apiName, synopsis, openInApp)
         }
     }
 
@@ -1184,16 +1154,17 @@ object BookDownloader2 {
         author: String?,
         name: String,
         apiName: String,
-        synopsis: String?
+        synopsis: String?,
+        openInApp: Boolean? = null
     ) {
         if (readEpubMutex.isLocked) return
         readEpubMutex.withLock {
             val downloaded = getKey(DOWNLOAD_EPUB_SIZE, id.toString(), 0)!!
             val shouldUpdate = downloadedCount - downloaded != 0
             if (shouldUpdate) {
-                generateAndReadEpub(author, name, apiName, synopsis)
+                generateAndReadEpub(author, name, apiName, synopsis, openInApp)
             } else {
-                readEpub(author, name, apiName, synopsis)
+                readEpub(author, name, apiName, synopsis, openInApp)
             }
         }
     }

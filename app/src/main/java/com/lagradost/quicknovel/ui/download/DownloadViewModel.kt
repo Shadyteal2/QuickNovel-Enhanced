@@ -88,6 +88,14 @@ const val CHAPTER_SORT = 11
 const val REVERSE_CHAPTER_SORT = 12
 
 data class SortingMethod(@StringRes val name: Int, val id: Int, val inverse: Int = id)
+
+data class CategoryItem(
+    val id: Int,
+    @StringRes val stringRes: Int? = null,
+    val name: String,
+    val isSystem: Boolean = false
+)
+
 class DownloadViewModel : ViewModel() {
 
     companion object {
@@ -112,15 +120,73 @@ class DownloadViewModel : ViewModel() {
             SortingMethod(R.string.recently_sort, LAST_ACCES_SORT, REVERSE_LAST_ACCES_SORT),
             SortingMethod(R.string.alpha_sort, ALPHA_SORT, REVERSE_ALPHA_SORT),
         )
+
+        val systemCategories = listOf(
+            CategoryItem(ReadType.READING.prefValue, R.string.type_reading, "Reading", true),
+            CategoryItem(ReadType.ON_HOLD.prefValue, R.string.type_on_hold, "On-Hold", true),
+            CategoryItem(ReadType.PLAN_TO_READ.prefValue, R.string.type_plan_to_read, "Plan to Read", true),
+            CategoryItem(ReadType.COMPLETED.prefValue, R.string.type_completed, "Completed", true),
+            CategoryItem(ReadType.DROPPED.prefValue, R.string.type_dropped, "Dropped", true),
+        )
+        val bookmarkChanged = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 0)
     }
 
-    val readList = arrayListOf(
-        ReadType.READING,
-        ReadType.ON_HOLD,
-        ReadType.PLAN_TO_READ,
-        ReadType.COMPLETED,
-        ReadType.DROPPED,
-    )
+    init {
+        viewModelScope.launch {
+            bookmarkChanged.collect {
+                loadAllData(false)
+            }
+        }
+    }
+
+    private fun getSavedCategories(): List<CategoryItem> {
+        val json = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+        return try {
+            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            val customList = mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {})
+            
+            val orderJson = getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
+            val orderList = mapper.readValue(orderJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {})
+
+            val allItems = systemCategories + customList
+            if (orderList.isNotEmpty()) {
+                allItems.sortedBy { orderList.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
+            } else {
+                allItems
+            }
+        } catch (t: Throwable) {
+            systemCategories
+        }
+    }
+
+    private val _readList = MutableStateFlow<List<CategoryItem>>(getSavedCategories())
+    val readList: List<CategoryItem> get() = _readList.value
+
+    fun updateCategories(newList: List<CategoryItem>) {
+        _readList.value = newList
+        val customList = newList.filter { !it.isSystem }
+        val orderList = newList.map { it.id }
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        setKey(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", mapper.writeValueAsString(customList))
+        setKey(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", mapper.writeValueAsString(orderList))
+        loadAllData(false)
+    }
+
+    fun addCategory(name: String) {
+        val current = readList
+        val maxId = (current.maxByOrNull { it.id }?.id ?: 10).coerceAtLeast(10)
+        val newItem = CategoryItem(maxId + 1, null, name, false)
+        updateCategories(current + newItem)
+    }
+
+    fun deleteCategory(id: Int) {
+        updateCategories(readList.filter { it.id != id })
+    }
+
+    fun renameCategory(id: Int, newName: String) {
+        updateCategories(readList.map { if (it.id == id) it.copy(name = newName) else it })
+    }
 
     var activeQuery: String = ""
     val _pages: MutableLiveData<List<Page>> = MutableLiveData(null)
@@ -171,7 +237,8 @@ class DownloadViewModel : ViewModel() {
                 card.author,
                 card.name,
                 card.apiName,
-                card.synopsis
+                card.synopsis,
+                openInApp = true
             )
         } finally {
             setKey(DOWNLOAD_EPUB_LAST_ACCESS, card.id.toString(), System.currentTimeMillis())
@@ -454,13 +521,11 @@ class DownloadViewModel : ViewModel() {
 
     fun loadAllData(refreshAll: Boolean) = viewModelScope.launch {
         if (refreshAll) fetchAllData(false)
-        val mapping: HashMap<Int, ArrayList<ResultCached>> = hashMapOf(
-            ReadType.PLAN_TO_READ.prefValue to arrayListOf(),
-            ReadType.DROPPED.prefValue to arrayListOf(),
-            ReadType.COMPLETED.prefValue to arrayListOf(),
-            ReadType.ON_HOLD.prefValue to arrayListOf(),
-            ReadType.READING.prefValue to arrayListOf(),
-        )
+        val mapping: HashMap<Int, ArrayList<ResultCached>> = hashMapOf()
+        val currentCategories = readList
+        for (cat in currentCategories) {
+            mapping[cat.id] = arrayListOf()
+        }
 
         withContext(Dispatchers.IO) {
             val keys = getKeys(RESULT_BOOKMARK_STATE)
@@ -471,30 +536,30 @@ class DownloadViewModel : ViewModel() {
                     RESULT_BOOKMARK
                 )
                 val cached = getKey<ResultCached>(id) ?: continue
-                mapping[type]?.add(cached)
+                if (mapping.containsKey(type)) {
+                    mapping[type]?.add(cached)
+                }
             }
         }
 
         val pages = mutableListOf(
             getDownloadedCards(),
         )
-        for (read in readList) {
+        for (read in currentCategories) {
             pages.add(
                 Page(
-                    read.name,
-                    unsortedItems = mapping[read.prefValue]!!,
-                    items = sortNormalArray(mapping[read.prefValue]!!)
+                    if (read.isSystem && read.stringRes != null) context?.getString(read.stringRes) ?: read.name else read.name,
+                    unsortedItems = mapping[read.id] ?: arrayListOf(),
+                    items = sortNormalArray(mapping[read.id] ?: arrayListOf())
                 ),
             )
         }
         _pages.postValue(pages)
-
-
     }
 
     private suspend fun getDownloadedCards(): Page = cardsDataMutex.withLock {
         Page(
-            ReadType.NONE.name, unsortedItems = ArrayList(cardsData.values),
+            com.lagradost.quicknovel.ui.ReadType.NONE.name, unsortedItems = ArrayList(cardsData.values),
             items =
                 sortArray(ArrayList(cardsData.values))
         )

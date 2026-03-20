@@ -589,9 +589,9 @@ class ResultViewModel : ViewModel() {
                 RESULT_BOOKMARK_STATE, loadId.toString(), state
             )
             updateBookmarkData()
+            readState.postValue(ReadType.fromSpinner(state))
+            com.lagradost.quicknovel.ui.download.DownloadViewModel.bookmarkChanged.emit(Unit)
         }
-
-        readState.postValue(ReadType.fromSpinner(state))
     }
 
     fun toggleSyncEnabled() = viewModelScope.launch {
@@ -742,6 +742,7 @@ class ResultViewModel : ViewModel() {
 
     private fun setState(tid: Int) {
         loadId = tid
+        id.postValue(tid)
 
         readState.postValue(
             ReadType.fromSpinner(

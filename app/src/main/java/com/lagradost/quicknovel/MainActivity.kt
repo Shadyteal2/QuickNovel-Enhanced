@@ -549,7 +549,6 @@ class MainActivity : AppCompatActivity() {
     private fun updateNavBar(destination: NavDestination) {
         val tabIds = listOf(
             R.id.navigation_download,
-            R.id.navigation_updates,
             R.id.navigation_search,
             R.id.navigation_history,
             R.id.navigation_settings,
@@ -571,7 +570,6 @@ class MainActivity : AppCompatActivity() {
         
         val tabs = listOf(
             R.id.navigation_download,
-            R.id.navigation_updates,
             R.id.navigation_search,
             R.id.navigation_history,
             R.id.navigation_settings,
@@ -747,13 +745,48 @@ class MainActivity : AppCompatActivity() {
 
         val tabs = listOf(
             R.id.navigation_download,
-            R.id.navigation_updates,
             R.id.navigation_search,
             R.id.navigation_history,
             R.id.navigation_settings,
         )
 
+        class ZoomOutPageTransformer : androidx.viewpager2.widget.ViewPager2.PageTransformer {
+            override fun transformPage(page: android.view.View, position: Float) {
+                val absPos = kotlin.math.abs(position)
+                val pageWidth = page.width
+                val pageHeight = page.height
+
+                page.apply {
+                    when {
+                        position < -1 -> { // [-Infinity,-1)
+                            alpha = 0f
+                        }
+                        position <= 1 -> { // [-1,1]
+                            val scaleFactor = Math.max(0.85f, 1 - absPos)
+                            val vertMargin = pageHeight * (1 - scaleFactor) / 2
+                            val horzMargin = pageWidth * (1 - scaleFactor) / 2
+                            
+                            if (position < 0) {
+                                translationX = horzMargin - vertMargin / 2
+                            } else {
+                                translationX = -horzMargin + vertMargin / 2
+                            }
+
+                            scaleX = scaleFactor
+                            scaleY = scaleFactor
+
+                            alpha = 0.5f + (((scaleFactor - 0.85f) / (1 - 0.85f)) * (1 - 0.5f))
+                        }
+                        else -> { // (1,+Infinity]
+                            alpha = 0f
+                        }
+                    }
+                }
+            }
+        }
+
         binding?.mainViewpager?.apply {
+            setPageTransformer(ZoomOutPageTransformer())
             adapter = object : FragmentStateAdapter(this@MainActivity) {
                 override fun getItemCount(): Int = tabs.size
                 override fun createFragment(position: Int) = when (tabs[position]) {
@@ -812,7 +845,7 @@ class MainActivity : AppCompatActivity() {
                     onNavDestinationSelected(item, navController)
                 }
                 if (binding?.mainViewpager?.currentItem != index) {
-                    binding?.mainViewpager?.setCurrentItem(index, false)
+                    binding?.mainViewpager?.setCurrentItem(index, true)
                 }
                 syncIndicator(item.itemId)
                 
@@ -847,7 +880,7 @@ class MainActivity : AppCompatActivity() {
                     supportFragmentManager.popBackStack(null, 1)
                     navController.popBackStack(navController.graph.startDestinationId, false)
                 }
-                binding?.mainViewpager?.currentItem = index
+                binding?.mainViewpager?.setCurrentItem(index, true)
             }
         }
         

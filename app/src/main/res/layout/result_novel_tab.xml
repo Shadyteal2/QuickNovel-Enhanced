@@ -110,21 +110,67 @@
     </LinearLayout>
 
 
-    <View
-        android:alpha="0.5"
-        android:layout_margin="5dp"
+    <LinearLayout
+        android:id="@+id/synopsis_card"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="?attr/textColor"/>
-
-    <TextView
-        android:id="@+id/result_synopsis_text"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="10dp"
-        android:textColor="?attr/textColor"
-        android:textSize="14sp"
-        tools:text="Synopsis text goes here..." />
+        android:layout_margin="12dp"
+        android:background="@drawable/spatial_glass_card"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:id="@+id/synopsis_title_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ripple_masked_rounded"
+                android:backgroundTint="?attr/iconGrayBackground"
+                android:textColor="?attr/textColor"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
+                android:text="Synopsis" />
+
+            <ImageView
+                android:id="@+id/result_synopsis_collapse_arrow"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="@drawable/ripple_masked_rounded"
+                android:backgroundTint="?attr/iconGrayBackground"
+                android:src="@drawable/ic_baseline_keyboard_arrow_down_24"
+                android:padding="6dp"
+                app:tint="?attr/textColor" />
+        </RelativeLayout>
+
+        <TextView
+            android:id="@+id/result_synopsis_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/textColor"
+            android:textSize="14sp"
+            android:lineSpacingExtra="4dp"
+            android:ellipsize="end"
+            android:maxLines="4"
+            tools:text="In a world shattered by rifts and overrun by monsters..." />
+
+        <TextView
+            android:id="@+id/result_synopsis_tap_more"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:text="Tap to read more..." />
+    </LinearLayout>
 
     <com.google.android.material.chip.ChipGroup
         android:id="@+id/result_tag"

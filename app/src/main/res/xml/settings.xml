@@ -131,13 +131,7 @@
                 android:entryValues="@array/updates_interval_values"
                 android:icon="@drawable/ic_baseline_notifications_active_24"
                 app:layout="@layout/setting_tile" />
-        <SwitchPreference
-                app:key="@string/external_reader_key"
-                android:title="@string/external_reader"
-                android:summary="@string/external_reader_desc"
-                app:defaultValue="true"
-                android:icon="@drawable/ic_baseline_menu_book_24"
-                app:layout="@layout/setting_tile" />
+
         <SwitchPreference
                 app:key="@string/remove_external_key"
                 android:title="@string/remove_bloat"

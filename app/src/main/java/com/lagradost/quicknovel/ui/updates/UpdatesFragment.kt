@@ -69,7 +69,10 @@ class UpdatesFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             dao.getRecentUpdates(threshold).collectLatest { list ->
                 currentUpdatesList = list
-                baseGroupedMap = groupUpdates(list)
+                val grouped = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    groupUpdates(list)
+                }
+                baseGroupedMap = grouped
                 renderList()
                 binding.swipeRefresh.isRefreshing = false
                 binding.emptyView.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE

@@ -8,7 +8,8 @@
     <item
             android:id="@+id/navigation_updates"
             android:icon="@drawable/ic_baseline_notifications_active_24"
-            android:title="@string/title_updates"/>
+            android:title="@string/title_updates"
+            android:visible="false"/>
     <item
             android:id="@+id/navigation_search"
             android:icon="@drawable/ic_baseline_search_24"
