@@ -389,8 +389,8 @@
         android:visibility="gone"
         app:cardCornerRadius="28dp"
         app:cardElevation="6dp"
-        app:backgroundTint="@null"
-        android:background="?attr/primaryBlackBackground">
+        app:cardBackgroundColor="?attr/colorPrimary">
+        <!-- android:background removed, app:cardBackgroundColor added -->
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -403,7 +403,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_baseline_filter_list_24"
-                app:tint="?attr/textColor" />
+                app:tint="@android:color/white" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

@@ -491,16 +491,26 @@ class ResultFragment : Fragment() {
 
             resultChaptersFab.setOnClickListener { view ->
                 val act = activity ?: return@setOnClickListener
-                val popup = android.widget.PopupMenu(act, view, android.view.Gravity.TOP)
-                popup.menu.add("Filter & Sort")
-                popup.menu.add("Go to Latest Chapter")
-                popup.menu.add("Go to Last Read")
+                val popup = android.widget.ListPopupWindow(act)
+                popup.anchorView = view
+                popup.isModal = true
                 
-                popup.setOnMenuItemClickListener { item ->
-                    when (item.title.toString()) {
+                val items = listOf("Filter & Sort", "Go to Latest Chapter", "Go to Last Read")
+                val adapter = android.widget.ArrayAdapter(
+                    act,
+                    android.R.layout.simple_list_item_1,
+                    items
+                )
+                popup.setAdapter(adapter)
+                
+                popup.setBackgroundDrawable(androidx.core.content.ContextCompat.getDrawable(act, R.drawable.spatial_glass_card))
+                popup.width = 220.toPx // set appropriate width (e.g., 220dp)
+                
+                popup.setOnItemClickListener { _, _, position, _ ->
+                    when (items[position]) {
                         "Filter & Sort" -> showFilterBottomSheet(act)
                         "Go to Latest Chapter" -> chaptersTabBinding?.chapterList?.let { list ->
-                             val chapters = viewModel.chapters.value ?: return@setOnMenuItemClickListener true
+                             val chapters = viewModel.chapters.value ?: return@setOnItemClickListener
                              if (chapters.isNotEmpty()) {
                                   val sortType = ResultViewModel.sortChapterBy
                                   val target = if (sortType == REVERSE_CHAPTER_SORT || sortType == REVERSE_LAST_ACCES_SORT) 0 else chapters.size - 1
@@ -508,7 +518,7 @@ class ResultFragment : Fragment() {
                              }
                         }
                         "Go to Last Read" -> chaptersTabBinding?.chapterList?.let { list ->
-                             val chapters = viewModel.chapters.value ?: return@setOnMenuItemClickListener true
+                             val chapters = viewModel.chapters.value ?: return@setOnItemClickListener
                              val responseValue = (viewModel.loadResponse.value as? Resource.Success)?.value
                              val name = (responseValue as? StreamResponse)?.name ?: ""
                              val index = chapters.indexOfLast { ch ->
@@ -518,14 +528,15 @@ class ResultFragment : Fragment() {
                              if (index != -1) {
                                   list.scrollToPosition(index)
                              } else {
-                                  com.lagradost.quicknovel.CommonActivity.showToast(act, "No chapters read yet", android.widget.Toast.LENGTH_SHORT)
+                                  com.lagradost.quicknovel.CommonActivity.showToast(act, "No last read position found")
                              }
                         }
                     }
-                    true
+                    popup.dismiss()
                 }
                 popup.show()
             }
+
 
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(resultChaptersFab) { view, insets ->
                 val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
