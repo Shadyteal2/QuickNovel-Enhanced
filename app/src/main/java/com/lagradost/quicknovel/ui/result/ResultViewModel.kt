@@ -215,6 +215,7 @@ class ResultViewModel : ViewModel() {
     private var loadUrl: String = ""
     var hasLoaded: Boolean = false
     val userNote: MutableLiveData<String?> = MutableLiveData(null)
+    val isSyncEnabledDisplay: MutableLiveData<Boolean> = MutableLiveData(false)
 
 
     val loadResponse: MutableLiveData<Resource<LoadResponse>?> =
@@ -541,6 +542,10 @@ class ResultViewModel : ViewModel() {
             return
         }
         val totalChapters = (load as? StreamResponse)?.data?.size ?: 1
+        val currentCached = getKey<ResultCached>(RESULT_BOOKMARK, loadId.toString())
+        val isSyncEnabled = currentCached?.isSyncEnabled ?: false
+        isSyncEnabledDisplay.postValue(isSyncEnabled)
+
         setKey(
             RESULT_BOOKMARK, loadId.toString(), ResultCached(
                 loadUrl,
@@ -553,7 +558,8 @@ class ResultViewModel : ViewModel() {
                 load.rating,
                 totalChapters,
                 System.currentTimeMillis(),
-                synopsis = load.synopsis
+                synopsis = load.synopsis,
+                isSyncEnabled = isSyncEnabled
             )
         )
     }
@@ -583,9 +589,21 @@ class ResultViewModel : ViewModel() {
                 RESULT_BOOKMARK_STATE, loadId.toString(), state
             )
             updateBookmarkData()
+            readState.postValue(ReadType.fromSpinner(state))
+            com.lagradost.quicknovel.ui.download.DownloadViewModel.bookmarkChanged.emit(Unit)
         }
+    }
 
-        readState.postValue(ReadType.fromSpinner(state))
+    fun toggleSyncEnabled() = viewModelScope.launch {
+        loadMutex.withLock {
+            if (!hasLoaded) return@launch
+            val currentCached = getKey<ResultCached>(RESULT_BOOKMARK, loadId.toString()) ?: return@launch
+            val isSyncEnabled = !currentCached.isSyncEnabled
+            isSyncEnabledDisplay.postValue(isSyncEnabled)
+            setKey(
+                RESULT_BOOKMARK, loadId.toString(), currentCached.copy(isSyncEnabled = isSyncEnabled)
+            )
+        }
     }
 
     fun share() = viewModelScope.launch {
@@ -724,6 +742,7 @@ class ResultViewModel : ViewModel() {
 
     private fun setState(tid: Int) {
         loadId = tid
+        id.postValue(tid)
 
         readState.postValue(
             ReadType.fromSpinner(

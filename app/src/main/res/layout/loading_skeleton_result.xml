@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground">
+
+    <!-- Scrollable skeleton to mimic real scrolling layout -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?android:attr/colorBackground">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="80dp">
+
+            <!-- Title & Hero Frame inside scroll -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="80dp"
+                android:orientation="vertical"
+                android:paddingBottom="16dp">
+
+                <!-- Asymmetric Novel Layout -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false">
+
+                    <!-- Poster Skeleton -->
+                    <View
+                        android:layout_width="120dp"
+                        android:layout_height="180dp"
+                        android:layout_marginEnd="16dp"
+                        android:background="@drawable/skeleton_bg_rounded" />
+
+                    <!-- Text Info Column -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_gravity="top"
+                        android:orientation="vertical">
+
+                        <!-- Status + Chip Row -->
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="8dp">
+
+                            <View
+                                android:layout_width="64dp"
+                                android:layout_height="16dp"
+                                android:background="@drawable/skeleton_bg_rounded" />
+
+                            <View
+                                android:layout_width="80dp"
+                                android:layout_height="16dp"
+                                android:layout_marginStart="8dp"
+                                android:background="@drawable/skeleton_bg_rounded" />
+                        </LinearLayout>
+
+                        <!-- Title Line 1 -->
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="28dp"
+                            android:layout_marginBottom="6dp"
+                            android:background="@drawable/skeleton_bg_rounded" />
+
+                        <!-- Title Line 2 -->
+                        <View
+                            android:layout_width="140dp"
+                            android:layout_height="28dp"
+                            android:layout_marginBottom="12dp"
+                            android:background="@drawable/skeleton_bg_rounded" />
+
+                        <!-- Author -->
+                        <View
+                            android:layout_width="100dp"
+                            android:layout_height="18dp"
+                            android:layout_marginBottom="16dp"
+                            android:background="@drawable/skeleton_bg_rounded" />
+
+                        <!-- Stats or short info overlay row -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+                            <View
+                                android:layout_width="45dp"
+                                android:layout_height="14dp"
+                                android:background="@drawable/skeleton_bg_rounded" />
+                            <View
+                                android:layout_width="45dp"
+                                android:layout_height="14dp"
+                                android:layout_marginStart="8dp"
+                                android:background="@drawable/skeleton_bg_rounded" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Continue Reading Bar -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/skeleton_bg_rounded" />
+
+            <!-- Bookmark Button -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginBottom="24dp"
+                android:background="@drawable/skeleton_bg_rounded" />
+
+            <!-- Tab Layout simulation -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:orientation="horizontal"
+                android:paddingHorizontal="24dp"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_vertical">
+                <View
+                    android:layout_width="80dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="16dp"
+                    android:background="@drawable/skeleton_bg_rounded" />
+                <View
+                    android:layout_width="80dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/skeleton_bg_rounded" />
+            </LinearLayout>
+
+            <!-- Description/Content Lines (Repeated for effect) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="24dp">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/skeleton_bg_rounded" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/skeleton_bg_rounded" />
+                <View
+                    android:layout_width="240dp"
+                    android:layout_height="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/skeleton_bg_rounded" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/skeleton_bg_rounded" />
+                <View
+                    android:layout_width="160dp"
+                    android:layout_height="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/skeleton_bg_rounded" />
+
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

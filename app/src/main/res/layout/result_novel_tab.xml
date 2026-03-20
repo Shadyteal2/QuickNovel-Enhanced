@@ -89,24 +89,88 @@
                 android:textColor="?attr/grayTextColor"
                 android:textSize="12sp" />
         </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/result_updates_toggle_holder"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_vertical">
+            <ImageView
+                android:id="@+id/result_updates_toggle"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center"
+                android:background="@drawable/ripple_masked_rounded"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="5dp"
+                android:src="@drawable/ic_baseline_notifications_active_24"
+                app:tint="?attr/textColor" />
+        </FrameLayout>
     </LinearLayout>
 
 
-    <View
-        android:alpha="0.5"
-        android:layout_margin="5dp"
+    <LinearLayout
+        android:id="@+id/synopsis_card"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="?attr/textColor"/>
-
-    <TextView
-        android:id="@+id/result_synopsis_text"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="10dp"
-        android:textColor="?attr/textColor"
-        android:textSize="14sp"
-        tools:text="Synopsis text goes here..." />
+        android:layout_margin="12dp"
+        android:background="@drawable/spatial_glass_card"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:id="@+id/synopsis_title_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ripple_masked_rounded"
+                android:backgroundTint="?attr/iconGrayBackground"
+                android:textColor="?attr/textColor"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
+                android:text="Synopsis" />
+
+            <ImageView
+                android:id="@+id/result_synopsis_collapse_arrow"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="@drawable/ripple_masked_rounded"
+                android:backgroundTint="?attr/iconGrayBackground"
+                android:src="@drawable/ic_baseline_keyboard_arrow_down_24"
+                android:padding="6dp"
+                app:tint="?attr/textColor" />
+        </RelativeLayout>
+
+        <TextView
+            android:id="@+id/result_synopsis_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/textColor"
+            android:textSize="14sp"
+            android:lineSpacingExtra="4dp"
+            android:ellipsize="end"
+            android:maxLines="4"
+            tools:text="In a world shattered by rifts and overrun by monsters..." />
+
+        <TextView
+            android:id="@+id/result_synopsis_tap_more"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:text="Tap to read more..." />
+    </LinearLayout>
 
     <com.google.android.material.chip.ChipGroup
         android:id="@+id/result_tag"
@@ -244,15 +308,7 @@
                 app:iconSize="30dp" />
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/result_quickstream"
-            style="@style/WhiteButton"
-            android:layout_width="match_parent"
-            android:layout_marginHorizontal="10dp"
-            android:layout_marginTop="10dp"
-            android:gravity="center"
-            android:text="@string/quickstream_novel_text"
-            app:iconSize="20dp" />
+
 
 
         <!-- Progress Layout from ResultFragment code -->

@@ -207,7 +207,7 @@
     <string name="related">Related</string>
     <string name="votes_format">%d Votes</string>
     <string name="latest_format">Latest: %s</string>
-    <string name="new_update_found_format">New update found!\n %s -> %s</string>
+    <string name="new_update_found_format">New update found!\n %1$s -> %2$s</string>
     <string name="download_started">Download started</string>
     <string name="download_failed">Download failed</string>
     <string name="update">Update</string>
@@ -309,4 +309,5 @@
     <string name="by_shady">By Shady</string>
     <string name="notes">Notes</string>
     <string name="dropped_reason">Why did you drop this novel?</string>
+    <string name="title_updates">Updates</string>
 </resources>

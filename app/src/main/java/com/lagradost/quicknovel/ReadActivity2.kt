@@ -103,7 +103,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         fun lowerBottomNav(v: View) {
             v.translationY = 0f
-            ObjectAnimator.ofFloat(v, "translationY", v.height.toFloat()).apply {
+            val params = v.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+            val margin = params?.bottomMargin?.toFloat() ?: 0f
+            ObjectAnimator.ofFloat(v, "translationY", v.height.toFloat() + margin).apply {
                 duration = 200
                 start()
             }.doOnEnd {
@@ -136,7 +138,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         fun higherBottomNavView(v: View) {
             v.isVisible = true
-            v.translationY = v.height.toFloat()
+            val params = v.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+            val margin = params?.bottomMargin?.toFloat() ?: 0f
+            v.translationY = v.height.toFloat() + margin
             ObjectAnimator.ofFloat(v, "translationY", 0f).apply {
                 duration = 200
                 start()
@@ -728,6 +732,15 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         //updateTimeText()
         fixPaddingStatusbar(binding.readToolbarHolder)
 
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.readerBottomViewHolder) { v, insets ->
+            val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            val params = v.layoutParams as android.view.ViewGroup.MarginLayoutParams
+            val density = v.resources.displayMetrics.density
+            params.bottomMargin = (24 * density).toInt() + systemBars.bottom
+            v.layoutParams = params
+            insets
+        }
+
         observe(viewModel.paddingHorizontalLive) {
             updatePadding()
         }
@@ -1163,6 +1176,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 valueFrom = 10.0f
                 setValueRounded((viewModel.textSize).toFloat())
                 addOnChangeListener { slider, value, fromUser ->
+                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                     viewModel.textSize = value.roundToInt()
                 }
             }
@@ -1206,6 +1220,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             binding.readSettingsTtsPitch.apply {
                 setValueRounded(viewModel.ttsPitch)
                 addOnChangeListener { slider, value, fromUser ->
+                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                     viewModel.ttsPitch = value
                 }
             }
@@ -1213,6 +1228,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             binding.readSettingsTtsSpeed.apply {
                 setValueRounded(viewModel.ttsSpeed)
                 addOnChangeListener { slider, value, fromUser ->
+                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                     viewModel.ttsSpeed = value
                 }
             }
@@ -1245,6 +1261,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 valueTo = 50.0f
                 setValueRounded(viewModel.paddingHorizontal.toFloat())
                 addOnChangeListener { slider, value, fromUser ->
+                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                     viewModel.paddingHorizontal = value.roundToInt()
                 }
             }
@@ -1253,6 +1270,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 valueTo = 50.0f
                 setValueRounded(viewModel.paddingVertical.toFloat())
                 addOnChangeListener { slider, value, fromUser ->
+                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                     viewModel.paddingVertical = value.roundToInt()
                 }
             }
@@ -1260,6 +1278,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             binding.readSettingsTextVerticalPadding.apply {
                 setValueRounded(viewModel.textVerticalPadding)
                 addOnChangeListener { slider, value, fromUser ->
+                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                     viewModel.textVerticalPadding = value
                 }
             }

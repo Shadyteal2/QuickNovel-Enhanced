@@ -138,4 +138,21 @@
         <item>Green</item>
         <item>GreenApple</item>
     </string-array>
+    <string-array name="updates_interval_titles">
+        <item>When open app</item>
+        <item>Every 5 hours</item>
+        <item>Every 12 hours</item>
+        <item>Every 24 hours</item>
+        <item>Every 3 days</item>
+        <item>Every 1 week</item>
+    </string-array>
+    
+    <string-array name="updates_interval_values">
+        <item>0</item>
+        <item>5</item>
+        <item>12</item>
+        <item>24</item>
+        <item>72</item>
+        <item>168</item>
+    </string-array>
 </resources>

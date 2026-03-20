@@ -85,4 +85,10 @@ dependencies {
     implementation "com.facebook.shimmer:shimmer:0.5.0"
     implementation "com.google.mlkit:translate:17.0.1"
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
+
+    // Room Database for Updates Feed
+    def room_version = "2.6.1"
+    implementation "androidx.room:room-runtime:$room_version"
+    kapt "androidx.room:room-compiler:$room_version"
+    implementation "androidx.room:room-ktx:$room_version"
 }

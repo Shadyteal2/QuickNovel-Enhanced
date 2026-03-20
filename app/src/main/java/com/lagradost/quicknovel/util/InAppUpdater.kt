@@ -99,10 +99,25 @@ class InAppUpdater {
                 }
 
                 val foundVersion = foundAsset?.name?.let { versionRegex.find(it) }
-                val shouldUpdate =
-                    if (foundAsset?.browser_download_url != "" && foundVersion != null) currentVersion?.versionName?.compareTo(
-                        foundVersion.groupValues[2]
-                    )!! < 0 else false
+                val shouldUpdate = if (foundAsset?.browser_download_url != "" && foundVersion != null) {
+                    val current = currentVersion?.versionName?.split(".")?.mapNotNull { it.toIntOrNull() } ?: emptyList()
+                    val found = foundVersion.groupValues[2].split(".").mapNotNull { it.toIntOrNull() }
+                    
+                    if (current.isNotEmpty() && found.isNotEmpty()) {
+                        var updateNeeded = false
+                        for (i in 0 until maxOf(current.size, found.size)) {
+                            val curr = current.getOrNull(i) ?: 0
+                            val fnd = found.getOrNull(i) ?: 0
+                            if (fnd > curr) {
+                                updateNeeded = true
+                                break
+                            } else if (fnd < curr) {
+                                break
+                            }
+                        }
+                        updateNeeded
+                    } else false
+                } else false
                 return if (foundVersion != null) {
                     Update(
                         shouldUpdate,

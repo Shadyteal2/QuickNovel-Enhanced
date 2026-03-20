@@ -563,6 +563,61 @@ object UIHelper {
         return popup
     }
 
+    /**
+     * Shows a popup menu on top of this view supporting dynamic String titles.
+     *
+     * @param items menu item names to inflate the menu with. List of itemId to (stringRes Int OR String) pairs.
+     * @param selectedItemId optionally show a checkmark beside an item with this itemId.
+     * @param onMenuItemClick function to execute when a menu item is clicked.
+     */
+    @SuppressLint("RestrictedApi")
+    inline fun View.popupMenuCustom(
+        items: List<Pair<Int, Any>>,
+        selectedItemId: Int? = null,
+        noinline onMenuItemClick: (MenuItem) -> Unit,
+    ): PopupMenu {
+        val ctw = ContextThemeWrapper(context, R.style.PopupMenu)
+        val popup = PopupMenu(
+            ctw,
+            this,
+            Gravity.NO_GRAVITY,
+            androidx.appcompat.R.attr.actionOverflowMenuStyle,
+            0
+        )
+
+        items.forEach { (id, title) ->
+            if (title is Int) {
+                popup.menu.add(0, id, 0, title)
+            } else {
+                popup.menu.add(0, id, 0, title as CharSequence)
+            }
+        }
+
+        if (selectedItemId != null) {
+            (popup.menu as? MenuBuilder)?.setOptionalIconsVisible(true)
+
+            val emptyIcon = ContextCompat.getDrawable(context, R.drawable.ic_blank_24)
+            popup.menu.forEach { item ->
+                item.icon = when (item.itemId) {
+                    selectedItemId -> ContextCompat.getDrawable(context, R.drawable.ic_check_24)
+                        ?.mutate()?.apply {
+                            setTint(context.getResourceColor(android.R.attr.textColorPrimary))
+                        }
+
+                    else -> emptyIcon
+                }
+            }
+        }
+
+        popup.setOnMenuItemClickListener {
+            onMenuItemClick(it)
+            true
+        }
+
+        popup.show()
+        return popup
+    }
+
     @SuppressLint("RestrictedApi")
     inline fun View.popupMenu(
         items: List<Triple<Int, Int, Int>>,

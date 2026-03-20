@@ -192,7 +192,7 @@
     <string name="remove_bloat">Eliminar contenido innecesario</string>
     <string name="remove_bloat_desc">Elimina el título y traductor de las páginas (aumenta carga)</string>
     <string name="check_for_update">Buscar actualizaciones</string>
-    <string name="new_update_found_format">¡Nueva actualización disponible!\n %s -> %s</string>
+    <string name="new_update_found_format">¡Nueva actualización disponible!\n %1$s -> %2$s</string>
     <string name="no_update_found">No hay actualización</string>
 
     <!-- Copias de Seguridad (Backup) -->

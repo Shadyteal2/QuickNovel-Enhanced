@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item android:id="@android:id/mask">
+        <shape>
+            <corners android:radius="24dp" />
+            <solid android:color="@android:color/white" />
+        </shape>
+    </item>
+    <item>
+        <layer-list>
+            <!-- Contrast Overlay to enhance backdrop readability -->
+            <item>
+                <shape>
+                    <solid android:color="#0D000000" />
+                    <corners android:radius="24dp" />
+                </shape>
+            </item>
+            
+            <!-- Glass Translucency Panel -->
+            <item>
+                <shape>
+                    <solid android:color="?attr/floatingNavBackground" />
+                    <corners android:radius="24dp" />
+                </shape>
+            </item>
+            
+            <!-- Border Edge Highlight for Glass panel reflection -->
+            <item>
+                <shape>
+                    <stroke android:width="1.2dp" android:color="?attr/floatingNavStroke" />
+                    <corners android:radius="24dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</ripple>

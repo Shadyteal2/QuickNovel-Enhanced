@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="6dp"
-        android:background="@drawable/browse_item_background"
+        android:background="@drawable/spatial_glass_card"
         android:clickable="true"
         android:focusable="true"
         android:orientation="vertical"

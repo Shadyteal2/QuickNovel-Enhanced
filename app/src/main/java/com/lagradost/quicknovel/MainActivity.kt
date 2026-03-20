@@ -18,7 +18,10 @@ import androidx.annotation.IdRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -78,6 +81,7 @@ import com.lagradost.quicknovel.util.UIHelper.getResourceColor
 import com.lagradost.quicknovel.util.UIHelper.html
 import com.lagradost.quicknovel.util.UIHelper.popupMenu
 import com.lagradost.quicknovel.util.UIHelper.setImage
+import com.lagradost.quicknovel.util.toPx
 import com.lagradost.safefile.SafeFile
 import android.view.ViewGroup
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
@@ -162,8 +166,8 @@ class MainActivity : AppCompatActivity() {
         // === API ===
         lateinit var navOptions: NavOptions
 
-        fun loadResult(url: String, apiName: String, startAction: Int = 0) {
-            (activity as? AppCompatActivity)?.loadResult(url, apiName, startAction)
+        fun loadResult(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null) {
+            (activity as? AppCompatActivity)?.loadResult(url, apiName, startAction, startChapterUrl)
         }
 
         fun Activity?.navigate(@IdRes navigation: Int, arguments: Bundle? = null, options: NavOptions? = null) {
@@ -199,12 +203,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        fun FragmentActivity.loadResult(url: String, apiName: String, startAction: Int = 0) {
+        fun FragmentActivity.loadResult(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null) {
             SearchFragment.currentDialog?.dismiss()
             runOnUiThread {
                 this.navigate(
                     R.id.global_to_navigation_results,
-                    ResultFragment.newInstance(url, apiName, startAction)
+                    ResultFragment.newInstance(url, apiName, startAction, startChapterUrl)
                 )
                 /*supportFragmentManager.beginTransaction()
                         .setCustomAnimations(
@@ -368,6 +372,9 @@ class MainActivity : AppCompatActivity() {
         ) {
             updateGlobalBackground()
         }
+        if (key == "NEW_UPDATES_COUNT") {
+            updateUpdatesBadge()
+        }
     }
 
     private fun hidePreviewPopupDialog() {
@@ -484,6 +491,28 @@ class MainActivity : AppCompatActivity() {
         super.onBackPressed()
     }*/
 
+    private fun updateUpdatesBadge() {
+        val count = com.lagradost.quicknovel.BaseApplication.Companion.getKey<Int>("NEW_UPDATES_COUNT") ?: 0
+        val navView: BottomNavigationView? = binding?.navView
+        if (navView != null) {
+            val badge = navView.getOrCreateBadge(R.id.navigation_updates)
+            if (count > 0) {
+                badge.isVisible = true
+                badge.backgroundColor = colorFromAttribute(R.attr.colorPrimary)
+                badge.badgeTextColor = android.graphics.Color.WHITE
+                val displayCount = if (count > 9) 9 else count
+                badge.number = displayCount
+                if (count > 9) {
+                    // Maximum display digits for badge numbers is usually fixed, but some configs allow text modification
+                    badge.maxCharacterCount = 3 
+                }
+            } else {
+                badge.isVisible = false
+                badge.clearNumber()
+            }
+        }
+    }
+
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
         if (intent.action == Intent.ACTION_SEND) {
@@ -556,6 +585,8 @@ class MainActivity : AppCompatActivity() {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+// removed early listener
+
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         CommonActivity.loadThemes(this)
         CommonActivity.init(this)
@@ -563,9 +594,53 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
+
+        binding?.let { b ->
+            ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, windowInsets ->
+                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+                val bottomInset = insets.bottom
+
+                b.navBarContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    val threshold = 24.toPx
+                    if (bottomInset > threshold) {
+                        bottomMargin = 30.toPx + bottomInset
+                    } else {
+                        bottomMargin = 30.toPx
+                    }
+                }
+                windowInsets
+            }
+        }
+
+        binding?.let { b ->
+            ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, windowInsets ->
+                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+                val bottomInset = insets.bottom
+
+                b.navBarContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    val threshold = 24.toPx
+                    if (bottomInset > threshold) {
+                        bottomMargin = 30.toPx + bottomInset
+                    } else {
+                        bottomMargin = 30.toPx
+                    }
+                }
+                windowInsets
+            }
+
+            ViewCompat.setOnApplyWindowInsetsListener(b.navView) { _, insets ->
+                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+                WindowInsetsCompat.Builder(insets)
+                    .setInsets(WindowInsetsCompat.Type.systemBars(), androidx.core.graphics.Insets.of(systemBars.left, systemBars.top, systemBars.right, 0))
+                    .setInsets(WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.of(navBars.left, navBars.top, navBars.right, 0))
+                    .build()
+            }
+        }
         
         updateGlobalBackground()
         settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)
+        updateUpdatesBadge()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             binding?.navBarBlurView?.setRenderEffect(
@@ -601,9 +676,56 @@ class MainActivity : AppCompatActivity() {
                 appBackgroundDim.isVisible = hasBackground && !shouldHide
                 appBackgroundLightScrim.isVisible = hasBackground && !shouldHide
             }
+            if (navDestination.id == R.id.navigation_updates) {
+                binding?.navView?.getBadge(R.id.navigation_updates)?.isVisible = false
+                com.lagradost.quicknovel.BaseApplication.Companion.setKey("HAS_NEW_UPDATES", false)
+            }
         }
 
         val navView: BottomNavigationView = findViewById(R.id.nav_view)
+        
+        val hasUpdates = com.lagradost.quicknovel.BaseApplication.Companion.getKey("HAS_NEW_UPDATES", false) ?: false
+        if (hasUpdates) {
+            val badge = navView.getOrCreateBadge(R.id.navigation_updates)
+            badge.isVisible = true
+        }
+
+        val updatesReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                navView.post {
+                    val badge = navView.getOrCreateBadge(R.id.navigation_updates)
+                    badge.isVisible = true
+                }
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(updatesReceiver, android.content.IntentFilter("com.lagradost.quicknovel.UPDATES_REFRESH"), android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(updatesReceiver, android.content.IntentFilter("com.lagradost.quicknovel.UPDATES_REFRESH"))
+        }
+
+        // Schedule Periodic Updates sync based on preference
+        val sharedPreferences = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+        val intervalStr = sharedPreferences.getString("updates_sync_interval", "12") ?: "12"
+        val interval = intervalStr.toLongOrNull() ?: 12L
+
+        if (interval > 0) {
+            val syncRequest = androidx.work.PeriodicWorkRequestBuilder<com.lagradost.quicknovel.sync.UpdatesSyncWorker>(interval, java.util.concurrent.TimeUnit.HOURS)
+                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+                .build()
+            androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "UpdatesSync",
+                androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+                syncRequest
+            )
+        } else {
+            // Run on open
+            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.UpdatesSyncWorker>()
+                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+                .build()
+            androidx.work.WorkManager.getInstance(this).enqueueUniqueWork("UpdatesSyncOpen", androidx.work.ExistingWorkPolicy.KEEP, syncRequest)
+            androidx.work.WorkManager.getInstance(this).cancelUniqueWork("UpdatesSync")
+        }
         
         // Programmatically disable clipping on BottomNavigationItemViews
         navView.apply {
@@ -628,16 +750,56 @@ class MainActivity : AppCompatActivity() {
             R.id.navigation_settings,
         )
 
+        class ZoomOutPageTransformer : androidx.viewpager2.widget.ViewPager2.PageTransformer {
+            override fun transformPage(page: android.view.View, position: Float) {
+                val absPos = kotlin.math.abs(position)
+                val pageWidth = page.width
+                val pageHeight = page.height
+
+                page.apply {
+                    when {
+                        position < -1 -> { // [-Infinity,-1)
+                            alpha = 0f
+                        }
+                        position <= 1 -> { // [-1,1]
+                            val scaleFactor = Math.max(0.85f, 1 - absPos)
+                            val vertMargin = pageHeight * (1 - scaleFactor) / 2
+                            val horzMargin = pageWidth * (1 - scaleFactor) / 2
+                            
+                            if (position < 0) {
+                                translationX = horzMargin - vertMargin / 2
+                            } else {
+                                translationX = -horzMargin + vertMargin / 2
+                            }
+
+                            scaleX = scaleFactor
+                            scaleY = scaleFactor
+
+                            alpha = 0.5f + (((scaleFactor - 0.85f) / (1 - 0.85f)) * (1 - 0.5f))
+                        }
+                        else -> { // (1,+Infinity]
+                            alpha = 0f
+                        }
+                    }
+                }
+            }
+        }
+
         binding?.mainViewpager?.apply {
+            setPageTransformer(ZoomOutPageTransformer())
             adapter = object : FragmentStateAdapter(this@MainActivity) {
                 override fun getItemCount(): Int = tabs.size
                 override fun createFragment(position: Int) = when (tabs[position]) {
                     R.id.navigation_download -> DownloadFragment()
+                    R.id.navigation_updates -> com.lagradost.quicknovel.ui.updates.UpdatesFragment()
                     R.id.navigation_search -> SearchFragment()
                     R.id.navigation_history -> HistoryFragment()
                     R.id.navigation_settings -> SettingsFragment()
                     else -> DownloadFragment()
                 }
+
+                override fun getItemId(position: Int): Long = tabs[position].toLong()
+                override fun containsItem(itemId: Long): Boolean = tabs.contains(itemId.toInt())
             }
             isUserInputEnabled = true // Enable swiping
             
@@ -683,9 +845,13 @@ class MainActivity : AppCompatActivity() {
                     onNavDestinationSelected(item, navController)
                 }
                 if (binding?.mainViewpager?.currentItem != index) {
-                    binding?.mainViewpager?.setCurrentItem(index, false)
+                    binding?.mainViewpager?.setCurrentItem(index, true)
                 }
                 syncIndicator(item.itemId)
+                
+                if (item.itemId == R.id.navigation_updates) {
+                    com.lagradost.quicknovel.BaseApplication.Companion.setKey("NEW_UPDATES_COUNT", 0)
+                }
                 true
             } else {
                 onNavDestinationSelected(
@@ -714,7 +880,7 @@ class MainActivity : AppCompatActivity() {
                     supportFragmentManager.popBackStack(null, 1)
                     navController.popBackStack(navController.graph.startDestinationId, false)
                 }
-                binding?.mainViewpager?.currentItem = index
+                binding?.mainViewpager?.setCurrentItem(index, true)
             }
         }
         

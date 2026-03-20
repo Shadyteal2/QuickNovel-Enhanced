@@ -7,33 +7,52 @@
         android:fitsSystemWindows="false"
         android:orientation="vertical">
 
-    <FrameLayout
-            android:visibility="visible"
-            android:layout_height="40dp"
-            android:layout_margin="10dp"
-            android:background="?attr/searchBarBackground"
-            android:layout_width="match_parent">
+    <LinearLayout
+        android:id="@+id/download_header"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_margin="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <androidx.appcompat.widget.SearchView
-                android:animateLayoutChanges="true"
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/searchBarBackground">
+
+            <androidx.appcompat.widget.SearchView
                 android:id="@+id/download_search"
-                app:queryBackground="@color/transparent"
-                app:searchIcon="@drawable/search_icon"
-                android:paddingStart="-10dp"
-                android:iconifiedByDefault="false"
-                app:queryHint="@string/search_downloads"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_gravity="center_vertical"
+                android:animateLayoutChanges="true"
+                android:iconifiedByDefault="false"
+                android:paddingStart="-10dp"
                 app:iconifiedByDefault="false"
-                tools:ignore="RtlSymmetry">
+                app:queryBackground="@color/transparent"
+                app:queryHint="@string/search_downloads"
+                app:searchIcon="@drawable/search_icon"
+                tools:ignore="RtlSymmetry" />
+        </FrameLayout>
 
-            <!--app:queryHint="@string/search_hint"
-             android:background="?attr/primaryGrayBackground" ?attr/itemBackground
-                        app:searchHintIcon="@drawable/search_white"
-                        -->
-        </androidx.appcompat.widget.SearchView>
-    </FrameLayout>
+        <FrameLayout
+            android:id="@+id/updates_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/spatial_glass_card"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_baseline_notifications_active_24"
+                app:tint="?attr/iconColor" />
+        </FrameLayout>
+    </LinearLayout>
 
     <!--<com.google.android.material.appbar.AppBarLayout
             android:background="@android:color/transparent"
@@ -80,24 +99,51 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-        <com.google.android.material.tabs.TabLayout
-                android:id="@+id/bookmark_tabs"
-                style="@style/Theme.Widget.Tabs"
+        <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="45dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:background="#33000000"
-                android:descendantFocusability="blocksDescendants"
-                android:focusable="false"
-                android:paddingHorizontal="10dp"
-                app:tabGravity="fill"
-                app:tabIndicator="@drawable/indicator_background"
-                app:tabIndicatorColor="?attr/white"
-                app:tabIndicatorGravity="center"
-                app:tabIndicatorHeight="32dp"
-                app:tabMode="scrollable"
-                app:tabSelectedTextColor="?attr/primaryBlackBackground"
-                app:tabTextAppearance="@style/TabNoCaps"
-                app:tabTextColor="?attr/textColor" />
+                android:paddingEnd="10dp">
+
+            <com.google.android.material.tabs.TabLayout
+                    android:id="@+id/bookmark_tabs"
+                    style="@style/Theme.Widget.Tabs"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent"
+                    android:descendantFocusability="blocksDescendants"
+                    android:focusable="false"
+                    android:paddingHorizontal="10dp"
+                    app:tabGravity="fill"
+                    app:tabIndicator="@drawable/indicator_background"
+                    app:tabIndicatorColor="?attr/white"
+                    app:tabIndicatorGravity="center"
+                    app:tabIndicatorHeight="32dp"
+                    app:tabMode="scrollable"
+                    app:tabSelectedTextColor="?attr/primaryBlackBackground"
+                    app:tabTextAppearance="@style/TabNoCaps"
+                    app:tabTextColor="?attr/textColor" />
+
+            <FrameLayout
+                    android:id="@+id/edit_categories"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/spatial_glass_card"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackgroundBorderless">
+
+                <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_baseline_edit_24"
+                        app:tint="?attr/iconColor" />
+            </FrameLayout>
+        </LinearLayout>
 
         <FrameLayout
                 android:layout_width="match_parent"
