@@ -4,18 +4,22 @@ Adfree FOSS Android app for downloading novels. It also functions as an **Epub r
 This project is an enhanced fork of the original QuickNovel app, introducing a fully revamped, modern, and beautiful UI, alongside critical bug fixes.
 
 **Key Enhanced Features:**
-- **Custom Background Engine**: Personalize your library and search screens with any image. Includes adjustable **Blur** and **Dim** settings for the perfect look.
-- **Premium Glassmorphism UI**: A stunning, edge to edge, modern interface featuring floating navigation, translucent cards, and smooth micro-animations.
-- **Advanced Theme System**: Optimized themes including the modified **'Flashbang' Light Theme** with dynamic readability adjustments and light scrim overlays.
-- **Universal Text Readability**: Subtle shadows and theme-aware color attributes ensure novel titles and UI text pop against any background.
-- **Improved Reader Experience**: Refined typography, optimized spacing, and immersive reading modes for the best viewing experience.
-- **Optimized In-App Updater**: Direct integration with the NeoQN repository for faster and more reliable updates.
+- **Premium Glassmorphism UI**: A stunning, edge-to-edge layout featuring translucent floating action setups, glass-card layouts, and smooth micro-animations.
+- **Custom Background Engine**: Personalize sheets with background images supporting adjustable **Blur** and **Dim** properties.
+- **Advanced Theme System**: Adaptive adaptable layouts, including full readability support overlays inside index Light modes.
+- **Dynamic Updates Timeline Section**: Quickly check update nodes tracking fixes synced with repository payloads flawlessly.
+- **In-App Library Management**: Effortlessly re-order, sort, and edit bookmark shelves for custom directories.
+- **Integrated Backup & Restorations utilities**: Comprehensive local configurations archiving supporting prior app packages backup structures.
+- **WebView Sign-in Dialogs**: Native cookie triggers eliminating manual captures setups configuring dense provider targets.
+- **Visual Contrast Readability**: Shadow layers guarantee adaptive text formatting accurately overlays high-brightness layers.
 
 ## Screenshots
 
 | <img src="./app/assets/NeoQN%20(5).png" width="250"/> | <img src="./app/assets/NeoQN%20(6).png" width="250"/> | <img src="./app/assets/NeoQN%20(7).png" width="250"/> | <img src="./app/assets/NeoQN%20(8).png" width="250"/> | <img src="./app/assets/NeoQN%20(9).png" width="250"/> |
 |:---:|:---:|:---:|:---:|:---:|
-| **Library with Custom BG** | **Source Explorer** | **History** | **Settings** |**Novels Library**|
+| **Library with Custom BG** | **Source Explorer** | **History** | **Settings** | **Novels Library** |
+| <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> |
+| **[Screenshot 6]** | **[Screenshot 7]** | **[Screenshot 8]** | **[Screenshot 9]** | **[Screenshot 10]** |
 
 **Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
 
