@@ -4,14 +4,14 @@ Adfree FOSS Android app for downloading novels. It also functions as an **Epub r
 This project is an enhanced fork of the original QuickNovel app, introducing a fully revamped, modern, and beautiful UI, alongside critical bug fixes.
 
 **Key Enhanced Features:**
-- **Premium Glassmorphism UI**: A stunning, edge-to-edge layout featuring translucent floating action setups, glass-card layouts, and smooth micro-animations.
-- **Custom Background Engine**: Personalize sheets with background images supporting adjustable **Blur** and **Dim** properties.
-- **Advanced Theme System**: Adaptive adaptable layouts, including full readability support overlays inside index Light modes.
-- **Dynamic Updates Timeline Section**: Quickly check update nodes tracking fixes synced with repository payloads flawlessly.
-- **In-App Library Management**: Effortlessly re-order, sort, and edit bookmark shelves for custom directories.
-- **Integrated Backup & Restorations utilities**: Comprehensive local configurations archiving supporting prior app packages backup structures.
-- **WebView Sign-in Dialogs**: Native cookie triggers eliminating manual captures setups configuring dense provider targets.
-- **Visual Contrast Readability**: Shadow layers guarantee adaptive text formatting accurately overlays high-brightness layers.
+- **Premium Glassmorphism UI**: A stunning, edge-to-edge layout featuring translucent floating navigation, glass-card synopsis containers, and smooth micro-animations.
+- **Dynamic Updates Section**: Easily track novel chapter updates and releases synchronized directly from your timeline shelf.
+- **Advanced Category Management**: Effortlessly create, edit, and re-order custom library categories to organize your reading shelf flawlessly.
+- **Revamped Novel Details Screen**: Fully redesigned header and cover presentation with enhanced text readability and modern item frames.
+- **AMOLED and Light Mode Theme Templates**: Optimized adaptive displays supporting both full black background rendering and polished Light ('Flashbang') themes cleanly.
+- **Material You Dynamic Coloring Support**: Integrates native Monet-compatible dynamic tints for context-aware aesthetic uniformity (Android 12+).
+- **Custom Background Engine**: Personalize sheets with local background images supporting adjustable Blur and Dim framing parameters.
+- **Visual Contrast Readability Overlays**: Shadow layer integrations guarantee adaptive text formatting accurately adapts over high-brightness layouts.
 
 ## Screenshots
 
