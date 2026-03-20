@@ -204,6 +204,7 @@ class ResultFragment : Fragment() {
             is Resource.Failure -> {
                 binding.apply {
                     resultLoading.isVisible = false
+                    resultLoading.stopShimmer()
                     resultLoadingError.isVisible = true
                     resultHolder.isVisible = false
                     resultErrorText.text = loadResponse.errorString
@@ -214,6 +215,7 @@ class ResultFragment : Fragment() {
             is Resource.Loading -> {
                 binding.apply {
                     resultLoading.isVisible = true
+                    resultLoading.startShimmer()
                     resultLoadingError.isVisible = false
                     resultHolder.isVisible = false
                     resultPosterBlur.isVisible = false
@@ -251,7 +253,7 @@ class ResultFragment : Fragment() {
                     }
 
                     resultPoster.setImage(res.image)
-                    resultPosterBlur.setImage(res.image, radius = 100, sample = 3)
+                    resultPosterBlur.setImage(res.image, radius = 50, sample = 2)
 
                     resultTitle.text = res.name
                     resultAuthor.text = res.author ?: getString(R.string.no_author)
@@ -296,10 +298,21 @@ class ResultFragment : Fragment() {
                         resultViewpager.setCurrentItem(target, false)
                     }
 
-                    resultLoading.isVisible = false
                     resultLoadingError.isVisible = false
                     resultHolder.isVisible = true
                     resultPosterBlur.isVisible = true
+                    
+                    if (resultLoading.isVisible) {
+                        resultLoading.animate()
+                            .alpha(0f)
+                            .setDuration(120)
+                            .withEndAction {
+                                resultLoading.isVisible = false
+                                resultLoading.stopShimmer()
+                                resultLoading.alpha = 1f
+                            }.start()
+                    }
+                    
                     resultHolder.post { updateScrollHeight() }
                 }
             }
@@ -728,6 +741,9 @@ class ResultFragment : Fragment() {
         }
 
         binding.resultMainscroll.setOnScrollChangeListener { v: NestedScrollView, _, scrollY, _, oldScrollY ->
+            // Scroll backdrop with layout to fix wallpaper disconnect
+            binding.resultBackdropHolder.translationY = -scrollY.toFloat()
+            
             // Removed reviewsFab alpha logic since it's gone
             
             val scrollFade = maxOf(0f, 1 - scrollY / 170.toPx.toFloat())

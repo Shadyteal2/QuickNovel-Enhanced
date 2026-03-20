@@ -9,106 +9,6 @@
     android:clickable="true"
     android:focusable="true">
 
-    <com.facebook.shimmer.ShimmerFrameLayout
-        android:id="@+id/result_loading"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_gravity="center"
-        android:orientation="vertical"
-        android:paddingTop="40dp"
-        android:visibility="visible"
-        app:shimmer_auto_start="true"
-        app:shimmer_base_alpha="0.2"
-        app:shimmer_duration="@integer/loading_time"
-        app:shimmer_highlight_alpha="0.3"
-        tools:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/loading_margin"
-            android:layout_marginEnd="@dimen/loading_margin"
-            android:orientation="vertical">
-
-            <include layout="@layout/loading_downloads" />
-            <include layout="@layout/loading_line" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <include layout="@layout/loading_line_short" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <include layout="@layout/loading_line_short" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <View android:layout_width="0dp" android:layout_height="20dp" />
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <include layout="@layout/loading_line_short2" />
-                <View android:layout_width="20dp" android:layout_height="0dp" />
-                <include layout="@layout/loading_line_short2" />
-            </LinearLayout>
-
-            <View android:layout_width="0dp" android:layout_height="20dp" />
-
-            <include layout="@layout/loading_line" />
-            <include layout="@layout/loading_line" />
-            <include layout="@layout/loading_line_short" />
-
-            <View android:layout_width="0dp" android:layout_height="20dp" />
-
-            <include layout="@layout/loading_line_short2" />
-            <include layout="@layout/loading_line" />
-            <include layout="@layout/loading_line" />
-            <include layout="@layout/loading_line_short" />
-
-            <View android:layout_width="0dp" android:layout_height="20dp" />
-
-            <include layout="@layout/loading_line" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="horizontal">
-
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="0dp"
-                    android:layout_marginEnd="5dp"
-                    android:layout_weight="1"
-                    android:background="@color/grayShimmer"
-                    app:cardCornerRadius="@dimen/loading_radius" />
-
-                <androidx.cardview.widget.CardView
-                    android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="5dp"
-                    android:layout_weight="1"
-                    android:background="@color/grayShimmer"
-                    app:cardCornerRadius="@dimen/loading_radius" />
-            </LinearLayout>
-        </LinearLayout>
-    </com.facebook.shimmer.ShimmerFrameLayout>
 
     <LinearLayout
         android:id="@+id/result_loading_error"
@@ -147,6 +47,7 @@
 
     <!-- Full page backdrop -->
     <FrameLayout
+        android:id="@+id/result_backdrop_holder"
         android:layout_width="match_parent"
         android:layout_height="400dp">
         <ImageView
@@ -506,4 +407,21 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <com.facebook.shimmer.ShimmerFrameLayout
+        android:id="@+id/result_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?android:attr/colorBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="visible"
+        app:shimmer_auto_start="true"
+        app:shimmer_base_alpha="0.3"
+        app:shimmer_highlight_alpha="0.9"
+        app:shimmer_duration="800"
+        tools:visibility="gone">
+
+        <include layout="@layout/loading_skeleton_result" />
+
+    </com.facebook.shimmer.ShimmerFrameLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
