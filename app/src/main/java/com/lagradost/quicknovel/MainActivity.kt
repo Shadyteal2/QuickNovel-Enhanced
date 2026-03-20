@@ -166,8 +166,8 @@ class MainActivity : AppCompatActivity() {
         // === API ===
         lateinit var navOptions: NavOptions
 
-        fun loadResult(url: String, apiName: String, startAction: Int = 0) {
-            (activity as? AppCompatActivity)?.loadResult(url, apiName, startAction)
+        fun loadResult(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null) {
+            (activity as? AppCompatActivity)?.loadResult(url, apiName, startAction, startChapterUrl)
         }
 
         fun Activity?.navigate(@IdRes navigation: Int, arguments: Bundle? = null, options: NavOptions? = null) {
@@ -203,12 +203,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        fun FragmentActivity.loadResult(url: String, apiName: String, startAction: Int = 0) {
+        fun FragmentActivity.loadResult(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null) {
             SearchFragment.currentDialog?.dismiss()
             runOnUiThread {
                 this.navigate(
                     R.id.global_to_navigation_results,
-                    ResultFragment.newInstance(url, apiName, startAction)
+                    ResultFragment.newInstance(url, apiName, startAction, startChapterUrl)
                 )
                 /*supportFragmentManager.beginTransaction()
                         .setCustomAnimations(
@@ -372,6 +372,9 @@ class MainActivity : AppCompatActivity() {
         ) {
             updateGlobalBackground()
         }
+        if (key == "NEW_UPDATES_COUNT") {
+            updateUpdatesBadge()
+        }
     }
 
     private fun hidePreviewPopupDialog() {
@@ -488,6 +491,28 @@ class MainActivity : AppCompatActivity() {
         super.onBackPressed()
     }*/
 
+    private fun updateUpdatesBadge() {
+        val count = com.lagradost.quicknovel.BaseApplication.Companion.getKey<Int>("NEW_UPDATES_COUNT") ?: 0
+        val navView: BottomNavigationView? = binding?.navView
+        if (navView != null) {
+            val badge = navView.getOrCreateBadge(R.id.navigation_updates)
+            if (count > 0) {
+                badge.isVisible = true
+                badge.backgroundColor = colorFromAttribute(R.attr.colorPrimary)
+                badge.badgeTextColor = android.graphics.Color.WHITE
+                val displayCount = if (count > 9) 9 else count
+                badge.number = displayCount
+                if (count > 9) {
+                    // Maximum display digits for badge numbers is usually fixed, but some configs allow text modification
+                    badge.maxCharacterCount = 3 
+                }
+            } else {
+                badge.isVisible = false
+                badge.clearNumber()
+            }
+        }
+    }
+
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
         if (intent.action == Intent.ACTION_SEND) {
@@ -524,6 +549,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateNavBar(destination: NavDestination) {
         val tabIds = listOf(
             R.id.navigation_download,
+            R.id.navigation_updates,
             R.id.navigation_search,
             R.id.navigation_history,
             R.id.navigation_settings,
@@ -545,6 +571,7 @@ class MainActivity : AppCompatActivity() {
         
         val tabs = listOf(
             R.id.navigation_download,
+            R.id.navigation_updates,
             R.id.navigation_search,
             R.id.navigation_history,
             R.id.navigation_settings,
@@ -615,6 +642,7 @@ class MainActivity : AppCompatActivity() {
         
         updateGlobalBackground()
         settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)
+        updateUpdatesBadge()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             binding?.navBarBlurView?.setRenderEffect(
@@ -650,9 +678,56 @@ class MainActivity : AppCompatActivity() {
                 appBackgroundDim.isVisible = hasBackground && !shouldHide
                 appBackgroundLightScrim.isVisible = hasBackground && !shouldHide
             }
+            if (navDestination.id == R.id.navigation_updates) {
+                binding?.navView?.getBadge(R.id.navigation_updates)?.isVisible = false
+                com.lagradost.quicknovel.BaseApplication.Companion.setKey("HAS_NEW_UPDATES", false)
+            }
         }
 
         val navView: BottomNavigationView = findViewById(R.id.nav_view)
+        
+        val hasUpdates = com.lagradost.quicknovel.BaseApplication.Companion.getKey("HAS_NEW_UPDATES", false) ?: false
+        if (hasUpdates) {
+            val badge = navView.getOrCreateBadge(R.id.navigation_updates)
+            badge.isVisible = true
+        }
+
+        val updatesReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                navView.post {
+                    val badge = navView.getOrCreateBadge(R.id.navigation_updates)
+                    badge.isVisible = true
+                }
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(updatesReceiver, android.content.IntentFilter("com.lagradost.quicknovel.UPDATES_REFRESH"), android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(updatesReceiver, android.content.IntentFilter("com.lagradost.quicknovel.UPDATES_REFRESH"))
+        }
+
+        // Schedule Periodic Updates sync based on preference
+        val sharedPreferences = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+        val intervalStr = sharedPreferences.getString("updates_sync_interval", "12") ?: "12"
+        val interval = intervalStr.toLongOrNull() ?: 12L
+
+        if (interval > 0) {
+            val syncRequest = androidx.work.PeriodicWorkRequestBuilder<com.lagradost.quicknovel.sync.UpdatesSyncWorker>(interval, java.util.concurrent.TimeUnit.HOURS)
+                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+                .build()
+            androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "UpdatesSync",
+                androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+                syncRequest
+            )
+        } else {
+            // Run on open
+            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.UpdatesSyncWorker>()
+                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+                .build()
+            androidx.work.WorkManager.getInstance(this).enqueueUniqueWork("UpdatesSyncOpen", androidx.work.ExistingWorkPolicy.KEEP, syncRequest)
+            androidx.work.WorkManager.getInstance(this).cancelUniqueWork("UpdatesSync")
+        }
         
         // Programmatically disable clipping on BottomNavigationItemViews
         navView.apply {
@@ -672,6 +747,7 @@ class MainActivity : AppCompatActivity() {
 
         val tabs = listOf(
             R.id.navigation_download,
+            R.id.navigation_updates,
             R.id.navigation_search,
             R.id.navigation_history,
             R.id.navigation_settings,
@@ -682,11 +758,15 @@ class MainActivity : AppCompatActivity() {
                 override fun getItemCount(): Int = tabs.size
                 override fun createFragment(position: Int) = when (tabs[position]) {
                     R.id.navigation_download -> DownloadFragment()
+                    R.id.navigation_updates -> com.lagradost.quicknovel.ui.updates.UpdatesFragment()
                     R.id.navigation_search -> SearchFragment()
                     R.id.navigation_history -> HistoryFragment()
                     R.id.navigation_settings -> SettingsFragment()
                     else -> DownloadFragment()
                 }
+
+                override fun getItemId(position: Int): Long = tabs[position].toLong()
+                override fun containsItem(itemId: Long): Boolean = tabs.contains(itemId.toInt())
             }
             isUserInputEnabled = true // Enable swiping
             
@@ -735,6 +815,10 @@ class MainActivity : AppCompatActivity() {
                     binding?.mainViewpager?.setCurrentItem(index, false)
                 }
                 syncIndicator(item.itemId)
+                
+                if (item.itemId == R.id.navigation_updates) {
+                    com.lagradost.quicknovel.BaseApplication.Companion.setKey("NEW_UPDATES_COUNT", 0)
+                }
                 true
             } else {
                 onNavDestinationSelected(

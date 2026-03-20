@@ -121,6 +121,16 @@
                 app:defaultValue="true"
                 android:icon="@drawable/ic_baseline_notifications_active_24"
                 app:layout="@layout/setting_tile" />
+
+        <ListPreference
+                app:key="updates_sync_interval"
+                android:title="Updates Check Interval"
+                android:summary="Choose how often to check for bookmarked novel updates"
+                app:defaultValue="12"
+                android:entries="@array/updates_interval_titles"
+                android:entryValues="@array/updates_interval_values"
+                android:icon="@drawable/ic_baseline_notifications_active_24"
+                app:layout="@layout/setting_tile" />
         <SwitchPreference
                 app:key="@string/external_reader_key"
                 android:title="@string/external_reader"

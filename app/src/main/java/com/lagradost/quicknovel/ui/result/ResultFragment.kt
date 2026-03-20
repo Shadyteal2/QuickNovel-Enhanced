@@ -102,6 +102,7 @@ class ResultFragment : Fragment() {
             chapterAdapter?.notifyDataSetChanged()
             viewModel.isResume = false
         }
+        viewModel.reorderChapters()
 
 
         val savedNote = viewModel.getNote() ?: ""
@@ -115,8 +116,8 @@ class ResultFragment : Fragment() {
     private fun updateScrollHeight() {
         val displayMetrics = resources.displayMetrics
         val parameter = binding.resultViewpager.layoutParams
-        parameter.height =
-            displayMetrics.heightPixels - binding.viewsAndRating.height - binding.resultTabs.height - binding.resultScrollPadding.paddingTop
+        val bookmarkHeight = if (binding.resultBookmark.height > 0) binding.resultBookmark.height + 24.toPx else 80.toPx
+        parameter.height = displayMetrics.heightPixels - bookmarkHeight - binding.resultTabs.height
 
         binding.resultViewpager.layoutParams = parameter
     }
@@ -184,10 +185,8 @@ class ResultFragment : Fragment() {
                 resultChaptersInfoHolder.isVisible = true
                 resultChapters.text = res.data.size.toString()
                 resultChaptersInfo.text = if (res.data.size == 1) getString(R.string.chapter) else getString(R.string.chapters)
-                resultQuickstream.isVisible = true
             } else {
                 resultChaptersInfoHolder.isVisible = false
-                resultQuickstream.isVisible = false
             }
             // Notes text restoration managed by onResume and LiveData observer
         }
@@ -225,10 +224,30 @@ class ResultFragment : Fragment() {
                 val res = loadResponse.value
 
                 binding.apply {
-                    res.image?.let { img ->
-                        resultEmptyView.setOnClickListener {
-                            UIHelper.showImage(it.context, img)
-                        }
+                    resultPoster.setOnClickListener { view ->
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                        
+                        val scaleXDown = android.animation.ObjectAnimator.ofFloat(view, "scaleX", 1.0f, 0.95f)
+                        val scaleYDown = android.animation.ObjectAnimator.ofFloat(view, "scaleY", 1.0f, 0.95f)
+                        scaleXDown.duration = 100
+                        scaleYDown.duration = 100
+
+                        val scaleXUp = android.animation.ObjectAnimator.ofFloat(view, "scaleX", 0.95f, 1.0f)
+                        val scaleYUp = android.animation.ObjectAnimator.ofFloat(view, "scaleY", 0.95f, 1.0f)
+                        scaleXUp.duration = 100
+                        scaleYUp.duration = 100
+
+                        val animatorSet = android.animation.AnimatorSet()
+                        animatorSet.play(scaleXDown).with(scaleYDown)
+                        animatorSet.play(scaleXUp).with(scaleYUp).after(scaleXDown)
+                        animatorSet.start()
+                        
+                        // Animation Delay to show bounce
+                        view.postDelayed({
+                            res.image?.let { img ->
+                                UIHelper.showImage(view.context, img)
+                            }
+                        }, 200)
                     }
 
                     resultPoster.setImage(res.image)
@@ -243,10 +262,26 @@ class ResultFragment : Fragment() {
                     val readStatusText = res.status?.resource?.let { getString(it) } ?: ""
                     resultStatus.text = readStatusText
                     resultStatus.isVisible = readStatusText.isNotBlank()
+
+                    resultProviderChip.text = arguments?.getString("apiName") ?: ""
+                    resultProviderChip.isVisible = true
                     
                     if (res is StreamResponse) {
-                        resultTotalChapters.text = res.data.size.toString()
+                        val prefix = "Latest Chapter: "
+                        val text = "$prefix${res.data.size}"
+                        val spannable = android.text.SpannableString(text)
+                        spannable.setSpan(
+                            android.text.style.ForegroundColorSpan(requireContext().colorFromAttribute(R.attr.colorPrimary)),
+                            0, prefix.length, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        resultTotalChapters.text = spannable
                         resultTotalChapters.isVisible = true
+
+                        // Instant Continue text from local keys
+                        val savedIndex = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
+                            com.lagradost.quicknovel.EPUB_CURRENT_POSITION, res.name
+                        )
+                        binding.resultContinueText.text = if (savedIndex != null) "Continue Chapter ${savedIndex + 1}" else "Start Reading"
                     } else {
                         resultTotalChapters.isVisible = false
                     }
@@ -351,6 +386,19 @@ class ResultFragment : Fragment() {
         activity?.window?.decorView?.clearFocus()
         binding.resultTitle.isSelected = true
 
+        binding.resultTitle.setOnClickListener { view ->
+            val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("Novel Title", binding.resultTitle.text)
+            clipboard.setPrimaryClip(clip)
+            com.lagradost.quicknovel.CommonActivity.showToast("Title copied to clipboard")
+        }
+        binding.resultAuthor.setOnClickListener { view ->
+            val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("Author Name", binding.resultAuthor.text)
+            clipboard.setPrimaryClip(clip)
+            com.lagradost.quicknovel.CommonActivity.showToast("Author copied to clipboard")
+        }
+
         binding.resultSourceNotice.isVisible = apiName.contains("NovelFull", ignoreCase = true)
 
         if (viewModel.loadResponse.value == null)
@@ -371,30 +419,51 @@ class ResultFragment : Fragment() {
         binding.apply {
             activity?.fixPaddingStatusbar(resultInfoHeader)
 
+            // Theme Adaptability adjustments
+            val textColor = requireContext().colorFromAttribute(R.attr.textColor)
+            // If text is dark (R+G+B < 400), it's Light Theme
+            val isLightTheme = (android.graphics.Color.red(textColor) + android.graphics.Color.green(textColor) + android.graphics.Color.blue(textColor)) < 400
+            
+            val iconTint = if (isLightTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+            
+            val tintList = android.content.res.ColorStateList.valueOf(iconTint)
+            resultBack.imageTintList = tintList
+            resultOpeninbrower.imageTintList = tintList
+            resultShare.imageTintList = tintList
+
+            // #F2F2F2 for Light theme fallback absolute backdrops setups
+            resultContinueReading.setCardBackgroundColor(android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF")))
+            resultContinueReading.strokeColor = android.graphics.Color.parseColor(if (isLightTheme) "#E0E0E0" else "#11FFFFFF")
+            
+            resultProviderChip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF"))
+            resultProviderChip.setTextColor(if (isLightTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+
             resultReloadConnectionerror.setOnClickListener { viewModel.initState(apiName, url) }
             resultOpeninbrower.setOnClickListener { viewModel.openInBrowser() }
             resultReloadConnectionOpenInBrowser.setOnClickListener { viewModel.openInBrowser() }
 
-            val backParameter = resultBack.layoutParams as CoordinatorLayout.LayoutParams
-            backParameter.setMargins(
-                backParameter.leftMargin,
-                backParameter.topMargin + (activity?.getStatusBarHeight() ?: 0),
-                backParameter.rightMargin,
-                backParameter.bottomMargin
-            )
-            resultBack.layoutParams = backParameter
+
             resultBack.setOnClickListener { activity?.onBackPressedDispatcher?.onBackPressed() }
 
             activity?.fixPaddingStatusbar(resultStickyHeader)
 
-            val parameter = resultEmptyView.layoutParams as LinearLayout.LayoutParams
-            parameter.setMargins(
-                parameter.leftMargin,
-                parameter.topMargin + (activity?.getStatusBarHeight() ?: 0),
-                parameter.rightMargin,
-                parameter.bottomMargin
-            )
-            resultEmptyView.layoutParams = parameter
+            resultContinueReading.setOnClickListener {
+                val responseValue = (viewModel.loadResponse.value as? Resource.Success)?.value
+                val streamResponse = responseValue as? StreamResponse
+                val name = streamResponse?.name ?: ""
+                
+                val index = streamResponse?.data?.indexOfLast { ch ->
+                    val idx = streamResponse.data.indexOf(ch)
+                    val key = "$name/$idx"
+                    com.lagradost.quicknovel.BaseApplication.getKey<Long>(com.lagradost.quicknovel.EPUB_CURRENT_POSITION_READ_AT, key) != null
+                }
+                
+                if (index != null && index != -1 && index < streamResponse.data.size) {
+                    viewModel.streamRead(streamResponse.data[index])
+                } else {
+                    viewModel.streamRead()
+                }
+            }
 
             resultShare.setOnClickListener { viewModel.share() }
 
@@ -524,10 +593,10 @@ class ResultFragment : Fragment() {
         observe(viewModel.readState) { state ->
             val stringRes = if (state == ReadType.NONE) R.string.bookmark else state.stringRes
             binding.resultBookmark.text = getString(stringRes)
-            binding.resultBookmark.setCompoundDrawablesWithIntrinsicBounds(
-                0, 0, 0,
+            binding.resultBookmark.setIconResource(
                 if (state == ReadType.NONE) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
+            binding.resultBookmark.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_START
             novelTabBinding?.resultUpdatesToggle?.isVisible = state != ReadType.NONE
 
             // Update notes UI when read status changes
@@ -567,6 +636,17 @@ class ResultFragment : Fragment() {
             if (streamResponse != null && !chapters.isNullOrEmpty()) {
                 val total = chapters.size
                 val readCount = chapters.count { viewModel.hasReadChapter(it) }
+                
+                // Update Continue text with guaranteed loaded data
+                val name = streamResponse.name
+                val lastReadIndex = chapters.indexOfLast { ch ->
+                    val idx = viewModel.chapterIndex(ch) ?: -1
+                    if (idx == -1) return@indexOfLast false
+                    val key = "$name/$idx"
+                    com.lagradost.quicknovel.BaseApplication.getKey<Long>(com.lagradost.quicknovel.EPUB_CURRENT_POSITION_READ_AT, key) != null
+                }
+                binding.resultContinueText.text = if (lastReadIndex != -1) "Continue Chapter ${lastReadIndex + 1}" else "Start Reading"
+
                 novelTabBinding?.apply {
                     if (readCount > 0) {
                         resultProgressLayout.isVisible = true
@@ -657,14 +737,14 @@ class ResultFragment : Fragment() {
                 scaleY = 0.95f + scrollFade * 0.05f
             }
 
-            val crossFade = maxOf(0f, 1 - scrollY / 140.toPx.toFloat())
+            // resultBack is disabled from fading out to stay in the TopAppBar
             binding.resultBack.apply {
-                alpha = crossFade
-                isEnabled = crossFade > 0
+                alpha = 1f
+                isEnabled = true
             }
 
             val stickyFade = minOf(1f, scrollY / 170.toPx.toFloat())
-            binding.resultStickyHeader.alpha = stickyFade
+            binding.resultStickyTitle.alpha = stickyFade
 
             /*val dy = scrollY - oldScrollY
             if (dy > 0) {
@@ -715,7 +795,6 @@ class ResultFragment : Fragment() {
                 v.popupMenu(items.map { it to it }, null) { doAction(itemId) }
                 true
             }
-            resultQuickstream.setOnClickListener { viewModel.streamRead() }
 
             // Initial Notes Population
             val currentNote = resultNotesEdittext.text?.toString() ?: ""

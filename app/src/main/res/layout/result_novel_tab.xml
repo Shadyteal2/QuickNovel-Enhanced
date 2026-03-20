@@ -89,6 +89,24 @@
                 android:textColor="?attr/grayTextColor"
                 android:textSize="12sp" />
         </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/result_updates_toggle_holder"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_vertical">
+            <ImageView
+                android:id="@+id/result_updates_toggle"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center"
+                android:background="@drawable/ripple_masked_rounded"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="5dp"
+                android:src="@drawable/ic_baseline_notifications_active_24"
+                app:tint="?attr/textColor" />
+        </FrameLayout>
     </LinearLayout>
 
 
@@ -244,15 +262,7 @@
                 app:iconSize="30dp" />
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/result_quickstream"
-            style="@style/WhiteButton"
-            android:layout_width="match_parent"
-            android:layout_marginHorizontal="10dp"
-            android:layout_marginTop="10dp"
-            android:gravity="center"
-            android:text="@string/quickstream_novel_text"
-            app:iconSize="20dp" />
+
 
 
         <!-- Progress Layout from ResultFragment code -->

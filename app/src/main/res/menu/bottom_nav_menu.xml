@@ -6,6 +6,10 @@
             android:icon="@drawable/ic_baseline_collections_bookmark_24"
             android:title="@string/title_download"/>
     <item
+            android:id="@+id/navigation_updates"
+            android:icon="@drawable/ic_baseline_notifications_active_24"
+            android:title="@string/title_updates"/>
+    <item
             android:id="@+id/navigation_search"
             android:icon="@drawable/ic_baseline_search_24"
             android:title="@string/title_search"/>

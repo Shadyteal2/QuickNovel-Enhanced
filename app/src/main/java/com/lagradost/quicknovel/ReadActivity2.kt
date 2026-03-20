@@ -728,6 +728,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         //updateTimeText()
         fixPaddingStatusbar(binding.readToolbarHolder)
 
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.readerBottomViewHolder) { v, insets ->
+            val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, systemBars.bottom)
+            insets
+        }
+
         observe(viewModel.paddingHorizontalLive) {
             updatePadding()
         }

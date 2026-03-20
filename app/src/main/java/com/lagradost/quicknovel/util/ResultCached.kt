@@ -16,8 +16,9 @@ data class ResultCached(
     val tags : List<String>?,
     val rating : Int?,
     val totalChapters : Int,
-    val cachedTime : Long, // milliseconds
-    val synopsis : String? = null
+    val cachedTime : Long,
+    val synopsis : String? = null,
+    val isSyncEnabled : Boolean = false
 ) {
     val image : UiImage? get() = img(poster)
 
