@@ -8,7 +8,7 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 - **Dynamic Updates Section**: Easily track novel chapter updates and releases synchronized directly from your timeline shelf.
 - **Advanced Category Management**: Effortlessly create, edit, and re-order custom library categories to organize your reading shelf flawlessly.
 - **Revamped Novel Details Screen**: Fully redesigned header and cover presentation with enhanced text readability and modern item frames.
-- **AMOLED and Light Mode Theme Templates**: Optimized adaptive displays supporting both full black background rendering and polished Light ('Flashbang') themes cleanly.
+- **AMOLED and Light Mode Theme Templates with many Accents**: Optimized adaptive displays supporting both full black background rendering and polished Light ('Flashbang') themes cleanly.
 - **Material You Dynamic Coloring Support**: Integrates native Monet-compatible dynamic tints for context-aware aesthetic uniformity (Android 12+).
 - **Custom Background Engine**: Personalize sheets with local background images supporting adjustable **Blur** and **Dim** framing parameters.
 - **Visual Contrast Readability Overlays**: Shadow layer integrations guarantee adaptive text formatting accurately adapts over high-brightness layouts.
