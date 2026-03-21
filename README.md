@@ -7,6 +7,7 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 - **Premium Glassmorphism UI**: A stunning, edge-to-edge layout featuring translucent floating navigation, glass-card synopsis containers, and smooth micro-animations.
 - **Dynamic Updates Section**: Easily track novel chapter updates and releases synchronized directly from your timeline shelf.
 - **Advanced Category Management**: Effortlessly create, edit, and re-order custom library categories to organize your reading shelf flawlessly.
+- **Notes on Any Novel**: Forgot the plot or why you stopped reading? Now you can add Notes to any novel.
 - **Revamped Novel Details Screen**: Fully redesigned header and cover presentation with enhanced text readability and modern item frames.
 - **AMOLED and Light Mode Theme Templates with many Accents**: Optimized adaptive displays supporting both full black background rendering and polished Light ('Flashbang') themes cleanly.
 - **Material You Dynamic Coloring Support**: Integrates native Monet-compatible dynamic tints for context-aware aesthetic uniformity (Android 12+).
