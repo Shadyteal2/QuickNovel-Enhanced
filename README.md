@@ -10,16 +10,21 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 - **Revamped Novel Details Screen**: Fully redesigned header and cover presentation with enhanced text readability and modern item frames.
 - **AMOLED and Light Mode Theme Templates**: Optimized adaptive displays supporting both full black background rendering and polished Light ('Flashbang') themes cleanly.
 - **Material You Dynamic Coloring Support**: Integrates native Monet-compatible dynamic tints for context-aware aesthetic uniformity (Android 12+).
-- **Custom Background Engine**: Personalize sheets with local background images supporting adjustable Blur and Dim framing parameters.
+- **Custom Background Engine**: Personalize sheets with local background images supporting adjustable **Blur** and **Dim** framing parameters.
 - **Visual Contrast Readability Overlays**: Shadow layer integrations guarantee adaptive text formatting accurately adapts over high-brightness layouts.
-
+- **Many More**
 ## Screenshots
 
-| <img src="./app/assets/NeoQN%20(5).png" width="250"/> | <img src="./app/assets/NeoQN%20(6).png" width="250"/> | <img src="./app/assets/NeoQN%20(7).png" width="250"/> | <img src="./app/assets/NeoQN%20(8).png" width="250"/> | <img src="./app/assets/NeoQN%20(9).png" width="250"/> |
+| <img src="app/assets/NeoQN v2.0.9 (7).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (8).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (9).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (10).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (11).png" width="250"/> |
 |:---:|:---:|:---:|:---:|:---:|
-| **Library with Custom BG** | **Source Explorer** | **History** | **Settings** | **Novels Library** |
-| <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> | <img src="./app/assets/placeholder.png" width="250"/> |
-| **[Screenshot 6]** | **[Screenshot 7]** | **[Screenshot 8]** | **[Screenshot 9]** | **[Screenshot 10]** |
+| **Library with Custom BG** | **Edit/Add Categories** | **Updates Section** | **Novel Providers** | **History** |
+| <img src="app/assets/NeoQN v2.0.9 (12).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (13).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (14).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (6).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (15).png" width="250"/> |
+| **Settings** | **Novel Library** | **Novel Detail Screen** | **with Custom BG** | **Chapters Index** |
+| <img src="app/assets/NeoQN v2.0.9 (16).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (4).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (17).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (1)-1.webp" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (5).png" width="250"/> |
+| **with Custom BG** | **Flashbang theme** | **with Custom BG** | **Novel Reading** | **Flashbang theme** |
+| <img src="app/assets/NeoQN v2.0.9 (2).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (3).png" width="250"/> 
+| **Reader Setting** | **Reader Setting 2nd** 
+
 
 **Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
 
