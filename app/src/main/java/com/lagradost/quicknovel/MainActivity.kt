@@ -936,12 +936,43 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         bookmark.setOnClickListener { view ->
-                            view.popupMenu(
-                                ReadType.entries.map { it.prefValue to it.stringRes },
-                                selectedItemId = viewModel.readState.value?.prefValue
+                            val popup = android.widget.ListPopupWindow(view.context)
+                            popup.anchorView = view
+                            popup.isModal = true
+                            
+                            val currentReadState = viewModel.readState.value
+                            val items = ReadType.entries.map { it.prefValue to it.stringRes }
+                            
+                            val adapter = object : android.widget.ArrayAdapter<Pair<Int, Int>>(
+                                view.context, 
+                                android.R.layout.simple_list_item_1, 
+                                items
                             ) {
-                                viewModel.bookmark(itemId)
+                                override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                                    val v = super.getView(position, convertView, parent) as android.widget.TextView
+                                    val pair = items[position]
+                                    v.setText(pair.second)
+                                    
+                                    if (pair.first == currentReadState?.prefValue) {
+                                        val checkIcon = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_check_24)?.mutate()?.apply {
+                                            setTint(context.getResourceColor(android.R.attr.textColorPrimary))
+                                        }
+                                        v.setCompoundDrawablesWithIntrinsicBounds(checkIcon, null, null, null)
+                                    } else {
+                                        v.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null)
+                                    }
+                                    return v
+                                }
                             }
+                            popup.setAdapter(adapter)
+                            popup.setBackgroundDrawable(androidx.core.content.ContextCompat.getDrawable(view.context, R.drawable.spatial_glass_card))
+                            popup.width = 180.toPx
+                            
+                            popup.setOnItemClickListener { _, _, position, _ ->
+                                viewModel.bookmark(items[position].first)
+                                popup.dismiss()
+                            }
+                            popup.show()
                         }
 
                         readMore.setOnClickListener {

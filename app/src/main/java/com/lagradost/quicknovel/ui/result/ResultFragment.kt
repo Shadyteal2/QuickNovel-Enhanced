@@ -630,12 +630,47 @@ class ResultFragment : Fragment() {
                      menuItems.add(-1 to "Unbookmark")
                 }
 
-                view.popupMenuCustom(
-                    menuItems,
-                    selectedItemId = currentState
-                ) { menuItem ->
-                    viewModel.bookmark(menuItem.itemId)
+                val popup = android.widget.ListPopupWindow(context)
+                popup.anchorView = view
+                popup.isModal = true
+                
+                val adapter = object : android.widget.ArrayAdapter<Pair<Int, Any>>(
+                    context, 
+                    android.R.layout.simple_list_item_1, 
+                    menuItems
+                ) {
+                    override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                        val v = super.getView(position, convertView, parent) as android.widget.TextView
+                        val pair = menuItems[position]
+                        val title = pair.second
+                        if (title is Int) {
+                            v.setText(title)
+                        } else {
+                            v.setText(title as CharSequence)
+                        }
+                        
+                        if (pair.first == currentState) {
+                             val checkIcon = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_check_24)?.mutate()?.apply {
+                                 val typedValue = android.util.TypedValue()
+                                 context.theme.resolveAttribute(android.R.attr.textColorPrimary, typedValue, true)
+                                 setTint(typedValue.data)
+                             }
+                            v.setCompoundDrawablesWithIntrinsicBounds(checkIcon, null, null, null)
+                        } else {
+                            v.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null)
+                        }
+                        return v
+                    }
                 }
+                popup.setAdapter(adapter)
+                popup.setBackgroundDrawable(androidx.core.content.ContextCompat.getDrawable(context, R.drawable.spatial_glass_card))
+                popup.width = 200.toPx
+                
+                popup.setOnItemClickListener { _, _, position, _ ->
+                    viewModel.bookmark(menuItems[position].first)
+                    popup.dismiss()
+                }
+                popup.show()
             }
         }
 
