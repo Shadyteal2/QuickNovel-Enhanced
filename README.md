@@ -27,6 +27,8 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 | **Reader Setting** | **Reader Setting 2nd** 
 
 
+## Links:
+
 **Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
 
 **Telegram:** [Join Telegram community](https://t.me/+i9MSwgeoXzU0NTE1)
@@ -34,6 +36,12 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 **Discord:** [Join Discord Community](https://discord.gg/njMumTKvVw)
 
 **Download Releases:** [Get the latest APK](https://github.com/Shadyteal2/QuickNovel-Enhanced/releases)
+
+## Todo:
+1) Web support
+2) Optimize the current providers.
+3) More Providers.
+
 
 **Providers used:** (Some of the providers listed below are currently non-functional. I’ve removed them for now and will reintroduce them once a reliable solution is found.)
 
