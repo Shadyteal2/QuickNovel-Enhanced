@@ -180,7 +180,11 @@
         <item name="textColor">?attr/textColor</item>
     </style>
 
-    <style name="PopupMenu" parent="@style/Widget.AppCompat.PopupMenu">
+    <style name="PopupMenu" parent="@style/ThemeOverlay.AppCompat">
+        <item name="popupMenuStyle">@style/PopupMenuStyle</item>
+    </style>
+
+    <style name="PopupMenuStyle" parent="@style/Widget.AppCompat.PopupMenu">
         <item name="android:popupBackground">@drawable/spatial_glass_card</item>
     </style>
 
