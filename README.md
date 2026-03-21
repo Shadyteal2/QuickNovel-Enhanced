@@ -1,5 +1,5 @@
 # NeoQN (QuickNovel-Enhanced)
-Adfree FOSS Android app for downloading novels. It also functions as an **Epub reader**.
+Adfree FOSS Android app for downloading and reading novels. It also functions as an **Epub/Pdf reader**.
 
 This project is an enhanced fork of the original QuickNovel app, introducing a fully revamped, modern, and beautiful UI, alongside critical bug fixes.
 
