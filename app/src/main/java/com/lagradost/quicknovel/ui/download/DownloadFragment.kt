@@ -94,6 +94,11 @@ class DownloadFragment : Fragment() {
         /** Unix time ms */
         @JsonProperty("lastDownloaded")
         val lastDownloaded: Long?,
+        // Import extensions
+        @JsonProperty("filePath")
+        val filePath: String? = null,
+        @JsonProperty("formatType")
+        val formatType: String? = null,
     )
 
     data class DownloadDataLoaded(
@@ -116,6 +121,9 @@ class DownloadFragment : Fragment() {
         val generating: Boolean,
         val lastUpdated: Long?,
         val lastDownloaded: Long?,
+        val filePath: String? = null,
+        val formatType: String? = null,
+        val hash: String? = null,
     ) {
         val image by lazy {
             if(isImported) {

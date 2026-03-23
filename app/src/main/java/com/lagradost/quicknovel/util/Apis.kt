@@ -65,6 +65,7 @@ class Apis {
             //MoreNovelProvider(), // cloudflare?
             MtlNovelProvider(),
             NovelBinProvider(),
+            com.lagradost.quicknovel.providers.OceanOfPDFProvider(),
             NovelFullNETProvider(),
 
             NovelFullProvider(),

@@ -418,19 +418,30 @@ class MainActivity : AppCompatActivity() {
                 val fileName = file?.name()
 
                 val mimeType = ctx.contentResolver.getType(uri)
-                println("Loaded epub file. Selected URI path: $uri - Name: $fileName")
+                println("Loaded ebook file. Selected URI path: $uri - Name: $fileName")
 
                 ioSafe {
                     try {
-                        if (mimeType == "application/pdf" || fileName?.endsWith(".pdf") == true) {
-                            BookDownloader2.downloadPDFWorkThread(uri, ctx)
-                        }
-                        else{
-                            BookDownloader2.downloadWorkThread(uri, ctx)
+                        val inputData = androidx.work.Data.Builder()
+                            .putString("uri", uri.toString())
+                            .putString("fileName", fileName ?: "Unknown")
+                            .putString("mimeType", mimeType ?: "")
+                            .build()
+                            
+                        val request = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.MetadataExtractionWorker>()
+                            .setInputData(inputData)
+                            .build()
+                            
+                        androidx.work.WorkManager.getInstance(ctx).enqueue(request)
+                            
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            showToast(getString(R.string.download_started))
                         }
                     } catch (t : Throwable) {
                         logError(t)
-                        showToast(t.message)
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            showToast(t.message)
+                        }
                     }
                 }
             }
@@ -440,11 +451,10 @@ class MainActivity : AppCompatActivity() {
         try {
             epubPathPicker.launch(
                 arrayOf(
-                    //"text/plain",
-                    //"text/str",
-                    //"application/octet-stream",
                     "application/pdf",
                     "application/epub+zip",
+                    "application/x-mobipocket-ebook",
+                    "application/vnd.amazon.mobi8-ebook"
                 )
             )
         } catch (e: Exception) {
@@ -726,6 +736,15 @@ class MainActivity : AppCompatActivity() {
             androidx.work.WorkManager.getInstance(this).enqueueUniqueWork("UpdatesSyncOpen", androidx.work.ExistingWorkPolicy.KEEP, syncRequest)
             androidx.work.WorkManager.getInstance(this).cancelUniqueWork("UpdatesSync")
         }
+
+        // Trigger one-time library migration from SharedPreferences to Room
+        val migrationRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.LibraryMigrationWorker>()
+            .build()
+        androidx.work.WorkManager.getInstance(this).enqueueUniqueWork(
+            "LibraryMigration", 
+            androidx.work.ExistingWorkPolicy.KEEP, 
+            migrationRequest
+        )
         
         // Programmatically disable clipping on BottomNavigationItemViews
         navView.apply {

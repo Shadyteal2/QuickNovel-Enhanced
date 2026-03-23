@@ -131,10 +131,50 @@ class DownloadViewModel : ViewModel() {
         val bookmarkChanged = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 0)
     }
 
+    var activeQuery: String = ""
+    val _pages: androidx.lifecycle.MutableLiveData<List<Page>> = androidx.lifecycle.MutableLiveData(null)
+    val pages: androidx.lifecycle.LiveData<List<Page>> = _pages
+
+    private val cardsDataMutex = kotlinx.coroutines.sync.Mutex()
+    private val cardsData: java.util.HashMap<Int, com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded> = hashMapOf()
+
     init {
         viewModelScope.launch {
             bookmarkChanged.collect {
                 loadAllData(false)
+            }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@launch).novelDao().getAllAsFlow().collect { novels ->
+                cardsDataMutex.withLock {
+                    for (novel in novels) {
+                        val info = BookDownloader2.downloadProgress[novel.id]
+                        cardsData[novel.id] = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded(
+                            source = novel.source,
+                            name = novel.name,
+                            author = novel.author,
+                            posterUrl = novel.posterUrl,
+                            rating = novel.rating,
+                            peopleVoted = novel.peopleVoted,
+                            views = novel.views,
+                            synopsis = novel.synopsis,
+                            tags = novel.tags,
+                            apiName = novel.apiName,
+                            downloadedCount = if (novel.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE) 1L else info?.progress ?: 0L,
+                            downloadedTotal = if (novel.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE) 1L else info?.total ?: 0L,
+                            ETA = context?.let { ctx -> info?.eta(ctx) } ?: "",
+                            state = info?.state ?: DownloadState.Nothing,
+                            id = novel.id,
+                            generating = false,
+                            lastUpdated = novel.lastUpdated,
+                            lastDownloaded = novel.lastDownloaded,
+                            filePath = novel.filePath,
+                            formatType = novel.formatType,
+                            hash = novel.hash
+                        )
+                    }
+                }
+                postCards()
             }
         }
     }
@@ -188,9 +228,7 @@ class DownloadViewModel : ViewModel() {
         updateCategories(readList.map { if (it.id == id) it.copy(name = newName) else it })
     }
 
-    var activeQuery: String = ""
-    val _pages: MutableLiveData<List<Page>> = MutableLiveData(null)
-    val pages: LiveData<List<Page>> = _pages
+
 
     var currentTab: MutableLiveData<Int> =
         MutableLiveData<Int>(getKey(DOWNLOAD_SETTINGS, CURRENT_TAB, 0))
@@ -358,6 +396,7 @@ class DownloadViewModel : ViewModel() {
 
     fun delete(card: DownloadFragment.DownloadDataLoaded) {
         BookDownloader2.deleteNovel(card.author, card.name, card.apiName)
+        loadAllData(false)
     }
 
     private fun matchesQuery(x: String): Boolean {
@@ -613,8 +652,7 @@ class DownloadViewModel : ViewModel() {
         }
     }
 
-    private val cardsDataMutex = Mutex()
-    private val cardsData: HashMap<Int, DownloadFragment.DownloadDataLoaded> = hashMapOf()
+
 
     private fun progressChanged(data: Pair<Int, DownloadProgressState>) =
         viewModelScope.launchSafe {

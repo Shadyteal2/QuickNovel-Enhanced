@@ -286,9 +286,10 @@ class ResultViewModel : ViewModel() {
         loadMutex.withLock {
             if (!hasLoaded) return@launchSafe
             addToHistory()
+            val downloadedCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.DOWNLOAD_EPUB_SIZE, loadId.toString(), 0) ?: 0
             BookDownloader2.readEpub(
                 loadId,
-                downloadState.value?.progress?.toInt() ?: return@launchSafe,
+                downloadState.value?.progress?.toInt() ?: downloadedCount,
                 load.author,
                 load.name,
                 apiName,

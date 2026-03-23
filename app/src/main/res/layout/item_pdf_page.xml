@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/colorSurface"
+    android:layout_marginBottom="8dp">
+
+    <com.lagradost.quicknovel.ZoomableImageView
+        android:id="@+id/pdf_page_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true" />
+
+    <!-- Optional: Add a progress bar while rendering large pages -->
+    <ProgressBar
+        android:id="@+id/pdf_page_progress"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
+</FrameLayout>

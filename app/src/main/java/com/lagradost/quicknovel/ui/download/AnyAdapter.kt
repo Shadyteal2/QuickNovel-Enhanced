@@ -301,8 +301,10 @@ class AnyAdapter(
             is DownloadResultCompactBinding -> {
                 val card = item as DownloadFragment.DownloadDataLoaded
                 view.apply {
-                    downloadHolder.isGone =
+                    downloadUpdateHolder.isGone =
                         card.isImported && (card.apiName != IMPORT_SOURCE_PDF || card.downloadedTotal == card.downloadedCount)
+                    downloadDeleteTrash.isVisible = true
+                    downloadHolder.isGone = false
                     val same = imageText.text == card.name
                     backgroundCard.apply {
                         setOnClickListener {

@@ -334,10 +334,23 @@ object BookDownloader2Helper {
             removeKey(DOWNLOAD_TOTAL, id.toString())
             removeKey(DOWNLOAD_EPUB_SIZE, id.toString())
             removeKey(DOWNLOAD_OFFSET, id.toString())
+            removeKey(com.lagradost.quicknovel.DOWNLOAD_FOLDER, id.toString())
+            ioSafe {
+                com.lagradost.quicknovel.db.AppDatabase.getDatabase(activity).novelDao().deleteById(id)
+            }
 
             if (dir.isDirectory) {
                 dir.deleteRecursively()
             }
+
+            // Also delete fallback public files for full-file providers if they exist
+            val cleanTitle = sName.replace("[^a-zA-Z0-9]".toRegex(), "_")
+            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val epubFile = java.io.File(downloadsDir, "Epub/${cleanTitle}.epub")
+            val pdfFile = java.io.File(downloadsDir, "Epub/${cleanTitle}.pdf")
+            
+            if (epubFile.exists()) epubFile.delete()
+            if (pdfFile.exists()) pdfFile.delete()
         } catch (t: Throwable) {
             logError(t)
         }
@@ -1138,7 +1151,12 @@ object BookDownloader2 {
     }
 
     private fun readEpub(author: String?, name: String, apiName: String, synopsis: String?, openInApp: Boolean? = null) {
-        if (hasEpub(name)) {
+        val cleanTitle = name.replace("[^a-zA-Z0-9]".toRegex(), "_")
+        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        val epubFile = java.io.File(downloadsDir, "Epub/${cleanTitle}.epub")
+        val pdfFile = java.io.File(downloadsDir, "Epub/${cleanTitle}.pdf")
+
+        if (hasEpub(name) || epubFile.exists() || pdfFile.exists()) {
             openEpub(name, openInApp)
         } else {
             generateAndReadEpub(author, name, apiName, synopsis, openInApp)
@@ -1159,12 +1177,102 @@ object BookDownloader2 {
     ) {
         if (readEpubMutex.isLocked) return
         readEpubMutex.withLock {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val ctx = com.lagradost.quicknovel.CommonActivity.activity ?: com.lagradost.quicknovel.BaseApplication.Companion.context ?: return@withContext
+            val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(ctx).novelDao()
+            val novel = dao.getById(id)
+            var format = novel?.formatType?.lowercase()
+            var path = novel?.filePath
+
+            if (path.isNullOrEmpty()) {
+                val cleanTitle = name.replace("[^a-zA-Z0-9]".toRegex(), "_")
+                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                val epubFile = java.io.File(downloadsDir, "Epub/${cleanTitle}.epub")
+                val pdfFile = java.io.File(downloadsDir, "Epub/${cleanTitle}.pdf")
+                
+                if (epubFile.exists()) {
+                    path = epubFile.absolutePath
+                    format = "epub"
+                } else if (pdfFile.exists()) {
+                    path = pdfFile.absolutePath
+                    format = "pdf"
+                }
+            }
+
+            if (!path.isNullOrEmpty()) {
+                val originalFile = java.io.File(path)
+                if (originalFile.exists()) {
+                    val isExternal = !originalFile.absolutePath.startsWith(ctx.filesDir.absolutePath)
+                    val shadowedFile = if (isExternal) {
+                        try {
+                            val cacheFile = java.io.File(ctx.cacheDir, "temp_open_${originalFile.name}")
+                            ctx.contentResolver.openInputStream(android.net.Uri.fromFile(originalFile))?.use { input ->
+                                cacheFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            cacheFile
+                        } catch (e: Exception) {
+                            com.lagradost.quicknovel.mvvm.logError(e)
+                            originalFile
+                        }
+                    } else {
+                        originalFile
+                    }
+                    val file = shadowedFile // Shadowing outer file for inner blocks
+
+                    if (format == "pdf") {
+                        try {
+                            val intent = android.content.Intent(ctx, com.lagradost.quicknovel.PdfActivity::class.java).apply {
+                                putExtra("path", file.absolutePath)
+                                putExtra("title", name)
+                            }
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            ctx.startActivity(intent)
+                        } catch (e: Exception) {
+                            com.lagradost.quicknovel.mvvm.logError(e)
+                            com.lagradost.quicknovel.CommonActivity.showToast("Error opening PDF: ${e.message}")
+                        }
+                        return@withContext
+                    } else if (format == "mobi" || format == "prc") {
+                        try {
+                            val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.provider", file)
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "application/x-mobipocket-ebook")
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            ctx.startActivity(intent)
+                        } catch (e: Exception) {
+                            com.lagradost.quicknovel.mvvm.logError(e)
+                            com.lagradost.quicknovel.CommonActivity.showToast("No application found to open $format")
+                        }
+                        return@withContext
+                    } else if (format == "epub") {
+                        try {
+                            val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.provider", file)
+                            val myIntent = android.content.Intent(ctx, com.lagradost.quicknovel.ReadActivity2::class.java).apply {
+                                setDataAndType(uri, "application/epub+zip")
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            myIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            ctx.startActivity(myIntent)
+                        } catch (e: Exception) {
+                            com.lagradost.quicknovel.mvvm.logError(e)
+                            com.lagradost.quicknovel.CommonActivity.showToast("Error opening reader view: ${e.message}")
+                        }
+                        return@withContext
+                    }
+                }
+            }
+
             val downloaded = getKey(DOWNLOAD_EPUB_SIZE, id.toString(), 0)!!
             val shouldUpdate = downloadedCount - downloaded != 0
             if (shouldUpdate) {
                 generateAndReadEpub(author, name, apiName, synopsis, openInApp)
             } else {
                 readEpub(author, name, apiName, synopsis, openInApp)
+            }
             }
         }
     }
@@ -1315,10 +1423,24 @@ object BookDownloader2 {
 
     private fun initDownloadProgress() = ioSafe {
         downloadInfoMutex.withLock {
-            val keys = getKeys(DOWNLOAD_FOLDER) ?: return@ioSafe
-            for (key in keys) {
-                val res =
-                    getKey<DownloadFragment.DownloadData>(key) ?: continue
+            val novels = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@ioSafe).novelDao().getAll()
+            for (novel in novels) {
+                val res = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadData(
+                    source = novel.source,
+                    name = novel.name,
+                    author = novel.author,
+                    posterUrl = novel.posterUrl,
+                    rating = novel.rating,
+                    peopleVoted = novel.peopleVoted,
+                    views = novel.views,
+                    synopsis = novel.synopsis,
+                    tags = novel.tags,
+                    apiName = novel.apiName,
+                    lastUpdated = novel.lastUpdated,
+                    lastDownloaded = novel.lastDownloaded,
+                    filePath = novel.filePath,
+                    formatType = novel.formatType
+                )
 
                 val localId = generateId(res.apiName, res.author, res.name)
 
@@ -1409,10 +1531,14 @@ object BookDownloader2 {
             DOWNLOAD_TOTAL, to.toString(),
             getKey<Int>(DOWNLOAD_TOTAL, from.toString())
         )
-        setKey(
-            DOWNLOAD_FOLDER, to.toString(),
-            getKey<DownloadFragment.DownloadData>(DOWNLOAD_FOLDER, from.toString())
-        )
+        ioSafe {
+            val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@ioSafe).novelDao()
+            val oldData = dao.getById(from)
+            if (oldData != null) {
+                dao.insert(oldData.copy(id = to))
+                dao.deleteById(from)
+            }
+        }
         setKey(
             DOWNLOAD_EPUB_SIZE, to.toString(),
             getKey<Int>(DOWNLOAD_EPUB_SIZE, from.toString())
@@ -1580,9 +1706,26 @@ object BookDownloader2 {
             System.currentTimeMillis()
         )
 
-        setKey(
-            DOWNLOAD_FOLDER, id.toString(), newData
-        )
+        ioSafe {
+            val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@ioSafe).novelDao()
+            dao.insert(com.lagradost.quicknovel.db.NovelEntity(
+                id = id,
+                source = newData.source,
+                name = newData.name,
+                author = newData.author,
+                posterUrl = newData.posterUrl,
+                rating = newData.rating,
+                peopleVoted = newData.peopleVoted,
+                views = newData.views,
+                synopsis = newData.synopsis,
+                tags = newData.tags,
+                apiName = newData.apiName,
+                lastUpdated = newData.lastUpdated,
+                lastDownloaded = newData.lastDownloaded,
+                filePath = newData.filePath,
+                formatType = newData.formatType
+            ))
+        }
 
         downloadInfoMutex.withLock {
             downloadData[id] = newData
@@ -1605,8 +1748,27 @@ object BookDownloader2 {
             }
             currentDownloads += id
         }
-        val prevDownloadData =
-            getKey<DownloadFragment.DownloadData>(DOWNLOAD_FOLDER, id.toString())
+        val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return).novelDao()
+        val oldNovel = dao.getById(id)
+
+        val oldData = if (oldNovel != null) {
+            com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadData(
+                source = oldNovel.source,
+                name = oldNovel.name,
+                author = oldNovel.author,
+                posterUrl = oldNovel.posterUrl,
+                rating = oldNovel.rating,
+                peopleVoted = oldNovel.peopleVoted,
+                views = oldNovel.views,
+                synopsis = oldNovel.synopsis,
+                tags = oldNovel.tags,
+                apiName = oldNovel.apiName,
+                lastUpdated = oldNovel.lastUpdated,
+                lastDownloaded = oldNovel.lastDownloaded,
+                filePath = oldNovel.filePath,
+                formatType = oldNovel.formatType
+            )
+        } else null
 
         val currentDownloadData = DownloadFragment.DownloadData(
             load.url,
@@ -1620,9 +1782,28 @@ object BookDownloader2 {
             load.tags,
             apiName,
             System.currentTimeMillis(),
-            prevDownloadData?.lastDownloaded
+            oldData?.lastDownloaded
         )
-        setKey(DOWNLOAD_FOLDER, id.toString(), currentDownloadData)
+        ioSafe {
+            val updateDao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@ioSafe).novelDao()
+            updateDao.insert(com.lagradost.quicknovel.db.NovelEntity(
+                id = id,
+                source = currentDownloadData.source,
+                name = currentDownloadData.name,
+                author = currentDownloadData.author,
+                posterUrl = currentDownloadData.posterUrl,
+                rating = currentDownloadData.rating,
+                peopleVoted = currentDownloadData.peopleVoted,
+                views = currentDownloadData.views,
+                synopsis = currentDownloadData.synopsis,
+                tags = currentDownloadData.tags,
+                apiName = currentDownloadData.apiName,
+                lastUpdated = currentDownloadData.lastUpdated,
+                lastDownloaded = currentDownloadData.lastDownloaded,
+                filePath = currentDownloadData.filePath,
+                formatType = currentDownloadData.formatType
+            ))
+        }
         setKey(DOWNLOAD_TOTAL, id.toString(), total)
 
         downloadInfoMutex.withLock {
@@ -2217,13 +2398,26 @@ object BookDownloader2 {
                 }
 
                 // download into a file
-                val stream = try {
-                    link.get().body
+                val response = try {
+                    link.get()
                 } catch (e: Exception) {
                     delay(api.rateLimitTime + 1000)
                     continue
                 }
 
+                val okResponse = response.okhttpResponse
+                if (!okResponse.isSuccessful) {
+                    delay(api.rateLimitTime + 1000)
+                    continue
+                }
+
+                val contentType = okResponse.header("Content-Type", "")
+                if (contentType?.contains("text/html") == true || contentType?.contains("text/xml") == true) {
+                    com.lagradost.quicknovel.CommonActivity.showToast("Download failed: Received HTML error page")
+                    continue
+                }
+
+                val stream = response.body
                 val length = stream.contentLength()
 
                 if (length <= LOCAL_EPUB_MIN_SIZE) {
@@ -2231,17 +2425,21 @@ object BookDownloader2 {
                     continue
                 }
 
-                val totalBytes = ArrayList<Byte>()
                 var progress = 0L
                 val startedTime = System.currentTimeMillis()
-                file.parentFile?.mkdirs()
-                file.createNewFile()
+                val tempFile = java.io.File(file.parentFile, file.name + ".part")
+                tempFile.parentFile?.mkdirs()
+                if (tempFile.exists()) tempFile.delete()
+                tempFile.createNewFile()
                 val size = DEFAULT_BUFFER_SIZE
                 var lastUpdatedMs = 0L
+
+                val outputStream = tempFile.outputStream()
+                try {
                 stream.byteStream().buffered(size).iterator().asSequence().chunked(size)
                     .forEach { bytes ->
                         progress += bytes.size
-                        totalBytes.addAll(bytes)
+                        outputStream.write(bytes.toByteArray())
                         val total = maxOf(length, progress)
                         val currentTime = System.currentTimeMillis()
                         val totalTimeSoFar = currentTime - startedTime
@@ -2297,8 +2495,15 @@ object BookDownloader2 {
                             )
                         }
                     }
+                } finally {
+                    outputStream.close()
+                }
 
-                file.writeBytes(totalBytes.toByteArray())
+                // Written directly via outputStream
+                if (!tempFile.renameTo(file)) {
+                    com.lagradost.quicknovel.mvvm.logError(java.io.IOException("Failed to rename ${tempFile.name} to ${file.name}"))
+                    continue
+                }
 
                 setSuffixData(load, api.name)
 

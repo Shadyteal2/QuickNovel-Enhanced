@@ -441,6 +441,10 @@ class ResultFragment : Fragment() {
         binding.apply {
             activity?.fixPaddingStatusbar(resultInfoHeader)
 
+            if (apiName == "OceanOfPDF") {
+                resultContinueReading.visibility = android.view.View.GONE
+            }
+
             // Theme Adaptability adjustments
             val textColor = requireContext().colorFromAttribute(R.attr.textColor)
             // If text is dark (R+G+B < 400), it's Light Theme
@@ -901,6 +905,17 @@ class ResultFragment : Fragment() {
             }
             resultDownloadGenerateEpub.setOnClickListener { viewModel.readEpub() }
             resultDownloadBtt.setOnClickListener { v ->
+                val apiName = arguments?.getString("apiName") ?: ""
+                if (apiName == "OceanOfPDF") {
+                    val res = (viewModel.loadResponse.value as? Resource.Success)?.value as? com.lagradost.quicknovel.EpubResponse
+                    val link = res?.downloadLinks?.firstOrNull()
+                    if (link != null) {
+                        showOceanOfPDFDownloadDialog(link)
+                    } else {
+                        com.lagradost.quicknovel.CommonActivity.showToast("No download links found")
+                    }
+                    return@setOnClickListener
+                }
                 val actions = getActions()
                 if (actions == null) {
                     viewModel.downloadOrPause()
@@ -978,9 +993,101 @@ class ResultFragment : Fragment() {
              viewModel.reorderChapters()
          }
          filterBinding.filterDownloaded.setOnCheckedChangeListener { _, isChecked ->
-             ResultViewModel.filterChapterByDownloads = isChecked
+                    ResultViewModel.filterChapterByDownloads = isChecked
              viewModel.reorderChapters()
          }
          bottomSheetDialog.show()
+    }
+
+    private fun showOceanOfPDFDownloadDialog(link: com.lagradost.quicknovel.DownloadLink) {
+        val context = context ?: return
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(context)
+        val frame = android.widget.FrameLayout(context)
+        val webView = android.webkit.WebView(context)
+        val progressBar = android.widget.ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal)
+        
+        webView.settings.apply {
+             javaScriptEnabled = true
+             domStorageEnabled = true
+             databaseEnabled = true
+             @Suppress("DEPRECATION")
+             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        }
+        
+        progressBar.isIndeterminate = true
+        val params = android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+        )
+        frame.addView(webView)
+        frame.addView(progressBar, params)
+
+        webView.webViewClient = object : android.webkit.WebViewClient() {
+             override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                  super.onPageFinished(view, url)
+                  progressBar.visibility = android.view.View.GONE
+             }
+        }
+        
+        webView.setDownloadListener { url, _, _, _, _ ->
+             activity?.runOnUiThread {
+                  com.lagradost.quicknovel.CommonActivity.showToast("Download started: $url")
+                  try {
+                       val request = android.app.DownloadManager.Request(android.net.Uri.parse(url))
+                       request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                       
+                       val title = binding.resultTitle.text.toString().replace("[^a-zA-Z0-9]".toRegex(), "_")
+                       val ext = if (url.contains(".pdf", ignoreCase = true) || url.contains("type=pdf", ignoreCase = true)) ".pdf" else ".epub"
+                       request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "Epub/${title}${ext}")
+
+                       val downloadManager = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                       val downloadId = downloadManager.enqueue(request)
+
+                       val res = (viewModel.loadResponse.value as? com.lagradost.quicknovel.mvvm.Resource.Success)?.value as? com.lagradost.quicknovel.EpubResponse
+                       if (res != null) {
+                            val id = com.lagradost.quicknovel.BookDownloader2Helper.generateId(res.apiName, res.author, res.name)
+                            val downloadData = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadData(
+                                source = res.url,
+                                name = res.name,
+                                author = res.author ?: "",
+                                posterUrl = res.posterUrl,
+                                rating = res.rating,
+                                peopleVoted = res.peopleVoted,
+                                views = res.views,
+                                synopsis = res.synopsis,
+                                tags = res.tags,
+                                apiName = res.apiName,
+                                lastUpdated = System.currentTimeMillis(),
+                                lastDownloaded = System.currentTimeMillis()
+                            )
+                            com.lagradost.quicknovel.BaseApplication.setKey(com.lagradost.quicknovel.DOWNLOAD_FOLDER, id.toString(), downloadData)
+                            com.lagradost.quicknovel.BaseApplication.setKey(com.lagradost.quicknovel.DOWNLOAD_TOTAL, id.toString(), 1)
+                            
+                            // 1. Force state updates for 1/1 Completed in DownloadManager
+                            com.lagradost.quicknovel.BookDownloader2.downloadProgress[id] = com.lagradost.quicknovel.DownloadProgressState(
+                                 state = com.lagradost.quicknovel.DownloadState.IsDone,
+                                 progress = 1,
+                                 downloaded = 1,
+                                 total = 1,
+                                 lastUpdatedMs = System.currentTimeMillis(),
+                                 etaMs = null
+                            )
+                            com.lagradost.quicknovel.BookDownloader2.downloadProgressChanged.invoke(id to com.lagradost.quicknovel.BookDownloader2.downloadProgress[id]!!)
+
+                            // 2. Trigger memory list sync to DownloadViewModel
+                            com.lagradost.quicknovel.BookDownloader2.downloadDataChanged.invoke(id to downloadData)
+                       }
+                  } catch (e: Exception) {
+                      com.lagradost.quicknovel.CommonActivity.showToast("Download error")
+                  }
+                  dialog.dismiss()
+             }
+        }
+
+        val postData = link.params.map { "${it.key}=${java.net.URLEncoder.encode(it.value, "UTF-8")}" }.joinToString("&")
+        webView.postUrl(link.url, postData.toByteArray())
+
+        dialog.setContentView(frame)
+        dialog.show()
     }
 }

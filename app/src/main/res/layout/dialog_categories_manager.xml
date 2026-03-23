@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#DD121212">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Manage Categories"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_gravity="center_horizontal"
+        android:textColor="?attr/textColor"
+        android:layout_marginBottom="16dp"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/categories_list"
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        android:overScrollMode="never"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/spatial_glass_card"
+        android:paddingHorizontal="16dp">
+
+        <EditText
+            android:id="@+id/add_category_input"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:hint="Add Category (Max 10 Total)"
+            android:background="@android:color/transparent"
+            android:textColor="?attr/textColor"
+            android:textColorHint="#88FFFFFF"
+            android:textSize="14sp"
+            android:singleLine="true"
+            android:imeOptions="actionDone"/>
+
+        <ImageView
+            android:id="@+id/add_category_btn"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_baseline_add_24" 
+            app:tint="?attr/iconColor"
+            android:padding="6dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackgroundBorderless"/>
+    </LinearLayout>
+</LinearLayout>
