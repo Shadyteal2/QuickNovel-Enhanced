@@ -43,6 +43,7 @@ import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
 import com.lagradost.quicknovel.CommonActivity.showToast
 import com.lagradost.quicknovel.DataStore.getKey
+import com.lagradost.quicknovel.DataStore.setKey
 import com.lagradost.quicknovel.TTSNotifications.TTS_NOTIFICATION_ID
 import com.lagradost.quicknovel.databinding.ColorRoundCheckmarkBinding
 import com.lagradost.quicknovel.databinding.ReadBottomSettingsBinding
@@ -303,6 +304,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
     fun parseAction(input: TTSHelper.TTSActionType): Boolean {
         return viewModel.parseAction(input)
+    }
+
+    private val selectFontLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            saveCustomFont(uri)
+        }
     }
 
     private lateinit var textAdapter: TextAdapter
@@ -574,11 +581,13 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     override fun onResume() {
         viewModel.resumedApp()
         super.onResume()
+        readStartTime = System.currentTimeMillis()
     }
 
     override fun onPause() {
         viewModel.leftApp()
         super.onPause()
+        saveReadingTime()
     }
 
     /*private fun pendingPost() {
@@ -603,20 +612,129 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         dialog.show()
 
         val res = dialog.findViewById<RecyclerView>(R.id.sort_click)!!
+        val addButton = dialog.findViewById<android.widget.Button>(R.id.add_custom_font)
 
-        val fonts = systemFonts
+        addButton?.setOnClickListener {
+            dialog.dismiss()
+            selectFontLauncher.launch("*/*")
+        }
+
+        val customFontsFolder = java.io.File(filesDir, "fonts")
+        val customFonts = if (customFontsFolder.exists()) customFontsFolder.listFiles() ?: emptyArray<java.io.File>() else emptyArray<java.io.File>()
+        val fonts = customFonts + systemFonts
         val items = listOf(FontFile(null)) + fonts.map { FontFile(it) }
 
-        val currentName = getKey(EPUB_FONT) ?: ""
+        val currentName = viewModel.textFont ?: ""
         val storingIndex = items.indexOfFirst { (it.file?.name ?: "") == currentName }
 
-        val adapter = FontAdapter(this, storingIndex) { file ->
-            viewModel.textFont = file.file?.name ?: ""
-            dialog.dismiss()
-        }
+        val adapter = FontAdapter(
+            this, 
+            storingIndex,
+            clickCallback = { file ->
+                viewModel.textFont = file.file?.name ?: ""
+                dialog.dismiss()
+            },
+            deleteCallback = { file ->
+                file.file?.delete()
+                showToast("Font deleted")
+                dialog.dismiss()
+                showFonts()
+            }
+        )
         res.adapter = adapter
         adapter.submitIncomparableList(items)
         res.scrollToPosition(storingIndex)
+    }
+
+    private fun saveCustomFont(uri: android.net.Uri) {
+        try {
+            val contentResolver = contentResolver
+            var name = "custom_font_${System.currentTimeMillis()}.ttf"
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            if (cursor != null) {
+                try {
+                    if (cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (index != -1) {
+                            name = cursor.getString(index)
+                        }
+                    }
+                } finally {
+                    cursor.close()
+                }
+            }
+
+            if (!name.endsWith(".ttf", ignoreCase = true) && !name.endsWith(".otf", ignoreCase = true)) {
+                showToast("Please select a valid font (.ttf or .otf)")
+                return
+            }
+
+            val tempFile = java.io.File(cacheDir, "temp_font_validate.ttf")
+            contentResolver.openInputStream(uri)?.use { input ->
+                tempFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            try {
+                android.graphics.Typeface.createFromFile(tempFile.absolutePath)
+                
+                val folder = java.io.File(filesDir, "fonts")
+                if (!folder.exists()) folder.mkdirs()
+                val destFile = java.io.File(folder, name)
+                tempFile.copyTo(destFile, overwrite = true)
+                
+                showToast("Font added: ${com.lagradost.quicknovel.util.UIHelper.parseFontFileName(name)}")
+                viewModel.textFont = name
+                binding.root.post { showFonts() }
+            } catch (t: Throwable) {
+                showToast("Invalid font format")
+                tempFile.delete()
+            }
+            tempFile.delete()
+        } catch (t: Throwable) {
+            com.lagradost.quicknovel.mvvm.logError(t)
+            showToast("Failed to save font")
+        }
+    }
+
+
+
+    private fun saveReadingTime() {
+        if (readStartTime == 0L) return
+        val elapsed = System.currentTimeMillis() - readStartTime
+        readStartTime = 0L
+        if (elapsed < 1000) return
+
+        val currentTotal = getKey<Long>("TOTAL_READING_TIME", 0L) ?: 0L
+        setKey("TOTAL_READING_TIME", currentTotal + elapsed)
+
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        val lastReadDay = getKey<String>("LAST_READ_DAY", "") ?: ""
+        val currentStreak = getKey<Int>("CURRENT_STREAK", 0) ?: 0
+
+        if (lastReadDay != today) {
+            if (lastReadDay.isNotEmpty()) {
+                try {
+                    val format = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                    val lastDate = format.parse(lastReadDay)
+                    val todayDate = format.parse(today)
+                    if (lastDate != null && todayDate != null) {
+                        val diff = (todayDate.time - lastDate.time) / (1000 * 60 * 60 * 24)
+                        if (diff == 1L) {
+                            setKey("CURRENT_STREAK", currentStreak + 1)
+                        } else if (diff > 1L) {
+                            setKey("CURRENT_STREAK", 1)
+                        }
+                    }
+                } catch (e: Exception) {
+                    com.lagradost.quicknovel.mvvm.logError(e)
+                }
+            } else {
+                setKey("CURRENT_STREAK", 1)
+            }
+            setKey("LAST_READ_DAY", today)
+        }
     }
 
     /*  private fun updateTimeText() {
@@ -627,6 +745,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
           binding.readTime.text = currentTime
           binding.readTime.postDelayed({ -> updateTimeText() }, 1000)
       }*/
+    private var readStartTime: Long = 0L
     private var topBarHeight by Delegates.notNull<Int>()
 
 

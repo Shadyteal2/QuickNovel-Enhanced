@@ -225,6 +225,16 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         val multiPreference = getPref(R.string.search_providers_list_key)
 
+        findPreference<Preference>("reading_stats_header")?.setOnPreferenceClickListener {
+            try {
+                androidx.navigation.fragment.NavHostFragment.findNavController(this)
+                    .navigate(R.id.navigation_reading_stats)
+            } catch (e: Exception) {
+                logError(e)
+            }
+            true
+        }
+
         val updatePrefrence =
             findPreference<Preference>(getString(R.string.manual_check_update_key))!!
         val providerLangPreference =

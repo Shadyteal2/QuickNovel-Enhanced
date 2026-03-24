@@ -5,6 +5,9 @@
     <Preference
         android:key="by_shady_header"
         app:layout="@layout/settings_header" />
+    <Preference
+        android:key="reading_stats_header"
+        app:layout="@layout/setting_reading_stats" />
     <PreferenceCategory
         android:key="appearance"
         android:title="@string/appearance_background"

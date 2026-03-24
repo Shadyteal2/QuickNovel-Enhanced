@@ -1,0 +1,246 @@
+package com.lagradost.quicknovel.ui.settings
+
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
+import androidx.fragment.app.Fragment
+import com.lagradost.quicknovel.DataStore.getKey
+import com.lagradost.quicknovel.DataStore.setKey
+import com.lagradost.quicknovel.R
+import com.lagradost.quicknovel.databinding.FragmentReadingStatsBinding
+import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
+
+class ReadingStatsFragment : Fragment() {
+    private var _binding: FragmentReadingStatsBinding? = null
+    private val binding get() = _binding!!
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentReadingStatsBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // Fix status bar padding covers
+        activity?.fixPaddingStatusbar(binding.statsAppbar)
+
+        binding.statsToolbar.setNavigationOnClickListener {
+            activity?.onBackPressed()
+        }
+
+        // Setup Toolbar Menu for Share
+        binding.statsToolbar.inflateMenu(R.menu.stats_menu)
+        binding.statsToolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.action_share_stats) {
+                shareStatistics()
+                true
+            } else false
+        }
+
+        // Click on Level Title for ranks info
+        binding.tvLevelTitle.setOnClickListener {
+            val ranks = listOf("Novice (Level 1)", "Apprentice (Level 2)", "Scholar (Level 3)", "Sage (Level 4)", "Legend (Level 5+)")
+            AlertDialog.Builder(requireContext(), R.style.AlertDialogCustom)
+                .setTitle("Reader Ranks")
+                .setItems(ranks.toTypedArray(), null)
+                .show()
+        }
+
+        // Click handlers for Goals
+        binding.llDailyGoal.setOnClickListener {
+            showSetGoalDialog("Daily")
+        }
+        binding.llWeeklyGoal.setOnClickListener {
+            showSetGoalDialog("Weekly")
+        }
+
+        loadStatistics()
+    }
+
+    private fun loadStatistics() {
+        val context = context ?: return
+
+        // 1. Get Totals
+        val totalMs = context.getKey<Long>("TOTAL_READING_TIME", 0L) ?: 0L
+        val currentStreak = context.getKey<Int>("CURRENT_STREAK", 0) ?: 0
+
+        val totalMinutes = totalMs / (1000 * 60)
+        val totalHours = totalMinutes / 60
+
+        // 2. Level System Ratio
+        val hoursPerLevel = 5
+        val currentLevel = (totalHours / hoursPerLevel) + 1
+        val progressHours = totalHours % hoursPerLevel
+        val progressPercentage = ((progressHours.toFloat() / hoursPerLevel) * 100).toInt()
+
+        // Level Title Lists
+        val levelTitles = listOf("Novice", "Apprentice", "Scholar", "Sage", "Legend")
+        val titleIdx = (currentLevel - 1).toInt().coerceIn(0, levelTitles.size - 1)
+
+        // Bind Profile
+        binding.tvLevelTitle.text = levelTitles[titleIdx]
+        binding.tvLevelSubtitle.text = "Level $currentLevel Reader"
+        binding.pbLevelProgress.progress = progressPercentage
+        binding.tvLevelProgressText.text = "${progressHours}h read / ${hoursPerLevel}h to next"
+
+        // Bind Pills
+        val totalChapters = context.getKey<Int>("TOTAL_CHAPTERS_READ", 0) ?: 0
+        binding.tvPillStreak.text = "🔥 $currentStreak"
+        binding.tvPillChapters.text = "📖 $totalChapters"
+        binding.tvPillHours.text = "🕒 ${totalHours}h"
+
+        // Streak Card
+        binding.tvStreakHeader.text = "$currentStreak day streak"
+        binding.tvBestStreak.text = "Best: $currentStreak days"
+
+        // 3. Goals Logic from DataStore
+        val dailyGoal = context.getKey<Int>("DAILY_GOAL_MIN", 30) ?: 30
+        val weeklyGoal = context.getKey<Int>("WEEKLY_GOAL_MIN", 180) ?: 180
+
+        binding.pbDailyGoal.progress = (totalMinutes.toFloat().coerceIn(0f, dailyGoal.toFloat()) / dailyGoal.toFloat() * 100f).toInt()
+        binding.tvDailyGoalSub.text = "$totalMinutes / $dailyGoal min"
+        
+        binding.pbWeeklyGoal.progress = (totalMinutes.toFloat().coerceIn(0f, weeklyGoal.toFloat()) / weeklyGoal.toFloat() * 100f).toInt()
+        binding.tvWeeklyGoalSub.text = "$totalMinutes / $weeklyGoal min"
+
+        // Times Grid
+        binding.tvTimeToday.text = "${totalMinutes}m"
+        binding.tvTimeWeek.text = "${totalMinutes}m"
+        binding.tvTimeMonth.text = "${totalMinutes}m"
+
+        setupBarChart(totalMinutes)
+    }
+
+    private fun showSetGoalDialog(type: String) {
+        val context = context ?: return
+        val key = if (type == "Daily") "DAILY_GOAL_MIN" else "WEEKLY_GOAL_MIN"
+        val defaultVal = if (type == "Daily") 30 else 180
+
+        val builder = AlertDialog.Builder(context, R.style.AlertDialogCustom)
+        builder.setTitle("Set $type Goal")
+        
+        val input = EditText(context).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            hint = "Value in minutes (e.g., 30)"
+            setText(context.getKey<Int>(key, defaultVal)?.toString())
+        }
+        builder.setView(input)
+
+        builder.setPositiveButton("Save") { _, _ ->
+            val value = input.text.toString().toIntOrNull() ?: defaultVal
+            context.setKey(key, value)
+            loadStatistics() // reload
+        }
+        builder.setNegativeButton("Cancel", null)
+        builder.show()
+    }
+
+    private fun shareStatistics() {
+        val context = context ?: return
+        val totalMs = context.getKey<Long>("TOTAL_READING_TIME", 0L) ?: 0L
+        val currentStreak = context.getKey<Int>("CURRENT_STREAK", 0) ?: 0
+        val totalMinutes = totalMs / (1000 * 60)
+        
+        val currentLevel = (totalMinutes / 60 / 5) + 1
+        val levelTitles = listOf("Novice", "Apprentice", "Scholar", "Sage", "Legend")
+        val title = levelTitles[((currentLevel - 1).toInt().coerceIn(0, 4))]
+        
+        val dailyGoal = context.getKey<Int>("DAILY_GOAL_MIN", 30) ?: 30
+        val weeklyGoal = context.getKey<Int>("WEEKLY_GOAL_MIN", 180) ?: 180
+
+        val totalChapters = context.getKey<Int>("TOTAL_CHAPTERS_READ", 0) ?: 0
+        val date = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+
+        val text = """
+            📖 *My Reading Stats - $date* 📖
+
+            🏆 Reader Level: $title (Level $currentLevel)
+            🔥 Streak: $currentStreak days
+            📖 Chapters Read: $totalChapters
+            🕒 Time Spent: ${totalMinutes / 60}h ${totalMinutes % 60}m
+            
+            🎯 Goals:
+            Daily: $totalMinutes/$dailyGoal min
+            Weekly: $totalMinutes/$weeklyGoal min
+
+            ✨ Reading with **NeoQN** - https://github.com/Shadyteal2/QuickNovel-Enhanced
+        """.trimIndent()
+
+        val sendIntent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            putExtra(android.content.Intent.EXTRA_TEXT, text)
+            type = "text/plain"
+        }
+        val shareIntent = android.content.Intent.createChooser(sendIntent, null)
+        startActivity(shareIntent)
+    }
+
+    private fun setupBarChart(todayMinutes: Long) {
+        val chart = binding.layoutBarChart
+        chart.removeAllViews()
+
+        val days = listOf("M", "T", "W", "T", "F", "S", "S")
+        val heights = listOf(10, 20, todayMinutes.toInt().coerceIn(10, 80), 30, 15, 25, 40) // Mock values for weight effects
+
+        for (i in days.indices) {
+            val barContainer = LinearLayout(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL
+            }
+
+            // The visual bar
+            val bar = FrameLayout(context!!).apply {
+                val params = LinearLayout.LayoutParams(
+                    (12 * resources.displayMetrics.density).toInt(),
+                    0,
+                    heights[i].toFloat() // weight determines height
+                )
+                layoutParams = params
+                background = resources.getDrawable(R.drawable.search_background, null)
+                
+                if (i == 2) { 
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.colorPrimary, null))
+                } else {
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(resources.getColor(com.google.android.material.R.color.material_dynamic_neutral20, null))
+                    alpha = 0.5f
+                }
+            }
+
+            // Top spacer weight layout holder
+            val spacer = FrameLayout(context!!).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 100f - heights[i].toFloat())
+            }
+
+            val text = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = (4 * resources.displayMetrics.density).toInt()
+                }
+                this.text = days[i]
+                textSize = 10f
+                setTextColor(resources.getColor(R.color.grayTextColor, null))
+            }
+
+            barContainer.addView(spacer)
+            barContainer.addView(bar)
+            barContainer.addView(text)
+            chart.addView(barContainer)
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+}

@@ -97,4 +97,11 @@
                 android:name="tag"
                 app:argType="integer" />
     </action>
+    <fragment
+            android:id="@+id/navigation_reading_stats"
+            android:name="com.lagradost.quicknovel.ui.settings.ReadingStatsFragment"
+            android:label="Reading Stats"
+            android:layout_height="match_parent"
+            tools:layout="@layout/fragment_reading_stats">
+    </fragment>
 </navigation>

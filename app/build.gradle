@@ -30,6 +30,7 @@ android {
             signingConfig signingConfigs.debug
         }
         debug {
+            applicationIdSuffix ".debug"
             buildConfigField("boolean", "BETA", "true")
             versionNameSuffix '-DEBUG'
             debuggable true

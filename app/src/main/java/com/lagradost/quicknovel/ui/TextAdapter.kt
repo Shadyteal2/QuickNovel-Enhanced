@@ -184,7 +184,16 @@ data class TextConfig(
     val verticalPadding: Float,
 ) {
     private val fontFile: File? by lazy {
-        if (textFont == "") null else systemFonts.firstOrNull { it.name == textFont }
+        if (textFont == "") null else {
+            val found = systemFonts.firstOrNull { it.name == textFont }
+            if (found != null) found else {
+                val ctx = com.lagradost.quicknovel.BaseApplication.context
+                if (ctx != null) {
+                    val file = File(File(ctx.filesDir, "fonts"), textFont)
+                    if (file.exists()) file else null
+                } else null
+            }
+        }
     }
 
     private val cachedFont: Typeface by lazy {

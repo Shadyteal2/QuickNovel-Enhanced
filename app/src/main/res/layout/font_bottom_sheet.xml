@@ -23,12 +23,21 @@
 
     <androidx.recyclerview.widget.RecyclerView
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-
             android:layout_marginTop="-10dp"
             android:paddingTop="10dp"
             android:id="@+id/sort_click"
             android:background="?attr/primaryBlackBackground"
             tools:listitem="@layout/sort_bottom_single_choice"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+    <com.google.android.material.button.MaterialButton
+            android:id="@+id/add_custom_font"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Add Custom Font"
+            android:layout_margin="16dp"
+            app:cornerRadius="8dp"
+            app:backgroundTint="?attr/colorPrimary" />
 </LinearLayout>
