@@ -16,11 +16,10 @@ import com.lagradost.quicknovel.providers.FanMtlnProvider
 import com.lagradost.quicknovel.providers.FreewebnovelProvider
 import com.lagradost.quicknovel.providers.GraycityProvider
 import com.lagradost.quicknovel.providers.HiraethTranslationProvider
-import com.lagradost.quicknovel.providers.IndoWebNovelProvider
-import com.lagradost.quicknovel.providers.KolNovelProvider
-import com.lagradost.quicknovel.providers.LightNovelWorldProvider
 import com.lagradost.quicknovel.providers.LibReadProvider
 import com.lagradost.quicknovel.providers.LightNovelTranslationsProvider
+import com.lagradost.quicknovel.providers.LightNovelWorldProvider
+import com.lagradost.quicknovel.providers.LNoRiProvider
 import com.lagradost.quicknovel.providers.MeioNovelProvider
 import com.lagradost.quicknovel.providers.MoreNovelProvider
 import com.lagradost.quicknovel.providers.MtlNovelProvider
@@ -63,6 +62,7 @@ class Apis {
             //LightNovelPubProvider(), // Got cloudflare, but probably bypassable
             LightNovelTranslationsProvider(),
             LightNovelWorldProvider(),
+            LNoRiProvider(),
             //MeioNovelProvider(),
             //MNovelFreeProvider(), // same as NovelFullVipProvider
             //MoreNovelProvider(), // cloudflare?
