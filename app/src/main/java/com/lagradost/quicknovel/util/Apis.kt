@@ -18,6 +18,7 @@ import com.lagradost.quicknovel.providers.GraycityProvider
 import com.lagradost.quicknovel.providers.HiraethTranslationProvider
 import com.lagradost.quicknovel.providers.IndoWebNovelProvider
 import com.lagradost.quicknovel.providers.KolNovelProvider
+import com.lagradost.quicknovel.providers.LightNovelWorldProvider
 import com.lagradost.quicknovel.providers.LibReadProvider
 import com.lagradost.quicknovel.providers.LightNovelTranslationsProvider
 import com.lagradost.quicknovel.providers.MeioNovelProvider
@@ -38,6 +39,7 @@ import com.lagradost.quicknovel.providers.SakuraNovelProvider
 import com.lagradost.quicknovel.providers.ScribblehubProvider
 import com.lagradost.quicknovel.providers.WtrLabProvider
 import com.lagradost.quicknovel.providers.WuxiaBoxProvider
+
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 
 class Apis {
@@ -60,6 +62,7 @@ class Apis {
             LibReadProvider(),
             //LightNovelPubProvider(), // Got cloudflare, but probably bypassable
             LightNovelTranslationsProvider(),
+            LightNovelWorldProvider(),
             //MeioNovelProvider(),
             //MNovelFreeProvider(), // same as NovelFullVipProvider
             //MoreNovelProvider(), // cloudflare?
@@ -189,10 +192,22 @@ class Apis {
             val hashSet = HashSet<String>()
             hashSet.addAll(apis.map { it.name })
 
-            val set = settingsManager.getStringSet(
+            val savedSet = settingsManager.getStringSet(
                 this.getString(R.string.search_providers_list_key),
+                null
+            )
+
+            val set = if (savedSet == null) {
                 hashSet
-            )?.toHashSet() ?: hashSet
+            } else {
+                val updated = HashSet(savedSet)
+                for (api in apis) {
+                    if (!savedSet.contains(api.name)) {
+                        updated.add(api.name)
+                    }
+                }
+                updated
+            }
 
             val activeLangs = getApiProviderLangSettings()
             val list = HashSet<String>()
