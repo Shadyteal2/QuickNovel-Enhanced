@@ -23,6 +23,7 @@ import com.lagradost.quicknovel.providers.LNoRiProvider
 import com.lagradost.quicknovel.providers.MeioNovelProvider
 import com.lagradost.quicknovel.providers.MoreNovelProvider
 import com.lagradost.quicknovel.providers.MtlNovelProvider
+import com.lagradost.quicknovel.providers.NovelArchiveProvider
 import com.lagradost.quicknovel.providers.NovLoveProvider
 import com.lagradost.quicknovel.providers.NovelBinProvider
 import com.lagradost.quicknovel.providers.NovelFireProvider
@@ -38,6 +39,7 @@ import com.lagradost.quicknovel.providers.SakuraNovelProvider
 import com.lagradost.quicknovel.providers.ScribblehubProvider
 import com.lagradost.quicknovel.providers.WtrLabProvider
 import com.lagradost.quicknovel.providers.WuxiaBoxProvider
+import com.lagradost.quicknovel.providers.WuxiaClickProvider
 
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 
@@ -65,8 +67,9 @@ class Apis {
             LNoRiProvider(),
             //MeioNovelProvider(),
             //MNovelFreeProvider(), // same as NovelFullVipProvider
-            //MoreNovelProvider(), // cloudflare?
+             MoreNovelProvider(), // cloudflare?
             MtlNovelProvider(),
+            NovelArchiveProvider(),
             NovelBinProvider(),
             com.lagradost.quicknovel.providers.OceanOfPDFProvider(),
             NovelFullNETProvider(),
@@ -91,6 +94,7 @@ class Apis {
             //WattpadProvider(), // they have randomized the css classes
             //WtrLabProvider(),
             WuxiaBoxProvider(),
+            WuxiaClickProvider(),
         ).sortedBy { it.name }
 
 

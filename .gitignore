@@ -17,3 +17,6 @@ build/
 .agent/
 stitch_screens/
 scripts/
+.kotlin/
+.vscode/
+.venv/

@@ -13,6 +13,7 @@ class LightNovelWorldProvider : MainAPI() {
     override val hasMainPage = true
     override val iconId = R.drawable.light_novel_world
     override val iconBackgroundId = R.color.white
+    override val iconFullScreen = true
 
     private val baseHeaders = mapOf(
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

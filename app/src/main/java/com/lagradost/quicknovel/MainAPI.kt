@@ -35,6 +35,7 @@ abstract class MainAPI {
 
     open val iconId: Int? = null
     open val iconBackgroundId: Int = R.color.primaryGrayBackground
+    open val iconFullScreen: Boolean = false
 
     open suspend fun loadMainPage(
         page: Int,

@@ -34,6 +34,14 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
         binding.apply {
             browseText.text = item.name
             item.iconId?.let { browseIcon.setImageResource(it) }
+            
+            if (item.iconFullScreen) {
+                browseIcon.setPadding(0, 0, 0, 0)
+            } else {
+                val paddingDp = (12 * browseIcon.context.resources.displayMetrics.density).toInt()
+                browseIcon.setPadding(paddingDp, paddingDp, paddingDp, paddingDp)
+            }
+
             browseIconBackground.setCardBackgroundColor(
                 ContextCompat.getColor(
                     browseIconBackground.context,
