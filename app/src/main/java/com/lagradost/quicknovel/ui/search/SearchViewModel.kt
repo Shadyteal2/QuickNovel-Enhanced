@@ -11,6 +11,7 @@ import com.lagradost.quicknovel.MainActivity.Companion.loadResult
 import com.lagradost.quicknovel.OnGoingSearch
 import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.mvvm.Resource
+import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.Apis.Companion.apis
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.amap
@@ -27,7 +28,6 @@ class SearchViewModel : ViewModel() {
 
     @Volatile
     var searchCounter = 0
-    private val repos = apis.map { APIRepository(it) }
 
     fun clearSearch() {
         searchCounter++
@@ -43,7 +43,6 @@ class SearchViewModel : ViewModel() {
 
     fun showMetadata(card: SearchResponse) {
         MainActivity.loadPreviewPage(card)
-        //showToast(card.name)
     }
 
     var ongoingSearchJob : Job? = null
@@ -62,10 +61,10 @@ class SearchViewModel : ViewModel() {
             val currentList = ArrayList<OnGoingSearch>()
 
             _currentSearch.postValue(ArrayList())
+            // Use pre-warmed repo cache from Apis — avoids creating new APIRepository objects on every search
+            val repos = Apis.getActiveRepositories()
 
-            repos.filter { a ->
-                (providersActive.isEmpty() || providersActive.contains(a.name))
-            }.amap { a ->
+            repos.amap { a ->
                 if(!isActive) return@amap
                 currentList.add(OnGoingSearch(a.name, a.search(query)))
                 if (localSearchCounter == searchCounter) {

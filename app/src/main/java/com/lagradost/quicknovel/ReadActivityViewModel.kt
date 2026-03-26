@@ -59,7 +59,6 @@ import com.lagradost.quicknovel.mvvm.safe
 import com.lagradost.quicknovel.mvvm.safeApiCall
 import com.lagradost.quicknovel.mvvm.safeAsync
 import com.lagradost.quicknovel.mvvm.throwableToResource
-import com.lagradost.quicknovel.providers.RedditProvider
 import com.lagradost.quicknovel.ui.OrientationType
 import com.lagradost.quicknovel.ui.ReadingType
 import com.lagradost.quicknovel.ui.ScrollIndex
@@ -272,7 +271,7 @@ class QuickBook(val data: QuickStreamData) : AbstractBook() {
                         true
                     ) || text.equals("next part", true)
                 ) {
-                    val name = RedditProvider.getName(href) ?: "Next"
+                    val name = "Next"
                     data.data.add(ChapterData(name, href, null, null))
                     return true
                 }

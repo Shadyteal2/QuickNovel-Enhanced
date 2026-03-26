@@ -18,6 +18,22 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
 }, contentSame = { a, b ->
     a.name == b.name
 })) {
+
+    companion object {
+        // Cache resolved icon resource IDs — getIdentifier() is expensive, only call once per name
+        private val iconCache = HashMap<String, Int>()
+
+        fun resolveIcon(context: android.content.Context, providerName: String): Int {
+            return iconCache.getOrPut(providerName) {
+                val name = providerName.lowercase().replace(" ", "_")
+                var id = context.resources.getIdentifier("icon_$name", "drawable", context.packageName)
+                if (id == 0) id = context.resources.getIdentifier(name, "drawable", context.packageName)
+                if (id == 0) id = context.resources.getIdentifier("${name}icon", "drawable", context.packageName)
+                id // 0 if not found, that's fine
+            }
+        }
+    }
+
     override fun onCreateContent(parent: ViewGroup): ViewHolderState<Any> {
         return ViewHolderState(
             BrowseListCompactBinding.inflate(
@@ -33,7 +49,21 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
 
         binding.apply {
             browseText.text = item.name
-            item.iconId?.let { browseIcon.setImageResource(it) }
+            try {
+                if (item.pluginContext != null && item.iconId != null && item.iconId != 0) {
+                    browseIcon.setImageDrawable(item.pluginContext!!.getDrawable(item.iconId!!))
+                } else {
+                    val context = browseIcon.context
+                    val iconRes = resolveIcon(context, item.name)
+                    when {
+                        iconRes != 0 -> browseIcon.setImageResource(iconRes)
+                        item.iconId != null && item.iconId != 0 -> browseIcon.setImageResource(item.iconId!!)
+                        else -> browseIcon.setImageResource(R.drawable.ic_baseline_code_24)
+                    }
+                }
+            } catch (e: Exception) {
+                browseIcon.setImageResource(R.drawable.ic_baseline_code_24)
+            }
             
             if (item.iconFullScreen) {
                 browseIcon.setPadding(0, 0, 0, 0)
@@ -42,12 +72,19 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
                 browseIcon.setPadding(paddingDp, paddingDp, paddingDp, paddingDp)
             }
 
-            browseIconBackground.setCardBackgroundColor(
-                ContextCompat.getColor(
-                    browseIconBackground.context,
-                    item.iconBackgroundId
+            try {
+                browseIconBackground.setCardBackgroundColor(
+                    ContextCompat.getColor(
+                        browseIconBackground.context,
+                        item.iconBackgroundId
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                // Fallback to a safe default if resource ID is invalid across APKs
+                browseIconBackground.setCardBackgroundColor(
+                    ContextCompat.getColor(browseIconBackground.context, R.color.primaryGrayBackground)
+                )
+            }
             browseBackground.setOnClickListener {
                 activity?.navigate(
                     R.id.global_to_navigation_mainpage,

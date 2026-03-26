@@ -59,7 +59,6 @@ import com.lagradost.quicknovel.mvvm.logError
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
 import com.lagradost.quicknovel.mvvm.safe
-import com.lagradost.quicknovel.providers.RedditProvider
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.download.DownloadFragment
 import com.lagradost.quicknovel.ui.result.ResultFragment
@@ -94,9 +93,11 @@ import com.lagradost.quicknovel.ui.settings.SettingsFragment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.content.SharedPreferences
+import okhttp3.Protocol
 import okhttp3.OkHttpClient
-import java.lang.ref.WeakReference
+import okhttp3.ConnectionPool
 import java.util.concurrent.TimeUnit
+import java.lang.ref.WeakReference
 import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.reflect.KClass
@@ -114,27 +115,36 @@ class MainActivity : AppCompatActivity() {
                 _mainActivity = WeakReference(value)
             }
 
+        @JvmStatic
         fun loadPreviewPage(searchResponse: SearchResponse) {
             mainActivity?.loadPopup(searchResponse.url, searchResponse.apiName)
         }
 
+        @JvmStatic
         fun loadPreviewPage(card: DownloadFragment.DownloadDataLoaded) {
             mainActivity?.loadPopup(card)
         }
 
+        @JvmStatic
         fun loadPreviewPage(cached: ResultCached) {
             mainActivity?.loadPopup(cached)
         }
 
+        @JvmStatic
         fun importEpub() {
             mainActivity?.openEpubPicker()
         }
 
+        @JvmStatic
         var app = Requests(
             OkHttpClient()
                 .newBuilder()
                 .ignoreAllSSLErrors()
-                .readTimeout(50L, TimeUnit.SECONDS)//to online translations
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .connectionPool(ConnectionPool(64, 5, TimeUnit.MINUTES))
                 .build(),
             responseParser = object : ResponseParser {
                 val mapper: ObjectMapper = jacksonObjectMapper().configure(
@@ -166,6 +176,7 @@ class MainActivity : AppCompatActivity() {
         // === API ===
         lateinit var navOptions: NavOptions
 
+        @JvmStatic
         fun loadResult(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null) {
             (activity as? AppCompatActivity)?.loadResult(url, apiName, startAction, startChapterUrl)
         }
@@ -235,31 +246,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // kinda dirty ik
-            val reddit = RedditProvider()
-            RedditProvider.getName(url)?.let { name ->
-                try {
-                    Coroutines.main {
-                        val uri = withContext(Dispatchers.IO) {
-                            createQuickStream(
-                                QuickStreamData(
-                                    QuickStreamMetaData(
-                                        "Not found",
-                                        name,
-                                        reddit.name,
-                                    ),
-                                    null,
-                                    mutableListOf(ChapterData("Single Post", url, null, null))
-                                )
-                            )
-                        }
-                        openQuickStream(uri)
-                    }
-                } catch (e: Exception) {
-                    logError(e)
-                }
-                return true
-            }
             return false
         }
 
@@ -745,6 +731,26 @@ class MainActivity : AppCompatActivity() {
             androidx.work.ExistingWorkPolicy.KEEP, 
             migrationRequest
         )
+
+        // Remote Plugin Sync — run immediately on every launch (REPLACE replaces any stuck work)
+        val immediatePluginSync = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>()
+            .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+            .build()
+        androidx.work.WorkManager.getInstance(this).enqueueUniqueWork(
+            "PluginSyncImmediate",
+            androidx.work.ExistingWorkPolicy.REPLACE, // Always run fresh on launch
+            immediatePluginSync
+        )
+
+        // Daily background check for plugin updates
+        val pluginSyncRequest = androidx.work.PeriodicWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>(24, java.util.concurrent.TimeUnit.HOURS)
+            .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+            .build()
+        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "PluginSyncPeriodic",
+            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+            pluginSyncRequest
+        )
         
         // Programmatically disable clipping on BottomNavigationItemViews
         navView.apply {
@@ -1061,7 +1067,8 @@ class MainActivity : AppCompatActivity() {
         //    ColorStateList.valueOf(getResourceColor(R.attr.colorPrimary, 0.1f))
 
         val apiNames = getApiSettings()
-        providersActive = apiNames
+        providersActive.clear()
+        providersActive.addAll(apiNames)
         val edit = settingsManager.edit()
         edit.putStringSet(getString(R.string.search_providers_list_key), providersActive)
         edit.apply()

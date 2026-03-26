@@ -12,13 +12,14 @@ import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.ResultCached
 
 class HomeViewModel : ViewModel() {
-    val homeApis: LiveData<List<MainAPI>> by lazy {
-        MutableLiveData(
-            let {
-                val langs = getApiProviderLangSettings()
-                Apis.apis.filter { api -> api.hasMainPage && (langs.contains(api.lang)) }
-            }
-        )
+    val homeApis: LiveData<List<MainAPI>> = androidx.lifecycle.MediatorLiveData<List<MainAPI>>().apply {
+        addSource(Apis.apisLiveData) { apis ->
+            val langs = getApiProviderLangSettings()
+            value = apis.filter { api -> api.hasMainPage && (langs.contains(api.lang)) }
+        }
+        // Also initialize with current value
+        val langs = getApiProviderLangSettings()
+        value = Apis.apis.filter { api -> api.hasMainPage && (langs.contains(api.lang)) }
     }
 
     val latestHistory: MutableLiveData<ResultCached?> = MutableLiveData(null)

@@ -310,4 +310,10 @@
     <string name="notes">Notes</string>
     <string name="dropped_reason">Why did you drop this novel?</string>
     <string name="title_updates">Updates</string>
+    <string name="plugin_sync_key" translatable="false">plugin_sync_key</string>
+    <string name="check_for_plugin_update">Check for Plugin Updates</string>
+    <string name="plugin_sync_desc">Download and update novel providers from GitHub</string>
+    <string name="plugin_import_key" translatable="false">plugin_import_key</string>
+    <string name="import_plugin">Import Plugin from Storage</string>
+    <string name="import_plugin_desc">Pick an APK and JSON to manually install a plugin</string>
 </resources>

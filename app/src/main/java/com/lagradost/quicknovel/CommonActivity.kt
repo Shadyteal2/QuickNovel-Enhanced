@@ -24,6 +24,7 @@ import java.util.Locale
 
 object CommonActivity {
     private var _activity: WeakReference<Activity>? = null
+    @JvmStatic
     var activity
         get() = _activity?.get()
         set(value) {
@@ -33,14 +34,17 @@ object CommonActivity {
     const val TAG = "COMPACT"
     var currentToast: Toast? = null
 
+    @JvmStatic
     fun showToast(@StringRes message: Int, duration: Int? = null) {
         activity?.runOnUiThread { showToast(activity, message, duration) }
     }
 
+    @JvmStatic
     fun showToast(message: String?, duration: Int? = null) {
         activity?.runOnUiThread { showToast(activity, message, duration) }
     }
 
+    @JvmStatic
     fun showToast(message: UiText?, duration: Int? = null) {
         val act = activity ?: return
         if (message == null) return

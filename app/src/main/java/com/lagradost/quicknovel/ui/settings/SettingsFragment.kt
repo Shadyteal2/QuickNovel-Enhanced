@@ -42,6 +42,7 @@ import com.lagradost.quicknovel.util.InAppUpdater.Companion.runAutoUpdate
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showBottomDialog
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showMultiDialog
+import com.lagradost.quicknovel.util.PluginManager
 import com.lagradost.quicknovel.util.SubtitleHelper
 import com.lagradost.quicknovel.util.UIHelper.clipboardHelper
 import com.lagradost.quicknovel.util.UIHelper.dismissSafe
@@ -116,7 +117,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             list.map { apiNames[it] }.toSet()
                         )
                     }
-                    providersActive = getApiSettings()
+                    val settings = getApiSettings()
+                    providersActive.clear()
+                    providersActive.addAll(settings)
                 }
             }
         }
@@ -217,6 +220,79 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
             PreferenceManager.getDefaultSharedPreferences(context)
                 .edit { putString(getString(R.string.background_image_key), uri.toString()) }
+        }
+    private val pluginPicker =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNullOrEmpty()) return@registerForActivityResult
+            val context = context ?: return@registerForActivityResult
+            
+            ioSafe {
+                try {
+                    val pluginsDir = com.lagradost.quicknovel.util.PluginManager.getPluginsDir(context)
+                    
+                    val apkUris = mutableListOf<android.net.Uri>()
+                    val jsonUris = mutableListOf<android.net.Uri>()
+                    
+                    uris.forEach { uri ->
+                        val name = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            cursor.moveToFirst()
+                            cursor.getString(nameIndex)
+                        } ?: uri.lastPathSegment ?: "unknown"
+                        
+                        if (name.endsWith(".apk", true) || name.endsWith(".dex", true)) apkUris.add(uri)
+                        else if (name.endsWith(".json", true)) jsonUris.add(uri)
+                    }
+
+                    // Special case: 1 APK + 1 JSON -> Rename JSON to match APK exactly
+                    if (apkUris.size == 1 && jsonUris.size == 1) {
+                        val apkUri = apkUris[0]
+                        val jsonUri = jsonUris[0]
+                        
+                        val apkName = context.contentResolver.query(apkUri, null, null, null, null)?.use { cursor ->
+                            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            cursor.moveToFirst()
+                            cursor.getString(nameIndex)
+                        } ?: "plugin.apk"
+                        
+                        val baseName = apkName.substringBeforeLast(".")
+                        
+                        // Copy APK
+                        context.contentResolver.openInputStream(apkUri)?.use { input ->
+                            File(pluginsDir, apkName).outputStream().use { output -> input.copyTo(output) }
+                        }
+                        
+                        // Copy JSON with matching name
+                        context.contentResolver.openInputStream(jsonUri)?.use { input ->
+                            File(pluginsDir, "$baseName.json").outputStream().use { output -> input.copyTo(output) }
+                        }
+                    } else {
+                        // Regular copy for all others
+                        uris.forEach { uri ->
+                            val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                cursor.moveToFirst()
+                                cursor.getString(nameIndex)
+                            } ?: uri.lastPathSegment ?: "unknown"
+
+                            context.contentResolver.openInputStream(uri)?.use { input ->
+                                File(pluginsDir, fileName).outputStream().use { output -> input.copyTo(output) }
+                            }
+                        }
+                    }
+                    
+                    // Trigger refresh
+                    ioSafe {
+                        val count = com.lagradost.quicknovel.util.PluginManager.loadAllPlugins(context)
+                        activity?.runOnUiThread {
+                            showToast(if (count > 0) "Successfully imported and loaded $count plugin(s)" else "No valid plugins found in selection")
+                        }
+                    }
+                } catch (e: Exception) {
+                    logError(e)
+                    activity?.runOnUiThread { showToast("Failed to import: ${e.message}") }
+                }
+            }
         }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -383,7 +459,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         )
                     }
 
-                    providersActive = it.context.getApiSettings()
+                    val settings = it.context.getApiSettings()
+                    providersActive.clear()
+                    providersActive.addAll(settings)
                 }
             }
 
@@ -448,6 +526,28 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 dialog.dismissSafe(activity)
             }
 
+            return@setOnPreferenceClickListener true
+        }
+
+        getPref(R.string.plugin_sync_key)?.setOnPreferenceClickListener {
+            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>()
+                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+                .build()
+            androidx.work.WorkManager.getInstance(it.context).enqueueUniqueWork(
+                "PluginSyncManual",
+                androidx.work.ExistingWorkPolicy.REPLACE,
+                syncRequest
+            )
+            showToast("Checking for plugin updates...")
+            return@setOnPreferenceClickListener true
+        }
+
+        getPref(R.string.plugin_import_key)?.setOnPreferenceClickListener {
+            try {
+                pluginPicker.launch(arrayOf("*/*"))
+            } catch (e: Exception) {
+                logError(e)
+            }
             return@setOnPreferenceClickListener true
         }
 

@@ -71,7 +71,7 @@
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:exported="true">
-            <intent-filter android:label="Read with QuickNovel">
+            <intent-filter android:label="Read with NeoQN">
                 <action android:name="android.intent.action.SEND" />
 
                 <category android:name="android.intent.category.DEFAULT" />

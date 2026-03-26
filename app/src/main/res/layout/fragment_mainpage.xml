@@ -207,4 +207,5 @@
         android:paddingBottom="130dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         app:spanCount="3" />
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

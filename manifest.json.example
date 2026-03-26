@@ -1,0 +1,60 @@
+{
+  "plugins": [
+    {
+      "pluginId": "bundle1",
+      "name": "QuickNovel Bundle 1",
+      "version": 1,
+      "minApiVersion": 1,
+      "mainClasses": [
+        "com.lagradost.quicknovel.providers.LNoRiProvider",
+        "com.lagradost.quicknovel.providers.LightNovelWorldProvider",
+        "com.lagradost.quicknovel.providers.NovelArchiveProvider",
+        "com.lagradost.quicknovel.providers.WuxiaClickProvider",
+        "com.lagradost.quicknovel.providers.NovelBinProvider",
+        "com.lagradost.quicknovel.providers.NovelFireProvider"
+      ],
+      "url": "https://github.com/Shadyteal2/NeoQN-Extensions/releases/download/test/app-debug.apk"
+    },
+    {
+      "pluginId": "bundle2",
+      "name": "QuickNovel Bundle 2",
+      "version": 1,
+      "minApiVersion": 1,
+      "mainClasses": [
+        "com.lagradost.quicknovel.providers.AllNovelProvider",
+        "com.lagradost.quicknovel.providers.FanMTL",
+        "com.lagradost.quicknovel.providers.FreeWebNovel",
+        "com.lagradost.quicknovel.providers.GraycityProvider",
+        "com.lagradost.quicknovel.providers.HiraethTranslationProvider",
+        "com.lagradost.quicknovel.providers.LibReadProvider"
+      ],
+      "url": "https://github.com/Shadyteal2/NeoQN-Extensions/releases/download/test/bundle2-debug.apk"
+    },
+    {
+      "pluginId": "bundle3",
+      "name": "QuickNovel Bundle 3",
+      "version": 1,
+      "minApiVersion": 1,
+      "mainClasses": [
+        "com.lagradost.quicknovel.providers.LightNovelTranslationsProvider",
+        "com.lagradost.quicknovel.providers.MtlNovelProvider",
+        "com.lagradost.quicknovel.providers.NovelFullProvider",
+        "com.lagradost.quicknovel.providers.NovelsOnlineProvider",
+        "com.lagradost.quicknovel.providers.ReadFromNetProvider",
+        "com.lagradost.quicknovel.providers.WuxiaBox"
+      ],
+      "url": "https://github.com/Shadyteal2/NeoQN-Extensions/releases/download/test/bundle3-debug.apk"
+    },
+    {
+      "pluginId": "bundle4",
+      "name": "QuickNovel Bundle 4",
+      "version": 1,
+      "minApiVersion": 1,
+      "mainClasses": [
+        "com.lagradost.quicknovel.providers.OceanOfPDFProvider",
+        "com.lagradost.quicknovel.providers.RoyalRoadProvider"
+      ],
+      "url": "https://github.com/Shadyteal2/NeoQN-Extensions/releases/download/test/bundle4-debug.apk"
+    }
+  ]
+}

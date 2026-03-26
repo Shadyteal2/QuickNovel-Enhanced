@@ -14,7 +14,12 @@ import org.jsoup.Jsoup
 const val USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36"
 
+const val API_VERSION = 5
+
+val app get() = MainActivity.app
+
 abstract class MainAPI {
+    var pluginContext: android.content.Context? = null
     open val name = "NONE"
     open val mainUrl = "NONE"
 

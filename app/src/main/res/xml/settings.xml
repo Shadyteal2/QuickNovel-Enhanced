@@ -164,6 +164,20 @@
                 android:key="@string/show_logcat_key"
                 android:title="@string/show_log_cat"
                 app:layout="@layout/setting_tile" />
+
+        <Preference
+                android:title="@string/check_for_plugin_update"
+                app:key="@string/plugin_sync_key"
+                android:summary="@string/plugin_sync_desc"
+                android:icon="@drawable/ic_baseline_autorenew_24"
+                app:layout="@layout/setting_tile" />
+
+        <Preference
+                android:title="@string/import_plugin"
+                app:key="@string/plugin_import_key"
+                android:summary="@string/import_plugin_desc"
+                android:icon="@drawable/ic_baseline_add_24"
+                app:layout="@layout/setting_tile" />
     </PreferenceCategory>
 
     <PreferenceCategory
