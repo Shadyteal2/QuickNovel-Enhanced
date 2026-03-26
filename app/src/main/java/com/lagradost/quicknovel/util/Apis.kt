@@ -29,6 +29,13 @@ class Apis {
         private val _apisLiveData = androidx.lifecycle.MutableLiveData<List<MainAPI>>()
         val apisLiveData: androidx.lifecycle.LiveData<List<MainAPI>> get() = _apisLiveData
 
+        private val _isSyncing = androidx.lifecycle.MutableLiveData<Boolean>(false)
+        val isSyncing: androidx.lifecycle.LiveData<Boolean> get() = _isSyncing
+
+        fun setSyncing(value: Boolean) {
+            _isSyncing.postValue(value)
+        }
+
         val apis: List<MainAPI>
             get() {
                 val current = cachedApis

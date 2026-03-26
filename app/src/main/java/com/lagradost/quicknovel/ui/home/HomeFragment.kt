@@ -57,21 +57,7 @@ class HomeFragment : Fragment() {
             setHasFixedSize(true)
         }
 
-        // FAB is in activity_main.xml to float above the ViewPager2
-        val syncFab = requireActivity().findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.home_sync_fab)
-        syncFab?.visibility = View.VISIBLE
-        syncFab?.setOnClickListener {
-            context?.let { ctx ->
-                Toast.makeText(ctx, "Checking for plugin updates...", Toast.LENGTH_SHORT).show()
-                val syncRequest = OneTimeWorkRequestBuilder<PluginSyncWorker>()
-                    .build()
-                WorkManager.getInstance(ctx).enqueueUniqueWork(
-                    "PluginSyncImmediate",
-                    androidx.work.ExistingWorkPolicy.REPLACE,
-                    syncRequest
-                )
-            }
-        }
+        // FAB and sync logic moved to MainActivity for tab-specific scoping
 
         observe(viewModel.homeApis) { list ->
             browseAdapter.submitList(list)
@@ -96,13 +82,9 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         viewModel.updateHistory()
-        // Show FAB when returning to Home tab
-        requireActivity().findViewById<View>(R.id.home_sync_fab)?.visibility = View.VISIBLE
     }
 
     override fun onPause() {
         super.onPause()
-        // Hide FAB when leaving Home tab
-        requireActivity().findViewById<View>(R.id.home_sync_fab)?.visibility = View.GONE
     }
 }

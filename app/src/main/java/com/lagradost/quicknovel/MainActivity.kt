@@ -810,6 +810,43 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        binding?.homeSyncFab?.apply {
+            setOnClickListener {
+                performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>().build()
+                androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
+                    "PluginSyncImmediate",
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    syncRequest
+                )
+            }
+        }
+
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            val isTopLevel = tabs.contains(destination.id)
+            val isProvidersTab = binding?.mainViewpager?.currentItem == 1
+            
+            // Only show FAB if we are on the dashboard, on the Search/Providers tab
+            binding?.homeSyncFab?.visibility = if (isTopLevel && isProvidersTab && binding?.mainViewpager?.isVisible == true) {
+                android.view.View.VISIBLE
+            } else {
+                android.view.View.GONE
+            }
+        }
+
+        var syncSnackbar: com.google.android.material.snackbar.Snackbar? = null
+        com.lagradost.quicknovel.util.Apis.isSyncing.observe(this) { syncing ->
+            if (syncing) {
+                syncSnackbar = com.google.android.material.snackbar.Snackbar.make(binding!!.container, "Checking for plugin updates...", com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE)
+                // Offset snackbar to be above the bottom nav
+                syncSnackbar?.setAnchorView(R.id.nav_bar_container)
+                syncSnackbar?.show()
+            } else {
+                syncSnackbar?.dismiss()
+                syncSnackbar = null
+            }
+        }
+
         binding?.mainViewpager?.apply {
             setPageTransformer(ZoomOutPageTransformer())
             adapter = object : FragmentStateAdapter(this@MainActivity) {
@@ -831,6 +868,9 @@ class MainActivity : AppCompatActivity() {
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
                     navView.selectedItemId = tabs[position]
+                    // Show FAB only on Search/Providers tab (position 1) AND when dashboard is visible
+                    val isDashboardVisible = binding?.mainViewpager?.isVisible == true
+                    binding?.homeSyncFab?.visibility = if (position == 1 && isDashboardVisible) android.view.View.VISIBLE else android.view.View.GONE
                     // Fade in indicator if it was hidden
                     binding?.navIndicator?.animate()?.alpha(1f)?.setDuration(200)?.start()
                 }

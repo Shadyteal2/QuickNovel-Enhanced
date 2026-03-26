@@ -32,13 +32,24 @@ class PluginSyncWorker(
         defaultHeaders = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     )
 
+    private fun showToast(message: String) {
+        try {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(applicationContext, message, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        } catch (_: Exception) { }
+    }
+
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val MANIFEST_URL = "https://raw.githubusercontent.com/Shadyteal2/NeoQN-Extensions/main/manifest.json"
         try {
+            com.lagradost.quicknovel.util.Apis.setSyncing(true)
+            showToast("Syncing plugins...")
             android.util.Log.i("PluginSync", "Starting manifest fetch from $MANIFEST_URL")
             val response = syncApp.get(MANIFEST_URL)
             if (!response.isSuccessful) {
                 android.util.Log.e("PluginSync", "Manifest fetch failed: ${response.code}")
+                com.lagradost.quicknovel.util.Apis.setSyncing(false)
                 return@withContext Result.retry()
             }
 
@@ -60,8 +71,11 @@ class PluginSyncWorker(
             val count = PluginManager.loadAllPlugins(applicationContext)
             android.util.Log.i("PluginSync", "Post-sync reload complete. Total providers: $count")
 
+            com.lagradost.quicknovel.util.Apis.setSyncing(false)
+            showToast("Sync Complete: $count providers loaded")
             Result.success()
         } catch (e: Exception) {
+            com.lagradost.quicknovel.util.Apis.setSyncing(false)
             logError(e)
             Result.failure()
         }

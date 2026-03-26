@@ -26,6 +26,12 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
         fun resolveIcon(context: android.content.Context, providerName: String): Int {
             return iconCache.getOrPut(providerName) {
                 val name = providerName.lowercase().replace(" ", "_")
+                // Specific fix for WuxiaBox casing/mismatch
+                if (name.contains("wuxiabox")) {
+                    val id = context.resources.getIdentifier("icon_wuxiabox", "drawable", context.packageName)
+                    if (id != 0) return@getOrPut id
+                }
+                
                 var id = context.resources.getIdentifier("icon_$name", "drawable", context.packageName)
                 if (id == 0) id = context.resources.getIdentifier(name, "drawable", context.packageName)
                 if (id == 0) id = context.resources.getIdentifier("${name}icon", "drawable", context.packageName)
