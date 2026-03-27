@@ -102,7 +102,7 @@ class PluginSyncWorker(
         val latestVersion = plugins.maxOf { it.version }
         android.util.Log.d("PluginSync", "Syncing bundle for $url - Current version: $currentVersion, Latest version: $latestVersion")
         
-        if (latestVersion >= currentVersion) {
+        if (latestVersion > currentVersion) {
             // Check compatibility for all plugins in bundle (optional: if any fails, skip bundle or just that plugin?)
             // We'll proceed if at least one is compatible
             val compatiblePlugins = plugins.filter { it.minApiVersion <= API_VERSION }

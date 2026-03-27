@@ -307,6 +307,11 @@
     <string name="reset_background_key" translatable="false">reset_background</string>
     <string name="background_reset_confirmed">Background has been reset to default</string>
     <string name="by_shady">By Shady</string>
+    <string name="library_nav_style_key" translatable="false">library_nav_style</string>
+    <string name="library_nav_style">Library Navigation Style</string>
+    <string name="library_nav_style_pill">Pill Drawer</string>
+    <string name="library_nav_style_swipe">Swipe View</string>
+    <string name="library_nav_style_desc">Choose how you navigate categories in the Library</string>
     <string name="notes">Notes</string>
     <string name="dropped_reason">Why did you drop this novel?</string>
     <string name="title_updates">Updates</string>
@@ -316,4 +321,17 @@
     <string name="plugin_import_key" translatable="false">plugin_import_key</string>
     <string name="import_plugin">Import Plugin from Storage</string>
     <string name="import_plugin_desc">Pick an APK and JSON to manually install a plugin</string>
+    <string name="dev_only">Dev Only</string>
+    <string name="dev_only_desc">For dev and beta testers only</string>
+    <string name="plugin_import_invalid_apk">Invalid APK or DEX file selected</string>
+    <string name="plugin_import_signature_error">Plugin rejected: Signature mismatch! Internal developer only.</string>
+    <string name="clear_cookies">Clear Network Cookies</string>
+    <string name="clear_cookies_desc">Removes all stored Cloudflare and site cookies. Use if verification is stuck.</string>
+    <string name="clear_cookies_key" translatable="false">clear_cookies_key</string>
+    <string name="cloudflare_auto_solve_title">Automatic Cloudflare Solving</string>
+    <string name="cloudflare_auto_solve_summary">Automatically attempt to solve Cloudflare challenges using WebView</string>
+    <string name="cloudflare_resolve_manual_title">Resolve Cloudflare Challenge</string>
+    <string name="cloudflare_resolve_manual_summary">Manually open a WebView to solve a challenge for a specific site</string>
+    <string name="cloudflare_auto_solve_key" translatable="false">cloudflare_auto_solve</string>
+    <string name="cloudflare_resolve_manual_key" translatable="false">cloudflare_resolve_manual</string>
 </resources>

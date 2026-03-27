@@ -73,6 +73,7 @@ import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.Coroutines.main
 import com.lagradost.quicknovel.util.InAppUpdater.Companion.runAutoUpdate
 import com.lagradost.quicknovel.util.ResultCached
+import com.lagradost.quicknovel.util.SettingsHelper.getLibraryNavStyle
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
 import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.UIHelper.dismissSafe
@@ -105,8 +106,17 @@ import android.net.Uri
 import coil3.load
 import coil3.request.crossfade
 import coil3.asDrawable
+import com.lagradost.quicknovel.ui.TabNavigator
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), TabNavigator {
+    override fun switchToMainTab(index: Int) {
+        binding?.mainViewpager?.setCurrentItem(index, true)
+        binding?.mainViewpager?.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+    }
+
+    override fun moveToTab(index: Int) {
+        switchToMainTab(index)
+    }
     companion object {
         private var _mainActivity: WeakReference<MainActivity>? = null
         private var mainActivity
@@ -140,6 +150,7 @@ class MainActivity : AppCompatActivity() {
             OkHttpClient()
                 .newBuilder()
                 .ignoreAllSSLErrors()
+                .addInterceptor(com.lagradost.quicknovel.network.CloudflareKiller())
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
@@ -868,6 +879,12 @@ class MainActivity : AppCompatActivity() {
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
                     navView.selectedItemId = tabs[position]
+                    
+                    // Disable main swiping for Library tab if Swipe Mode is active
+                    // This allows DownloadFragment's split-zone touch logic to work
+                    val isSwipeMode = this@MainActivity.getLibraryNavStyle() == "1"
+                    binding?.mainViewpager?.isUserInputEnabled = !(position == 0 && isSwipeMode)
+
                     // Show FAB only on Search/Providers tab (position 1) AND when dashboard is visible
                     val isDashboardVisible = binding?.mainViewpager?.isVisible == true
                     binding?.homeSyncFab?.visibility = if (position == 1 && isDashboardVisible) android.view.View.VISIBLE else android.view.View.GONE

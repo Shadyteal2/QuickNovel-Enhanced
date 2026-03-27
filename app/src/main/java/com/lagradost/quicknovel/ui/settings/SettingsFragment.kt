@@ -225,50 +225,71 @@ class SettingsFragment : PreferenceFragmentCompat() {
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             if (uris.isNullOrEmpty()) return@registerForActivityResult
             val context = context ?: return@registerForActivityResult
-            
+
             ioSafe {
                 try {
                     val pluginsDir = com.lagradost.quicknovel.util.PluginManager.getPluginsDir(context)
-                    
+
                     val apkUris = mutableListOf<android.net.Uri>()
                     val jsonUris = mutableListOf<android.net.Uri>()
-                    
+                    var rejectedCount = 0
+
                     uris.forEach { uri ->
                         val name = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                             val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                             cursor.moveToFirst()
                             cursor.getString(nameIndex)
                         } ?: uri.lastPathSegment ?: "unknown"
-                        
-                        if (name.endsWith(".apk", true) || name.endsWith(".dex", true)) apkUris.add(uri)
-                        else if (name.endsWith(".json", true)) jsonUris.add(uri)
+
+                        when {
+                            name.endsWith(".apk", true) || name.endsWith(".dex", true) -> {
+                                if (com.lagradost.quicknovel.util.PluginManager.verifyApkSignature(context, uri)) {
+                                    apkUris.add(uri)
+                                } else {
+                                    rejectedCount++
+                                    activity?.runOnUiThread {
+                                        showToast("Rejected: \"$name\" is not signed by a trusted key.")
+                                    }
+                                }
+                            }
+                            name.endsWith(".json", true) -> jsonUris.add(uri)
+                        }
                     }
 
-                    // Special case: 1 APK + 1 JSON -> Rename JSON to match APK exactly
+                    // Nothing valid to import
+                    if (apkUris.isEmpty()) {
+                        if (rejectedCount == 0) {
+                            activity?.runOnUiThread { showToast(getString(R.string.plugin_import_invalid_apk)) }
+                        }
+                        return@ioSafe
+                    }
+
+                    // Special case: 1 APK + 1 JSON -> Rename JSON to match APK
                     if (apkUris.size == 1 && jsonUris.size == 1) {
                         val apkUri = apkUris[0]
                         val jsonUri = jsonUris[0]
-                        
+
                         val apkName = context.contentResolver.query(apkUri, null, null, null, null)?.use { cursor ->
                             val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                             cursor.moveToFirst()
                             cursor.getString(nameIndex)
                         } ?: "plugin.apk"
-                        
+
                         val baseName = apkName.substringBeforeLast(".")
-                        
-                        // Copy APK
+
                         context.contentResolver.openInputStream(apkUri)?.use { input ->
-                            File(pluginsDir, apkName).outputStream().use { output -> input.copyTo(output) }
+                            val target = File(pluginsDir, apkName)
+                            if (target.exists()) target.delete() // Clear existing to avoid EACCES
+                            target.outputStream().use { output -> input.copyTo(output) }
                         }
-                        
-                        // Copy JSON with matching name
                         context.contentResolver.openInputStream(jsonUri)?.use { input ->
-                            File(pluginsDir, "$baseName.json").outputStream().use { output -> input.copyTo(output) }
+                            val target = File(pluginsDir, "$baseName.json")
+                            if (target.exists()) target.delete()
+                            target.outputStream().use { output -> input.copyTo(output) }
                         }
                     } else {
-                        // Regular copy for all others
-                        uris.forEach { uri ->
+                        // Multiple files: copy all verified APKs and any JSONs
+                        apkUris.forEach { uri ->
                             val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                                 val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                                 cursor.moveToFirst()
@@ -276,17 +297,35 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             } ?: uri.lastPathSegment ?: "unknown"
 
                             context.contentResolver.openInputStream(uri)?.use { input ->
-                                File(pluginsDir, fileName).outputStream().use { output -> input.copyTo(output) }
+                                val target = File(pluginsDir, fileName)
+                                if (target.exists()) target.delete()
+                                target.outputStream().use { output -> input.copyTo(output) }
+                            }
+                        }
+                        jsonUris.forEach { uri ->
+                            val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                cursor.moveToFirst()
+                                cursor.getString(nameIndex)
+                            } ?: uri.lastPathSegment ?: "unknown"
+
+                            context.contentResolver.openInputStream(uri)?.use { input ->
+                                val target = File(pluginsDir, fileName)
+                                if (target.exists()) target.delete()
+                                target.outputStream().use { output -> input.copyTo(output) }
                             }
                         }
                     }
-                    
-                    // Trigger refresh
-                    ioSafe {
-                        val count = com.lagradost.quicknovel.util.PluginManager.loadAllPlugins(context)
-                        activity?.runOnUiThread {
-                            showToast(if (count > 0) "Successfully imported and loaded $count plugin(s)" else "No valid plugins found in selection")
+
+                    // Reload plugins from disk and report the count of freshly loaded providers
+                    val loadedCount = com.lagradost.quicknovel.util.PluginManager.loadAllPlugins(context)
+                    activity?.runOnUiThread {
+                        val msg = if (loadedCount > 0) {
+                            "Plugin installed! $loadedCount provider(s) now active."
+                        } else {
+                            "Plugin copied but no providers loaded. Check the JSON metadata."
                         }
+                        showToast(msg)
                     }
                 } catch (e: Exception) {
                     logError(e)
@@ -545,6 +584,48 @@ class SettingsFragment : PreferenceFragmentCompat() {
         getPref(R.string.plugin_import_key)?.setOnPreferenceClickListener {
             try {
                 pluginPicker.launch(arrayOf("*/*"))
+            } catch (e: Exception) {
+                logError(e)
+            }
+            return@setOnPreferenceClickListener true
+        }
+
+        getPref(R.string.cloudflare_resolve_manual_key)?.setOnPreferenceClickListener {
+            val builder = AlertDialog.Builder(it.context, R.style.AlertDialogCustom)
+            builder.setTitle(R.string.cloudflare_resolve_manual_title)
+            
+            val input = android.widget.EditText(it.context)
+            input.hint = "https://example.com"
+            builder.setView(input)
+            
+            builder.setPositiveButton(R.string.ok) { _, _ ->
+                val url = input.text.toString()
+                if (url.isNotBlank()) {
+                    ioSafe {
+                        com.lagradost.quicknovel.network.WebViewResolver(
+                            Regex(".^"),
+                            userAgent = null,
+                            useOkhttp = false,
+                            additionalUrls = listOf(Regex("."))
+                        ).resolveUsingWebView(url, showDialog = true) {
+                            // Just open it to get cookies and save them to CookieManager
+                            false
+                        }
+                    }
+                }
+            }
+            builder.setNegativeButton(R.string.cancel, null)
+            builder.show()
+            return@setOnPreferenceClickListener true
+        }
+
+        getPref(R.string.clear_cookies_key)?.setOnPreferenceClickListener {
+            try {
+                android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                // Also clear the internal map in our interceptor if possible
+                // Since it's a singleton-like static in MainActivity for now (or instantiated once)
+                // Actually, we can just clear it here if we had access, but CookieManager is the most important.
+                showToast("Network cookies cleared successfully")
             } catch (e: Exception) {
                 logError(e)
             }

@@ -3,7 +3,6 @@ package com.lagradost.quicknovel.util
 import android.content.Context
 import androidx.preference.PreferenceManager
 import com.lagradost.quicknovel.R
-import com.lagradost.quicknovel.util.SettingsHelper.getDownloadFormat
 
 object SettingsHelper {
     fun Context.getRatingReview(score: Int): String {
@@ -29,29 +28,22 @@ object SettingsHelper {
         return getGridFormat() != "grid"
     }
 
-    private fun Context.getGridFormat(): String {
+    fun Context.getGridFormat(): String {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         return settingsManager.getString(getString(R.string.grid_format_key), "grid")!!
     }
 
-    private fun Context.getDownloadFormat(): String {
+    fun Context.getDownloadFormat(): String {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         return settingsManager.getString(getString(R.string.download_format_key), "list")!!
     }
-
-    /*
-    fun Context.setDownloadGridIsCompact( item : Int) {
-        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-
-        when(item) {
-            0 ->"normal"
-            1 -> "grid"
-            else -> "normal"
-        }
-    }*/
 
     fun Context.getDownloadIsCompact(): Boolean {
         return getDownloadFormat() != "grid"
     }
 
+    fun Context.getLibraryNavStyle(): String {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+        return settingsManager.getString(getString(R.string.library_nav_style_key), "0") ?: "0"
+    }
 }

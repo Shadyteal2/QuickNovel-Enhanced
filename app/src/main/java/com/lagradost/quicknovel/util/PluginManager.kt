@@ -1,7 +1,6 @@
 package com.lagradost.quicknovel.util
 
 import android.content.Context
-import com.lagradost.quicknovel.BuildConfig
 import com.lagradost.quicknovel.MainAPI
 import com.lagradost.quicknovel.API_VERSION
 import com.lagradost.quicknovel.mvvm.logError
@@ -24,11 +23,10 @@ object PluginManager {
         }
     }
     
-    // Whitelists provided by the user
-    private const val DEBUG_WHITELIST = "8C:27:D9:66:64:8B:ED:16:3A:B3:5D:C4:BF:8E:BC:3E:52:1B:CE:28:C0:7E:FF:6D:2D:31:41:65:64:0D:EF:E2"
-    private const val RELEASE_WHITELIST = "8C:27:D9:66:64:8B:ED:16:3A:B3:5D:C4:BF:8E:BC:3E:52:1B:CE:28:C0:7E:FF:6D:2D:31:41:65:64:0D:EF:E2"
-
-    private var developerMode = true // Temporarily true for Phase 5 verification
+    // Trusted signature hash (same cert for debug & release, stored only in memory)
+    private val TRUSTED_SIGNATURE = arrayOf(
+        "8C:27:D9:66:64:8B:ED:16:3A:B3:5D:C4:BF:8E:BC:3E:52:1B:CE:28:C0:7E:FF:6D:2D:31:41:65:64:0D:EF:E2"
+    )
 
     // Track class loaders to avoid leaks and facilitate manual unloading
     private val classLoaders = mutableMapOf<String, DexClassLoader>()
@@ -43,18 +41,13 @@ object PluginManager {
     }
 
     /**
-     * Checks if the given signature hash is trusted based on the current build type.
+     * Checks if the given signature hash is trusted.
+     * Only logs a generic rejection — never logs the real hash.
      */
     fun isSignatureTrusted(signatureHash: String): Boolean {
-        if (developerMode) {
-            println("PluginManager: Developer Mode ACTIVE - Bypassing signature check ($signatureHash)")
-            return true
-        }
-        
-        val whitelist = if (BuildConfig.DEBUG) DEBUG_WHITELIST else RELEASE_WHITELIST
-        val match = signatureHash.equals(whitelist, ignoreCase = true)
+        val match = TRUSTED_SIGNATURE.any { it.equals(signatureHash, ignoreCase = true) }
         if (!match) {
-            println("PluginManager: Signature mismatch! Expected: $whitelist, Got: $signatureHash")
+            Log.w(TAG, "Signature verification failed: the APK is not signed by a trusted key.")
         }
         return match
     }
@@ -78,13 +71,35 @@ object PluginManager {
      * Extracts the SHA-256 signature hash from an APK file.
      */
     fun getSignatureHash(context: Context, file: File): String? {
+        return getSignatureHash(context, file.absolutePath)
+    }
+
+    /**
+     * Extracts the SHA-256 signature hash from an APK file URI.
+     */
+    fun getSignatureHash(context: Context, uri: android.net.Uri): String? {
+        return try {
+            val tempFile = File(context.cacheDir, "temp_plugin_verify.apk")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                tempFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            val hash = getSignatureHash(context, tempFile.absolutePath)
+            tempFile.delete()
+            hash
+        } catch (e: Exception) {
+            logError(e)
+            null
+        }
+    }
+
+    private fun getSignatureHash(context: Context, path: String): String? {
         return try {
             val packageManager = context.packageManager
             val packageInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                packageManager.getPackageArchiveInfo(file.absolutePath, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+                packageManager.getPackageArchiveInfo(path, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
             } else {
                 @Suppress("DEPRECATION")
-                packageManager.getPackageArchiveInfo(file.absolutePath, android.content.pm.PackageManager.GET_SIGNATURES)
+                packageManager.getPackageArchiveInfo(path, android.content.pm.PackageManager.GET_SIGNATURES)
             }
 
             val signatures = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
@@ -103,6 +118,14 @@ object PluginManager {
             logError(e)
             null
         }
+    }
+
+    /**
+     * Verifies if an APK from a URI has a trusted signature.
+     */
+    fun verifyApkSignature(context: Context, uri: android.net.Uri): Boolean {
+        val hash = getSignatureHash(context, uri)
+        return hash != null && isSignatureTrusted(hash)
     }
 
     /**
@@ -245,13 +268,14 @@ object PluginManager {
                 }
             }
             
-            val allInstances = results.awaitAll().flatten()
+            val allResults = results.awaitAll()
+            val allInstances = allResults.flatten()
             if (allInstances.isNotEmpty()) {
                 Apis.addPlugins(allInstances)
                 Log.i(TAG, "Batch registration successful: ${allInstances.size} plugins total.")
             }
             
-            val totalBundles = results.awaitAll().count { it.isNotEmpty() }
+            val totalBundles = allResults.count { it.isNotEmpty() }
             Log.i(TAG, "Optimized warmup finished. Total bundles loaded: $totalBundles")
             allInstances.size
         } catch (e: Exception) {
