@@ -501,22 +501,18 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     private fun updateUpdatesBadge() {
         val count = com.lagradost.quicknovel.BaseApplication.Companion.getKey<Int>("NEW_UPDATES_COUNT") ?: 0
         val navView: BottomNavigationView? = binding?.navView
-        if (navView != null) {
-            val badge = navView.getOrCreateBadge(R.id.navigation_updates)
-            if (count > 0) {
-                badge.isVisible = true
-                badge.backgroundColor = colorFromAttribute(R.attr.colorPrimary)
-                badge.badgeTextColor = android.graphics.Color.WHITE
-                val displayCount = if (count > 9) 9 else count
-                badge.number = displayCount
-                if (count > 9) {
-                    // Maximum display digits for badge numbers is usually fixed, but some configs allow text modification
-                    badge.maxCharacterCount = 3 
-                }
-            } else {
-                badge.isVisible = false
-                badge.clearNumber()
-            }
+        if (navView != null && count > 0) {
+            // navigation_updates tab was removed to keep 5-tab limit.
+            // Badge could be moved to another tab if desired, but for now we disable it.
+            /*val badge = navView.getOrCreateBadge(R.id.navigation_updates)
+            badge.isVisible = true
+            badge.backgroundColor = colorFromAttribute(R.attr.colorPrimary)
+            badge.badgeTextColor = android.graphics.Color.WHITE
+            val displayCount = if (count > 9) 9 else count
+            badge.number = displayCount
+            if (count > 9) {
+                badge.maxCharacterCount = 3 
+            }*/
         }
     }
 
@@ -557,6 +553,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val tabIds = listOf(
             R.id.navigation_download,
             R.id.navigation_search,
+            R.id.navigation_foryou,
             R.id.navigation_history,
             R.id.navigation_settings,
         )
@@ -578,6 +575,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val tabs = listOf(
             R.id.navigation_download,
             R.id.navigation_search,
+            R.id.navigation_foryou,
             R.id.navigation_history,
             R.id.navigation_settings,
         )
@@ -683,26 +681,23 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 appBackgroundDim.isVisible = hasBackground && !shouldHide
                 appBackgroundLightScrim.isVisible = hasBackground && !shouldHide
             }
-            if (navDestination.id == R.id.navigation_updates) {
-                binding?.navView?.getBadge(R.id.navigation_updates)?.isVisible = false
-                com.lagradost.quicknovel.BaseApplication.Companion.setKey("HAS_NEW_UPDATES", false)
-            }
+            // Updates badge logic removed as tab is no longer in bottom nav
         }
 
         val navView: BottomNavigationView = findViewById(R.id.nav_view)
         
-        val hasUpdates = com.lagradost.quicknovel.BaseApplication.Companion.getKey("HAS_NEW_UPDATES", false) ?: false
+        /*val hasUpdates = com.lagradost.quicknovel.BaseApplication.Companion.getKey("HAS_NEW_UPDATES", false) ?: false
         if (hasUpdates) {
             val badge = navView.getOrCreateBadge(R.id.navigation_updates)
             badge.isVisible = true
-        }
+        }*/
 
         val updatesReceiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
-                navView.post {
+                /*navView.post {
                     val badge = navView.getOrCreateBadge(R.id.navigation_updates)
                     badge.isVisible = true
-                }
+                }*/
             }
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -782,6 +777,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val tabs = listOf(
             R.id.navigation_download,
             R.id.navigation_search,
+            R.id.navigation_foryou,
             R.id.navigation_history,
             R.id.navigation_settings,
         )
@@ -866,6 +862,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     R.id.navigation_download -> DownloadFragment()
                     R.id.navigation_updates -> com.lagradost.quicknovel.ui.updates.UpdatesFragment()
                     R.id.navigation_search -> SearchFragment()
+                    R.id.navigation_foryou -> com.lagradost.quicknovel.ui.foryou.ForYouFragment()
                     R.id.navigation_history -> HistoryFragment()
                     R.id.navigation_settings -> SettingsFragment()
                     else -> DownloadFragment()
@@ -880,8 +877,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 override fun onPageSelected(position: Int) {
                     navView.selectedItemId = tabs[position]
                     
-                    // Disable main swiping for Library tab if Swipe Mode is active
-                    // This allows DownloadFragment's split-zone touch logic to work
+                    // Disable main swiping for Library tab ONLY if Swipe Mode is active
+                    // This allows For You tab to switch tabs on background swipes
                     val isSwipeMode = this@MainActivity.getLibraryNavStyle() == "1"
                     binding?.mainViewpager?.isUserInputEnabled = !(position == 0 && isSwipeMode)
 

@@ -33,6 +33,13 @@
             tools:layout="@layout/fragment_updates">
     </fragment>
     <fragment
+            android:id="@+id/navigation_foryou"
+            android:name="com.lagradost.quicknovel.ui.foryou.ForYouFragment"
+            android:label="For You"
+            android:layout_height="match_parent"
+            tools:layout="@layout/fragment_for_you">
+    </fragment>
+    <fragment
             android:id="@+id/navigation_settings"
             android:name="com.lagradost.quicknovel.ui.settings.SettingsFragment"
             android:label="@string/title_download"
