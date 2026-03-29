@@ -31,7 +31,7 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 
 **Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
 
-**Telegram:** [Join Telegram community](https://t.me/+i9MSwgeoXzU0NTE1)
+**Telegram:** [Join Telegram community to get Beta Releases](https://t.me/+i9MSwgeoXzU0NTE1)
 
 **Discord:** [Join Discord Community](https://discord.gg/njMumTKvVw)
 
