@@ -77,6 +77,11 @@ class ResultFragment : Fragment() {
 
     val repo get() = viewModel.repo
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        sharedElementEnterTransition = android.transition.TransitionInflater.from(requireContext()).inflateTransition(android.R.transition.move)
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -180,7 +185,7 @@ class ResultFragment : Fragment() {
                     resultSynopsisText.maxLines = if (isExpanded) Integer.MAX_VALUE else 4
                     resultSynopsisTapMore.isVisible = !isExpanded
                     resultSynopsisCollapseArrow.rotation = if (isExpanded) 180f else 0f
-                    root.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    root.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 }
                 synopsisCard.setOnClickListener { toggleExpand() }
                 resultSynopsisCollapseArrow.setOnClickListener { toggleExpand() }
@@ -314,7 +319,7 @@ class ResultFragment : Fragment() {
                     if (resultLoading.isVisible) {
                         resultLoading.animate()
                             .alpha(0f)
-                            .setDuration(120)
+                            .setDuration(200)
                             .withEndAction {
                                 resultLoading.isVisible = false
                                 resultLoading.stopShimmer()
@@ -322,6 +327,29 @@ class ResultFragment : Fragment() {
                             }.start()
                     }
                     
+                    if (!resultHolder.isVisible || resultHolder.alpha < 1f) {
+                        resultHolder.alpha = 0f
+                        resultHolder.isVisible = true
+                        resultHolder.animate()
+                            .alpha(1f)
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(300)
+                            .setInterpolator(android.view.animation.DecelerateInterpolator())
+                            .start()
+                            
+                        resultPosterBlur.alpha = 0f
+                        resultPosterBlur.scaleX = 1.05f
+                        resultPosterBlur.scaleY = 1.05f
+                        resultPosterBlur.animate()
+                            .alpha(0.5f)
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(600)
+                            .setInterpolator(android.view.animation.DecelerateInterpolator())
+                            .start()
+                    }
+                    resultPosterBlur.isVisible = true
                     resultHolder.post { updateScrollHeight() }
                 }
             }
@@ -404,6 +432,8 @@ class ResultFragment : Fragment() {
         val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
         val startAction = savedInstanceState?.getInt("startAction") ?: arguments?.getInt("startAction") ?: 0
         val startChapterUrl = savedInstanceState?.getString("startChapterUrl") ?: arguments?.getString("startChapterUrl")
+
+        binding.resultPoster.transitionName = url
 
         activity?.window?.decorView?.clearFocus()
         binding.resultTitle.isSelected = true
@@ -606,7 +636,7 @@ class ResultFragment : Fragment() {
             })
 
             resultBookmark.setOnClickListener { view ->
-                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 val context = view.context ?: return@setOnClickListener
                 val json = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
                 val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()

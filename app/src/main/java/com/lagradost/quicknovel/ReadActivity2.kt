@@ -23,6 +23,14 @@ import android.widget.ArrayAdapter
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.net.Uri
+import androidx.preference.PreferenceManager
+import coil3.load
+import coil3.request.crossfade
+import com.lagradost.quicknovel.util.UsageStatsManager
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -91,6 +99,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
     }
 
+
     private fun hideSystemUI() {
         WindowInsetsControllerCompat(window, binding.readerContainer).let { controller ->
             controller.hide(WindowInsetsCompat.Type.systemBars())
@@ -116,11 +125,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         lowerBottomNav(binding.readerBottomViewHolder)
 
+        // Pixel-Perfect Translation: Pull actual dynamic margin to ensure it clears the notch/status bar
+        val params = binding.readToolbarHolder.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+        val topMargin = params?.topMargin?.toFloat() ?: (12 * resources.displayMetrics.density)
         binding.readToolbarHolder.translationY = 0f
         ObjectAnimator.ofFloat(
             binding.readToolbarHolder,
             "translationY",
-            -binding.readToolbarHolder.height.toFloat()
+            -(binding.readToolbarHolder.height.toFloat() + topMargin)
         ).apply {
             duration = 200
             start()
@@ -150,7 +162,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         higherBottomNavView(binding.readerBottomViewHolder)
 
-        binding.readToolbarHolder.translationY = -binding.readToolbarHolder.height.toFloat()
+        // Pixel-Perfect Reset: Start from offset that clears the notch/status bar
+        val params = binding.readToolbarHolder.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+        val topMargin = params?.topMargin?.toFloat() ?: (12 * resources.displayMetrics.density)
+        binding.readToolbarHolder.translationY = -(binding.readToolbarHolder.height.toFloat() + topMargin)
 
         ObjectAnimator.ofFloat(binding.readToolbarHolder, "translationY", 0f).apply {
             duration = 200
@@ -175,8 +190,59 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
     }
 
+    private var readingSessionStartTime: Long = 0L
+
     private fun setBackgroundColor(color: Int) {
         viewModel.backgroundColor = color
+    }
+
+    private fun updateGlobalBackground() {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+        val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
+        val blur = settingsManager.getInt(getString(R.string.background_blur_key), 0)
+        val dim = settingsManager.getInt(getString(R.string.background_dim_key), 0)
+        val isLightTheme = settingsManager.getString(getString(R.string.theme_key), "Amoled") == "Light"
+        val isEnabled = settingsManager.getBoolean(getString(R.string.reader_background_key), false)
+
+        binding.apply {
+            if (!isEnabled || imageUri.isNullOrBlank()) {
+                readerBackgroundImage.isVisible = false
+                readerBackgroundDim.isVisible = false
+                readerBackgroundLightScrim.isVisible = false
+                // Restore solid background if disabled
+                root.setBackgroundColor(viewModel.backgroundColor)
+                return@apply
+            }
+
+            readerBackgroundImage.isVisible = true
+            readerBackgroundDim.isVisible = true
+            readerBackgroundLightScrim.isVisible = true
+            
+            // Make actual containers transparent so background shows through
+            root.setBackgroundColor(Color.TRANSPARENT)
+            readOverlay.setBackgroundColor(Color.TRANSPARENT)
+
+            readerBackgroundImage.load(Uri.parse(imageUri)) {
+                crossfade(true)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (blur > 0) {
+                    readerBackgroundImage.setRenderEffect(
+                        RenderEffect.createBlurEffect(
+                            blur.toFloat(),
+                            blur.toFloat(),
+                            Shader.TileMode.CLAMP
+                        )
+                    )
+                } else {
+                    readerBackgroundImage.setRenderEffect(null)
+                }
+            }
+
+            readerBackgroundDim.alpha = dim / 100f
+            readerBackgroundLightScrim.alpha = if (isLightTheme) 0.3f else 0f
+        }
     }
 
     private fun setTextColor(color: Int) {
@@ -581,13 +647,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     override fun onResume() {
         viewModel.resumedApp()
         super.onResume()
-        readStartTime = System.currentTimeMillis()
+        readingSessionStartTime = System.currentTimeMillis()
     }
 
     override fun onPause() {
         viewModel.leftApp()
         super.onPause()
-        saveReadingTime()
+        if (readingSessionStartTime != 0L) {
+            val sessionTime = System.currentTimeMillis() - readingSessionStartTime
+            UsageStatsManager.addReadingTime(this, sessionTime)
+            readingSessionStartTime = 0L
+        }
     }
 
     /*private fun pendingPost() {
@@ -794,6 +864,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             //     overscrollMaxTranslation * currentOverScrollValue //alpha = (1.0f - currentOverScrollValue.absoluteValue)
         }
 
+
+
     override fun onDestroy() {
         viewModel.stopTTS()
         super.onDestroy()
@@ -817,11 +889,25 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         binding = ReadMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        updateGlobalBackground()
+        PreferenceManager.getDefaultSharedPreferences(this)
+            .registerOnSharedPreferenceChangeListener { _, key ->
+                if (key == getString(R.string.background_image_key) ||
+                    key == getString(R.string.background_blur_key) ||
+                    key == getString(R.string.background_dim_key) ||
+                    key == getString(R.string.theme_key) ||
+                    key == getString(R.string.reader_background_key)
+                ) {
+                    updateGlobalBackground()
+                }
+            }
+
         registerBattery()
+        readingSessionStartTime = System.currentTimeMillis()
 
         viewModel.init(intent, this)
-        topBarHeight = binding.readToolbarHolder.minimumHeight + getStatusBarHeight()
-        binding.readToolbarHolder.minimumHeight = topBarHeight
+        // Dynamic Slotting: Set topBarHeight based on a slim 64dp standard + the system safe area
+        topBarHeight = (64 * resources.displayMetrics.density).toInt() + getStatusBarHeight()
         textAdapter = TextAdapter(
             viewModel,
             TextConfig(
@@ -848,8 +934,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
         }
 
-        //updateTimeText()
-        fixPaddingStatusbar(binding.readToolbarHolder)
+        // Pixel-Perfect Refinement: Dynamically slot the header below the status bar
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.readToolbarHolder) { v, insets ->
+            val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            val params = v.layoutParams as android.view.ViewGroup.MarginLayoutParams
+            val density = v.resources.displayMetrics.density
+            params.topMargin = systemBars.top + (12 * density).toInt()
+            params.leftMargin = (16 * density).toInt()
+            params.rightMargin = (16 * density).toInt()
+            v.layoutParams = params
+            insets
+        }
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.readerBottomViewHolder) { v, insets ->
             val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
@@ -874,8 +969,18 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         //}
 
         observe(viewModel.backgroundColorLive) { color ->
-            binding.root.setBackgroundColor(color)
-            binding.readOverlay.setBackgroundColor(color)
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+            val isEnabled = settingsManager.getBoolean(getString(R.string.reader_background_key), false)
+            val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
+
+            if (isEnabled && !imageUri.isNullOrBlank()) {
+                binding.root.setBackgroundColor(Color.TRANSPARENT)
+                binding.readOverlay.setBackgroundColor(Color.TRANSPARENT)
+            } else {
+                binding.root.setBackgroundColor(color)
+                binding.readOverlay.setBackgroundColor(color)
+            }
+
             if (textAdapter.changeBackgroundColor(color)) {
                 updateTextAdapterConfig()
             }
@@ -1232,11 +1337,13 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     viewModel._loadingStatus.postValue(Resource.Success(true))
                     scrollToDesired()
                     onScroll()
+                    UsageStatsManager.incrementChapterRead(this@ReadActivity2)
                 }
             } else {
                 textAdapter.submitList(chapter.data) {
                     viewModel._loadingStatus.postValue(Resource.Success(true))
                     onScroll()
+                    UsageStatsManager.incrementChapterRead(this@ReadActivity2)
                 }
             }
         }
@@ -1253,10 +1360,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         binding.readActionSettings.setOnClickListener {
-            val bottomSheetDialog = BottomSheetDialog(this)
+            val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
 
             val binding = ReadBottomSettingsBinding.inflate(layoutInflater, null, false)
-            bottomSheetDialog.setContentView(binding.root)
+            builder.setView(binding.root)
+            val bottomSheetDialog = builder.create()
+            bottomSheetDialog.show()
 
             binding.readReadingType.setText(viewModel.readerType.stringRes)
             binding.readReadingType.setOnLongClickListener {
@@ -1291,12 +1400,13 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
 
             binding.readSettingsTextSize.apply {
+                valueSuffix = "pt"
                 valueTo = 30.0f
                 valueFrom = 10.0f
                 setValueRounded((viewModel.textSize).toFloat())
-                addOnChangeListener { slider, value, fromUser ->
-                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                setOnValueChangeListener { _, value, fromUser ->
                     viewModel.textSize = value.roundToInt()
+                    UsageStatsManager.incrementCustomization(this@ReadActivity2)
                 }
             }
 
@@ -1337,17 +1447,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
 
             binding.readSettingsTtsPitch.apply {
+                valueSuffix = "x"
                 setValueRounded(viewModel.ttsPitch)
-                addOnChangeListener { slider, value, fromUser ->
-                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                setOnValueChangeListener { _, value, fromUser ->
                     viewModel.ttsPitch = value
                 }
             }
 
             binding.readSettingsTtsSpeed.apply {
+                valueSuffix = "x"
                 setValueRounded(viewModel.ttsSpeed)
-                addOnChangeListener { slider, value, fromUser ->
-                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                setOnValueChangeListener { _, value, fromUser ->
                     viewModel.ttsSpeed = value
                 }
             }
@@ -1377,31 +1487,43 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
 
             binding.readSettingsTextPadding.apply {
+                valueSuffix = "px"
                 valueTo = 50.0f
                 setValueRounded(viewModel.paddingHorizontal.toFloat())
-                addOnChangeListener { slider, value, fromUser ->
-                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                setOnValueChangeListener { _, value, fromUser ->
                     viewModel.paddingHorizontal = value.roundToInt()
                 }
             }
 
             binding.readSettingsTextPaddingTop.apply {
+                valueSuffix = "px"
                 valueTo = 50.0f
                 setValueRounded(viewModel.paddingVertical.toFloat())
-                addOnChangeListener { slider, value, fromUser ->
-                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                setOnValueChangeListener { _, value, fromUser ->
                     viewModel.paddingVertical = value.roundToInt()
                 }
             }
 
             binding.readSettingsTextVerticalPadding.apply {
+                valueSuffix = "px"
                 setValueRounded(viewModel.textVerticalPadding)
-                addOnChangeListener { slider, value, fromUser ->
-                    if (fromUser) slider.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                setOnValueChangeListener { _, value, fromUser ->
                     viewModel.textVerticalPadding = value
                 }
             }
 
+
+            binding.readSettingsUseGoogle.apply {
+                isChecked = viewModel.ttsUseGoogle
+                setOnCheckedChangeListener { _, isChecked ->
+                    viewModel.ttsUseGoogle = isChecked
+                }
+            }
+
+
+            viewModel.ttsUseGoogleLive.observe(this) {
+                binding.readSettingsUseGoogle.isChecked = it == true
+            }
 
             binding.readShowFonts.apply {
                 //text = UIHelper.parseFontFileName(getKey(EPUB_FONT))
@@ -1506,20 +1628,27 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             binding.readLanguage.setOnClickListener { _ ->
                 ioSafe {
-                    viewModel.ttsSession.requireTTS({ tts ->
+                    viewModel.ttsSession.requireEngine({ tts ->
                         runOnUiThread {
+                            val voices = tts.getVoices()
                             val languages = mutableListOf<Locale?>(null).apply {
-                                addAll(tts.availableLanguages?.filterNotNull() ?: emptySet())
+                                val allLocales = voices.map { it.locale }.distinct().sortedBy { it.displayName }
+                                addAll(allLocales)
                             }
+                            val currentVoiceName = tts.getCurrentVoiceName()
+                            val currentVoice = voices.find { it.name == currentVoiceName }
                             val ctx = binding.readLanguage.context ?: return@runOnUiThread
+                            
+                            val currentIndex = if (currentVoice != null) languages.indexOf(currentVoice.locale) else 0
+                            
                             ctx.showDialog(
                                 languages.map {
                                     it?.displayName ?: ctx.getString(R.string.default_text)
                                 },
-                                languages.indexOf(tts.voice?.locale),
+                                currentIndex,
                                 ctx.getString(R.string.tts_locale), false, {}
                             ) { index ->
-                                viewModel.setTTSLanguage(languages.getOrNull(index))
+                                viewModel.setTTSVoice(null)
                             }
                         }
                     }, action = { false })
@@ -1529,7 +1658,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             binding.readLanguage.setOnLongClickListener {
                 it.popupMenu(items = listOf(1 to R.string.reset_value), selectedItemId = null) {
                     if (itemId == 1) {
-                        viewModel.setTTSLanguage(null)
+                        viewModel.setTTSVoice(null)
                     }
                 }
 
@@ -1574,35 +1703,44 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             binding.readVoice.setOnClickListener {
                 ioSafe {
-                    viewModel.ttsSession.requireTTS({ tts ->
+                    viewModel.ttsSession.requireEngine({ tts ->
                         runOnUiThread {
-                            val matchAgainst = tts.voice.locale
-                            val ctx = binding.readLanguage.context ?: return@runOnUiThread
+                            val allVoices = tts.getVoices()
+                            val currentVoiceName = tts.getCurrentVoiceName()
+                            val matchAgainst = allVoices.find { it.name == currentVoiceName }?.locale
+                            val ctx = binding.readVoice.context ?: return@runOnUiThread
                             val voices =
-                                mutableListOf<Pair<String, Voice?>>(ctx.getString(R.string.default_text) to null).apply {
-                                    val voices =
-                                        tts.voices.filter { it != null && it.locale == matchAgainst }
-                                            .map {
-                                                // ${"★".repeat(it.quality / 100) }
-                                                ("${it.name} ${
-                                                    if (it.isNetworkConnectionRequired) {
-                                                        "(☁)"
-                                                    } else {
-                                                        ""
-                                                    }
-                                                }") to it
-                                            }
+                                mutableListOf<Pair<String, EngineVoice?>>(ctx.getString(R.string.default_text) to null).apply {
+                                    val filtered = if (matchAgainst == null) {
+                                        allVoices
+                                    } else {
+                                        allVoices.filter { it.locale == matchAgainst }
+                                    }
 
-                                    addAll(voices.sortedBy { (name, _) -> name })
+                                    val mapped = filtered.map {
+                                        ("${it.name} ${
+                                            if (it.isNetworkRequired) {
+                                                "(☁)"
+                                            } else {
+                                                ""
+                                            }
+                                        }") to it
+                                    }
+
+                                    addAll(mapped.sortedBy { (name, _) -> name })
                                 }
+
+                            val selectedIndex = if (currentVoiceName != null) {
+                                voices.indexOfFirst { it.second?.name == currentVoiceName }.takeIf { it != -1 } ?: 0
+                            } else 0
 
                             ctx.showDialog(
                                 voices.map { it.first },
-                                voices.map { it.second }.indexOf(tts.voice),
+                                selectedIndex,
                                 ctx.getString(R.string.tts_locale), false, {}
                             ) { index ->
                                 val voice = voices.getOrNull(index)?.second
-                                viewModel.setTTSVoice(voice)
+                                viewModel.setTTSVoice(voice?.name)
                             }
                         }
                     }, action = { false })

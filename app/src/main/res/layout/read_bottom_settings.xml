@@ -5,7 +5,7 @@
     android:id="@+id/read_settings_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/primaryBlackBackground"
+    android:background="@android:color/transparent"
     android:orientation="vertical">
 
     <androidx.core.widget.NestedScrollView
@@ -48,86 +48,165 @@
                     android:text="@string/reload_chapter"
                     app:icon="@drawable/ic_baseline_autorenew_24" />
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_settings_scroll_vol"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/scroll_with_volume_keys"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor"
+                    android:orientation="horizontal"
                     android:paddingTop="8dp"
                     android:paddingBottom="8dp"
-                    tools:checked="true" />
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/scroll_with_volume_keys"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_scroll_vol"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_settings_lock_tts"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/lock_tts"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor"
+                    android:orientation="horizontal"
                     android:paddingTop="8dp"
-                    android:paddingBottom="8dp" />
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/lock_tts"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_lock_tts"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_settings_show_time"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/show_time"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor"
+                    android:orientation="horizontal"
                     android:paddingTop="8dp"
-                    android:paddingBottom="8dp" />
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/show_time"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_show_time"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_settings_show_battery"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/show_battery"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor"
+                    android:orientation="horizontal"
                     android:paddingTop="8dp"
-                    android:paddingBottom="8dp" />
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/show_battery"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_show_battery"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_settings_show_bionic"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/bionic_reading"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor"
+                    android:orientation="horizontal"
                     android:paddingTop="8dp"
-                    android:paddingBottom="8dp" />
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/bionic_reading"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_show_bionic"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_settings_is_text_selectable"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/selectable_text"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor"
+                    android:orientation="horizontal"
                     android:paddingTop="8dp"
-                    android:paddingBottom="8dp" />
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/selectable_text"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_is_text_selectable"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_settings_keep_screen_active"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/keep_screen_active"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor"
+                    android:orientation="horizontal"
                     android:paddingTop="8dp"
-                    android:paddingBottom="8dp" />
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/keep_screen_active"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_keep_screen_active"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_settings_author_notes"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/show_authors_notes"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor"
+                    android:orientation="horizontal"
                     android:paddingTop="8dp"
-                    android:paddingBottom="8dp" />
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/show_authors_notes"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_author_notes"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
             </LinearLayout>
 
             <TextView
@@ -230,11 +309,31 @@
                         android:id="@+id/read_sleep_timer"
                         style="@style/BlackButton"
                         android:layout_width="0dp"
-                        android:layout_weight="1"
+                android:layout_weight="1"
                         android:layout_marginStart="6dp"
                         android:layout_marginEnd="0dp"
                         android:text="@string/sleep_timer"
                         app:icon="@drawable/nights_stay_24px" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Use Google TTS (Neural Online)"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_use_google"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
                 </LinearLayout>
 
                 <TextView
@@ -252,34 +351,35 @@
                     android:layout_marginTop="8dp">
 
                     <ImageView
+                        android:id="@+id/read_settings_tts_speed_icon_left"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/pace_24px"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toStartOf="@id/read_settings_tts_speed"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_tts_speed"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/read_settings_tts_speed"
                         app:tint="?attr/white" />
 
-                    <com.google.android.material.slider.Slider
+                    <com.lagradost.quicknovel.ui.custom.TactileRulerSlider
                         android:id="@+id/read_settings_tts_speed"
-                        style="@style/SettingsSliderTheme"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:stepSize="0.1"
-                        android:value="1.0"
-                        android:valueFrom="0.1"
-                        android:valueTo="5"
+                        android:layout_marginHorizontal="12dp"
+                        app:stepSize="0.1"
+                        app:valueFrom="0.1"
+                        app:valueTo="5.0"
+                        app:layout_constraintEnd_toStartOf="@id/read_settings_tts_speed_icon_right"
+                        app:layout_constraintStart_toEndOf="@id/read_settings_tts_speed_icon_left"
                         app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/read_settings_tts_speed_icon_right"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/acute_24px"
-                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_tts_speed"
                         app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@id/read_settings_tts_speed"
-                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/read_settings_tts_speed"
                         app:tint="?attr/white" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -298,34 +398,35 @@
                     android:layout_marginTop="8dp">
 
                     <ImageView
+                        android:id="@+id/read_settings_tts_pitch_icon_left"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/hiking_24px"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toStartOf="@id/read_settings_tts_pitch"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_tts_pitch"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/read_settings_tts_pitch"
                         app:tint="?attr/white" />
 
-                    <com.google.android.material.slider.Slider
+                    <com.lagradost.quicknovel.ui.custom.TactileRulerSlider
                         android:id="@+id/read_settings_tts_pitch"
-                        style="@style/SettingsSliderTheme"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:stepSize="0.1"
-                        android:value="1.0"
-                        android:valueFrom="0.1"
-                        android:valueTo="3"
+                        android:layout_marginHorizontal="12dp"
+                        app:stepSize="0.1"
+                        app:valueFrom="0.1"
+                        app:valueTo="3.0"
+                        app:layout_constraintEnd_toStartOf="@id/read_settings_tts_pitch_icon_right"
+                        app:layout_constraintStart_toEndOf="@id/read_settings_tts_pitch_icon_left"
                         app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/read_settings_tts_pitch_icon_right"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/directions_run_24px"
-                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_tts_pitch"
                         app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@id/read_settings_tts_pitch"
-                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/read_settings_tts_pitch"
                         app:tint="?attr/white" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -344,33 +445,34 @@
                     android:layout_marginTop="8dp">
 
                     <ImageView
+                        android:id="@+id/read_settings_text_size_icon_left"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/smaller_font"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toStartOf="@id/read_settings_text_size"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_text_size"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="@id/read_settings_text_size" />
 
-                    <com.google.android.material.slider.Slider
+                    <com.lagradost.quicknovel.ui.custom.TactileRulerSlider
                         android:id="@+id/read_settings_text_size"
-                        style="@style/SettingsSliderTheme"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:stepSize="1"
-                        android:value="4"
-                        android:valueFrom="0"
-                        android:valueTo="10"
+                        android:layout_marginHorizontal="12dp"
+                        app:stepSize="1.0"
+                        app:valueFrom="10.0"
+                        app:valueTo="30.0"
+                        app:layout_constraintEnd_toStartOf="@id/read_settings_text_size_icon_right"
+                        app:layout_constraintStart_toEndOf="@id/read_settings_text_size_icon_left"
                         app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/read_settings_text_size_icon_right"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/bigger_font"
-                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_text_size"
                         app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@id/read_settings_text_size"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="@id/read_settings_text_size" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
                 <TextView
@@ -388,33 +490,34 @@
                     android:layout_marginTop="8dp">
 
                     <ImageView
+                        android:id="@+id/read_settings_text_padding_icon_left"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/format_padding_decrease_white_24dp"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toStartOf="@id/read_settings_text_padding"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_text_padding"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="@id/read_settings_text_padding" />
 
-                    <com.google.android.material.slider.Slider
+                    <com.lagradost.quicknovel.ui.custom.TactileRulerSlider
                         android:id="@+id/read_settings_text_padding"
-                        style="@style/SettingsSliderTheme"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:stepSize="1"
-                        android:value="4"
-                        android:valueFrom="0"
-                        android:valueTo="10"
+                        android:layout_marginHorizontal="12dp"
+                        app:stepSize="1.0"
+                        app:valueFrom="0.0"
+                        app:valueTo="50.0"
+                        app:layout_constraintEnd_toStartOf="@id/read_settings_text_padding_icon_right"
+                        app:layout_constraintStart_toEndOf="@id/read_settings_text_padding_icon_left"
                         app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/read_settings_text_padding_icon_right"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/format_padding_increase_white_24dp"
-                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_text_padding"
                         app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@id/read_settings_text_padding"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="@id/read_settings_text_padding" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
                 <TextView
@@ -432,33 +535,34 @@
                     android:layout_marginTop="8dp">
 
                     <ImageView
+                        android:id="@+id/read_settings_text_padding_top_icon_left"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/text_top_bottom_margin"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toStartOf="@id/read_settings_text_padding_top"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_text_padding_top"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="@id/read_settings_text_padding_top" />
 
-                    <com.google.android.material.slider.Slider
+                    <com.lagradost.quicknovel.ui.custom.TactileRulerSlider
                         android:id="@+id/read_settings_text_padding_top"
-                        style="@style/SettingsSliderTheme"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:stepSize="1"
-                        android:value="4"
-                        android:valueFrom="0"
-                        android:valueTo="10"
+                        android:layout_marginHorizontal="12dp"
+                        app:stepSize="1.0"
+                        app:valueFrom="0.0"
+                        app:valueTo="50.0"
+                        app:layout_constraintEnd_toStartOf="@id/read_settings_text_padding_top_icon_right"
+                        app:layout_constraintStart_toEndOf="@id/read_settings_text_padding_top_icon_left"
                         app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/read_settings_text_padding_top_icon_right"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/text_top_bottom_margin_expand"
-                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_text_padding_top"
                         app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@id/read_settings_text_padding_top"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="@id/read_settings_text_padding_top" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
                 <TextView
@@ -476,33 +580,34 @@
                     android:layout_marginTop="8dp">
 
                     <ImageView
+                        android:id="@+id/read_settings_text_vertical_padding_icon_left"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/density_small_24px"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toStartOf="@id/read_settings_text_vertical_padding"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_text_vertical_padding"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="@id/read_settings_text_vertical_padding" />
 
-                    <com.google.android.material.slider.Slider
+                    <com.lagradost.quicknovel.ui.custom.TactileRulerSlider
                         android:id="@+id/read_settings_text_vertical_padding"
-                        style="@style/SettingsSliderTheme"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:stepSize="0.5"
-                        android:value="7.5"
-                        android:valueFrom="0"
-                        android:valueTo="30.0"
+                        android:layout_marginHorizontal="12dp"
+                        app:stepSize="0.5"
+                        app:valueFrom="0.0"
+                        app:valueTo="30.0"
+                        app:layout_constraintEnd_toStartOf="@id/read_settings_text_vertical_padding_icon_right"
+                        app:layout_constraintStart_toEndOf="@id/read_settings_text_vertical_padding_icon_left"
                         app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/read_settings_text_vertical_padding_icon_right"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:src="@drawable/density_medium_24px"
-                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintBottom_toBottomOf="@id/read_settings_text_vertical_padding"
                         app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toEndOf="@id/read_settings_text_vertical_padding"
-                        app:layout_constraintTop_toTopOf="parent" />
+                        app:layout_constraintTop_toTopOf="@id/read_settings_text_vertical_padding" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </LinearLayout>
 
@@ -564,14 +669,25 @@
                         app:icon="@drawable/translate_24px" />
                 </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/read_online_translation_switch"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/online_translate"
-                    android:textSize="16sp"
-                    android:textColor="?attr/textColor" />
+                    android:orientation="horizontal"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/online_translate"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_online_translation_switch"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
             </LinearLayout>
 
 

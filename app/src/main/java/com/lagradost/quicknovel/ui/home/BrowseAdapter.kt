@@ -12,6 +12,9 @@ import com.lagradost.quicknovel.ui.BaseDiffCallback
 import com.lagradost.quicknovel.ui.NoStateAdapter
 import com.lagradost.quicknovel.ui.ViewHolderState
 import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
+import com.lagradost.quicknovel.util.KineticTiltHelper
+import coil3.load
+import coil3.request.crossfade
 
 class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b ->
     a.name == b.name
@@ -20,13 +23,11 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
 })) {
 
     companion object {
-        // Cache resolved icon resource IDs — getIdentifier() is expensive, only call once per name
         private val iconCache = HashMap<String, Int>()
 
         fun resolveIcon(context: android.content.Context, providerName: String): Int {
             return iconCache.getOrPut(providerName) {
                 val name = providerName.lowercase().replace(" ", "_")
-                // Specific fix for WuxiaBox casing/mismatch
                 if (name.contains("wuxiabox")) {
                     val id = context.resources.getIdentifier("icon_wuxiabox", "drawable", context.packageName)
                     if (id != 0) return@getOrPut id
@@ -35,7 +36,7 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
                 var id = context.resources.getIdentifier("icon_$name", "drawable", context.packageName)
                 if (id == 0) id = context.resources.getIdentifier(name, "drawable", context.packageName)
                 if (id == 0) id = context.resources.getIdentifier("${name}icon", "drawable", context.packageName)
-                id // 0 if not found, that's fine
+                id
             }
         }
     }
@@ -55,26 +56,34 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
 
         binding.apply {
             browseText.text = item.name
+            
+            // Kinetic Evolution: Apply tactile feedback to source tiles
+            KineticTiltHelper.applyKineticTilt(browseBackground)
+
             try {
-                if (item.pluginContext != null && item.iconId != null && item.iconId != 0) {
-                    browseIcon.setImageDrawable(item.pluginContext!!.getDrawable(item.iconId!!))
-                } else {
-                    val context = browseIcon.context
-                    val iconRes = resolveIcon(context, item.name)
-                    when {
-                        iconRes != 0 -> browseIcon.setImageResource(iconRes)
-                        item.iconId != null && item.iconId != 0 -> browseIcon.setImageResource(item.iconId!!)
-                        else -> browseIcon.setImageResource(R.drawable.ic_baseline_code_24)
+                val context = browseIcon.context
+                val iconData: Any = when {
+                    item.pluginContext != null && item.iconId != null && item.iconId != 0 -> 
+                        item.pluginContext!!.getDrawable(item.iconId!!) ?: R.drawable.ic_baseline_code_24
+                    else -> {
+                        val resId = resolveIcon(context, item.name)
+                        if (resId != 0) resId 
+                        else if (item.iconId != null && item.iconId != 0) item.iconId!!
+                        else R.drawable.ic_baseline_code_24
                     }
+                }
+
+                browseIcon.load(iconData) {
+                    crossfade(true)
                 }
             } catch (e: Exception) {
                 browseIcon.setImageResource(R.drawable.ic_baseline_code_24)
             }
-            
+
             if (item.iconFullScreen) {
                 browseIcon.setPadding(0, 0, 0, 0)
             } else {
-                val paddingDp = (12 * browseIcon.context.resources.displayMetrics.density).toInt()
+                val paddingDp = (2 * browseIcon.context.resources.displayMetrics.density).toInt()
                 browseIcon.setPadding(paddingDp, paddingDp, paddingDp, paddingDp)
             }
 
@@ -86,7 +95,6 @@ class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b
                     )
                 )
             } catch (e: Exception) {
-                // Fallback to a safe default if resource ID is invalid across APKs
                 browseIconBackground.setCardBackgroundColor(
                     ContextCompat.getColor(browseIconBackground.context, R.color.primaryGrayBackground)
                 )

@@ -59,13 +59,37 @@
             android:icon="@drawable/ic_baseline_color_lens_24"
             app:useSimpleSummaryProvider="true"
             app:layout="@layout/setting_tile" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:key="@string/reader_background_key"
+            android:title="@string/reader_background"
+            android:summary="@string/reader_background_summary"
+            app:defaultValue="false"
+            android:icon="@drawable/ic_baseline_color_lens_24"
+            app:layout="@layout/setting_tile" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:key="@string/library_pinterest_bento_key"
+            android:title="@string/library_pinterest_bento_title"
+            android:summary="@string/library_pinterest_bento_desc"
+            app:defaultValue="false"
+            android:icon="@drawable/ic_baseline_color_lens_24"
+            app:layout="@layout/setting_tile" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:key="@string/library_tactile_response_key"
+            android:title="@string/library_tactile_response_title"
+            android:summary="@string/library_tactile_response_desc"
+            app:defaultValue="true"
+            android:icon="@drawable/ic_baseline_color_lens_24"
+            app:layout="@layout/setting_tile" />
     </PreferenceCategory>
 
     <PreferenceCategory
         android:key="search"
         android:title="@string/search"
         app:layout="@layout/setting_category_title">
-        <SwitchPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
                 android:icon="@drawable/search_icon_white"
                 app:key="advanced_search"
                 android:title="@string/advanced_search"
@@ -127,7 +151,7 @@
                 android:entryValues="@array/library_nav_style_values"
                 android:icon="@drawable/ic_baseline_edit_24"
                 app:layout="@layout/setting_tile" />
-        <SwitchPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
                 app:key="@string/auto_update_key"
                 android:title="@string/show_app_updates"
                 android:summary="@string/show_app_updates_desc"
@@ -145,7 +169,7 @@
                 android:icon="@drawable/ic_baseline_notifications_active_24"
                 app:layout="@layout/setting_tile" />
 
-        <SwitchPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
                 app:key="@string/remove_external_key"
                 android:title="@string/remove_bloat"
                 android:summary="@string/remove_bloat_desc"
@@ -197,7 +221,7 @@
                 android:icon="@drawable/ic_baseline_add_24"
                 app:layout="@layout/setting_tile" />
 
-        <SwitchPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
                 android:title="@string/cloudflare_auto_solve_title"
                 app:key="@string/cloudflare_auto_solve_key"
                 android:summary="@string/cloudflare_auto_solve_summary"
@@ -237,13 +261,32 @@
 
         <Preference
                 android:title="Join Telegram Group"
-                android:icon="@drawable/ic_baseline_discord_24"
+                android:icon="@drawable/ic_baseline_language_24"
                 app:summary="https://t.me/+i9MSwgeoXzU0NTE1"
                 app:layout="@layout/setting_tile">
             <intent
                     android:action="android.intent.action.VIEW"
                     android:data="https://t.me/+i9MSwgeoXzU0NTE1" />
+        </Preference>
 
+        <Preference
+                android:title="Join Discord Server"
+                android:icon="@drawable/ic_baseline_discord_24"
+                app:summary="https://discord.gg/njMumTKvVw"
+                app:layout="@layout/setting_tile">
+            <intent
+                    android:action="android.intent.action.VIEW"
+                    android:data="https://discord.gg/njMumTKvVw" />
+        </Preference>
+
+        <Preference
+                android:title="QuickNovel Dev (LagradOst)"
+                android:icon="@drawable/ic_github_logo"
+                app:summary="https://github.com/LagradOst"
+                app:layout="@layout/setting_tile">
+            <intent
+                    android:action="android.intent.action.VIEW"
+                    android:data="https://github.com/LagradOst" />
         </Preference>
     </PreferenceCategory>
 </PreferenceScreen>

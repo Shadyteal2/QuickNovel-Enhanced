@@ -387,7 +387,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     val code = languageCodes[languageIndex]
                     CommonActivity.setLocale(activity, code)
                     settingsManager.edit { putString(getString(R.string.locale_key), code) }
-                    activity?.recreate()
+                    CommonActivity.recreateWithSmoothTransition(activity)
                 } catch (e: Exception) {
                     logError(e)
                 }
@@ -664,7 +664,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     settingsManager.edit {
                         putString(getString(R.string.theme_key), prefValues[it])
                     }
-                    activity?.recreate()
+                    CommonActivity.recreateWithSmoothTransition(activity)
                 } catch (e: Exception) {
                     logError(e)
                 }
@@ -702,7 +702,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     settingsManager.edit {
                         putString(getString(R.string.primary_color_key), prefValues[it])
                     }
-                    activity?.recreate()
+                    CommonActivity.recreateWithSmoothTransition(activity)
                 } catch (e: Exception) {
                     logError(e)
                 }
@@ -796,6 +796,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Optimization for smooth scrolling
+        listView.apply {
+            recycledViewPool.setMaxRecycledViews(0, 20)
+            setItemViewCacheSize(20)
+            isDrawingCacheEnabled = false
+            setHasFixedSize(true)
+        }
 
         // Fix status bar overlap
         activity?.fixPaddingStatusbar(view)

@@ -81,21 +81,25 @@ class ForYouFragment : Fragment() {
         // Recommendations Adapter
         binding.recommendationContent.apply {
             layoutManager = androidx.recyclerview.widget.LinearLayoutManager(context)
-            adapter = RecommendationGroupAdapter { rec ->
+            adapter = RecommendationGroupAdapter(onBookClick = { rec, imageView ->
                 // Record Interaction
                 viewModel.recordInteraction(rec.novel.url, "CLICK")
                 
-                // Navigate to ResultFragment
-                navigateToResult(rec.novel.url, rec.novel.apiName)
-            }
+                // Navigate to ResultFragment with Shared Elements
+                imageView.transitionName = rec.novel.url
+                val extras = androidx.navigation.fragment.FragmentNavigatorExtras(imageView to rec.novel.url)
+                navigateToResult(rec.novel.url, rec.novel.apiName, extras)
+            })
         }
     }
 
-    private fun navigateToResult(url: String, apiName: String) {
+    private fun navigateToResult(url: String, apiName: String, extras: androidx.navigation.Navigator.Extras? = null) {
         val bundle = com.lagradost.quicknovel.ui.result.ResultFragment.newInstance(url, apiName)
         (activity as? com.lagradost.quicknovel.MainActivity)?.navigate(
             com.lagradost.quicknovel.R.id.global_to_navigation_results,
-            bundle
+            bundle,
+            null,
+            extras
         )
     }
 

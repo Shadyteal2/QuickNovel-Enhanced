@@ -14,6 +14,8 @@ import android.widget.Toast
 import androidx.annotation.MainThread
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.preference.PreferenceManager
 import com.lagradost.quicknovel.ui.UiText
 import com.lagradost.quicknovel.mvvm.logError
@@ -23,6 +25,28 @@ import java.lang.ref.WeakReference
 import java.util.Locale
 
 object CommonActivity {
+    var pendingThemeChangeScreenshot: Bitmap? = null
+
+    @JvmStatic
+    fun recreateWithSmoothTransition(act: Activity?) {
+        if (act == null) return
+        try {
+            val rootView = act.window?.decorView?.rootView
+            if (rootView != null && rootView.width > 0 && rootView.height > 0) {
+                val bitmap = Bitmap.createBitmap(
+                    rootView.width,
+                    rootView.height,
+                    Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(bitmap)
+                rootView.draw(canvas)
+                pendingThemeChangeScreenshot = bitmap
+            }
+        } catch (e: Exception) {
+            logError(e)
+        }
+        act.recreate()
+    }
     private var _activity: WeakReference<Activity>? = null
     @JvmStatic
     var activity

@@ -223,10 +223,15 @@ object PluginManager {
                 (name.endsWith(".apk") || name.endsWith(".dex")) && !name.endsWith(".part")
             }
             
-            Log.d(TAG, "Plugin Directory Scan: ${dir.absolutePath} - Found ${apkFiles?.size ?: 0} files")
+            Log.d(TAG, "Plugin Directory Scan: ${dir.absolutePath} - Found ${apkFiles?.size ?: 0} file(s)")
             
             if (apkFiles == null || apkFiles.isEmpty()) {
-                Log.w(TAG, "No plugin files found in ${dir.absolutePath}")
+                val jsonCount = dir.listFiles { _, name -> name.endsWith(".json") }?.size ?: 0
+                if (jsonCount > 0) {
+                    Log.e(TAG, "Sync System Inconsistency: $jsonCount metadata file(s) found, but 0 APK/DEX files present!")
+                } else {
+                    Log.w(TAG, "No plugin files found in ${dir.absolutePath}")
+                }
                 return@supervisorScope 0
             }
             
@@ -234,7 +239,7 @@ object PluginManager {
                 async(Dispatchers.IO) {
                     val metaFile = File(dir, file.nameWithoutExtension + ".json")
                     if (!metaFile.exists()) {
-                        Log.w(TAG, "Missing metadata for ${file.name}")
+                        Log.w(TAG, "Skipping plugin ${file.name}: Missing metadata JSON file (${metaFile.name})")
                         return@async emptyList<MainAPI>()
                     }
                     
@@ -244,7 +249,7 @@ object PluginManager {
                         val item = mapper.readValue(json, PluginItem::class.java)
                         
                         if (item.minApiVersion > API_VERSION) {
-                            Log.w(TAG, "${item.name} requires version ${item.minApiVersion}, current is $API_VERSION")
+                            Log.w(TAG, "Incompatible plugin ${item.name}: Requires API ${item.minApiVersion}, but current is $API_VERSION")
                             return@async emptyList<MainAPI>()
                         }
 
@@ -252,16 +257,23 @@ object PluginManager {
                         item.mainClass?.let { classesToLoad.add(it) }
                         item.mainClasses?.let { classesToLoad.addAll(it) }
                         
-                        if (classesToLoad.isEmpty()) return@async emptyList<MainAPI>()
+                        if (classesToLoad.isEmpty()) {
+                            Log.w(TAG, "Plugin ${item.name} has no mainClasses defined in metadata.")
+                            return@async emptyList<MainAPI>()
+                        }
                         
                         val instances = classesToLoad.distinct().map { className ->
                             loadPlugin(context, file, className)
                         }.filterNotNull()
                         
-                        Log.d(TAG, "Bundled ${instances.size} provider(s) from ${file.name}")
+                        if (instances.size < classesToLoad.distinct().size) {
+                            Log.w(TAG, "Partial load for ${item.name}: Loaded ${instances.size}/${classesToLoad.distinct().size} providers.")
+                        } else {
+                            Log.d(TAG, "Successfully loaded ${instances.size} provider(s) from ${file.name}")
+                        }
                         instances
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error in async load for ${file.name}", e)
+                        Log.e(TAG, "Fatal parsing error for plugin metadata ${metaFile.name}", e)
                         logError(e)
                         emptyList<MainAPI>()
                     }
@@ -272,14 +284,15 @@ object PluginManager {
             val allInstances = allResults.flatten()
             if (allInstances.isNotEmpty()) {
                 Apis.addPlugins(allInstances)
-                Log.i(TAG, "Batch registration successful: ${allInstances.size} plugins total.")
+            } else {
+                Log.w(TAG, "Scan complete: No providers were successfully loaded from existing files.")
             }
             
             val totalBundles = allResults.count { it.isNotEmpty() }
-            Log.i(TAG, "Optimized warmup finished. Total bundles loaded: $totalBundles")
+            Log.i(TAG, "Plugin initialization finished. Total bundles: $totalBundles, Total providers: ${allInstances.size}")
             allInstances.size
         } catch (e: Exception) {
-            Log.e(TAG, "Fatal error in loadAllPlugins", e)
+            Log.e(TAG, "Critical scan failure in loadAllPlugins", e)
             logError(e)
             0
         }

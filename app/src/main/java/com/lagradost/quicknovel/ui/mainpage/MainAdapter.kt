@@ -93,7 +93,14 @@ class MainAdapter(
                 setImage(item.image)
 
                 setOnClickListener {
-                    loadResult(item.url, item.apiName)
+                    transitionName = item.url
+                    val extras = androidx.navigation.fragment.FragmentNavigatorExtras(this to item.url)
+                    val act = com.lagradost.quicknovel.CommonActivity.activity
+                    if (act is androidx.fragment.app.FragmentActivity) {
+                        act.loadResult(item.url, item.apiName, 0, null, extras)
+                    } else {
+                        loadResult(item.url, item.apiName)
+                    }
                 }
 
                 setOnLongClickListener { view ->

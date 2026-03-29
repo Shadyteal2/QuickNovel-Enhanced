@@ -302,6 +302,9 @@
     <string name="background_image_key" translatable="false">background_image</string>
     <string name="background_blur_key" translatable="false">background_blur</string>
     <string name="background_dim_key" translatable="false">background_dim</string>
+    <string name="reader_background">Custom Background in Reader</string>
+    <string name="reader_background_summary">Apply global background image and blur/dim settings to the reader</string>
+    <string name="reader_background_key" translatable="false">reader_background</string>
     <string name="reset_background">Reset Background</string>
     <string name="reset_background_summary">Remove custom background and return to default</string>
     <string name="reset_background_key" translatable="false">reset_background</string>
@@ -334,4 +337,12 @@
     <string name="cloudflare_resolve_manual_summary">Manually open a WebView to solve a challenge for a specific site</string>
     <string name="cloudflare_auto_solve_key" translatable="false">cloudflare_auto_solve</string>
     <string name="cloudflare_resolve_manual_key" translatable="false">cloudflare_resolve_manual</string>
+
+    <string name="library_pinterest_bento_key" translatable="false">library_pinterest_bento</string>
+    <string name="library_pinterest_bento_title">Pinterest Bento Grid</string>
+    <string name="library_pinterest_bento_desc">Transforms Library &amp; Home into a gapless 2rd col masonry grid. Only works in Grid View.</string>
+
+    <string name="library_tactile_response_key" translatable="false">library_tactile_response</string>
+    <string name="library_tactile_response_title">Tactile Cover Response</string>
+    <string name="library_tactile_response_desc">Enable premium 3D physical tilt effect when touching book covers.</string>
 </resources>

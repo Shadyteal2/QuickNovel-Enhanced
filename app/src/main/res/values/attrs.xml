@@ -50,4 +50,36 @@
         <attr name="white" format="color" />
         <attr name="searchBarBackground" format="reference" />
     </declare-styleable>
+
+    <!-- Global Custom Attributes -->
+    <attr name="thumbColor" format="color" />
+    <attr name="trackColor" format="color" />
+    <attr name="valueFrom" format="float" />
+    <attr name="valueTo" format="float" />
+    <attr name="stepSize" format="float" />
+
+    <!-- Custom View Attributes -->
+    <declare-styleable name="ElasticSwitch">
+        <attr name="android:checked" />
+        <attr name="checkedColor" format="color" />
+        <attr name="uncheckedColor" format="color" />
+        <attr name="thumbColor" />
+    </declare-styleable>
+
+    <declare-styleable name="ElasticSlider">
+        <attr name="thumbColor" />
+        <attr name="trackColor" />
+        <attr name="progressColor" format="color" />
+        <attr name="valueFrom" />
+        <attr name="valueTo" />
+        <attr name="stepSize" />
+    </declare-styleable>
+
+    <declare-styleable name="TactileRulerSlider">
+        <attr name="valueFrom" />
+        <attr name="valueTo" />
+        <attr name="stepSize" />
+        <attr name="tickColor" format="color" />
+        <attr name="needleColor" format="color" />
+    </declare-styleable>
 </resources>

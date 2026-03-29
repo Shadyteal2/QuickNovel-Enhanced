@@ -145,18 +145,18 @@ object SingleSelectionHelper {
         callback: (Int) -> Unit,
     ) {
         val builder =
-            BottomSheetDialog(this)
-        builder.setContentView(R.layout.bottom_selection_dialog)
+            AlertDialog.Builder(this, R.style.AlertDialogCustom).setView(R.layout.bottom_selection_dialog)
 
-        builder.show()
+        val dialog = builder.create()
+        dialog.show()
         showDialog(
-            builder,
+            dialog,
             items,
             listOf(selectedIndex),
             name,
             showApply,
             false,
-            { callback.invoke(it.first()) },
+            { if (it.isNotEmpty()) callback.invoke(it.first()) },
             dismissCallback
         )
     }

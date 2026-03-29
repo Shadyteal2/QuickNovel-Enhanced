@@ -16,7 +16,7 @@
             android:id="@+id/home_toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#33000000"
+            android:background="@drawable/glass_header_background"
             android:paddingTop="@dimen/navbarHeight"
             app:layout_scrollFlags="scroll|enterAlways"
             app:menu="@menu/home_actionbar"
@@ -26,6 +26,7 @@
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
+        android:id="@+id/home_scrollview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
@@ -41,15 +42,16 @@
             <FrameLayout
                 android:id="@+id/home_hero_section"
                 android:layout_width="match_parent"
-                android:layout_height="220dp"
-                android:layout_margin="12dp">
+                android:layout_height="180dp"
+                android:layout_marginHorizontal="12dp"
+                android:layout_marginVertical="8dp">
 
                 <androidx.cardview.widget.CardView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     app:cardBackgroundColor="?attr/primaryBlackBackground"
-                    app:cardCornerRadius="24dp"
-                    app:cardElevation="4dp">
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="2dp">
 
                     <ImageView
                         android:id="@+id/hero_image"
@@ -70,7 +72,10 @@
                         android:layout_gravity="bottom"
                         android:orientation="vertical"
                         android:padding="20dp">
-
+                        <TextView
+                            android:id="@+id/hero_badge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
                             android:background="@drawable/rounded_text_bg"
                             android:paddingHorizontal="8dp"
                             android:paddingVertical="4dp"
@@ -121,12 +126,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="8dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="4dp"
                 android:fontFamily="@font/google_sans"
                 android:text="Explore Sources"
                 android:textColor="?attr/textColor"
-                android:textSize="18sp"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <com.lagradost.quicknovel.widget.AutofitRecyclerView

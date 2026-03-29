@@ -17,6 +17,7 @@
             android:id="@+id/stats_toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
+            android:background="@drawable/glass_header_background"
             app:navigationIcon="@drawable/ic_baseline_arrow_back_24"
             app:title="Reading Stats"
             app:titleCentered="true"
@@ -24,6 +25,7 @@
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
+        android:id="@+id/stats_scrollview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
@@ -423,6 +425,25 @@
                 android:clickable="true"
                 android:focusable="true">
                 <!-- Bar item hooks left to setup by scripts later -->
+            </LinearLayout>
+
+            <!-- Achievements Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:text="Achievements"
+                android:textColor="?attr/textColor"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/layout_achievements"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <!-- Achievement items injected here -->
             </LinearLayout>
 
             <!-- 6. Reading Time Cards -->

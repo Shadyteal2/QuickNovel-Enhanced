@@ -8,7 +8,7 @@ import com.lagradost.quicknovel.databinding.ItemRecommendationBookBinding
 import com.lagradost.quicknovel.ui.foryou.recommendation.Recommendation
 import com.lagradost.quicknovel.util.UIHelper.setImage
 
-class RecommendationBookAdapter(private val onClick: (Recommendation) -> Unit) :
+class RecommendationBookAdapter(private val onClick: (Recommendation, android.widget.ImageView) -> Unit) :
     ListAdapter<Recommendation, RecommendationBookAdapter.ViewHolder>(DiffCallback) {
 
     inner class ViewHolder(val binding: ItemRecommendationBookBinding) :
@@ -46,7 +46,7 @@ class RecommendationBookAdapter(private val onClick: (Recommendation) -> Unit) :
             // IMPORTANT: Removed RenderEffect blur from root to fix "blurry posters"
             // The glassmorphism is now achieved via cardBackgroundColor and stroke in XML
             
-            root.setOnClickListener { onClick(item) }
+            root.setOnClickListener { onClick(item, bookPoster) }
             root.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
         }
     }

@@ -53,7 +53,7 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
             }
         }
     private var isRegistered = false
-    private var tts: TextToSpeech? = null
+    private var engine: TTSEngine? = null
     private var TTSQueue: Pair<TTSHelper.TTSLine, Int>? = null
 
     private var TTSQueueId = 0
@@ -64,74 +64,70 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
     private var pitch: Float = 1.0f
 
     fun isValidTTS(): Boolean {
-        return tts != null
+        return engine?.isInitialized() == true
     }
 
-    private fun clearTTS(tts: TextToSpeech) {
-        tts.stop()
+    private fun clearTTS(engine: TTSEngine) {
+        engine.stop()
         TTSQueue = null
     }
 
     fun setSpeed(speed: Float) {
         this.speed = speed
-        tts?.setSpeechRate(speed)
+        engine?.setSpeed(speed)
     }
 
     fun setPitch(pitch: Float) {
         this.pitch = pitch
-        tts?.setPitch(pitch)
+        engine?.setPitch(pitch)
     }
 
     fun setLanguage(locale: Locale?) {
         val realLocale = locale ?: Locale.US
         setKey(EPUB_LANG, realLocale.displayName)
-        val tts = tts ?: return
-        clearTTS(tts)
-        tts.language = realLocale
+        val engine = engine ?: return
+        clearTTS(engine)
+        engine.setLanguage(realLocale.toLanguageTag())
     }
 
-    fun setVoice(voice: Voice?) {
-        if (voice == null) {
+    fun setVoice(voiceName: String?) {
+        if (voiceName == null) {
             removeKey(EPUB_VOICE)
         } else {
-            setKey(EPUB_VOICE, voice.name)
+            setKey(EPUB_VOICE, voiceName)
         }
-        val tts = tts ?: return
-        clearTTS(tts)
-        tts.voice = voice ?: tts.defaultVoice
+        val engine = engine ?: return
+        clearTTS(engine)
+        engine.setVoice(voiceName)
     }
 
     fun interruptTTS() {
         // we don't actually want to initialize tts here
-        tts?.let { tts ->
-            clearTTS(tts)
+        engine?.let { engine ->
+            clearTTS(engine)
         }
     }
 
-    fun ttsInitialized(): Boolean {
-        return tts != null
+    fun releaseEngine() {
+        engine?.release()
+        engine = null
     }
 
-    suspend fun speak(
-        line: TTSHelper.TTSLine,
-        next: TTSHelper.TTSLine?,
-        action: () -> Boolean
-    ): Int? {
-        return requireTTS({ tts ->
+    fun ttsInitialized(): Boolean {
+        return engine != null
+    }
+
+    suspend fun speak(line: TTSHelper.TTSLine, next: TTSHelper.TTSLine?, action: () -> Boolean): Int? {
+        return requireEngine({ engine ->
             val ret: Int
             val queue = TTSQueue
             ret = if (queue?.first == line) {
                 queue.second
             } else {
                 TTSQueueId++
-                tts.speak(line.speakOutMsg, TextToSpeech.QUEUE_FLUSH, null, TTSQueueId.toString())
+                engine.speak(line.speakOutMsg, TTSQueueId, false)
+                TTSQueue = line to TTSQueueId
                 TTSQueueId
-            }
-
-            if (next != null) {
-                TTSQueueId++
-                TTSQueue = next to TTSQueueId
-                tts.speak(next.speakOutMsg, TextToSpeech.QUEUE_ADD, null, TTSQueueId.toString())
             }
             ret
         }, action)
@@ -152,96 +148,48 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
     }
 
     private val mutex: Mutex = Mutex() // no duplicate tts
-    suspend fun <T> requireTTS(callback: (TextToSpeech) -> T, action: () -> Boolean): T? =
+    suspend fun <T> requireEngine(callback: suspend (TTSEngine) -> T, action: () -> Boolean): T? =
         mutex.withLock {
             coroutineScope {
-                return@coroutineScope tts?.let(callback) ?: run {
-                    var waiting = true
-                    var success = false
-                    val pendingTTS = TextToSpeech(context) { status ->
-                        success = status == TextToSpeech.SUCCESS
-                        waiting = false
-                        if (status == TextToSpeech.SUCCESS) {
-                            return@TextToSpeech
+                return@coroutineScope engine?.let { callback(it) } ?: run {
+                    val useGoogle = BaseApplication.getKey<Boolean>("TTS_USE_GOOGLE") ?: false
+                    
+                    val onStatusUpdate = { id: Int, isStarted: Boolean ->
+                        if (isStarted) {
+                            TTSStartSpeakId = maxOf(TTSStartSpeakId, id)
+                        } else {
+                            TTSEndSpeakId = maxOf(TTSEndSpeakId, id)
                         }
-                        val errorMSG = when (status) {
-                            TextToSpeech.ERROR -> "ERROR"
-                            TextToSpeech.ERROR_INVALID_REQUEST -> "ERROR_INVALID_REQUEST"
-                            TextToSpeech.ERROR_NETWORK -> "ERROR_NETWORK"
-                            TextToSpeech.ERROR_NETWORK_TIMEOUT -> "ERROR_NETWORK_TIMEOUT"
-                            TextToSpeech.ERROR_NOT_INSTALLED_YET -> "ERROR_NOT_INSTALLED_YET"
-                            TextToSpeech.ERROR_OUTPUT -> "ERROR_OUTPUT"
-                            TextToSpeech.ERROR_SYNTHESIS -> "ERROR_SYNTHESIS"
-                            TextToSpeech.ERROR_SERVICE -> "ERROR_SERVICE"
-                            else -> status.toString()
-                        }
-
-                        CommonActivity.showToast("Initialization Failed! Error $errorMSG")
-                        return@TextToSpeech
                     }
 
-                    while (waiting && isActive) {
-                        if (action()) {
-                            return@coroutineScope null
-                        }
+                    val newEngine: TTSEngine = when {
+                        useGoogle -> GoogleTTSEngine(context).apply { setStatusUpdateCallback(onStatusUpdate) }
+                        else -> NativeTTSEngine(context, onStatusUpdate)
+                    }
+                    
+                    newEngine.setSpeed(speed)
+                    newEngine.setPitch(pitch)
+
+                    var waiting = true
+                    val waitStart = System.currentTimeMillis()
+                    while (!newEngine.isInitialized() && isActive && System.currentTimeMillis() - waitStart < 5000) {
+                        if (action()) return@coroutineScope null
                         delay(100)
                     }
 
-                    if (!success) return@coroutineScope null
+                    if (!newEngine.isInitialized()) return@coroutineScope null
 
+                    newEngine.setPitch(pitch)
+                    newEngine.setSpeed(speed)
+                    
                     val voiceName = BaseApplication.getKey<String>(EPUB_VOICE)
-                    val langName = BaseApplication.getKey<String>(EPUB_LANG)
+                    newEngine.setVoice(voiceName)
 
-                    val canSetLanguage = pendingTTS.setLanguage(
-                        pendingTTS.availableLanguages.firstOrNull { it.displayName == langName }
-                            ?: Locale.US)
-                    pendingTTS.voice =
-                        pendingTTS.voices.firstOrNull { it.name == voiceName }
-                            ?: pendingTTS.defaultVoice
-
-                    if (canSetLanguage == TextToSpeech.LANG_MISSING_DATA || canSetLanguage == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        CommonActivity.showToast(R.string.tts_language_error)
-                        return@coroutineScope null
-                    }
-
-                    pendingTTS.setOnUtteranceProgressListener(object :
-                        UtteranceProgressListener() {
-                        //MIGHT BE INTERESTING https://stackoverflow.com/questions/44461533/android-o-new-texttospeech-onrangestart-callback
-                        override fun onDone(utteranceId: String) {
-                            utteranceId.toIntOrNull()?.let { id ->
-                                TTSEndSpeakId = maxOf(TTSEndSpeakId, id)
-                            }
-                        }
-
-                        @Deprecated("Deprecated")
-                        override fun onError(utteranceId: String?) {
-                            utteranceId?.toIntOrNull()?.let { id ->
-                                TTSEndSpeakId = maxOf(TTSEndSpeakId, id)
-                            }
-                        }
-
-                        override fun onError(utteranceId: String?, errorCode: Int) {
-                            utteranceId?.toIntOrNull()?.let { id ->
-                                TTSEndSpeakId = maxOf(TTSEndSpeakId, id)
-                            }
-                        }
-
-                        override fun onStart(utteranceId: String) {
-                            utteranceId.toIntOrNull()?.let { id ->
-                                TTSStartSpeakId = maxOf(TTSStartSpeakId, id)
-                            }
-                        }
-                    })
-
-                    pendingTTS.setPitch(pitch)
-                    pendingTTS.setSpeechRate(speed)
-
-                    tts = pendingTTS
-                    tts?.let(callback)
+                    engine = newEngine
+                    engine?.let { callback(it) }
                 }
             }
         }
-
 
     fun register() {
         if (isRegistered) return
@@ -253,9 +201,9 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
     }
 
     fun release() {
-        tts?.stop()
-        tts?.shutdown()
-        tts = null
+        engine?.stop()
+        engine?.release()
+        engine = null
 
         unregister()
     }
@@ -265,6 +213,7 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
         isRegistered = false
         context.unregisterReceiver(myNoisyAudioStreamReceiver)
     }
+
 
     init {
         // mediaSession = TTSHelper.initMediaSession(context, event)

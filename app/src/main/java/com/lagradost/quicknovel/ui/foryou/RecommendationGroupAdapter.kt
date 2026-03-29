@@ -9,23 +9,29 @@ import com.lagradost.quicknovel.databinding.ItemRecommendationGroupBinding
 import com.lagradost.quicknovel.ui.foryou.recommendation.Recommendation
 import com.lagradost.quicknovel.ui.foryou.recommendation.RecommendationGroup
 
-class RecommendationGroupAdapter(private val onBookClick: (Recommendation) -> Unit) :
-    ListAdapter<RecommendationGroup, RecommendationGroupAdapter.ViewHolder>(DiffCallback) {
+class RecommendationGroupAdapter(
+    private val viewPool: RecyclerView.RecycledViewPool = RecyclerView.RecycledViewPool(),
+    private val onBookClick: (Recommendation, android.widget.ImageView) -> Unit
+) : ListAdapter<RecommendationGroup, RecommendationGroupAdapter.ViewHolder>(DiffCallback) {
 
     inner class ViewHolder(val binding: ItemRecommendationGroupBinding) :
         RecyclerView.ViewHolder(binding.root) {
         
-        fun bind(group: RecommendationGroup) {
-            binding.groupTitle.text = group.title
-            val bookAdapter = RecommendationBookAdapter(onBookClick)
+        private val bookAdapter = RecommendationBookAdapter(onBookClick)
+        
+        init {
             binding.groupRecycler.apply {
+                setHasFixedSize(true)
                 adapter = bookAdapter
-                layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+                setRecycledViewPool(viewPool)
+                layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false).apply {
+                    initialPrefetchItemCount = 5
+                }
                 
+                // Optimized Touch Listener
                 addOnItemTouchListener(object : RecyclerView.OnItemTouchListener {
                     override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
                         if (e.action == MotionEvent.ACTION_DOWN) {
-                            // Tell parents (including ViewPager2) NOT to intercept touches while interacting with carousel
                             rv.parent.requestDisallowInterceptTouchEvent(true)
                         }
                         return false
@@ -34,19 +40,23 @@ class RecommendationGroupAdapter(private val onBookClick: (Recommendation) -> Un
                     override fun onRequestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {}
                 })
                 
-                // Haptic feedback for "tick" on scroll
+                // Optimized Scroll Listener
                 addOnScrollListener(object : RecyclerView.OnScrollListener() {
                     private var lastPosition = -1
                     override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                        val layoutManager = recyclerView.layoutManager as LinearLayoutManager
-                        val firstVisible = layoutManager.findFirstVisibleItemPosition()
-                        if (firstVisible != lastPosition) {
+                        val lm = recyclerView.layoutManager as LinearLayoutManager
+                        val firstVisible = lm.findFirstVisibleItemPosition()
+                        if (firstVisible != lastPosition && firstVisible != -1) {
                             lastPosition = firstVisible
                             recyclerView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                         }
                     }
                 })
             }
+        }
+
+        fun bind(group: RecommendationGroup) {
+            binding.groupTitle.text = group.title
             bookAdapter.submitList(group.recommendations)
         }
     }

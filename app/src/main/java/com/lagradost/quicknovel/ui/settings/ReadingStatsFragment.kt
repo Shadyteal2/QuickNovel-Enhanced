@@ -14,6 +14,9 @@ import com.lagradost.quicknovel.DataStore.getKey
 import com.lagradost.quicknovel.DataStore.setKey
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.databinding.FragmentReadingStatsBinding
+import com.lagradost.quicknovel.databinding.ItemAchievementBinding
+import com.lagradost.quicknovel.util.UsageStatsManager
+import androidx.core.view.isVisible
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 
 class ReadingStatsFragment : Fragment() {
@@ -38,6 +41,10 @@ class ReadingStatsFragment : Fragment() {
         binding.statsToolbar.setNavigationOnClickListener {
             activity?.onBackPressed()
         }
+        com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(
+            binding.statsToolbar,
+            binding.statsScrollview
+        )
 
         // Setup Toolbar Menu for Share
         binding.statsToolbar.inflateMenu(R.menu.stats_menu)
@@ -101,8 +108,9 @@ class ReadingStatsFragment : Fragment() {
         binding.tvPillHours.text = "🕒 ${totalHours}h"
 
         // Streak Card
+        val bestStreak = context.getKey<Int>("BEST_STREAK", 0) ?: 0
         binding.tvStreakHeader.text = "$currentStreak day streak"
-        binding.tvBestStreak.text = "Best: $currentStreak days"
+        binding.tvBestStreak.text = "Best: $bestStreak days"
 
         // 3. Goals Logic from DataStore
         val dailyGoal = context.getKey<Int>("DAILY_GOAL_MIN", 30) ?: 30
@@ -120,6 +128,7 @@ class ReadingStatsFragment : Fragment() {
         binding.tvTimeMonth.text = "${totalMinutes}m"
 
         setupBarChart(totalMinutes)
+        setupAchievements()
     }
 
     private fun showSetGoalDialog(type: String) {
@@ -144,6 +153,96 @@ class ReadingStatsFragment : Fragment() {
         }
         builder.setNegativeButton("Cancel", null)
         builder.show()
+    }
+
+    data class Achievement(
+        val title: String,
+        val desc: String,
+        val icon: Int,
+        val currentProgress: Int,
+        val maxProgress: Int,
+        val isUnlocked: Boolean = false, // Handled logic during creation
+        val level: String? = null
+    )
+
+    private fun setupAchievements() {
+        val context = context ?: return
+        binding.layoutAchievements.removeAllViews()
+
+        val streak = context.getKey<Int>("CURRENT_STREAK", 0) ?: 0
+        val bestStreak = context.getKey<Int>("BEST_STREAK", 0) ?: 0
+        val chapters = context.getKey<Int>("TOTAL_CHAPTERS_READ", 0) ?: 0
+        val customizations = context.getKey<Int>("CUSTOMIZATION_COUNT", 0) ?: 0
+
+        // Helper to find the next tier for a given value
+        fun getTier(valIn: Int, tiers: List<Int>): Pair<Int, Int> {
+            val nextTierIndex = tiers.indexOfFirst { valIn < it }
+            return if (nextTierIndex == -1) {
+                tiers.last() to tiers.last() // All completed
+            } else {
+                tiers[nextTierIndex] to nextTierIndex // Next tier and its level
+            }
+        }
+
+        val streakTiers = listOf(3, 7, 30, 100, 365)
+        val chapterTiers = listOf(10, 50, 100, 500, 1000, 5000)
+        val customTiers = listOf(5, 15, 50, 100)
+
+        val (nextStreak, streakLvl) = getTier(streak, streakTiers)
+        val (nextChapter, chapterLvl) = getTier(chapters, chapterTiers)
+        val (nextCustom, customLvl) = getTier(customizations, customTiers)
+
+        val achievements = mutableListOf<Achievement>()
+        
+        // Streak Achievement
+        achievements.add(Achievement(
+            title = if (streakLvl > 0) "Habit Former ${"I".repeat(streakLvl + 1)}" else "Early Bird",
+            desc = "Maintain a $nextStreak-day streak",
+            icon = R.drawable.ic_baseline_autorenew_24,
+            currentProgress = streak,
+            maxProgress = nextStreak
+        ))
+
+        // Volume Achievement
+        achievements.add(Achievement(
+            title = "Page Turner ${"I".repeat(chapterLvl + 1)}",
+            desc = "Read $nextChapter chapters",
+            icon = R.drawable.ic_baseline_menu_book_24,
+            currentProgress = chapters,
+            maxProgress = nextChapter
+        ))
+
+        // Customizer Achievement
+        achievements.add(Achievement(
+            title = "Customizer ${"I".repeat(customLvl + 1)}",
+            desc = "Personalize fonts/themes $nextCustom times",
+            icon = R.drawable.ic_baseline_color_lens_24,
+            currentProgress = customizations,
+            maxProgress = nextCustom
+        ))
+
+        for (ach in achievements) {
+            val itemBinding = ItemAchievementBinding.inflate(layoutInflater, binding.layoutAchievements, false)
+            itemBinding.achievementTitle.text = ach.title
+            itemBinding.achievementDesc.text = ach.desc
+            itemBinding.achievementIcon.setImageResource(ach.icon)
+            
+            val isCompleted = ach.currentProgress >= ach.maxProgress
+            val progress = (ach.currentProgress.toFloat() / ach.maxProgress.toFloat() * 100f).toInt().coerceIn(0, 100)
+            itemBinding.achievementProgress.progress = if (isCompleted && ach.maxProgress != 0) 100 else progress
+            
+            if (isCompleted) {
+                itemBinding.achievementIcon.imageTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.colorPrimary, null))
+                itemBinding.achievementLocked.setImageResource(R.drawable.ic_baseline_check_24)
+                itemBinding.achievementLocked.isVisible = true
+                itemBinding.achievementLocked.imageTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.colorPrimary, null))
+            } else {
+                itemBinding.achievementIcon.imageTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.grayTextColor, null))
+                itemBinding.achievementLocked.isVisible = false
+            }
+
+            binding.layoutAchievements.addView(itemBinding.root)
+        }
     }
 
     private fun shareStatistics() {

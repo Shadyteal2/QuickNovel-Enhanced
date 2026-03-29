@@ -18,6 +18,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -185,19 +186,36 @@ class DownloadFragment : Fragment() {
     @SuppressLint("NotifyDataSetChanged")
     private fun setupGridView() {
         val adapter = (binding.viewpager.adapter as? ViewpagerAdapter) ?: return
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context ?: return)
+        val usePinterest = prefs.getBoolean("library_pinterest_bento", false)
+
         for ((_, ref) in adapter.collectionsOfRecyclerView) {
             val rv = ref.get() ?: continue
             val compactView = rv.context.getDownloadIsCompact()
 
-            val spanCountLandscape = if (compactView) 2 else 6
-            val spanCountPortrait = if (compactView) 1 else 3
-            val orientation = rv.resources.configuration.orientation
-            rv.spanCount = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                spanCountLandscape
+            if (usePinterest && !compactView) {
+                // Pinterest True Masonry: 2 columns, gapless vertical filling
+                rv.layoutManager = StaggeredGridLayoutManager(
+                    2, StaggeredGridLayoutManager.VERTICAL
+                ).apply {
+                    gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
+                }
             } else {
-                spanCountPortrait
-            }
+                // Standard Grid: Clean blocks
+                val spanCountLandscape = if (compactView) 2 else 6
+                val spanCountPortrait = if (compactView) 1 else 3
+                val orientation = rv.resources.configuration.orientation
+                val totalSpan = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                    spanCountLandscape
+                } else {
+                    spanCountPortrait
+                }
 
+                rv.layoutManager = androidx.recyclerview.widget.GridLayoutManager(rv.context, totalSpan)
+            }
+            if (rv.layoutAnimation == null) {
+                rv.layoutAnimation = android.view.animation.AnimationUtils.loadLayoutAnimation(rv.context, R.anim.grid_layout_animation)
+            }
             (rv.adapter as? AnyAdapter)?.notifyDataSetChanged()
         }
     }
@@ -280,13 +298,13 @@ class DownloadFragment : Fragment() {
         })
 
         binding.updatesButton.setOnClickListener {
-            it.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             val navHostFragment = activity?.supportFragmentManager?.findFragmentById(R.id.nav_host_fragment) as? androidx.navigation.fragment.NavHostFragment
             navHostFragment?.navController?.navigate(R.id.navigation_updates)
         }
 
         binding.editCategories.setOnClickListener {
-            it.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             showCategoriesManager()
         }
 
@@ -331,7 +349,7 @@ class DownloadFragment : Fragment() {
                  frame.addView(dot)
                  frame.setOnClickListener {
                      binding.viewpager.currentItem = i
-                     it.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                     it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                  }
                  dotsHolder.addView(frame)
             }
@@ -376,7 +394,7 @@ class DownloadFragment : Fragment() {
                         val index = (newX / stepSize).coerceIn(0f, totalCats.toFloat()).toInt()
                         if (index != currentSelectedIndex) {
                             currentSelectedIndex = index
-                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                            view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                             binding.viewpager.setCurrentItem(index, true) 
                             
                             for (i in 0 until dotsHolder.childCount) {
@@ -430,7 +448,7 @@ class DownloadFragment : Fragment() {
             override fun onPageSelected(position: Int) {
                 val navStyle = context?.getLibraryNavStyle() ?: "0"
                 if (navStyle == "1") {
-                    view?.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    view?.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 }
 
                 if (isDragging) return
@@ -543,10 +561,10 @@ class DownloadFragment : Fragment() {
                 
                 if (direction == 1) { // Swipe Left -> Next Tab (Search)
                     (activity as? com.lagradost.quicknovel.ui.TabNavigator)?.moveToTab(1)
-                    binding.tabGestureZone.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK)
+                    binding.tabGestureZone.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                     return true
                 } else if (direction == -1) { // Swipe Right -> Previous (Overscroll on Library)
-                    binding.tabGestureZone.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    binding.tabGestureZone.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                     return true
                 }
                 return false

@@ -73,6 +73,7 @@ class PluginSyncWorker(
 
             com.lagradost.quicknovel.util.Apis.setSyncing(false)
             showToast("Sync Complete: $count providers loaded")
+            com.lagradost.quicknovel.BaseApplication.setKey("PLUGINS_INITIAL_SYNC_DONE", true)
             Result.success()
         } catch (e: Exception) {
             com.lagradost.quicknovel.util.Apis.setSyncing(false)

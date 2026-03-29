@@ -182,6 +182,10 @@ class SearchFragment : Fragment() {
         }
 
         activity?.fixPaddingStatusbar(binding.searchToolbar)
+        
+        com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(binding.searchToolbar, binding.searchAllRecycler)
+        com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(binding.searchToolbar, binding.homeBrowselist)
+        com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(binding.searchToolbar, binding.searchMasterRecycler)
 
         fixGrid()
         binding.searchLoadingBar.alpha = 0f

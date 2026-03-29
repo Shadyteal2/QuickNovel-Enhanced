@@ -83,12 +83,16 @@ import io.noties.markwon.image.AsyncDrawableSpan
 import io.noties.markwon.image.ImageSizeResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import me.ag2s.epublib.domain.EpubBook
@@ -137,14 +141,18 @@ class PreferenceDelegate<T : Any>(
 }
 
 class PreferenceDelegateLiveView<T : Any>(
-    val key: String, val default: T, klass: KClass<T>, private val _liveData: MutableLiveData<T>
+    val key: String,
+    val default: T,
+    private val klassK: KClass<T>,
+    private val _liveData: MutableLiveData<T>,
+    private val onChanged: ((T) -> Unit)? = null
 ) {
     // simple cache to make it not get the key every time it is accessed, however this requires
     // that ONLY this changes the key
     private var cache: T
 
     init {
-        cache = getKeyClass(key, klass.java) ?: default
+        cache = getKeyClass(key, klassK.java) ?: default
         _liveData.postValue(cache)
     }
 
@@ -938,32 +946,27 @@ class ReadActivityViewModel : ViewModel() {
             val separator = "\n\n" // Use double line breaks to separate paragraphs within the batch
             if (currentSettings.useOnlineTranslation) {
                 // --- Online mode ---
-                val batchSize = 5
-                for (i in 0 until spans.size step batchSize) {
+                val out = arrayListOf<TextSpan>()
+                for (i in 0 until spans.size) {
+                    currentCoroutineContext().ensureActive()
+                    if (mlSettings.isInvalid()) break
+
                     loading.invoke(Triple(spans[i].index, i, spans.size))
-                    val batch = spans.subList(i, minOf(i + batchSize, spans.size))
-                    val combinedText = batch.joinToString(separator) { it.text.toString() }
-                    val translatedBatch = onlineTranslate(combinedText, currentSettings.from,currentSettings.to)
-                    val translatedParagraphs = translatedBatch.split(separator)
-
-                    for (j in batch.indices) {
-                        val finalText =
-                            translatedParagraphs.getOrNull(j) ?: batch[j].text.toString()
-
-                        val start = builder.length
-                        builder.append(finalText)
-                        val end = builder.length
-                        builder.append('\n')
-                        out.add(
-                            TextSpan(
-                                finalText.toSpanned(),
-                                start,
-                                end,
-                                batch[j].index,
-                                batch[j].innerIndex
-                            )
+                    val translatedParagraph = onlineTranslate(spans[i].text.toString(), currentSettings.from, currentSettings.to)
+                    
+                    val start = builder.length
+                    builder.append(translatedParagraph)
+                    val end = builder.length
+                    builder.append('\n')
+                    out.add(
+                        TextSpan(
+                            translatedParagraph.toSpanned(),
+                            start,
+                            end,
+                            spans[i].index,
+                            spans[i].innerIndex
                         )
-                    }
+                    )
                 }
             } else {
                 val translator = mlTranslator
@@ -971,7 +974,11 @@ class ReadActivityViewModel : ViewModel() {
                     return text to spans
                 }
                 // --- Offline mode ---
-                for (i in spans.indices) {
+                for (i in 0 until spans.size) {
+                    currentCoroutineContext().ensureActive()
+                    val currentSettings = mlSettings
+                    if (currentSettings.isInvalid()) break
+
                     loading.invoke(Triple(spans[i].index, i, spans.size))
                     val originalText = spans[i].text.toString()
 
@@ -1038,12 +1045,14 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun applyMLSettings(allowDownload: Boolean) = ioSafe {
+        currentCoroutineContext().ensureActive()
         val settings = MLSettings(from = mlFromLanguage, to = mlToLanguage, mlUseOnlineTransaltion)
-        if (settings.isValid() && allowDownload && safeAsync { requireMLDownload() } == true) {
-            _loadingStatus.postValue(Resource.Loading("Downloading language"))
+        if (settings.isValid() && allowDownload && (safeAsync { requireMLDownload() } == true)) {
+            _loadingStatus.postValue(Resource.Loading(context?.getString(R.string.download_ml)))
         }
         initMLFromSettings(settings, allowDownload)
         reloadMLForAllChapters()
+        updateReadArea(seekToDesired = false)
     }
 
     private suspend fun reloadMLForAllChapters() {
@@ -1064,6 +1073,7 @@ class ReadActivityViewModel : ViewModel() {
 
             // update the rem cache
             for (entry in chapterData.entries) {
+                currentCoroutineContext().ensureActive()
                 val value = entry.value
                 if (value !is Resource.Success) continue
                 val success = value.value
@@ -1073,6 +1083,7 @@ class ReadActivityViewModel : ViewModel() {
                         success.originalRendered,
                         success.originalSpans
                     ) { (progressChapter, progressInnerIndex, progressInnerTotal) ->
+                        // we cannot easily ensureActive here as it is a lambda
                         _loadingStatus.postValue(
                             Resource.Loading(
                                 "${context?.getString(R.string.translating)} ${
@@ -1324,9 +1335,6 @@ class ReadActivityViewModel : ViewModel() {
         ttsSession.setLanguage(locale)
     }
 
-    fun setTTSVoice(voice: Voice?) {
-        ttsSession.setVoice(voice)
-    }
 
     fun pauseTTS() {
         if (!ttsSession.ttsInitialized()) return
@@ -1386,55 +1394,46 @@ class ReadActivityViewModel : ViewModel() {
                 ttsSession.setSpeed(ttsSpeed)
                 ttsSession.setPitch(ttsPitch)
 
-                var ttsInnerIndex = 0 // this inner index is different from what is set
+                var ttsInnerIndex = 0
                 var index = dIndex.index
 
-                let {
-                    val startChar = dIndex.char
+                val startLines = chapterMutex.withLock {
+                    chapterData[index].letInner { it.ttsLines }
+                } ?: run {
+                    index++
+                    return@coroutineScope
+                }
 
-                    val lines = chapterMutex.withLock {
-                        chapterData[index].letInner {
-                            it.ttsLines
-                        }
-                    } ?: run {
-                        // in case of error just go to the next chapter
-                        index++
-                        return@let
-                    }
-
-                    val idx = lines.indexOfFirst { it.startChar >= startChar }
-                    if (idx != -1) {
-                        ttsInnerIndex = idx
-                    } else {
-                        // In case we are at the very last thing, then goto the next chapter
-                        index++
-                    }
+                val idx = startLines.indexOfFirst { it.startChar >= dIndex.char }
+                if (idx != -1) {
+                    ttsInnerIndex = idx
+                } else {
+                    index++
                 }
 
                 loadIndividualChapter(index)
                 while (isActive && currentTTSStatus != TTSHelper.TTSStatus.IsStopped) {
-                    val lines =
-                        when (val currentData = chapterMutex.withLock { chapterData[index]}) {
-                            null -> {
-                                showToast(R.string.got_null_data)
-                                break
-                            }
-
-                            is Resource.Failure -> {
-                                showToast(currentData.errorString)
-                                break
-                            }
-
-                            is Resource.Loading -> {
-                                if (currentTTSStatus == TTSHelper.TTSStatus.IsStopped) break
-                                delay(100)
-                                continue
-                            }
-
-                            is Resource.Success -> {
-                                currentData.value.ttsLines
-                            }
+                    var lines = when (val currentData = chapterMutex.withLock { chapterData[index] }) {
+                        null -> {
+                            showToast(R.string.got_null_data)
+                            break
                         }
+
+                        is Resource.Failure -> {
+                            showToast(currentData.errorString)
+                            break
+                        }
+
+                        is Resource.Loading -> {
+                            if (currentTTSStatus == TTSHelper.TTSStatus.IsStopped) break
+                            delay(100)
+                            continue
+                        }
+
+                        is Resource.Success -> {
+                            currentData.value.ttsLines
+                        }
+                    }
 
                     fun notify() {
                         TTSNotifications.notify(
@@ -1447,8 +1446,6 @@ class ReadActivityViewModel : ViewModel() {
                     }
                     notify()
 
-                    // this is because if you go back one line you will be on the previous chapter with
-                    // a negative innerIndex, this makes the wrapping good
                     if (ttsInnerIndex < 0) {
                         ttsInnerIndex += lines.size
                     }
@@ -1461,11 +1458,22 @@ class ReadActivityViewModel : ViewModel() {
                         if (!exists)
                             loadIndividualChapter(index + 1)
                     }
+
                     // speak all lines
                     while (ttsInnerIndex < lines.size && ttsInnerIndex >= 0) {
                         ensureActive()
 
-                        // auto stop
+                        // --- SYNC FIX: Re-validate chapter data for translation updates ---
+                        val currentChapterData = chapterMutex.withLock { chapterData[index] }
+                        if (currentChapterData is Resource.Success && currentChapterData.value.ttsLines !== lines) {
+                            val oldLine = lines.getOrNull(ttsInnerIndex)
+                            lines = currentChapterData.value.ttsLines
+                            if (oldLine != null) {
+                                val newIdx = lines.indexOfFirst { it.startChar >= oldLine.startChar }
+                                ttsInnerIndex = if (newIdx != -1) newIdx else ttsInnerIndex
+                            }
+                        }
+
                         val currentTimeRemaining = ttsEndTime - System.currentTimeMillis()
                         if (ttsHasTimer) {
                             if (currentTimeRemaining < 0) {
@@ -1480,17 +1488,6 @@ class ReadActivityViewModel : ViewModel() {
                         val line = lines[ttsInnerIndex]
                         val nextLine = lines.getOrNull(ttsInnerIndex + 1)
 
-                        // set keys
-                        /*setKey(
-                            EPUB_CURRENT_POSITION_SCROLL_CHAR,
-                            book.title(),
-                            line.startChar
-                        )
-                        setKey(EPUB_CURRENT_POSITION, book.title(), line.index)*/
-
-                        // if we are outside the app, then we post new desired location
-                        // as otherwise the scroll overrides it
-                        // this is done to scroll to latest when we go back to the app
                         if (!isInApp) {
                             innerCharToIndex(index, line.startChar)?.let {
                                 changeIndex(
@@ -1502,7 +1499,6 @@ class ReadActivityViewModel : ViewModel() {
                                 )
                             }
                         }
-
 
                         // post visual
                         _ttsLine.postValue(line)
@@ -1532,10 +1528,8 @@ class ReadActivityViewModel : ViewModel() {
                             delay(100)
                         }
 
-                        // do not count in tts sleep
                         ttsEndTime += 100L * isPauseDuration
 
-                        // if we pause then we resume on the same line
                         if (isPauseDuration > 0) {
                             notify()
                             pendingTTSSkip = 0
@@ -1549,12 +1543,10 @@ class ReadActivityViewModel : ViewModel() {
                             ttsInnerIndex += 1
                         }
                     }
+
                     if (currentTTSStatus == TTSHelper.TTSStatus.IsStopped) break
 
-                    // this may case a bug where you cant seek back if the entire chapter is none
-                    // but this is better than restarting the chapter
                     if (ttsInnerIndex > 0 || lines.isEmpty()) {
-                        // goto next chapter and set inner to 0
                         index++
                         ttsInnerIndex = 0
                     } else if (index > 0) {
@@ -1565,7 +1557,6 @@ class ReadActivityViewModel : ViewModel() {
                 }
             }
         } catch (_: TimeoutCancellationException) {
-
         } catch (t: Throwable) {
             logError(t)
         } finally {
@@ -1781,6 +1772,23 @@ class ReadActivityViewModel : ViewModel() {
             ttsPitchKey = value
         }
 
+    fun setTTSVoice(name: String?) {
+        setKey(EPUB_VOICE, name)
+        ttsSession.setVoice(name)
+        ttsSession.interruptTTS()
+    }
+
+    private val _ttsUseGoogleLive = MutableLiveData<Boolean>()
+    val ttsUseGoogleLive: LiveData<Boolean> get() = _ttsUseGoogleLive
+    var ttsUseGoogle: Boolean
+        get() = _ttsUseGoogleLive.value ?: false
+        set(value) {
+            _ttsUseGoogleLive.postValue(value)
+            setKey("TTS_USE_GOOGLE", value)
+            ttsSession.releaseEngine()
+            ttsSession.interruptTTS()
+        }
+
 
     val textFontLive: MutableLiveData<String> = MutableLiveData(null)
     var textFont by PreferenceDelegateLiveView(EPUB_FONT, "", String::class, textFontLive)
@@ -1885,12 +1893,16 @@ class ReadActivityViewModel : ViewModel() {
     )
 
     val mlUseOnlineTransaltionLive: MutableLiveData<Boolean> = MutableLiveData(false)
-    var mlUseOnlineTransaltion by PreferenceDelegateLiveView(
+    var mlUseOnlineTransaltion: Boolean by PreferenceDelegateLiveView(
         EPUB_ML_USEONLINETRANSLATION,
         false,
         Boolean::class,
         mlUseOnlineTransaltionLive
-    )
+    ) {
+        if (it != null) {
+            applyMLSettings(false)
+        }
+    }
 
     /*
    // Moved up to ensure correct initialization order. Having it lower caused a race condition  // where the default 'false' value was loaded before the actual saved preference.

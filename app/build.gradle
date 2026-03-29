@@ -21,6 +21,10 @@ android {
         versionCode 58
         versionName "2.0.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
 
     buildTypes {
@@ -54,7 +58,7 @@ android {
 }
 
 dependencies {
-    implementation fileTree(dir: "libs", include: ["*.jar"])
+    implementation fileTree(dir: "libs", include: ["*.jar", "*.aar"])
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
@@ -77,7 +81,7 @@ dependencies {
     implementation 'io.reactivex.rxjava2:rxjava:2.2.21'
     implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
 
-    implementation("com.google.android.material:material:1.12.0")
+    implementation "com.google.android.material:material:1.12.0"
 
     implementation 'androidx.media:media:1.7.0'
     implementation 'com.github.LagradOst:SafeFile:a926e7615a'
@@ -97,4 +101,6 @@ dependencies {
     implementation "androidx.room:room-runtime:$room_version"
     kapt "androidx.room:room-compiler:$room_version"
     implementation "androidx.room:room-ktx:$room_version"
+    implementation 'com.google.android.flexbox:flexbox:3.0.0'
+    implementation "androidx.dynamicanimation:dynamicanimation:1.0.0"
 }

@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import com.lagradost.quicknovel.BaseApplication.Companion.getKey
+import com.lagradost.quicknovel.MainActivity.Companion.loadResult
 import com.lagradost.quicknovel.BookDownloader2.preloadPartialImportedPdf
 import com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE_PDF
 import com.lagradost.quicknovel.DOWNLOAD_EPUB_SIZE
@@ -28,7 +29,11 @@ import com.lagradost.quicknovel.util.SettingsHelper.getDownloadIsCompact
 import com.lagradost.quicknovel.util.UIHelper.hideKeyboard
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.widget.AutofitRecyclerView
+import com.lagradost.quicknovel.util.KineticTiltHelper
 import kotlin.math.roundToInt
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
+import androidx.preference.PreferenceManager
 
 class AnyAdapter(
     private val resView: AutofitRecyclerView,
@@ -58,6 +63,33 @@ class AnyAdapter(
 
         const val RESULT_CACHED: Int = 1
         const val DOWNLOAD_DATA_LOADED: Int = 2
+    }
+
+    private fun getCorrectHeight(position: Int): Int {
+        val manager = resView.layoutManager
+        val baseWidth = resView.itemWidth
+        
+        return when (manager) {
+            is StaggeredGridLayoutManager -> {
+                // Pinterest True Masonry Style: 
+                // Deterministic variance based on position to create the "Staggered" look without gaps.
+                // We oscillate the aspect ratio slightly around the 2:3 (0.68) standard.
+                val variance = when (position % 5) {
+                    0 -> 0.64f // standard-tall
+                    1 -> 0.72f // standard-short
+                    2 -> 0.68f // standard
+                    3 -> 0.61f // tall
+                    else -> 0.75f // short
+                }
+                (baseWidth / variance).roundToInt()
+            }
+            is GridLayoutManager -> {
+                val spanSize = manager.spanSizeLookup.getSpanSize(position)
+                val actualWidth = baseWidth * spanSize
+                (actualWidth / 0.68).roundToInt()
+            }
+            else -> (baseWidth / 0.68).roundToInt()
+        }
     }
 
     override fun getItemId(position: Int): Long {
@@ -122,10 +154,9 @@ class AnyAdapter(
                         downloadViewModel.importEpub()
                     }
                     if (!compact) {
-                        val coverHeight: Int = (resView.itemWidth / 0.68).roundToInt()
                         layoutParams = LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
-                            coverHeight
+                            getCorrectHeight(itemCount - 1)
                         )
                     } else {
                         layoutParams = LinearLayout.LayoutParams(
@@ -199,16 +230,16 @@ class AnyAdapter(
                     historyPlay.setOnClickListener {
                         downloadViewModel.stream(card)
                     }
-                    backgroundCard.setOnClickListener { view ->
-                        view.postDelayed({
+                    backgroundCard.setOnClickListener { v ->
+                        v.postDelayed({
                             downloadViewModel.load(card)
                         }, 50)
                     }
                     historyDelete.setOnClickListener {
                         downloadViewModel.deleteAlert(card)
                     }
-                    backgroundCard.setOnLongClickListener { view ->
-                        hideKeyboard(view)
+                    backgroundCard.setOnLongClickListener { v ->
+                        hideKeyboard(v)
                         downloadViewModel.showMetadata(card)
                         return@setOnLongClickListener true
                     }
@@ -220,10 +251,9 @@ class AnyAdapter(
                     is DownloadFragment.DownloadDataLoaded -> {
                         view.apply {
                             backgroundCard.apply {
-                                val coverHeight: Int = (resView.itemWidth / 0.68).roundToInt()
                                 layoutParams = LinearLayout.LayoutParams(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
-                                    coverHeight
+                                    getCorrectHeight(position)
                                 )
                                 setOnClickListener {
                                     if (item.apiName == IMPORT_SOURCE_PDF && item.downloadedCount < item.downloadedTotal) {
@@ -234,12 +264,15 @@ class AnyAdapter(
                                     }
                                     downloadViewModel.readEpub(item)
                                 }
-                                setOnLongClickListener { view ->
-                                    hideKeyboard(view)
+                                setOnLongClickListener { v ->
+                                    hideKeyboard(v)
                                     downloadViewModel.showMetadata(item)
                                     return@setOnLongClickListener true
                                 }
                             }
+                            
+                            // High Quality Physical Feedback
+                            KineticTiltHelper.applyKineticTilt(backgroundCard)
 
                             downloadProgressbarIndeterment.isVisible = item.generating
                             val showDownloadLoading = item.state == DownloadState.IsPending
@@ -266,22 +299,33 @@ class AnyAdapter(
                     is ResultCached -> {
                         view.apply {
                             backgroundCard.apply {
-                                val coverHeight: Int = (resView.itemWidth / 0.68).roundToInt()
                                 layoutParams = LinearLayout.LayoutParams(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
-                                    coverHeight
+                                    getCorrectHeight(position)
                                 )
-                                setOnClickListener { view ->
-                                    view.postDelayed({
-                                        downloadViewModel.load(item)
+                                setOnClickListener { v ->
+                                    v.postDelayed({
+                                        val transitionUrl = item.source
+                                        imageView.transitionName = transitionUrl
+                                        val extras = androidx.navigation.fragment.FragmentNavigatorExtras(imageView to transitionUrl)
+                                        val act = com.lagradost.quicknovel.CommonActivity.activity
+                                        if (act is androidx.fragment.app.FragmentActivity) {
+                                            act.loadResult(transitionUrl, item.apiName, 0, null, extras)
+                                        } else {
+                                            downloadViewModel.load(item)
+                                        }
                                     }, 50)
                                 }
-                                setOnLongClickListener { view ->
-                                    hideKeyboard(view)
+                                setOnLongClickListener { v ->
+                                    hideKeyboard(v)
                                     downloadViewModel.showMetadata(item)
                                     return@setOnLongClickListener true
                                 }
                             }
+                            
+                            // High Quality Physical Feedback
+                            KineticTiltHelper.applyKineticTilt(backgroundCard)
+                            
                             imageView.setImage(
                                 item.image,
                             ) // skipCache = false
@@ -312,8 +356,8 @@ class AnyAdapter(
                                 preloadPartialImportedPdf(card, context)
                             downloadViewModel.readEpub(card)
                         }
-                        setOnLongClickListener { view ->
-                            hideKeyboard(view)
+                        setOnLongClickListener { v ->
+                            hideKeyboard(v)
                             downloadViewModel.showMetadata(card)
                             return@setOnLongClickListener true
                         }
@@ -323,8 +367,8 @@ class AnyAdapter(
                             if (!item.isImported)
                                 downloadViewModel.load(card)
                         }
-                        setOnLongClickListener { view ->
-                            hideKeyboard(view)
+                        setOnLongClickListener { v ->
+                            hideKeyboard(v)
                             downloadViewModel.showMetadata(card)
                             return@setOnLongClickListener true
                         }

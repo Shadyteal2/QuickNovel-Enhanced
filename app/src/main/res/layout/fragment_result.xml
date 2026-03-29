@@ -46,20 +46,21 @@
     </LinearLayout>
 
     <!-- Full page backdrop -->
+    <!-- Full page ambient glass backdrop -->
     <FrameLayout
         android:id="@+id/result_backdrop_holder"
         android:layout_width="match_parent"
-        android:layout_height="400dp">
+        android:layout_height="match_parent">
         <ImageView
             android:id="@+id/result_poster_blur"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:alpha="0.4"
+            android:alpha="0.5"
             android:scaleType="centerCrop" />
         <View
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@drawable/cinematic_overlay" />
+            android:background="@drawable/dynamic_glass_gradient" />
     </FrameLayout>
 
     <!-- Scrollable container FLAT -->

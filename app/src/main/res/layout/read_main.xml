@@ -7,7 +7,30 @@
         android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
         android:paddingTop="0dp"
         android:id="@+id/reader_container"
-        android:background="@color/readerBackground">
+        android:background="@android:color/transparent">
+
+    <ImageView
+        android:id="@+id/reader_background_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/reader_background_dim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:alpha="0"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/reader_background_light_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"
+        android:alpha="0"
+        android:visibility="gone" />
 
     <FrameLayout
             tools:visibility="visible"
@@ -485,12 +508,16 @@
 
 
         <com.google.android.material.appbar.AppBarLayout
-                tools:visibility="visible"
-                android:minHeight="?attr/actionBarSize"
-                android:layout_width="match_parent"
                 android:id="@+id/read_toolbar_holder"
-                android:background="?attr/primaryGrayBackground"
-                android:layout_height="wrap_content">
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/spatial_glass_card"
+                android:elevation="10dp"
+                android:outlineProvider="background"
+                app:elevation="0dp"
+                tools:visibility="visible">
 
             <com.google.android.material.appbar.MaterialToolbar
                     android:id="@+id/read_toolbar"
