@@ -58,6 +58,9 @@ import java.lang.System.currentTimeMillis
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.lagradost.quicknovel.util.TranslationEngineType
+import androidx.preference.ListPreference
+import androidx.preference.EditTextPreference
 
 class SettingsFragment : PreferenceFragmentCompat() {
     private fun PreferenceFragmentCompat?.getPref(id: Int): Preference? {

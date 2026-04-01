@@ -244,6 +244,8 @@
                 app:layout="@layout/setting_tile" />
     </PreferenceCategory>
 
+
+
     <PreferenceCategory
             android:key="extra"
             android:title="@string/info"

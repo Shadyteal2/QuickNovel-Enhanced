@@ -48,6 +48,7 @@ import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 import com.lagradost.quicknovel.util.toPx
+import com.lagradost.quicknovel.util.KineticTiltHelper
 import kotlinx.coroutines.launch
 import android.content.SharedPreferences
 import androidx.preference.PreferenceManager
@@ -193,9 +194,9 @@ class DownloadFragment : Fragment() {
             val rv = ref.get() ?: continue
             val compactView = rv.context.getDownloadIsCompact()
 
-            if (usePinterest && !compactView) {
+            rv.layoutManager = if (usePinterest && !compactView) {
                 // Pinterest True Masonry: 2 columns, gapless vertical filling
-                rv.layoutManager = StaggeredGridLayoutManager(
+                StaggeredGridLayoutManager(
                     2, StaggeredGridLayoutManager.VERTICAL
                 ).apply {
                     gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
@@ -210,11 +211,25 @@ class DownloadFragment : Fragment() {
                 } else {
                     spanCountPortrait
                 }
-
-                rv.layoutManager = androidx.recyclerview.widget.GridLayoutManager(rv.context, totalSpan)
+                androidx.recyclerview.widget.GridLayoutManager(rv.context, totalSpan)
             }
-            if (rv.layoutAnimation == null) {
-                rv.layoutAnimation = android.view.animation.AnimationUtils.loadLayoutAnimation(rv.context, R.anim.grid_layout_animation)
+
+            // QN-Enhanced: Peak Performance Tuning
+            rv.apply {
+                if (layoutAnimation == null) {
+                    layoutAnimation = android.view.animation.AnimationUtils.loadLayoutAnimation(context, R.anim.grid_layout_animation)
+                }
+                
+                setHasFixedSize(true)
+                setItemViewCacheSize(10) // Cache more items for fast scrolling
+                
+                // Kinetic Tilt Scroll-Lock: Disable tilt HUD while scrolling to ensure zero micro-stutter
+                clearOnScrollListeners()
+                addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+                    override fun onScrollStateChanged(recyclerView: androidx.recyclerview.widget.RecyclerView, newState: Int) {
+                        KineticTiltHelper.isLocked = newState != androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE
+                    }
+                })
             }
             (rv.adapter as? AnyAdapter)?.notifyDataSetChanged()
         }
@@ -250,6 +265,7 @@ class DownloadFragment : Fragment() {
     @SuppressLint("ClickableViewAccessibility")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.viewpager.reduceDragSensitivity(1)
         viewModel.loadAllData(true)
         activity?.fixPaddingStatusbar(binding.downloadRoot)
 
@@ -363,53 +379,65 @@ class DownloadFragment : Fragment() {
 
         binding.viewpager.adapter = adapter
         binding.viewpager.isUserInputEnabled = true
-        binding.viewpager.offscreenPageLimit = 1
+        binding.viewpager.offscreenPageLimit = 2
         
         val dotsHolder = binding.pillDotsHolder
         var initialTouchX = 0f
         var initialPillX = 0f
         var currentSelectedIndex = 0
         var isDragging = false
+        var lastPillX = 0f
 
         binding.travelerIcon.setOnTouchListener { view, event ->
             val maxOffset = binding.libraryPillMenu.width - view.width
             val totalCats = viewModel.readList.size
-            val stepSize = if (maxOffset > 0 && totalCats > 0) maxOffset.toFloat() / totalCats.toFloat() else 0f
+            if (maxOffset <= 0 || totalCats <= 0) return@setOnTouchListener false
+            
+            val stepSize = maxOffset.toFloat() / totalCats.toFloat()
+            val vpWidth = binding.viewpager.width.toFloat()
 
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     view.parent.requestDisallowInterceptTouchEvent(true)
+                    binding.viewpager.beginFakeDrag()
                     initialTouchX = event.rawX
                     initialPillX = view.translationX
+                    lastPillX = initialPillX
                     isDragging = true
                     true
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - initialTouchX
-                    var newX = initialPillX + dx
-                    newX = newX.coerceIn(0f, maxOffset.toFloat())
+                    var newX = (initialPillX + dx).coerceIn(0f, maxOffset.toFloat())
+                    
+                    // Calculate relative movement in ViewPager pixels
+                    val pillDelta = newX - lastPillX
+                    val dragAmount = - (pillDelta / stepSize) * vpWidth
+                    
+                    if (kotlin.math.abs(dragAmount) > 0.1f) {
+                        try {
+                            binding.viewpager.fakeDragBy(dragAmount)
+                            lastPillX = newX
+                        } catch (e: Exception) {
+                            // If fake drag fails/end was called prematurely
+                        }
+                    }
+
                     view.translationX = newX
 
-                    if (stepSize > 0) {
-                        val index = (newX / stepSize).coerceIn(0f, totalCats.toFloat()).toInt()
-                        if (index != currentSelectedIndex) {
-                            currentSelectedIndex = index
-                            view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                            binding.viewpager.setCurrentItem(index, true) 
-                            
-                            for (i in 0 until dotsHolder.childCount) {
-                                val dot = (dotsHolder.getChildAt(i) as? android.view.ViewGroup)?.getChildAt(0)
-                                if (dot != null) {
-                                    if (i == index) {
-                                        dot.alpha = 1.0f
-                                        dot.scaleX = 1.25f
-                                        dot.scaleY = 1.25f
-                                    } else {
-                                        dot.alpha = 0.4f
-                                        dot.scaleX = 1.0f
-                                        dot.scaleY = 1.0f
-                                    }
-                                }
+                    val index = (newX / stepSize).coerceIn(0f, totalCats.toFloat()).toInt()
+                    if (index != currentSelectedIndex) {
+                        currentSelectedIndex = index
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                        
+                        // Update dots only on index change
+                        for (i in 0 until dotsHolder.childCount) {
+                            val dot = (dotsHolder.getChildAt(i) as? android.view.ViewGroup)?.getChildAt(0)
+                            if (dot != null) {
+                                val selected = i == index
+                                dot.alpha = if (selected) 1.0f else 0.4f
+                                dot.scaleX = if (selected) 1.25f else 1.0f
+                                dot.scaleY = if (selected) 1.25f else 1.0f
                             }
                         }
                     }
@@ -418,15 +446,17 @@ class DownloadFragment : Fragment() {
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                     view.parent.requestDisallowInterceptTouchEvent(false)
                     isDragging = false
-                    if (stepSize > 0) {
-                        val targetX = currentSelectedIndex * stepSize
-                        android.animation.ObjectAnimator.ofFloat(view, "translationX", targetX).apply {
-                            duration = 200
-                            interpolator = android.view.animation.DecelerateInterpolator()
-                            start()
-                        }
-                        binding.viewpager.setCurrentItem(currentSelectedIndex, true)
+                    try {
+                        binding.viewpager.endFakeDrag()
+                    } catch (e: Exception) {}
+                    
+                    val targetX = currentSelectedIndex * stepSize
+                    android.animation.ObjectAnimator.ofFloat(view, "translationX", targetX).apply {
+                        duration = 200
+                        interpolator = android.view.animation.DecelerateInterpolator()
+                        start()
                     }
+                    binding.viewpager.setCurrentItem(currentSelectedIndex, true)
                     true
                 }
                 else -> false

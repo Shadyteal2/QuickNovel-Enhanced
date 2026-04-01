@@ -1,65 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/search_result_root"
+    android:layout_width="114dp"
+    android:layout_height="177dp"
+    android:layout_margin="6dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardBackgroundColor="?attr/primaryBlackBackground"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="6dp"
+    app:cardMaxElevation="10dp"
+    app:strokeColor="#1AFFFFFF"
+    app:strokeWidth="1dp"
+    app:cardPreventCornerOverlap="false">
 
-    <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        xmlns:tools="http://schemas.android.com/tools"
-        android:id="@+id/backgroundContainer"
-        android:layout_width="114dp"
-        android:layout_height="180dp"
-        android:layout_margin="4dp">
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
-        <!-- Physical Card for Content -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/backgroundCard"
+        <ImageView
+            android:id="@+id/imageView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:cardBackgroundColor="?attr/boxItemBackground"
-            app:cardCornerRadius="@dimen/roundedImageRadius"
-            app:cardElevation="2dp">
+            android:scaleType="centerCrop"
+            tools:src="@drawable/splash_background" />
 
-            <ImageView
-                android:id="@+id/imageView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="@string/poster_descript"
-                android:scaleType="centerCrop"
-                tools:src="@drawable/big_icon_royalroad" />
-
-            <!-- Cinematic Shadow Overlay -->
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="80dp"
-                android:layout_gravity="bottom"
-                android:contentDescription="@string/shadow_descript"
-                android:src="@drawable/cinematic_overlay" />
+        <!-- High-Fidelity Glass Footer -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="@drawable/glass_footer_background"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="8dp">
 
             <TextView
                 android:id="@+id/imageText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom"
                 android:ellipsize="end"
                 android:fontFamily="@font/google_sans"
-                android:gravity="center"
                 android:maxLines="2"
-                android:paddingLeft="6dp"
-                android:paddingRight="6dp"
-                android:paddingBottom="8dp"
-                android:textColor="?attr/textColor"
-                android:shadowColor="#B4000000"
-                android:shadowDx="1.2"
-                android:shadowDy="1.2"
-                android:shadowRadius="1.5"
-                android:textSize="12sp"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                tools:text="Novel Title" />
-
-        </androidx.cardview.widget.CardView>
-
-        <!-- Glass Border Overlay for Premium Feel -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/glass_card_border" />
-
+                android:shadowColor="#80000000"
+                android:shadowRadius="3"
+                tools:text="The Perfect Run Forever and Always" />
+        </LinearLayout>
     </FrameLayout>
+
+</com.google.android.material.card.MaterialCardView>

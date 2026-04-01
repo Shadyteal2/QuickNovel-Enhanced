@@ -32,9 +32,23 @@ class HomeFragment : Fragment() {
         return binding.root
     }
 
+    private lateinit var heroAdapter: HeroAdapter
+    private lateinit var headerAdapter: HeaderAdapter
+    private lateinit var browseAdapter: BrowseAdapter
+    private lateinit var concatAdapter: androidx.recyclerview.widget.ConcatAdapter
+
     private fun setupGridView() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(context ?: return)
         val usePinterest = prefs.getBoolean("library_pinterest_bento", false)
+
+        val spanCountLandscape = 8
+        val spanCountPortrait = 4
+        val orientation = resources.configuration.orientation
+        val totalSpan = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            spanCountLandscape
+        } else {
+            spanCountPortrait
+        }
 
         if (usePinterest) {
             // Pinterest Discovery: 2 column Masonry
@@ -43,16 +57,14 @@ class HomeFragment : Fragment() {
             }
         } else {
             // Discovery Density: 4 portrait, 8 landscape
-            val spanCountLandscape = 8
-            val spanCountPortrait = 4
-            val orientation = resources.configuration.orientation
-            val totalSpan = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                spanCountLandscape
-            } else {
-                spanCountPortrait
+            val layoutManager = GridLayoutManager(context, totalSpan)
+            layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int {
+                    // QN-Enhanced: Headers take full span
+                    return if (position < 2) totalSpan else 1
+                }
             }
-            
-            binding.homeBrowselist.layoutManager = GridLayoutManager(context, totalSpan)
+            binding.homeBrowselist.layoutManager = layoutManager
         }
         if (binding.homeBrowselist.layoutAnimation == null) {
             binding.homeBrowselist.layoutAnimation = android.view.animation.AnimationUtils.loadLayoutAnimation(context, com.lagradost.quicknovel.R.anim.grid_layout_animation)
@@ -66,9 +78,17 @@ class HomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         setupGridView()
-        val browseAdapter = BrowseAdapter()
+        
+        heroAdapter = HeroAdapter { res ->
+            loadResult(res.source, res.apiName)
+        }
+        headerAdapter = HeaderAdapter(getString(R.string.home_title_text)) // Using Explore text
+        browseAdapter = BrowseAdapter()
+        
+        concatAdapter = androidx.recyclerview.widget.ConcatAdapter(heroAdapter, headerAdapter, browseAdapter)
+        
         binding.homeBrowselist.apply {
-            adapter = browseAdapter
+            adapter = concatAdapter
             setHasFixedSize(true)
         }
 
@@ -77,24 +97,13 @@ class HomeFragment : Fragment() {
         }
 
         observe(viewModel.latestHistory) { res ->
-            if (res != null) {
-                binding.homeHeroSection.visibility = View.VISIBLE
-                binding.heroImage.setImage(res.poster)
-                binding.heroTitle.text = res.name
-                binding.homeHeroSection.setOnClickListener {
-                    loadResult(res.source, res.apiName)
-                }
-                // Physical Hero Tilt
-                KineticTiltHelper.applyKineticTilt(binding.homeHeroSection)
-            } else {
-                binding.homeHeroSection.visibility = View.GONE
-            }
+            heroAdapter.heroItem = res
         }
 
         activity?.fixPaddingStatusbar(binding.homeToolbar)
         com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(
             binding.homeToolbar,
-            binding.homeScrollview
+            binding.homeBrowselist // Now scroll handled by RecyclerView directly
         )
     }
 

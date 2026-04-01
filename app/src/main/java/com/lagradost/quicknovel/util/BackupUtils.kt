@@ -212,7 +212,10 @@ object BackupUtils {
     ) {
         val editor = DataStore.editor(this, isEditingAppSettings)
         map?.forEach {
-            editor.setKeyRaw(it.key, it.value)
+            // QN-Enhanced: Prevent download metadata from leaking into the 'Downloaded' section post-restore
+            if (!it.key.startsWith("downloads_data/")) {
+                editor.setKeyRaw(it.key, it.value)
+            }
         }
         editor.apply()
     }

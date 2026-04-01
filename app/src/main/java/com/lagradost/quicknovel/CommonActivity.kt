@@ -26,10 +26,14 @@ import java.util.Locale
 
 object CommonActivity {
     var pendingThemeChangeScreenshot: Bitmap? = null
+    var themeCenterX: Float? = null
+    var themeCenterY: Float? = null
 
     @JvmStatic
-    fun recreateWithSmoothTransition(act: Activity?) {
+    fun recreateWithSmoothTransition(act: Activity?, x: Float? = null, y: Float? = null) {
         if (act == null) return
+        themeCenterX = x
+        themeCenterY = y
         try {
             val rootView = act.window?.decorView?.rootView
             if (rootView != null && rootView.width > 0 && rootView.height > 0) {

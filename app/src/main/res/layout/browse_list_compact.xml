@@ -1,32 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:layout_margin="6dp"
+    app:cardBackgroundColor="?attr/primaryBlackBackground"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#1AFFFFFF"
+    app:strokeWidth="1dp"
+    android:id="@+id/browse_root_card">
 
     <LinearLayout
         android:id="@+id/browse_background"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="2dp"
-        android:background="@drawable/browse_item_background"
         android:clickable="true"
         android:focusable="true"
         android:orientation="vertical"
         android:paddingHorizontal="8dp"
-        android:paddingVertical="12dp">
+        android:paddingVertical="16dp"
+        android:background="?android:attr/selectableItemBackground">
 
         <androidx.cardview.widget.CardView
             android:id="@+id/browse_icon_background"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_gravity="center"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="12dp"
             app:cardBackgroundColor="?attr/iconGrayBackground"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            app:cardPreventCornerOverlap="false">
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp">
 
             <ImageView
                 android:id="@+id/browse_icon"
@@ -35,6 +40,7 @@
                 android:adjustViewBounds="true"
                 android:contentDescription="@string/browse_list_icon"
                 android:scaleType="fitCenter"
+                android:padding="8dp"
                 tools:src="@drawable/icon_royalroad" />
         </androidx.cardview.widget.CardView>
 
@@ -52,4 +58,4 @@
             tools:text="Royal Road" />
 
     </LinearLayout>
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>

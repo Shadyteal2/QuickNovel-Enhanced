@@ -33,28 +33,112 @@
         android:visibility="gone" />
 
     <FrameLayout
-            tools:visibility="visible"
             android:id="@+id/read_loading"
             android:visibility="gone"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="match_parent"
+            android:background="#99000000"
+            android:clickable="true"
+            android:focusable="true"
+            tools:visibility="visible">
 
-        <ProgressBar
-                android:id="@+id/read_loading_bar"
-                android:layout_gravity="center"
-                android:progressTint="@color/colorPrimary"
-                android:layout_width="50dp"
-                android:layout_height="50dp" />
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginHorizontal="32dp"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="12dp"
+            app:cardBackgroundColor="@color/grayBackground"
+            app:strokeWidth="0dp">
 
-        <TextView
-                android:id="@+id/loading_text"
-                android:layout_marginTop="50dp"
-                android:gravity="center"
-                android:layout_gravity="center"
-                android:textColor="@color/colorPrimary"
-                tools:text="@string/delete"
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="wrap_content"
+                android:padding="24dp">
+
+                <ImageView
+                    android:id="@+id/read_loading_icon"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/ic_google_translate"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:tint="@color/colorPrimary" />
+
+                <TextView
+                    android:id="@+id/read_loading_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="8dp"
+                    android:text="Translating... This may take a moment."
+                    android:textColor="?attr/textColor"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    app:layout_constraintEnd_toStartOf="@+id/read_stop_translation_btn"
+                    app:layout_constraintStart_toEndOf="@id/read_loading_icon"
+                    app:layout_constraintTop_toTopOf="@id/read_loading_icon" />
+
+                <TextView
+                    android:id="@+id/loading_text"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="?attr/grayTextColor"
+                    android:textSize="14sp"
+                    app:layout_constraintEnd_toEndOf="@id/read_loading_title"
+                    app:layout_constraintStart_toStartOf="@id/read_loading_title"
+                    app:layout_constraintTop_toBottomOf="@id/read_loading_title"
+                    tools:text="Google Translate (Free)" />
+
+                <ImageButton
+                    android:id="@+id/read_stop_translation_btn"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_sharp_clear_24"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:tint="?attr/textColor" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/read_loading_progress_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:progress="30"
+                    app:indicatorColor="@color/colorPrimary"
+                    app:layout_constraintTop_toBottomOf="@id/loading_text"
+                    app:trackColor="#26FFFFFF"
+                    app:trackCornerRadius="4dp"
+                    app:trackThickness="8dp" />
+
+                <TextView
+                    android:id="@+id/read_loading_percentage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/read_loading_progress_bar"
+                    tools:text="30%" />
+
+                <TextView
+                    android:id="@+id/read_loading_fraction"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/grayTextColor"
+                    android:textSize="14sp"
+                    app:layout_constraintBottom_toBottomOf="@id/read_loading_percentage"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="@id/read_loading_percentage"
+                    tools:text="30 / 100" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </com.google.android.material.card.MaterialCardView>
     </FrameLayout>
 
     <FrameLayout
@@ -109,6 +193,8 @@
             android:id="@+id/read_normal_layout"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
+
+        <include android:id="@+id/read_skeleton_shimmer" layout="@layout/read_skeleton_layout" />
 
         <LinearLayout
                 android:id="@+id/reader_lin_container"
@@ -521,18 +607,30 @@
 
             <com.google.android.material.appbar.MaterialToolbar
                     android:id="@+id/read_toolbar"
-
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
                     android:layout_gravity="center"
                     android:gravity="center"
-
                     app:navigationIconTint="?attr/iconColor"
                     app:titleTextColor="?attr/textColor"
                     app:subtitleTextColor="?attr/grayTextColor"
                     tools:title="TEST"
-                    tools:subtitle="TEST"
+                    tools:subtitle="TEST">
 
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+                <!-- Toggle Original/Translated -->
+                <ImageButton
+                    android:id="@+id/read_translate_toggle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="end|center_vertical"
+                    android:layout_marginEnd="12dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:src="@drawable/translate_24px"
+                    android:visibility="gone"
+                    app:tint="?attr/textColor"
+                    tools:visibility="visible" />
+
+            </com.google.android.material.appbar.MaterialToolbar>
         </com.google.android.material.appbar.AppBarLayout>
     </FrameLayout>
 </FrameLayout>

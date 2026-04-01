@@ -89,19 +89,13 @@
                     android:clipChildren="false"
                     android:clipToPadding="false"
                     android:baselineAligned="false"
-                    android:background="@drawable/floating_nav_border"
+                    android:elevation="4dp"
+                    android:background="@drawable/glass_nav_background"
+                    android:outlineProvider="background"
+                    android:clipToOutline="true"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent">
-
-                <!-- Dedicated blur background to keep icons sharp -->
-                <View
-                        android:id="@+id/nav_bar_blur_view"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:outlineProvider="background"
-                        android:clipToOutline="true"
-                        android:background="@drawable/floating_nav_background" />
 
                 <!-- Sliding Light Indicator -->
                 <View
@@ -116,8 +110,7 @@
                 <com.google.android.material.bottomnavigation.BottomNavigationView
                         android:id="@+id/nav_view"
                         android:layout_width="match_parent"
-                        android:layout_height="60dp"
-                        android:layout_gravity="center"
+                        android:layout_height="match_parent"
                         android:background="@android:color/transparent"
                         android:theme="@style/FloatingNavTheme"
                         app:elevation="0dp"
@@ -127,8 +120,8 @@
                         app:itemIconSize="24dp"
                         app:itemPaddingTop="8dp"
                         app:itemPaddingBottom="12dp"
-                        app:itemIconTint="@color/item_select_color"
-                        app:itemTextColor="@color/item_select_color"
+                        app:itemIconTint="@color/nav_icon_color"
+                        app:itemTextColor="@color/nav_icon_color"
                         app:menu="@menu/bottom_nav_menu" />
             </FrameLayout>
 

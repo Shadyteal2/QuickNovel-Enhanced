@@ -6,7 +6,11 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
-    app:chipBackgroundColor="?attr/primaryGrayBackground"
-    app:chipStrokeColor="?attr/grayTextColor"
-    app:chipStrokeWidth="1dp"
-    android:textColor="?attr/textColor" />
+    app:chipBackgroundColor="@color/chip_background_selector"
+    app:chipStrokeColor="@color/chip_stroke_selector"
+    app:chipIconVisible="false"
+    app:chipStrokeWidth="1.5dp"
+    app:checkedIconVisible="false"
+    android:textSize="13sp"
+    android:textStyle="bold"
+    android:textColor="@color/chip_text_selector" />

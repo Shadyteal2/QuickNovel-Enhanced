@@ -280,8 +280,9 @@ data class TextSpan(
     }
 
     override fun id(): Long {
-        return generateId(0, index, start, end)
+        return generateId(0, index, innerIndex, 0)
     }
+
 }
 
 abstract class SpanDisplay {

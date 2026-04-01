@@ -29,6 +29,7 @@ import android.net.Uri
 import androidx.preference.PreferenceManager
 import coil3.load
 import coil3.request.crossfade
+import com.facebook.shimmer.ShimmerFrameLayout
 import com.lagradost.quicknovel.util.UsageStatsManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -54,12 +55,14 @@ import com.lagradost.quicknovel.DataStore.getKey
 import com.lagradost.quicknovel.DataStore.setKey
 import com.lagradost.quicknovel.TTSNotifications.TTS_NOTIFICATION_ID
 import com.lagradost.quicknovel.databinding.ColorRoundCheckmarkBinding
+import com.lagradost.quicknovel.databinding.DialogMlDownloadBinding
 import com.lagradost.quicknovel.databinding.ReadBottomSettingsBinding
 import com.lagradost.quicknovel.databinding.ReadMainBinding
 import com.lagradost.quicknovel.databinding.SingleOverscrollChapterBinding
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
+import android.widget.Toast
 import com.lagradost.quicknovel.ui.CONFIG_COLOR
 import com.lagradost.quicknovel.ui.CONFIG_FONT
 import com.lagradost.quicknovel.ui.CONFIG_FONT_BOLD
@@ -71,6 +74,8 @@ import com.lagradost.quicknovel.ui.ScrollVisibilityItem
 import com.lagradost.quicknovel.ui.TextAdapter
 import com.lagradost.quicknovel.ui.TextConfig
 import com.lagradost.quicknovel.ui.TextVisualLine
+import com.lagradost.quicknovel.ui.DictionaryBottomSheet
+import com.lagradost.quicknovel.ui.TranslationBottomSheet
 import com.lagradost.quicknovel.ui.ViewHolderState
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
@@ -174,7 +179,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     lateinit var binding: ReadMainBinding
-    private val viewModel: ReadActivityViewModel by viewModels()
+    val viewModel: ReadActivityViewModel by viewModels()
 
     private var _imageHolder: WeakReference<LinearLayout>? = null
     var imageHolder
@@ -191,6 +196,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private var readingSessionStartTime: Long = 0L
+
+    fun showDictionary(word: String) {
+        DictionaryBottomSheet.newInstance(word).show(supportFragmentManager, "dictionary")
+    }
+
+    fun showTranslation(text: String) {
+        TranslationBottomSheet(text).show(supportFragmentManager, "translation")
+    }
 
     private fun setBackgroundColor(color: Int) {
         viewModel.backgroundColor = color
@@ -603,7 +616,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         config.setArgs(binding.loadingText, CONFIG_FONT or CONFIG_COLOR)
         config.setArgs(binding.readBattery, CONFIG_FONT or CONFIG_COLOR or CONFIG_FONT_BOLD)
         config.setArgs(binding.readTimeClock, CONFIG_FONT or CONFIG_COLOR or CONFIG_FONT_BOLD)
-        config.setArgs(binding.readLoadingBar)
+        config.setArgs(binding.readLoadingProgressBar)
     }
 
     private fun updatePadding() {
@@ -879,8 +892,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
 
 
-    @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
+    private var downloadProgressDialog: AlertDialog? = null
+    private var downloadProgressBinding: DialogMlDownloadBinding? = null
 
+    @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         CommonActivity.loadThemes(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -1051,8 +1066,62 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             viewModel.stopTTS()
         }
 
+        viewModel.isShowingOriginalLive.observe(this) { isOriginal ->
+            binding.readTranslateToggle.setImageResource(
+                if (isOriginal) R.drawable.ic_google_translate // Show "Translated" icon when showing original
+                else R.drawable.translate_24px // Show "Translate" icon when showing translated
+            )
+        }
+
+        viewModel.translationLoadingStatus.observe(this) { resource ->
+            when (resource) {
+                is Resource.Failure -> {
+                    if (resource.cause is java.util.concurrent.TimeoutException) {
+                        CommonActivity.showToast(this, R.string.unable_to_download_language)
+                    } else {
+                        CommonActivity.showToast(this, "Download Failed: ${resource.errorString}")
+                    }
+                    downloadProgressDialog?.dismiss()
+                    downloadProgressDialog = null
+                }
+
+                is Resource.Loading -> {
+                    if (downloadProgressDialog == null) {
+                        downloadProgressBinding = DialogMlDownloadBinding.inflate(layoutInflater)
+                        downloadProgressDialog =
+                            com.google.android.material.dialog.MaterialAlertDialogBuilder(
+                                this,
+                                R.style.AlertDialogCustom
+                            )
+                                .setView(downloadProgressBinding?.root)
+                                .setCancelable(false)
+                                .create()
+                        downloadProgressDialog?.show()
+                    }
+                    downloadProgressBinding?.mlDownloadStatus?.setText(
+                        resource.url ?: getString(R.string.download_ml)
+                    )
+                }
+
+                is Resource.Success<String> -> {
+                    downloadProgressDialog?.dismiss()
+                    downloadProgressDialog = null
+                    CommonActivity.showToast(this, "Applied successfully", Toast.LENGTH_SHORT)
+                }
+            }
+        }
+
+        viewModel.isTranslationActiveLive.observe(this) { active ->
+            binding.readTranslateToggle.isVisible = active
+        }
+
+        binding.readTranslateToggle.setOnClickListener {
+            val current = viewModel.isShowingOriginalLive.value ?: false
+            viewModel.isShowingOriginalLive.postValue(!current)
+            viewModel.updateReadArea() // Instant switch
+        }
+
         binding.readActionTts.setOnClickListener {
-            //scrollToDesired()
             viewModel.startTTS()
         }
 
@@ -1185,16 +1254,25 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
         }
 
-        var last: Resource<Boolean> = Resource.Loading() // very dirty
+        var last: Resource<String>? = null // very dirty
         observe(viewModel.loadingStatus) { loading ->
             val different = last != loading
             last = loading
             when (loading) {
-                is Resource.Success -> {
+                is Resource.Success<String> -> {
                     binding.readLoading.isVisible = false
                     binding.readFail.isVisible = false
+                    binding.readSkeletonShimmer.root.isVisible = false
+                    (binding.readSkeletonShimmer.root as? ShimmerFrameLayout)?.stopShimmer()
 
                     binding.readNormalLayout.isVisible = true
+                    binding.realText.isVisible = true
+                    
+                    // Force the toolbar title/subtitle refresh if needed
+                    val title = viewModel.book.getChapterTitle(viewModel.currentIndex)
+                    if (different) {
+                        viewModel.updateReadArea(seekToDesired = false)
+                    }
 
                     if (different) {
                         binding.readNormalLayout.alpha = 0.01f
@@ -1209,9 +1287,20 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 }
 
                 is Resource.Loading -> {
-                    binding.readNormalLayout.isVisible = false
                     binding.readFail.isVisible = false
-                    binding.readLoading.isVisible = true
+                    
+                    // Chapter loading should use shimmer
+                    binding.readLoading.isVisible = false
+                    binding.readNormalLayout.isVisible = true 
+                    binding.readNormalLayout.alpha = 1f
+                    
+                    val shimmer = binding.readSkeletonShimmer.root as? ShimmerFrameLayout
+                    shimmer?.isVisible = true
+                    shimmer?.startShimmer()
+                    
+                    // Ensure the real text is hidden while shimmering
+                    binding.realText.isVisible = false
+
                     binding.loadingText.apply {
                         isGone = loading.url.isNullOrBlank()
                         text = loading.url ?: ""
@@ -1220,6 +1309,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
                 is Resource.Failure -> {
                     binding.readLoading.isVisible = false
+                    binding.readSkeletonShimmer.root.isVisible = false
+                    (binding.readSkeletonShimmer.root as? ShimmerFrameLayout)?.stopShimmer()
                     binding.readFail.isVisible = true
                     binding.failText.text = loading.errorString
                     binding.readNormalLayout.isVisible = false
@@ -1334,14 +1425,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             if (chapter.seekToDesired) {
                 textAdapter.submitIncomparableList(chapter.data) {
-                    viewModel._loadingStatus.postValue(Resource.Success(true))
+                    viewModel.postLoadingStatus(Resource.Success(""))
                     scrollToDesired()
                     onScroll()
                     UsageStatsManager.incrementChapterRead(this@ReadActivity2)
                 }
             } else {
                 textAdapter.submitList(chapter.data) {
-                    viewModel._loadingStatus.postValue(Resource.Success(true))
+                    viewModel.postLoadingStatus(Resource.Success(""))
                     onScroll()
                     UsageStatsManager.incrementChapterRead(this@ReadActivity2)
                 }
@@ -1578,38 +1669,18 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 }
             }
 
-            binding.readOnlineTranslationSwitch.isChecked = viewModel.mlUseOnlineTransaltion
-            binding.readOnlineTranslationSwitch.setOnCheckedChangeListener { _, isChecked ->
-                viewModel.mlUseOnlineTransaltion = isChecked
+
+            binding.readApplyTranslation.setOnClickListener { _ ->
+                viewModel.applyMLSettings(true)
+                bottomSheetDialog.dismiss()
             }
 
-            binding.readApplyTranslation.setOnClickListener { view ->
-                if (view == null) return@setOnClickListener
-                ioSafe {
-                    try {
-                        if (!viewModel.requireMLDownload()) {
-                            viewModel.applyMLSettings(true)
-                            runOnUiThread { bottomSheetDialog.dismiss() }
-
-                            return@ioSafe
-                        }
-                        runOnUiThread {
-                            val builder: AlertDialog.Builder =
-                                AlertDialog.Builder(view.context, R.style.AlertDialogCustom)
-                            builder.setTitle(R.string.download_ml)
-                            builder.setMessage(R.string.download_ml_long)
-                            builder.setPositiveButton(R.string.download) { _, _ ->
-                                viewModel.applyMLSettings(true)
-                                bottomSheetDialog.dismiss()
-                            }
-                            builder.setCancelable(true)
-                            builder.setNegativeButton(R.string.cancel) { _, _ -> }
-                            builder.show()
-                        }
-                    } catch (t: Throwable) {
-                        showToast(t.message ?: t.toString())
-                    }
-                }
+            binding.readMlInfoBtn.setOnClickListener {
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ReadActivity2, R.style.AlertDialogCustom)
+                    .setTitle(R.string.ml_info_title)
+                    .setMessage(R.string.ml_info_text)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
             }
 
             binding.readMlTo.text =
@@ -1619,11 +1690,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             val mlSettings = viewModel.mlSettings
 
-            if (mlSettings.isInvalid()) {
-                binding.readMlTitle.setText(R.string.google_translate)
+            binding.readMlTitle.text = if (viewModel.isTranslationActive) {
+                "${getString(R.string.google_ml)} (${mlSettings.fromDisplay} -> ${mlSettings.toDisplay})"
             } else {
-                binding.readMlTitle.text =
-                    "${binding.readMlTitle.context.getString(R.string.google_translate)} (${mlSettings.fromDisplay} -> ${mlSettings.toDisplay})"
+                getString(R.string.google_ml)
             }
 
             binding.readLanguage.setOnClickListener { _ ->

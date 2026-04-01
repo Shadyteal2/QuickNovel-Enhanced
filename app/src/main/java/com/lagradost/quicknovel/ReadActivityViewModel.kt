@@ -44,6 +44,9 @@ import com.lagradost.quicknovel.BaseApplication.Companion.getKeyClass
 import com.lagradost.quicknovel.BaseApplication.Companion.removeKey
 import com.lagradost.quicknovel.BaseApplication.Companion.setKey
 import com.lagradost.quicknovel.BaseApplication.Companion.setKeyClass
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import com.lagradost.quicknovel.util.*
 import com.lagradost.quicknovel.BookDownloader2Helper.getQuickChapter
 import com.lagradost.quicknovel.CommonActivity.TAG
 import com.lagradost.quicknovel.CommonActivity.activity
@@ -96,6 +99,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import me.ag2s.epublib.domain.EpubBook
+import com.lagradost.quicknovel.util.TranslationEngineType
+import com.lagradost.quicknovel.util.TranslationRequest
+import com.lagradost.quicknovel.util.TranslationEnginesManager
 import me.ag2s.epublib.domain.TOCReference
 import me.ag2s.epublib.epub.EpubReader
 import me.ag2s.epublib.util.zip.AndroidZipFile
@@ -106,8 +112,6 @@ import java.net.URLDecoder
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.ExecutionException
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 import kotlin.math.pow
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
@@ -440,6 +444,11 @@ class ReadActivityViewModel : ViewModel() {
     private var isInApp: Boolean = true
     private var leftAppAt: ScrollIndex? = null
     private var mlTranslator: Translator? = null
+    val isShowingOriginalLive = MutableLiveData<Boolean>(false)
+    val isTranslationActiveLive = MutableLiveData<Boolean>(false)
+    var isTranslationActive
+        get() = isTranslationActiveLive.value ?: false
+        set(value) = isTranslationActiveLive.postValue(value)
 
     fun leftApp() {
         lastChangeIndex?.let { setScrollKeys(it) }
@@ -469,17 +478,22 @@ class ReadActivityViewModel : ViewModel() {
 
 
     var mlSettings
-        get() = getKey<MLSettings>(EPUB_CURRENT_ML, book.title()) ?: MLSettings("en", "en", false)
+        get() = getKey<MLSettings>(EPUB_CURRENT_ML, book.title()) ?: MLSettings("en", "en")
         set(value) = setKey(EPUB_CURRENT_ML, book.title(), value)
 
     private val _chapterData: MutableLiveData<ChapterUpdate> =
         MutableLiveData<ChapterUpdate>(null)
     val chapter: LiveData<ChapterUpdate> = _chapterData
 
-    // we use bool as we cant construct Nothing, does not represent anything
-    val _loadingStatus: MutableLiveData<Resource<Boolean>> =
-        MutableLiveData<Resource<Boolean>>(null)
-    val loadingStatus: LiveData<Resource<Boolean>> = _loadingStatus
+    private val _loadingStatus = MutableLiveData<Resource<String>>(null)
+    val loadingStatus: LiveData<Resource<String>> = _loadingStatus
+
+    private val _translationLoadingStatus = MutableLiveData<Resource<String>>(null)
+    val translationLoadingStatus: LiveData<Resource<String>> = _translationLoadingStatus
+
+    fun postLoadingStatus(resource: Resource<String>) {
+        _loadingStatus.postValue(resource)
+    }
 
     private val _chaptersTitles: MutableLiveData<List<UiText>> =
         MutableLiveData<List<UiText>>(null)
@@ -489,9 +503,15 @@ class ReadActivityViewModel : ViewModel() {
         MutableLiveData<String>(null)
     val title: LiveData<String> = _title
 
-    private val _chapterTile: MutableLiveData<UiText> =
-        MutableLiveData<UiText>(null)
-    val chapterTile: LiveData<UiText> = _chapterTile
+    private val _chapterTile = MutableLiveData<UiText>()
+    val chapterTile: LiveData<UiText> get() = _chapterTile
+
+    private var sessionTranslationCancelled = false
+
+    fun stopTranslation() {
+        sessionTranslationCancelled = true
+        _loadingStatus.postValue(Resource.Failure(null, "Stopped"))
+    }
 
     private val _bottomVisibility: MutableLiveData<Boolean> =
         MutableLiveData<Boolean>(false)
@@ -571,6 +591,7 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun reTranslateChapter(index: Int) = ioSafe {
+        if (!isTranslationActive) return@ioSafe
         hasExpanded.clear() // will unfuck the rest
         val notify = chapterMutex.withLock {
             chapterData[index] is Resource.Failure
@@ -679,10 +700,24 @@ class ReadActivityViewModel : ViewModel() {
         }
     }
 
-    private fun updateReadArea(seekToDesired: Boolean = false) {
+    fun updateReadArea(seekToDesired: Boolean = false) {
+        val showOriginal = isShowingOriginalLive.value ?: false
         val cIndex = currentIndex
         val chapters = ArrayList<SpanDisplay>()
         val canReload = this.book.canReload
+        
+        fun chapterIdxToSpanDisplayToggle(idx: Int): List<SpanDisplay> {
+            synchronized(chapterData) {
+                return (chapterData[idx]?.letInner { data ->
+                    if (showOriginal) {
+                        data.originalSpans
+                    } else {
+                        data.spans
+                    }
+                } ?: emptyList())
+            }
+        }
+
         when (readerType) {
             ReadingType.DEFAULT, ReadingType.INF_SCROLL -> {
                 for (idx in cIndex - chapterPaddingBottom..cIndex + chapterPaddingTop) {
@@ -695,7 +730,7 @@ class ReadActivityViewModel : ViewModel() {
                                 canReload
                             )
                         )
-                    chapters.addAll(chapterIdxToSpanDisplay(idx))
+                    chapters.addAll(chapterIdxToSpanDisplayToggle(idx))
                 }
             }
 
@@ -708,7 +743,7 @@ class ReadActivityViewModel : ViewModel() {
                     chapters.add(ChapterStartSpanned(cIndex, 0, text, canReload))
                 }
 
-                chapters.addAll(chapterIdxToSpanDisplay(cIndex))
+                chapters.addAll(chapterIdxToSpanDisplayToggle(cIndex))
 
                 chapterIdxToSpanDisplayNextButton(cIndex + 1, cIndex)?.let {
                     chapters.add(it)
@@ -724,7 +759,7 @@ class ReadActivityViewModel : ViewModel() {
                     chapters.add(ChapterStartSpanned(cIndex, 0, text, canReload))
                 }
 
-                chapters.addAll(chapterIdxToSpanDisplay(cIndex))
+                chapters.addAll(chapterIdxToSpanDisplayToggle(cIndex))
 
                 chapterIdxToSpanDisplayOverscrollButton(cIndex + 1, cIndex)?.let {
                     chapters.add(it)
@@ -842,28 +877,30 @@ class ReadActivityViewModel : ViewModel() {
                     }
 
                     // translation may strip stuff, idk how to solve that in a clean way atm
-                    translate(
-                        rendered,
-                        spans
-                    ) { (progressChapter, progressInnerIndex, progressInnerTotal) ->
-                        val progressText =
-                            "${context?.getString(R.string.translating)} ${
-                                book.getChapterTitle(
-                                    progressChapter
-                                )
-                            } ($progressInnerIndex/$progressInnerTotal)"
-                        if (postLoading) {
-                            _loadingStatus.postValue(Resource.Loading(progressText))
-                        } else {
-                            chapterMutex.withLock {
-                                chapterData[index] =
-                                    Resource.Loading(progressText)
-                                if (notify) notifyChapterUpdate(index)
+                    if (isTranslationActive) {
+                        translate(
+                            rendered,
+                            spans
+                        ) { (progressChapter, progressInnerIndex, progressInnerTotal) ->
+                            val progressText =
+                                "${context?.getString(R.string.translating)} ${
+                                    book.getChapterTitle(
+                                        progressChapter
+                                    )
+                                } ($progressInnerIndex/$progressInnerTotal)"
+                            if (postLoading) {
+                                _loadingStatus.postValue(Resource.Loading(progressText))
+                            } else {
+                                chapterMutex.withLock {
+                                    chapterData[index] =
+                                        Resource.Loading(progressText)
+                                    if (notify) notifyChapterUpdate(index)
+                                }
                             }
+                        }.let { (mlRender, mlSpans) ->
+                            rendered = mlRender
+                            spans = mlSpans
                         }
-                    }.let { (mlRender, mlSpans) ->
-                        rendered = mlRender
-                        spans = mlSpans
                     }
                 }
 
@@ -912,118 +949,186 @@ class ReadActivityViewModel : ViewModel() {
     ): Pair<Spanned, ArrayList<TextSpan>> {
         try {
             val currentSettings = mlSettings
-            if (spans.isEmpty() || currentSettings.isInvalid()) {
-                return text to spans
-            }
+            val appContext = com.lagradost.quicknovel.BaseApplication.context?.applicationContext
+            val manager = TranslationEnginesManager
+            val engine = appContext?.let { TranslationEnginesManager.getActiveEngine(it) }
+            val engineName = engine?.name ?: "offline"
+            val modelName = engine?.let { eng -> TranslationEnginesManager.getEngineModel(appContext!!, eng.type) } ?: ""
+            val engineId = engine?.type?.value ?: 0
+            
+            // Clean hash for cache key
+            val textToHash = text.toString().trim()
+            if (textToHash.isEmpty()) return text to spans
+            
+            val hash = hashString(textToHash.toByteArray())
+            val filePrefix = "ml_${hash}.${currentSettings.from}_to_${currentSettings.to}.${engineId}_${modelName.take(15)}"
 
-            // the file
-            val filePrefix =
-                "ml_${
-                    hashString(
-                        text.trim().toString().toByteArray()
-                    )
-                }.${currentSettings.from}_to_${currentSettings.to}.${if (currentSettings.useOnlineTranslation) "online" else "offline"}"
-
-            Log.i(TAG, "Translating $filePrefix")
-
-            // read from cache if it exists
-            // we assume that parseTextToSpans is equivalent from restoring from the builder
-            // aka out == parseTextToSpans(builder)
-            safe {
-                context?.cacheDir?.let {
-                    val cache = File(it, "$filePrefix.txt")
-                    if (cache.exists()) {
-                        Log.i(TAG, "Cache exists for $filePrefix")
-                        val mlText = cache.readText().toSpanned()
-                        return@safe mlText to parseTextToSpans(mlText, spans[0].index)
-                    }
+            // Read from cache
+            appContext?.let { ctx ->
+                val dir = File(ctx.filesDir, "translation_cache")
+                val cache = File(dir, "$filePrefix.txt")
+                if (cache.exists()) {
+                    val mlText = cache.readText().toSpanned()
+                    return mlText to parseTextToSpans(mlText, spans[0].index)
                 }
-                null
-            }?.let { return it }
-
+            }
+            
             val builder = StringBuilder()
             val out = ArrayList<TextSpan>()
-            val separator = "\n\n" // Use double line breaks to separate paragraphs within the batch
-            if (currentSettings.useOnlineTranslation) {
-                // --- Online mode ---
-                val out = arrayListOf<TextSpan>()
-                for (i in 0 until spans.size) {
-                    currentCoroutineContext().ensureActive()
-                    if (mlSettings.isInvalid()) break
-
-                    loading.invoke(Triple(spans[i].index, i, spans.size))
-                    val translatedParagraph = onlineTranslate(spans[i].text.toString(), currentSettings.from, currentSettings.to)
-                    
-                    val start = builder.length
-                    builder.append(translatedParagraph)
-                    val end = builder.length
-                    builder.append('\n')
-                    out.add(
-                        TextSpan(
-                            translatedParagraph.toSpanned(),
-                            start,
-                            end,
-                            spans[i].index,
-                            spans[i].innerIndex
-                        )
-                    )
+            
+            if (engine != null) {
+                val batchSize = engine.recommendedBatchSize
+                val maxParallel = engine.maxParallelRequests
+                
+                val chunks = spans.chunked(batchSize)
+                val totalChunks = chunks.size
+                var completedChunks = 0
+                
+                sessionTranslationCancelled = false
+                
+                coroutineScope {
+                    for (parallelGroup in chunks.chunked(maxParallel)) {
+                        yield()
+                        ensureActive()
+                        
+                        val deferredResults = parallelGroup.map { batchSpans ->
+                            async(Dispatchers.IO) {
+                                if (sessionTranslationCancelled) return@async batchSpans to Resource.Failure(null, "Cancelled")
+                                
+                                val prefersBatching = engine.prefersBatching
+                                val isBatch = batchSpans.size > 1 && prefersBatching
+                                val sep = if (isBatch) "\n###BATCH_SEP###\n" else ""
+                                val batchText = if (isBatch) {
+                                    batchSpans.joinToString(sep) { it.text.toString() }
+                                } else {
+                                    batchSpans.first().text.toString()
+                                }
+                                
+                                val request = TranslationRequest(
+                                    text = batchText,
+                                    from = currentSettings.from,
+                                    to = currentSettings.to,
+                                    bridgeText = sep,
+                                    systemInstruction = if (engine.supportsSystemInstructions) {
+                                        "Translate novel text from ${currentSettings.from} to ${currentSettings.to}. tone: Professional. Preserve exact paragraph count using separators."
+                                    } else null
+                                )
+                                
+                                var result: Resource<String>? = null
+                                try {
+                                    result = withTimeoutOrNull(180_000) {
+                                        var retryCount = 0
+                                        val maxRetries = 2
+                                        var lastCall: Resource<String>? = null
+                                        while (retryCount <= maxRetries && isActive) {
+                                            lastCall = engine.translate(appContext!!, request)
+                                            if (lastCall is Resource.Success) break
+                                            if (lastCall is Resource.Failure && lastCall.errorString?.contains("429") == true) {
+                                                runOnMainThread { stopTranslation() }
+                                                break
+                                            }
+                                            if (lastCall is Resource.Failure && lastCall.errorString?.contains("503") == true) {
+                                                retryCount++
+                                                delay(retryCount * 2000L)
+                                                continue
+                                            }
+                                            break
+                                        }
+                                        lastCall
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Batch failed", e)
+                                }
+                                batchSpans to (result ?: Resource.Failure(null, "Timeout"))
+                            }
+                        }
+                        
+                        val groupResults = deferredResults.awaitAll()
+                        for ((batchSpans, result) in groupResults) {
+                            if (sessionTranslationCancelled) break
+                            
+                            if (result is Resource.Success) {
+                                val translatedValue = result.value
+                                val prefersBatching = engine.prefersBatching
+                                val sep = if (prefersBatching) "\n###BATCH_SEP###\n" else ""
+                                val wasBatched = translatedValue != null && sep.isNotEmpty() && translatedValue.contains(sep)
+                                
+                                if (wasBatched && batchSpans.size > 1) {
+                                    val translatedTexts = translatedValue?.split(sep) ?: emptyList()
+                                    for (j in batchSpans.indices) {
+                                        val translatedParagraph = translatedTexts.getOrNull(j)?.trim() ?: batchSpans[j].text.toString()
+                                        val start = builder.length
+                                        builder.append(translatedParagraph).append("\n\n")
+                                        out.add(TextSpan(translatedParagraph.toSpanned(), start, builder.length - 2, batchSpans[j].index, batchSpans[j].innerIndex))
+                                    }
+                                } else {
+                                    val translatedParagraph = translatedValue?.trim() ?: batchSpans[0].text.toString()
+                                    val cleanedText = if (sep.isNotEmpty() && translatedParagraph.contains(sep)) translatedParagraph.replace(sep, "\n\n") else translatedParagraph
+                                    val start = builder.length
+                                    builder.append(cleanedText).append("\n\n")
+                                    out.add(TextSpan(cleanedText.toSpanned(), start, builder.length - 2, batchSpans[0].index, batchSpans[0].innerIndex))
+                                    
+                                    if (batchSpans.size > 1 && !wasBatched) {
+                                        for (j in 1 until batchSpans.size) {
+                                            val original = batchSpans[j].text.toString()
+                                            val s = builder.length
+                                            builder.append(original).append("\n\n")
+                                            out.add(TextSpan(original.toSpanned(), s, builder.length - 2, batchSpans[j].index, batchSpans[j].innerIndex))
+                                        }
+                                    }
+                                }
+                            } else {
+                                for (span in batchSpans) {
+                                    val original = span.text.toString()
+                                    val s = builder.length
+                                    builder.append(original).append("\n\n")
+                                    out.add(span.copy(text = original.toSpanned()))
+                                }
+                            }
+                        }
+                        
+                        completedChunks++
+                        loading.invoke(Triple(parallelGroup.first().first().index, completedChunks, totalChunks))
+                    }
                 }
             } else {
+                // Offline mode (fallback)
                 val translator = mlTranslator
-                if(translator == null) {
+                if (translator != null) {
+                    for (i in 0 until spans.size) {
+                        currentCoroutineContext().ensureActive()
+                        loading.invoke(Triple(spans[i].index, i + 1, spans.size))
+                        val translated = try {
+                            Tasks.await(translator.translate(spans[i].text.toString()))
+                        } catch (t: Throwable) {
+                            spans[i].text.toString()
+                        }
+                        val start = builder.length
+                        builder.append(translated).append("\n\n")
+                        out.add(TextSpan(translated.toSpanned(), start, builder.length - 2, spans[i].index, spans[i].innerIndex))
+                    }
+                } else {
                     return text to spans
                 }
-                // --- Offline mode ---
-                for (i in 0 until spans.size) {
-                    currentCoroutineContext().ensureActive()
-                    val currentSettings = mlSettings
-                    if (currentSettings.isInvalid()) break
-
-                    loading.invoke(Triple(spans[i].index, i, spans.size))
-                    val originalText = spans[i].text.toString()
-
-                    val finalText = try {
-                        Tasks.await(translator.translate(originalText))
-                    } catch (t: ExecutionException) {
-                        throw t.cause ?: t
-                    }
-                    val start = builder.length
-                    builder.append(finalText)
-                    val end = builder.length
-                    builder.append('\n')
-                    out.add(
-                        TextSpan(
-                            finalText.toSpanned(),
-                            start,
-                            end,
-                            spans[i].index,
-                            spans[i].innerIndex
-                        )
-                    )
-                }
             }
-            val mlRawText = builder.toString()
-
-            // atomically write the file by rename
-            safe {
-                context?.cacheDir?.let {
-                    val cache = File(it, "$filePrefix.tmp")
-                    cache.writeText(mlRawText)
-                    safe { File(it, "$filePrefix.txt").delete() } // just in case
-                    cache.renameTo(File(it, "$filePrefix.txt"))
-                }
+            
+            val resultRawText = builder.toString()
+            appContext?.let { ctx ->
+                val dir = File(ctx.filesDir, "translation_cache")
+                dir.mkdirs()
+                File(dir, "$filePrefix.txt").writeText(resultRawText)
             }
-
-            return mlRawText.toSpanned() to out
+            return resultRawText.toSpanned() to out
         } catch (t: Throwable) {
-            throw MLException(t)
+            Log.e(TAG, "Translation error", t)
+            return text to spans
         }
     }
 
     @Throws
     suspend fun requireMLDownload(): Boolean {
-        val settings = MLSettings(from = mlFromLanguage, to = mlToLanguage, mlUseOnlineTransaltion)
-        if (settings.isInvalid() || mlUseOnlineTransaltion) {
+        val settings = MLSettings(from = mlFromLanguage, to = mlToLanguage)
+        if (settings.isInvalid()) {
             return false
         }
         val modelManager = RemoteModelManager.getInstance()
@@ -1045,18 +1150,25 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun applyMLSettings(allowDownload: Boolean) = ioSafe {
+        _translationLoadingStatus.postValue(Resource.Loading("")) // Start feedback immediately
         currentCoroutineContext().ensureActive()
-        val settings = MLSettings(from = mlFromLanguage, to = mlToLanguage, mlUseOnlineTransaltion)
+        val settings = MLSettings(from = mlFromLanguage, to = mlToLanguage)
         if (settings.isValid() && allowDownload && (safeAsync { requireMLDownload() } == true)) {
-            _loadingStatus.postValue(Resource.Loading(context?.getString(R.string.download_ml)))
+            _translationLoadingStatus.postValue(Resource.Loading(context?.getString(R.string.download_ml)))
+        }
+        isTranslationActive = settings.isValid()
+        if (isTranslationActive) {
+            isShowingOriginalLive.postValue(false)
         }
         initMLFromSettings(settings, allowDownload)
-        reloadMLForAllChapters()
+        reloadMLForAllChapters(true)
         updateReadArea(seekToDesired = false)
+        _translationLoadingStatus.postValue(Resource.Success(""))
     }
 
-    private suspend fun reloadMLForAllChapters() {
-        _loadingStatus.postValue(Resource.Loading(context?.getString(R.string.translating)))
+    private suspend fun reloadMLForAllChapters(toTranslationStatus: Boolean = false) {
+        val status = if (toTranslationStatus) _translationLoadingStatus else _loadingStatus
+        status.postValue(Resource.Loading(context?.getString(R.string.translating)))
         chapterMutex.withLock {
             val cIndex = currentIndex
             val lower = cIndex - chapterPaddingBottom
@@ -1084,7 +1196,7 @@ class ReadActivityViewModel : ViewModel() {
                         success.originalSpans
                     ) { (progressChapter, progressInnerIndex, progressInnerTotal) ->
                         // we cannot easily ensureActive here as it is a lambda
-                        _loadingStatus.postValue(
+                        status.postValue(
                             Resource.Loading(
                                 "${context?.getString(R.string.translating)} ${
                                     book.getChapterTitle(
@@ -1121,7 +1233,9 @@ class ReadActivityViewModel : ViewModel() {
             mlTranslator?.closeQuietly()
             mlTranslator = null
 
-            if (settings.isInvalid() || settings.useOnlineTranslation) {
+            if (settings.isInvalid()) {
+                mlTranslator?.closeQuietly()
+                mlTranslator = null
                 mlSettings = settings
                 return
             }
@@ -1135,20 +1249,29 @@ class ReadActivityViewModel : ViewModel() {
             mlTranslator = translator
 
             if (allowDownload) {
-                Tasks.await(
-                    translator.downloadModelIfNeeded(), 120L, TimeUnit.SECONDS
-                )//for bad wifi, like my 2mb/s one TT
+                _translationLoadingStatus.postValue(Resource.Loading("Downloading local model..."))
+                try {
+                    Tasks.await(
+                        translator.downloadModelIfNeeded(), 300L, TimeUnit.SECONDS
+                    )
+                    _translationLoadingStatus.postValue(Resource.Success("Model applied"))
+                } catch (e: Exception) {
+                    _translationLoadingStatus.postValue(Resource.Failure(null, e.message ?: "Download failed"))
+                    throw e
+                }
             }
 
             mlSettings = settings
-        } catch (_: TimeoutException) {
-            showToast(R.string.unable_to_download_language)
+        } catch (e: TimeoutException) {
+            _translationLoadingStatus.postValue(Resource.Failure(e, "Timeout"))
             mlTranslator?.closeQuietly()
             mlTranslator = null
         } catch (t: Throwable) {
+            _translationLoadingStatus.postValue(Resource.Failure(t, t.message ?: "Error"))
             logError(t)
         }
     }
+
 
     fun init(intent: Intent?, context: ReadActivity2) = ioSafe {
         _loadingStatus.postValue(Resource.Loading())
@@ -1730,6 +1853,7 @@ class ReadActivityViewModel : ViewModel() {
     override fun onCleared() {
         lastChangeIndex?.let { setScrollKeys(it) }
         ttsSession.release()
+        stopTranslation()
         mlTranslator?.close()
         mlTranslator = null
         super.onCleared()
@@ -1756,6 +1880,7 @@ class ReadActivityViewModel : ViewModel() {
     //var ttsOSSpeed by PreferenceDelegate(EPUB_TTS_OS_SPEED, true, Boolean::class)
 
     private var ttsSpeedKey by PreferenceDelegate(EPUB_TTS_SET_SPEED, 1.0f, Float::class)
+    val isDictionaryEnabled by PreferenceDelegate(EPUB_DICTIONARY_ENABLED, true, Boolean::class)
     private var ttsPitchKey by PreferenceDelegate(EPUB_TTS_SET_PITCH, 1.0f, Float::class)
 
     var ttsSpeed: Float
@@ -1892,17 +2017,7 @@ class ReadActivityViewModel : ViewModel() {
         mlToLanguageLive
     )
 
-    val mlUseOnlineTransaltionLive: MutableLiveData<Boolean> = MutableLiveData(false)
-    var mlUseOnlineTransaltion: Boolean by PreferenceDelegateLiveView(
-        EPUB_ML_USEONLINETRANSLATION,
-        false,
-        Boolean::class,
-        mlUseOnlineTransaltionLive
-    ) {
-        if (it != null) {
-            applyMLSettings(false)
-        }
-    }
+    /* Removed Online Translation preferences */
 
     /*
    // Moved up to ensure correct initialization order. Having it lower caused a race condition  // where the default 'false' value was loaded before the actual saved preference.
@@ -1917,8 +2032,8 @@ class ReadActivityViewModel : ViewModel() {
         val from: String,
         @JsonProperty("to")
         val to: String,
-        @JsonProperty("useOnlineTranslation")
-        val useOnlineTranslation: Boolean = false
+        // @JsonProperty("useOnlineTranslation")
+        // val useOnlineTranslation: Boolean = false
     ) {
         companion object {
             val map = mapOf(
@@ -2041,26 +2156,5 @@ class ReadActivityViewModel : ViewModel() {
         val srcTranslit: String? = null
     )
 
-    suspend fun onlineTranslate(text: String,from:String, to: String): String {
-        val baseUrl = "https://translate.googleapis.com/translate_a/single"
-        if (text.trim().isBlank()) return ""
-
-        var retryNumber = 0
-        val maxRetry = 5
-        while (retryNumber < maxRetry){
-            try{
-                // Google returns: [ [[trans, orig, ...], [trans, orig, ...]], ... ]
-                return MainActivity.app.get(
-                    "$baseUrl?client=gtx&sl=$from&tl=$to&dt=t&q=${Uri.encode(text)}"
-                ).parsed<GoogleTranslationResponse>().sentences.joinToString("") { (trans, _) -> trans }
-            }
-            catch (t: Throwable){
-                retryNumber++
-                if(retryNumber >= maxRetry)
-                    throw t
-                delay( 500L * (2.0.pow(retryNumber).toLong()))
-            }
-        }
-        return ""
-    }
+    /* Removed onlineTranslate function */
 }

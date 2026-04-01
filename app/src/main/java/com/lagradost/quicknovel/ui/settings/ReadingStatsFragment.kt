@@ -176,12 +176,28 @@ class ReadingStatsFragment : Fragment() {
 
         // Helper to find the next tier for a given value
         fun getTier(valIn: Int, tiers: List<Int>): Pair<Int, Int> {
-            val nextTierIndex = tiers.indexOfFirst { valIn < it }
-            return if (nextTierIndex == -1) {
-                tiers.last() to tiers.last() // All completed
+            val tierIndex = tiers.indexOfFirst { valIn < it }
+            return if (tierIndex == -1) {
+                tiers.last() to tiers.size // All completed
             } else {
-                tiers[nextTierIndex] to nextTierIndex // Next tier and its level
+                tiers[tierIndex] to tierIndex // Next target tier and the count of completed tiers before it
             }
+        }
+
+        fun toRoman(number: Int): String {
+            if (number <= 0) return ""
+            val romanValues = intArrayOf(1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
+            val romanSymbols = arrayOf("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
+            
+            var n = number
+            val res = StringBuilder()
+            for (i in romanValues.indices) {
+                while (n >= romanValues[i]) {
+                    res.append(romanSymbols[i])
+                    n -= romanValues[i]
+                }
+            }
+            return res.toString()
         }
 
         val streakTiers = listOf(3, 7, 30, 100, 365)
@@ -196,7 +212,7 @@ class ReadingStatsFragment : Fragment() {
         
         // Streak Achievement
         achievements.add(Achievement(
-            title = if (streakLvl > 0) "Habit Former ${"I".repeat(streakLvl + 1)}" else "Early Bird",
+            title = if (streakLvl > 0) "Habit Former ${toRoman(streakLvl + 1)}" else "Early Bird",
             desc = "Maintain a $nextStreak-day streak",
             icon = R.drawable.ic_baseline_autorenew_24,
             currentProgress = streak,
@@ -205,7 +221,7 @@ class ReadingStatsFragment : Fragment() {
 
         // Volume Achievement
         achievements.add(Achievement(
-            title = "Page Turner ${"I".repeat(chapterLvl + 1)}",
+            title = "Page Turner ${toRoman(chapterLvl + 1)}",
             desc = "Read $nextChapter chapters",
             icon = R.drawable.ic_baseline_menu_book_24,
             currentProgress = chapters,
@@ -214,7 +230,7 @@ class ReadingStatsFragment : Fragment() {
 
         // Customizer Achievement
         achievements.add(Achievement(
-            title = "Customizer ${"I".repeat(customLvl + 1)}",
+            title = "Customizer ${toRoman(customLvl + 1)}",
             desc = "Personalize fonts/themes $nextCustom times",
             icon = R.drawable.ic_baseline_color_lens_24,
             currentProgress = customizations,

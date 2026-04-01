@@ -70,6 +70,7 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter android:label="Read with NeoQN">
                 <action android:name="android.intent.action.SEND" />
@@ -212,6 +213,8 @@
                 <data android:mimeType="application/epub+zip" />
             </intent-filter>
         </activity>
+
+
 
         <activity
             android:name=".PdfActivity"

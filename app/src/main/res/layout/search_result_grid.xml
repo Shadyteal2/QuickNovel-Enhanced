@@ -1,54 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        xmlns:tools="http://schemas.android.com/tools"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/search_result_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardBackgroundColor="?attr/primaryBlackBackground"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="4dp"
+    app:strokeColor="#1AFFFFFF"
+    app:strokeWidth="1dp"
+    app:cardPreventCornerOverlap="false">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_margin="2dp"
+        android:layout_height="wrap_content">
 
-        android:focusable="true"
-        android:clickable="true"
-        android:id="@+id/search_result_root">
-
-    <androidx.cardview.widget.CardView
-            android:foreground="?android:attr/selectableItemBackgroundBorderless"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginBottom="2dp"
-            app:cardElevation="4dp"
-            app:cardCornerRadius="@dimen/roundedImageRadius"
-            android:id="@+id/backgroundCard"
-            app:cardBackgroundColor="?attr/primaryGrayBackground">
-        <!-- USING CROP RATIO (182/268), centerCrop for fill -->
         <ImageView
-                android:duplicateParentState="true"
-                android:id="@+id/imageView"
-                android:scaleType="centerCrop"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="@string/poster_descript" />
+            android:id="@+id/imageView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintDimensionRatio="9:14"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:src="@drawable/splash_background" />
 
-    </androidx.cardview.widget.CardView>
-
-    <TextView
-            android:id="@+id/imageText"
-            android:layout_width="match_parent"
+        <!-- Glass Footer -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:maxLines="2"
-            android:minLines="2"
-            android:paddingStart="5dp"
-            android:paddingTop="5dp"
-            android:paddingEnd="5dp"
-            android:paddingBottom="5dp"
-            android:textColor="?attr/textColor"
-            android:shadowColor="#B4000000"
-            android:shadowDx="1.2"
-            android:shadowDy="1.2"
-            android:shadowRadius="1.5"
-            android:textSize="13sp"
-            tools:text="The Perfect Run\nThe Perfect Run" />
-</LinearLayout>
+            android:background="@drawable/glass_footer_background"
+            android:orientation="vertical"
+            android:paddingHorizontal="10dp"
+            android:paddingTop="18dp"
+            android:paddingBottom="10dp"
+            app:layout_constraintBottom_toBottomOf="@id/imageView"
+            app:layout_constraintEnd_toEndOf="@id/imageView"
+            app:layout_constraintStart_toStartOf="@id/imageView">
+
+            <TextView
+                android:id="@+id/imageText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/google_sans"
+                android:maxLines="2"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:shadowColor="#80000000"
+                android:shadowRadius="3"
+                tools:text="Novel Title Long Long Long Long" />
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>

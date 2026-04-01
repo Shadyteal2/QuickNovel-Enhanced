@@ -978,11 +978,13 @@ class ResultFragment : Fragment() {
             }
 
             // Keyboard Scrolling Focus Listener
-            resultNotesEdittext.setOnFocusChangeListener { _, hasFocus ->
+            resultNotesEdittext.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
-                    this@ResultFragment.binding.resultMainscroll.postDelayed({
-                        this@ResultFragment.binding.resultMainscroll.smoothScrollTo(0, resultNotesLayout.top)
-                    }, 200)
+                    val scrollHandler = android.os.Handler(android.os.Looper.getMainLooper())
+                    scrollHandler.postDelayed({
+                        val scrollPos = this@ResultFragment.binding.resultViewpager.top + resultNotesLayout.top - 100.toPx
+                        this@ResultFragment.binding.resultMainscroll.smoothScrollTo(0, Math.max(0, scrollPos))
+                    }, 400)
                 }
             }
         }

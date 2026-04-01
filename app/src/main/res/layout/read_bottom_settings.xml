@@ -179,6 +179,26 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:text="@string/inbuilt_dictionary"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_dictionary"
+                        android:layout_width="64dp"
+                        android:layout_height="32dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
                         android:text="@string/keep_screen_active"
                         android:textSize="16sp"
                         android:textColor="?attr/textColor" />
@@ -208,7 +228,7 @@
                         android:layout_height="32dp" />
                 </LinearLayout>
             </LinearLayout>
-
+            
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -612,16 +632,31 @@
             </LinearLayout>
 
 
-            <TextView
-                android:id="@+id/read_ml_title"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:layout_marginBottom="12dp"
-                android:text="@string/google_translate"
-                android:textColor="?attr/textColor"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:id="@+id/read_ml_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="@string/google_ml"
+                    android:textColor="?attr/textColor"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+                
+                <ImageButton
+                    android:id="@+id/read_ml_info_btn"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_google_ml"
+                    app:tint="?attr/textColor" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -669,25 +704,7 @@
                         app:icon="@drawable/translate_24px" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp"
-                    android:gravity="center_vertical">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/online_translate"
-                        android:textSize="16sp"
-                        android:textColor="?attr/textColor" />
-                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
-                        android:id="@+id/read_online_translation_switch"
-                        android:layout_width="64dp"
-                        android:layout_height="32dp" />
-                </LinearLayout>
+                <!-- Removed Auto-translate switch per user request -->
             </LinearLayout>
 
 

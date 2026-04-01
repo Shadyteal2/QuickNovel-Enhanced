@@ -25,6 +25,7 @@
     <string name="download_from_chapter">Partial download</string>
     <string name="download_ml">Download translation model</string>
     <string name="download_ml_long">To translate locally the app needs to download the translation model (~30MB)</string>
+    <string name="approx_30mb">~30MB</string>
     <string name="novel_imagecover_descript">Novel Imagecover</string>
     <string name="background_image_descript">Background Image</string>
     <string name="back_to_search">Back to search</string>
@@ -242,11 +243,14 @@
     <string name="download_path_key">download_path_key</string>
     <string name="download_path_pref">Download path</string>
     <string name="bionic_reading">Bionic Reading</string>
-    <string name="selectable_text">Selectable text</string>
+    <string name="selectable_text">Selectable text (to use inbuilt dictionary)</string>
     <string name="sleep_timer">Sleep</string>
     <string name="sleep_format">%d min</string>
     <string name="sleep_format_stop">TTS will stop in %d min</string>
-    <string name="google_translate">Google translate</string>
+    <string name="google_translate">Google Translate</string>
+    <string name="google_ml">Google ML</string>
+    <string name="ml_info_title">Google ML Kit</string>
+    <string name="ml_info_text">Fast, private, and offline translation. To translate, select your target language and tap \'Apply\'. Each language requires a one-time (~30MB) download. Once applied, use the translate icon in the reader toolbar to toggle between original and translated text.\n\nTip: If translation doesn\'t start immediately after a download, try restarting the app or re-applying the target language.</string>
     <string name="online_translate">Online translation</string>
     <string name="start_chapter">Skipped chapters</string>
     <string name="tts_speed">TTS Speed</string>
@@ -345,4 +349,38 @@
     <string name="library_tactile_response_key" translatable="false">library_tactile_response</string>
     <string name="library_tactile_response_title">Tactile Cover Response</string>
     <string name="library_tactile_response_desc">Enable premium 3D physical tilt effect when touching book covers.</string>
+    <string name="dictionary">Dictionary</string>
+    <string name="dictionary_not_found">Definition not found</string>
+    <string name="dictionary_error">Error fetching definition</string>
+    <string name="inbuilt_dictionary">Inbuilt Dictionary</string>
+
+    <!-- Translation Settings -->
+    <string name="translation_settings">Translation Settings</string>
+    <string name="advanced_settings">Advanced Settings</string>
+    <string name="translation_engine">Translation Engine</string>
+    <string name="translation_engine_key" translatable="false">translation_engine_key</string>
+    <string name="translation_target_lang">Target Language</string>
+    <string name="translation_target_lang_key" translatable="false">translation_target_lang_key</string>
+    
+    <string name="translate">Translate</string>
+    <string name="translation">Translation</string>
+
+    <string-array name="translation_engine_entries">
+        <item>None</item>
+        <item>Google ML Kit (Offline)</item>
+        <item>Google Translate (Online)</item>
+    </string-array>
+
+    <string-array name="translation_engine_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
+    <string name="translating_p">Translating</string>
+    <string name="translation_source_lang">Source Language</string>
+    <string name="translation_source_lang_key" translatable="false">translation_source_lang_key</string>
+    <string name="content_type">Content Type</string>
+    <string name="tone">Translation Tone</string>
 </resources>
+

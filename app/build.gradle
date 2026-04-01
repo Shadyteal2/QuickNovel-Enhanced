@@ -3,7 +3,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 
 android {
-    compileSdkVersion 35
+    compileSdkVersion 34
     
     dependenciesInfo {
         includeInApk = false
@@ -17,7 +17,7 @@ android {
     defaultConfig {
         applicationId "com.shady.neoqn"
         minSdkVersion 21
-        targetSdkVersion 35
+        targetSdkVersion 34
         versionCode 58
         versionName "2.0.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -47,14 +47,18 @@ android {
     buildFeatures.buildConfig true
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
     namespace 'com.lagradost.quicknovel'
+
+
+
+
 }
 
 dependencies {
@@ -86,7 +90,7 @@ dependencies {
     implementation 'androidx.media:media:1.7.0'
     implementation 'com.github.LagradOst:SafeFile:a926e7615a'
     implementation 'com.jaredrummler:colorpicker:1.1.0'
-
+    
     implementation 'com.github.Blatzar:NiceHttp:0.4.11'
     implementation "io.coil-kt.coil3:coil:3.0.4"
     implementation "io.coil-kt.coil3:coil-network-okhttp:3.0.4"
@@ -94,6 +98,8 @@ dependencies {
     implementation "io.noties.markwon:html:4.6.2"
     implementation "com.facebook.shimmer:shimmer:0.5.0"
     implementation "com.google.mlkit:translate:17.0.1"
+    implementation "com.google.mlkit:language-id:17.0.6"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1"
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
 
     // Room Database for Updates Feed

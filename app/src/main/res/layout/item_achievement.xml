@@ -1,74 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="12dp"
-    android:background="@drawable/spatial_glass_card"
     android:clickable="true"
     android:focusable="true"
-    android:orientation="horizontal"
-    android:padding="16dp">
-
-    <FrameLayout
-        android:id="@+id/achievement_icon_container"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginEnd="16dp"
-        android:background="@drawable/search_background"
-        android:backgroundTint="?attr/colorSurfaceVariant">
-
-        <ImageView
-            android:id="@+id/achievement_icon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_gravity="center"
-            android:src="@drawable/ic_baseline_star_24"
-            app:tint="?attr/colorPrimary" />
-            
-        <ImageView
-            android:id="@+id/achievement_locked"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:layout_gravity="bottom|end"
-            android:src="@drawable/ic_baseline_more_vert_24"
-            android:visibility="gone"
-            app:tint="?attr/grayTextColor" />
-    </FrameLayout>
+    app:cardBackgroundColor="?attr/primaryBlackBackground"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#1AFFFFFF"
+    app:strokeWidth="1dp">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/achievement_title"
-            android:layout_width="wrap_content"
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/achievement_icon_container"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="16dp"
+            app:cardBackgroundColor="?attr/iconGrayBackground"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <ImageView
+                android:id="@+id/achievement_icon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_baseline_star_24"
+                app:tint="?attr/colorPrimary"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/achievement_locked"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="2dp"
+                android:src="@drawable/ic_baseline_check_24"
+                android:visibility="gone"
+                app:tint="?attr/colorPrimary"
+                tools:ignore="ContentDescription" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Early Bird"
-            android:textColor="?attr/textColor"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/achievement_desc"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Read for 3 days in a row"
-            android:textColor="?attr/grayTextColor"
-            android:textSize="12sp" />
+            <TextView
+                android:id="@+id/achievement_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/google_sans"
+                android:maxLines="1"
+                android:textColor="?attr/textColor"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                tools:text="Early Bird V" />
 
-        <ProgressBar
-            android:id="@+id/achievement_progress"
-            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_marginTop="10dp"
-            android:progress="33"
-            android:progressTint="?attr/colorPrimary" />
+            <TextView
+                android:id="@+id/achievement_desc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="?attr/grayTextColor"
+                android:textSize="12sp"
+                tools:text="Read for 3 days in a row" />
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/achievement_progress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:progress="33"
+                app:indicatorColor="?attr/colorPrimary"
+                app:trackColor="?attr/iconGrayBackground"
+                app:trackCornerRadius="4dp"
+                app:trackThickness="4dp" />
+        </LinearLayout>
+
     </LinearLayout>
-
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>

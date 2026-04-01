@@ -138,7 +138,6 @@ class AnyAdapter(
     }
 
     override fun onBindFooter(holder: ViewHolderState<Any>) {
-        val compact = resView.context.getDownloadIsCompact()
         when (val binding = holder.view) {
             is DownloadImportBinding -> {
                 binding.backgroundCard.setOnClickListener {
@@ -153,17 +152,8 @@ class AnyAdapter(
                         performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                         downloadViewModel.importEpub()
                     }
-                    if (!compact) {
-                        layoutParams = LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            getCorrectHeight(itemCount - 1)
-                        )
-                    } else {
-                        layoutParams = LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT
-                        )
-                    }
+                    // QN-Enhanced: REMOVED layoutParams modification here to avoid layout thrashing.
+                    // The footer height is now handled by the layout XML.
                 }
             }
         }
@@ -171,7 +161,16 @@ class AnyAdapter(
 
     override fun onCreateCustomContent(parent: ViewGroup, viewType: Int): ViewHolderState<Any> {
         val compact = parent.context.getDownloadIsCompact()
-        val baseType = if (viewType >= 1000) viewType - 1000 else viewType
+        
+        // Extract base type and ratio variant from the consolidated viewType
+        // baseType is normalized back by BaseAdapter (viewType & CUSTOM_MASK)
+        val cleanType = viewType
+        val isCompactType = cleanType >= 1000
+        val typeWithoutCompact = if (isCompactType) cleanType - 1000 else cleanType
+        
+        val baseType = typeWithoutCompact % 100
+        val ratioVariant = typeWithoutCompact / 100 // 0 to 4
+        
         val binding = when (baseType) {
             RESULT_CACHED -> {
                 if (compact) {
@@ -185,7 +184,24 @@ class AnyAdapter(
                         LayoutInflater.from(parent.context),
                         parent,
                         false
-                    )
+                    ).apply {
+                        // QN-Enhanced: Set Aspect Ratio ONLY ONCE during creation
+                        // Deterministic Masonry Style (Pinterest variance)
+                        val ratio = when (ratioVariant) {
+                            0 -> "9:14"   // Standard
+                            1 -> "9:15"   // Tall
+                            2 -> "9:13"   // Short
+                            3 -> "9:14.5" // Medium-Tall
+                            else -> "9:13.5" // Medium-Short
+                        }
+                        (backgroundCard.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let {
+                            it.dimensionRatio = ratio
+                            backgroundCard.layoutParams = it
+                        }
+                        
+                        // High Quality Physical Feedback: Attach ONLY ONCE
+                        KineticTiltHelper.applyKineticTilt(backgroundCard)
+                    }
                 }
             }
 
@@ -201,7 +217,22 @@ class AnyAdapter(
                         LayoutInflater.from(parent.context),
                         parent,
                         false
-                    )
+                    ).apply {
+                        // QN-Enhanced: Set Aspect Ratio ONLY ONCE
+                        val ratio = when (ratioVariant) {
+                            0 -> "9:14"
+                            1 -> "9:15"
+                            2 -> "9:13"
+                            3 -> "9:14.5"
+                            else -> "9:13.5"
+                        }
+                        (backgroundCard.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let {
+                            it.dimensionRatio = ratio
+                            backgroundCard.layoutParams = it
+                        }
+                        
+                        KineticTiltHelper.applyKineticTilt(backgroundCard)
+                    }
                 }
             }
 
@@ -251,10 +282,8 @@ class AnyAdapter(
                     is DownloadFragment.DownloadDataLoaded -> {
                         view.apply {
                             backgroundCard.apply {
-                                layoutParams = LinearLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    getCorrectHeight(position)
-                                )
+                                // QN-Enhanced: NO LayoutParams modifications here.
+                                // Masonry is handled via ViewTypes and Ratios in onCreate.
                                 setOnClickListener {
                                     if (item.apiName == IMPORT_SOURCE_PDF && item.downloadedCount < item.downloadedTotal) {
                                         preloadPartialImportedPdf(item, context)
@@ -271,9 +300,6 @@ class AnyAdapter(
                                 }
                             }
                             
-                            // High Quality Physical Feedback
-                            KineticTiltHelper.applyKineticTilt(backgroundCard)
-
                             downloadProgressbarIndeterment.isVisible = item.generating
                             val showDownloadLoading = item.state == DownloadState.IsPending
 
@@ -299,10 +325,7 @@ class AnyAdapter(
                     is ResultCached -> {
                         view.apply {
                             backgroundCard.apply {
-                                layoutParams = LinearLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    getCorrectHeight(position)
-                                )
+                                // QN-Enhanced: NO LayoutParams modifications here.
                                 setOnClickListener { v ->
                                     v.postDelayed({
                                         val transitionUrl = item.source
@@ -322,9 +345,6 @@ class AnyAdapter(
                                     return@setOnLongClickListener true
                                 }
                             }
-                            
-                            // High Quality Physical Feedback
-                            KineticTiltHelper.applyKineticTilt(backgroundCard)
                             
                             imageView.setImage(
                                 item.image,
@@ -461,11 +481,29 @@ class AnyAdapter(
     override fun customContentViewType(item: Any): Int {
         val compact = resView.context.getDownloadIsCompact()
         val offset = if (compact) 1000 else 0
-        if (item is ResultCached) {
-            return RESULT_CACHED + offset
+        
+        val baseType = if (item is ResultCached) {
+            RESULT_CACHED + offset
         } else if (item is DownloadFragment.DownloadDataLoaded) {
-            return DOWNLOAD_DATA_LOADED + offset
+            DOWNLOAD_DATA_LOADED + offset
+        } else {
+            throw NotImplementedError()
         }
-        throw NotImplementedError()
+
+        // QN-Enhanced: Deterministic Masonry Pooling.
+        // We hash the item ID to choose its bento ratio.
+        // This ensures the same novel always has the same height across sessions.
+        return if (!compact) {
+            val id = when (item) {
+                is ResultCached -> item.id
+                is DownloadFragment.DownloadDataLoaded -> item.id
+                else -> 0
+            }.toLong()
+            
+            val variant = kotlin.math.abs((id % 5L).toInt())
+            baseType + (variant * 100)
+        } else {
+            baseType
+        }
     }
 }

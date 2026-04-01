@@ -22,6 +22,13 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.core.view.doOnPreDraw
+import android.view.ViewGroup
+import androidx.interpolator.view.animation.FastOutSlowInInterpolator
+import android.animation.AnimatorListenerAdapter
+import android.animation.Animator
+import android.view.ViewAnimationUtils
+import kotlin.math.hypot
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -83,8 +90,6 @@ import com.lagradost.quicknovel.util.UIHelper.popupMenu
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.util.toPx
 import com.lagradost.safefile.SafeFile
-import android.view.ViewGroup
-import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.bottomnavigation.BottomNavigationItemView
@@ -619,8 +624,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     override fun onCreate(savedInstanceState: Bundle?) {
         mainActivity = this
 
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
 // removed early listener
 
@@ -632,30 +637,55 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
 
-        // Smooth Theme Transition Overlay
+        // QN-Enhanced: Premium Circular Radial Reveal Transition (Material Design)
         if (CommonActivity.pendingThemeChangeScreenshot != null) {
+            val screenshot = CommonActivity.pendingThemeChangeScreenshot
+            val decorView = window.decorView as android.view.ViewGroup
             val overlay = android.widget.ImageView(this)
-            overlay.setImageBitmap(CommonActivity.pendingThemeChangeScreenshot)
+            overlay.setImageBitmap(screenshot)
             overlay.scaleType = android.widget.ImageView.ScaleType.FIT_XY
-            
-            // Add to content root
-            val params = android.widget.FrameLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            addContentView(overlay, params)
+            val params = android.widget.FrameLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+            decorView.addView(overlay, params)
 
-            overlay.animate()
-                .alpha(0f)
-                .setDuration(500)
-                .setInterpolator(android.view.animation.AccelerateInterpolator())
-                .setStartDelay(50)
-                .withEndAction {
-                    CommonActivity.pendingThemeChangeScreenshot = null
-                    val parent = (overlay.parent as? android.view.ViewGroup)
-                    parent?.removeView(overlay)
-                }.start()
+            overlay.doOnPreDraw {
+                // QN-Enhanced: 50ms "Settling" delay. This gives the CPU breathing room to 
+                // finish heavy layout inflation after recreate() before starting the GPU-heavy animation.
+                it.postDelayed({
+                    if (isFinishing || isDestroyed) return@postDelayed
+                    
+                    val width = it.width.toFloat()
+                    val height = it.height.toFloat()
+                    val cx = CommonActivity.themeCenterX ?: width
+                    val cy = CommonActivity.themeCenterY ?: 0f
+                    val finalRadius = hypot(width.toDouble(), height.toDouble()).toFloat()
+
+                    try {
+                        overlay.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                        val anim = ViewAnimationUtils.createCircularReveal(overlay, cx.toInt(), cy.toInt(), finalRadius, 0f)
+                        anim.duration = 750 
+                        anim.interpolator = FastOutSlowInInterpolator()
+                        anim.addListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                overlay.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                decorView.removeView(overlay)
+                                overlay.setImageDrawable(null)
+                                screenshot?.recycle()
+                                CommonActivity.pendingThemeChangeScreenshot = null
+                                CommonActivity.themeCenterX = null
+                                CommonActivity.themeCenterY = null
+                            }
+                        })
+                        anim.start()
+                    } catch (e: Exception) {
+                        overlay.animate().alpha(0f).setDuration(400).withEndAction {
+                            decorView.removeView(overlay)
+                            CommonActivity.pendingThemeChangeScreenshot = null
+                        }.start()
+                    }
+                }, 50)
+            }
         }
+
 
         binding?.let { b ->
             ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, windowInsets ->
@@ -703,14 +733,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         updateGlobalBackground()
         settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)
         updateUpdatesBadge()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            binding?.navBarBlurView?.setRenderEffect(
-                RenderEffect.createBlurEffect(
-                    30f, 30f, Shader.TileMode.CLAMP
-                )
-            )
-        }
 
         setUpBackup()
 
@@ -962,7 +984,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                             val nextCenterX = itemViewNext.left + itemViewNext.width / 2f
 
                             val currentX = currentCenterX + (nextCenterX - currentCenterX) * androidx.interpolator.view.animation.FastOutSlowInInterpolator().getInterpolation(positionOffset)
-                            navIndicator.translationX = currentX - navIndicator.width / 2f
+                            navIndicator?.let { indicator ->
+                                indicator.translationX = currentX - indicator.width / 2f
+                            }
                         }
                     }
                 }
@@ -1036,7 +1060,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             val firstItem = tabs.getOrNull(binding?.mainViewpager?.currentItem ?: 0) ?: return@post
             val itemView = navView.findViewById<android.view.View>(firstItem)
             if (itemView != null) {
-                binding?.navIndicator?.translationX = (itemView.left + itemView.width / 2f) - (binding?.navIndicator?.width ?: 0) / 2f
+                binding?.navIndicator?.let { indicator ->
+                    indicator.translationX = (itemView.left + itemView.width / 2f) - (indicator.width / 2f)
+                }
             }
         }
 
