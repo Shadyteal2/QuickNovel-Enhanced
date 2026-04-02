@@ -648,7 +648,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             decorView.addView(overlay, params)
 
             overlay.doOnPreDraw {
-                // QN-Enhanced: 50ms "Settling" delay. This gives the CPU breathing room to 
+                // QN-Enhanced: 10ms "Settling" delay. Just a tiny buffer to 
                 // finish heavy layout inflation after recreate() before starting the GPU-heavy animation.
                 it.postDelayed({
                     if (isFinishing || isDestroyed) return@postDelayed
@@ -662,7 +662,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     try {
                         overlay.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         val anim = ViewAnimationUtils.createCircularReveal(overlay, cx.toInt(), cy.toInt(), finalRadius, 0f)
-                        anim.duration = 750 
+                        anim.duration = 350 // Dramatically faster, premium snap
                         anim.interpolator = FastOutSlowInInterpolator()
                         anim.addListener(object : AnimatorListenerAdapter() {
                             override fun onAnimationEnd(animation: Animator) {
@@ -677,12 +677,12 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         })
                         anim.start()
                     } catch (e: Exception) {
-                        overlay.animate().alpha(0f).setDuration(400).withEndAction {
+                        overlay.animate().alpha(0f).setDuration(250).withEndAction {
                             decorView.removeView(overlay)
                             CommonActivity.pendingThemeChangeScreenshot = null
                         }.start()
                     }
-                }, 50)
+                }, 10)
             }
         }
 

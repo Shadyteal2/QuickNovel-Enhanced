@@ -559,12 +559,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 )
                 var fileStream: OutputStream?
                 try {
-                    fileStream = setupStream(
+                    val (stream, _) = setupStream(
                         it.context,
                         "logcat_${date}",
                         "txt",
                         getDefaultDir(context = it.context)
-                    ) ?: throw ErrorLoadingException("No stream")
+                    )
+                    fileStream = stream
+                    if (fileStream == null) throw ErrorLoadingException("No stream")
 
                     fileStream.writer().use { writer -> writer.write(logList.joinToString("\n")) }
                     dialog.dismissSafe(activity)

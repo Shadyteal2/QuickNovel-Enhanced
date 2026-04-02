@@ -114,14 +114,24 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
 
         fun download(
             load: LoadResponse,
-            context: Context
+            context: Context,
+            indices: List<Int>? = null
         ) {
-            if(load.apiName == IMPORT_SOURCE || load.apiName == IMPORT_SOURCE_PDF) {
+            if (load.apiName == IMPORT_SOURCE || load.apiName == IMPORT_SOURCE_PDF) {
                 return
             }
-            startDownload(load, context)
+            if (indices != null && load is StreamResponse) {
+                startDownload(DownloadBatch(load, indices), context)
+            } else {
+                startDownload(load, context)
+            }
         }
     }
+
+    data class DownloadBatch(
+        val load: StreamResponse,
+        val indices: List<Int>
+    )
 
     @WorkerThread
     override suspend fun doWork(): Result {
@@ -129,6 +139,10 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         when (id) {
             ID_DOWNLOAD -> {
                 when (val data = popWork(this.workerParams.inputData.getInt(DATA, -1))) {
+                    is DownloadBatch -> {
+                        BookDownloader2.downloadWorkThread(data.load, Apis.getApiFromName(data.load.apiName), data.indices)
+                    }
+
                     is StreamResponse -> {
                         BookDownloader2.downloadWorkThread(data, Apis.getApiFromName(data.apiName))
                     }
@@ -138,7 +152,7 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
                     }
 
                     is DownloadFragment.DownloadDataLoaded -> {
-                        if(data.apiName == IMPORT_SOURCE_PDF)
+                        if (data.apiName == IMPORT_SOURCE_PDF)
                             BookDownloader2.downloadPDFWorkThread(data.source.toUri(), context)
                         else
                             BookDownloader2.downloadWorkThread(data)

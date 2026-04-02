@@ -185,20 +185,18 @@ class AnyAdapter(
                         parent,
                         false
                     ).apply {
-                        // QN-Enhanced: Set Aspect Ratio ONLY ONCE during creation
-                        // Deterministic Masonry Style (Pinterest variance)
+                        // Standard masonry tall-portrait ratios (used as base)
                         val ratio = when (ratioVariant) {
-                            0 -> "9:14"   // Standard
-                            1 -> "9:15"   // Tall
-                            2 -> "9:13"   // Short
-                            3 -> "9:14.5" // Medium-Tall
-                            else -> "9:13.5" // Medium-Short
+                            0 -> "9:14"
+                            1 -> "9:15"
+                            2 -> "9:13"
+                            3 -> "9:14.5"
+                            else -> "9:13.5"
                         }
                         (backgroundCard.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let {
                             it.dimensionRatio = ratio
                             backgroundCard.layoutParams = it
                         }
-                        
                         // High Quality Physical Feedback: Attach ONLY ONCE
                         KineticTiltHelper.applyKineticTilt(backgroundCard)
                     }
@@ -218,7 +216,6 @@ class AnyAdapter(
                         parent,
                         false
                     ).apply {
-                        // QN-Enhanced: Set Aspect Ratio ONLY ONCE
                         val ratio = when (ratioVariant) {
                             0 -> "9:14"
                             1 -> "9:15"
@@ -230,7 +227,6 @@ class AnyAdapter(
                             it.dimensionRatio = ratio
                             backgroundCard.layoutParams = it
                         }
-                        
                         KineticTiltHelper.applyKineticTilt(backgroundCard)
                     }
                 }
@@ -282,8 +278,19 @@ class AnyAdapter(
                     is DownloadFragment.DownloadDataLoaded -> {
                         view.apply {
                             backgroundCard.apply {
-                                // QN-Enhanced: NO LayoutParams modifications here.
-                                // Masonry is handled via ViewTypes and Ratios in onCreate.
+                                // QN-Enhanced: Synchronize Bento Grid aspect ratios via bind position to avoid gaps
+                                val isBento3x3 = PreferenceManager.getDefaultSharedPreferences(context ?: return@apply).getBoolean("library_bento_3x3", false)
+                                if (isBento3x3) {
+                                    val isFeatured = (position % 7 == 0 || position % 7 == 5)
+                                    val bentoRatio = if (isFeatured) "16:7" else "1:1"
+                                    (layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let { p ->
+                                        if (p.dimensionRatio != bentoRatio) {
+                                            p.dimensionRatio = bentoRatio
+                                            layoutParams = p
+                                        }
+                                    }
+                                }
+
                                 setOnClickListener {
                                     if (item.apiName == IMPORT_SOURCE_PDF && item.downloadedCount < item.downloadedTotal) {
                                         preloadPartialImportedPdf(item, context)
@@ -325,7 +332,19 @@ class AnyAdapter(
                     is ResultCached -> {
                         view.apply {
                             backgroundCard.apply {
-                                // QN-Enhanced: NO LayoutParams modifications here.
+                                // QN-Enhanced: Synchronize Bento Grid aspect ratios via bind position to avoid gaps
+                                val isBento3x3 = PreferenceManager.getDefaultSharedPreferences(context ?: return@apply).getBoolean("library_bento_3x3", false)
+                                if (isBento3x3) {
+                                    val isFeatured = (position % 7 == 0 || position % 7 == 5)
+                                    val bentoRatio = if (isFeatured) "16:7" else "1:1"
+                                    (layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let { p ->
+                                        if (p.dimensionRatio != bentoRatio) {
+                                            p.dimensionRatio = bentoRatio
+                                            layoutParams = p
+                                        }
+                                    }
+                                }
+
                                 setOnClickListener { v ->
                                     v.postDelayed({
                                         val transitionUrl = item.source
@@ -500,7 +519,20 @@ class AnyAdapter(
                 else -> 0
             }.toLong()
             
-            val variant = kotlin.math.abs((id % 5L).toInt())
+            val isBento3x3 = PreferenceManager
+                .getDefaultSharedPreferences(resView.context)
+                .getBoolean("library_bento_3x3", false)
+
+            val variant = if (isBento3x3) {
+                // Bento Logic: We update dimensionRatio dynamically in onBindContent via position
+                // By returning 0 here, we pool ALL bento cards into a single recycled view pool
+                // This eliminates jitter completely and maximizes performance for 1000+ items
+                0
+            } else {
+                // Masonry logic: cycle of 5 based on stable ID
+                kotlin.math.abs((id % 5L).toInt())
+            }
+            
             baseType + (variant * 100)
         } else {
             baseType

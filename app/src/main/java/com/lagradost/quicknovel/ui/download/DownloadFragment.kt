@@ -65,6 +65,9 @@ class DownloadFragment : Fragment() {
         if (key == "library_nav_style_key") {
             updateNavStyleUI()
         }
+        if (key == "library_bento_3x3" || key == "library_pinterest_bento") {
+            setupGridView()
+        }
     }
 
     override fun onResume() {
@@ -189,29 +192,58 @@ class DownloadFragment : Fragment() {
         val adapter = (binding.viewpager.adapter as? ViewpagerAdapter) ?: return
         val prefs = PreferenceManager.getDefaultSharedPreferences(context ?: return)
         val usePinterest = prefs.getBoolean("library_pinterest_bento", false)
+        val use3x3Bento = prefs.getBoolean("library_bento_3x3", false)
 
         for ((_, ref) in adapter.collectionsOfRecyclerView) {
             val rv = ref.get() ?: continue
             val compactView = rv.context.getDownloadIsCompact()
 
-            rv.layoutManager = if (usePinterest && !compactView) {
-                // Pinterest True Masonry: 2 columns, gapless vertical filling
-                StaggeredGridLayoutManager(
-                    2, StaggeredGridLayoutManager.VERTICAL
-                ).apply {
-                    gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
+            rv.layoutManager = when {
+                use3x3Bento && !compactView -> {
+                    // True Bento Grid: 3-column base with featured wide cards
+                    // Pattern: every 7th item (0-indexed) is a featured 2-span card
+                    // Layout cycle of 7: [1,1,2,1,1,1,1] = fills 3+3+3+3+3+3+3 = nicely
+                    // Actually: cycle of 7 =[2,1,1,1,1,2,1] to create visual rhythm
+                    val rvAdapter = rv.adapter
+                    androidx.recyclerview.widget.GridLayoutManager(rv.context, 3).apply {
+                        spanSizeLookup = object : androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup() {
+                            override fun getSpanSize(position: Int): Int {
+                                // Footer always takes full width
+                                if (rvAdapter != null && position >= rvAdapter.itemCount - 1) return 3
+                                
+                                // Position-based packing perfectly fills all 3 columns without gaps:
+                                // Row 1: pos 0 (span 2), pos 1 (span 1) -> sum 3
+                                // Row 2: pos 2 (1), pos 3 (1), pos 4 (1) -> sum 3
+                                // Row 3: pos 5 (2), pos 6 (1) -> sum 3
+                                return when (position % 7) {
+                                    0, 5 -> 2   // wide/featured card
+                                    else -> 1   // regular square card
+                                }
+                            }
+                        }
+                        isItemPrefetchEnabled = true
+                    }
                 }
-            } else {
-                // Standard Grid: Clean blocks
-                val spanCountLandscape = if (compactView) 2 else 6
-                val spanCountPortrait = if (compactView) 1 else 3
-                val orientation = rv.resources.configuration.orientation
-                val totalSpan = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                    spanCountLandscape
-                } else {
-                    spanCountPortrait
+                usePinterest && !compactView -> {
+                    // Pinterest True Masonry: 2 columns, gapless vertical filling
+                    StaggeredGridLayoutManager(
+                        2, StaggeredGridLayoutManager.VERTICAL
+                    ).apply {
+                        gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
+                    }
                 }
-                androidx.recyclerview.widget.GridLayoutManager(rv.context, totalSpan)
+                else -> {
+                    // Standard Grid: Clean blocks
+                    val spanCountLandscape = if (compactView) 2 else 6
+                    val spanCountPortrait = if (compactView) 1 else 3
+                    val orientation = rv.resources.configuration.orientation
+                    val totalSpan = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                        spanCountLandscape
+                    } else {
+                        spanCountPortrait
+                    }
+                    androidx.recyclerview.widget.GridLayoutManager(rv.context, totalSpan)
+                }
             }
 
             // QN-Enhanced: Peak Performance Tuning

@@ -63,6 +63,7 @@ const val NOVEL_REPLACEMENTS: String = "novel_replacements"
 const val RESULT_BOOKMARK: String = "result_bookmarked"
 const val RESULT_BOOKMARK_STATE: String = "result_bookmarked_state"
 const val HISTORY_FOLDER: String = "result_history"
+const val RESULT_CHAPTER_BOOKMARK: String = "result_chapter_bookmarked"
 const val CURRENT_TAB : String = "current_tab"
 /** When inserting many keys use this function, this is because apply for every key is very expensive on memory */
 data class Editor(
@@ -89,6 +90,18 @@ data class Editor(
             return value.filterIsInstance<String>().size == value.size
         }
         return false
+    }
+
+    fun <T> setKey(path: String, value: T) {
+        try {
+            editor.putString(path, DataStore.mapper.writeValueAsString(value))
+        } catch (e: Exception) {
+            logError(e)
+        }
+    }
+
+    fun removeKey(path: String) {
+        editor.remove(path)
     }
 
     fun apply() {

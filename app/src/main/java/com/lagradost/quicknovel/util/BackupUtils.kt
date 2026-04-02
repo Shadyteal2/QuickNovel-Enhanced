@@ -49,7 +49,7 @@ object BackupUtils {
         @JsonProperty("settings") val settings: BackupVars
     )
 
-    fun setupStream(context: Context, displayName : String, ext : String, subDir : SafeFile?) : OutputStream? {
+    fun setupStream(context: Context, displayName : String, ext : String, subDir : SafeFile?) : Pair<OutputStream?, Uri?> {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { // && subDir?.isDownloadDir() == true
             val cr = context.contentResolver
             val contentUri =
@@ -67,8 +67,9 @@ object BackupUtils {
                 contentUri,
                 newFile
             ) ?: throw IOException("Error creating file uri")
-            cr.openOutputStream(newFileUri, "w")
+            val stream = cr.openOutputStream(newFileUri, "w")
                 ?: throw IOException("Error opening stream")
+            return stream to newFileUri
         } else {
             val fileName = "$displayName.$ext"
             val rFile = subDir?.findFile(fileName)
@@ -79,8 +80,21 @@ object BackupUtils {
                 subDir?.createFile(fileName)
                     ?: throw IOException("Error creating file")
             if (file.exists() != true) throw IOException("File does not exist")
-            file.openOutputStream()
+            val stream = file.openOutputStream()
+            return stream to file.uri()
         }
+    }
+
+    private fun isDownloadKey(key: String): Boolean {
+        // QN-Enhanced: Strictly ignore all download-related meta/content to reduce backup size
+        // and prevent ghost downloads from appearing post-restore.
+        return key.startsWith("downloads_data/") ||
+               key.startsWith("download_settings") ||
+               key.startsWith("downloads_size/") ||
+               key.startsWith("downloads_total/") ||
+               key.startsWith("downloads_offset/") ||
+               key.startsWith("downloads_epub_size/") ||
+               key.startsWith("downloads_epub_last_access/")
     }
 
     fun FragmentActivity.backup() {
@@ -88,18 +102,20 @@ object BackupUtils {
             if (checkWrite()) {
                 val subDir = SettingsFragment.getDefaultDir(context = this)//getBasePath().first
                 val date = SimpleDateFormat("yyyy_MM_dd_HH_mm").format(Date(currentTimeMillis()))
-                val displayName = "QN_Backup_${date}"
+                val displayName = "neoQN_Backup_${date}"
 
                 val allData = getSharedPrefs().all
                 val allSettings = getDefaultSharedPrefs().all
 
+                val allDataFiltered = allData.filterKeys { !isDownloadKey(it) }
+
                 val allDataSorted = BackupVars(
-                    allData.filter { it.value is Boolean } as? Map<String, Boolean>,
-                    allData.filter { it.value is Int } as? Map<String, Int>,
-                    allData.filter { it.value is String } as? Map<String, String>,
-                    allData.filter { it.value is Float } as? Map<String, Float>,
-                    allData.filter { it.value is Long } as? Map<String, Long>,
-                    allData.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
+                    allDataFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
+                    allDataFiltered.filter { it.value is Int } as? Map<String, Int>,
+                    allDataFiltered.filter { it.value is String } as? Map<String, String>,
+                    allDataFiltered.filter { it.value is Float } as? Map<String, Float>,
+                    allDataFiltered.filter { it.value is Long } as? Map<String, Long>,
+                    allDataFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
                 )
 
                 val allSettingsSorted = BackupVars(
@@ -115,9 +131,10 @@ object BackupUtils {
                     allDataSorted,
                     allSettingsSorted
                 )
-                val steam = setupStream(this,displayName,"json", subDir)
+                val (stream, fileUri) = setupStream(this,displayName,"json", subDir)
+                if (stream == null) throw IOException("Error creating export stream")
 
-                val printStream = PrintWriter(steam)
+                val printStream = PrintWriter(stream)
                 printStream.print(mapper.writeValueAsString(backupFile))
                 printStream.close()
 
@@ -125,6 +142,21 @@ object BackupUtils {
                     R.string.backup_success,
                     Toast.LENGTH_LONG
                 )
+
+                // QN-Enhanced: Open Share Panel immediately after backup
+                if (fileUri != null) {
+                    try {
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/json"
+                            putExtra(android.content.Intent.EXTRA_STREAM, fileUri)
+                            flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        }
+                        startActivity(android.content.Intent.createChooser(shareIntent, "Save or Share Backup"))
+                    } catch (e: Exception) {
+                        logError(e)
+                    }
+                }
+
             } else {
                 showToast(getString(R.string.backup_failed), Toast.LENGTH_LONG)
                 requestRW()
@@ -212,8 +244,8 @@ object BackupUtils {
     ) {
         val editor = DataStore.editor(this, isEditingAppSettings)
         map?.forEach {
-            // QN-Enhanced: Prevent download metadata from leaking into the 'Downloaded' section post-restore
-            if (!it.key.startsWith("downloads_data/")) {
+            // QN-Enhanced: Prevent ANY download metadata from leaking into the 'Downloaded' section post-restore
+            if (!isDownloadKey(it.key)) {
                 editor.setKeyRaw(it.key, it.value)
             }
         }

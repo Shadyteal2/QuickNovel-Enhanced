@@ -322,6 +322,8 @@
 
     <style name="AppEditStyle" parent="android:Widget.EditText">
         <item name="android:fontFamily">@font/google_sans</item>
+        <item name="android:textColor">?attr/textColor</item>
+        <item name="android:textColorHint">?attr/grayTextColor</item>
     </style>
 
     <style name="NiceButton">
@@ -440,7 +442,7 @@
         <item name="iconGrayBackground">@color/lightGrayBackground</item>
         <item name="boxItemBackground">@color/lightItemBackground</item>
         <item name="textColor">@color/lightTextColor</item>
-        <item name="floatingNavBackground">#CCFFFFFF</item> <!-- High-alpha white glass for readability -->
+        <item name="floatingNavBackground">#E6FFFFFF</item> <!-- Slightly more opaque white glass -->
         <item name="floatingNavStroke">#4D000000</item> <!-- Visible dark edge -->
         <item name="grayTextColor">@color/lightGrayTextColor</item>
         <item name="white">#000</item>

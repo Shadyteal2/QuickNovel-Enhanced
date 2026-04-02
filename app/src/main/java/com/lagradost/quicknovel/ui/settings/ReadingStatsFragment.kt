@@ -328,7 +328,7 @@ class ReadingStatsFragment : Fragment() {
                 if (i == 2) { 
                     backgroundTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.colorPrimary, null))
                 } else {
-                    backgroundTintList = android.content.res.ColorStateList.valueOf(resources.getColor(com.google.android.material.R.color.material_dynamic_neutral20, null))
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.grayTextColor, null))
                     alpha = 0.5f
                 }
             }

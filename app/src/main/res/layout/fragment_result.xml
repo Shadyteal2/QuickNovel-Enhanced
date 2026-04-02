@@ -6,6 +6,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:clickable="true"
     android:focusable="true">
 
@@ -291,12 +293,15 @@
                 android:focusable="false"
                 android:paddingHorizontal="16dp"
                 app:tabIndicatorFullWidth="true"
-                app:tabGravity="start"
-                app:tabIndicator="@drawable/indicator_background"
-                app:tabIndicatorColor="?attr/white"
+                app:tabGravity="center"
+                app:indicatorColor="@android:color/transparent"
+                app:tabIndicator="@drawable/tab_pill_indicator"
+                app:tabIndicatorAnimationMode="elastic"
                 app:tabIndicatorGravity="center"
-                app:tabIndicatorHeight="32dp"
-                app:tabMode="scrollable"
+                app:tabIndicatorHeight="36dp"
+                app:tabMode="fixed"
+                app:tabSelectedTextColor="?attr/textColor"
+                app:tabTextColor="?attr/grayTextColor"
                 app:tabTextAppearance="@style/TabNoCaps" />
 
             <!-- Empty view has been REMOVED as spacing was flattened -->
@@ -426,4 +431,103 @@
         <include layout="@layout/loading_skeleton_result" />
 
     </com.facebook.shimmer.ShimmerFrameLayout>
+
+    <!-- Chapter Selection Toolbar (Glass Design) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/result_selection_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="?attr/primaryGrayBackground"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="12dp"
+        app:strokeColor="?attr/colorPrimary"
+        app:strokeWidth="1.5dp"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <ImageView
+                android:id="@+id/result_selection_close"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="12dp"
+                android:src="@drawable/ic_sharp_clear_24"
+                app:tint="?attr/textColor" />
+
+            <TextView
+                android:id="@+id/result_selection_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/google_sans"
+                android:paddingStart="8dp"
+                android:textColor="?attr/textColor"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="1 Selected" />
+
+
+
+            <ImageView
+                android:id="@+id/result_selection_bookmark"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="10dp"
+                android:src="@drawable/ic_baseline_bookmark_24"
+                android:contentDescription="Bookmark"
+                app:tint="?attr/colorPrimary" />
+
+            <!-- Unbookmark -->
+            <ImageView
+                android:id="@+id/result_selection_unbookmark"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="10dp"
+                android:src="@drawable/ic_baseline_bookmark_border_24"
+                android:contentDescription="Unbookmark"
+                app:tint="?attr/colorPrimary" />
+
+            <!-- Read -->
+            <ImageView
+                android:id="@+id/result_selection_mark_read"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="10dp"
+                android:src="@drawable/ic_baseline_check_24"
+                app:tint="?attr/textColor" />
+
+            <!-- Unread -->
+            <ImageView
+                android:id="@+id/result_selection_mark_unread"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="10dp"
+                android:src="@drawable/ic_baseline_history_24"
+                app:tint="?attr/colorPrimary" />
+
+            <ImageView
+                android:id="@+id/result_selection_select_all"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="10dp"
+                android:src="@drawable/ic_baseline_select_all_24"
+                app:tint="?attr/textColor" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

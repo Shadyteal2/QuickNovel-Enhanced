@@ -5,7 +5,7 @@
     android:insetTop="20dp"
     android:insetBottom="20dp">
     <layer-list>
-        <!-- Main Glass Panel -->
+        <!-- Background Layer -->
         <item>
             <shape>
                 <solid android:color="?attr/floatingNavBackground" />
@@ -13,10 +13,22 @@
             </shape>
         </item>
 
+        <!-- Glass Shine/Gradient Overlay -->
+        <item>
+            <shape>
+                <gradient
+                    android:angle="135"
+                    android:startColor="#1AFFFFFF"
+                    android:endColor="#00FFFFFF"
+                    android:type="linear" />
+                <corners android:radius="24dp" />
+            </shape>
+        </item>
+
         <!-- Subtle Border Edge Highlight (The "Glass" edge) -->
         <item>
             <shape>
-                <stroke android:width="1.2dp" android:color="?attr/floatingNavStroke" />
+                <stroke android:width="1.5dp" android:color="?attr/floatingNavStroke" />
                 <corners android:radius="24dp" />
             </shape>
         </item>

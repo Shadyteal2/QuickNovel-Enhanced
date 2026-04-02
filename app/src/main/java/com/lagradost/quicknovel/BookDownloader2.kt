@@ -1684,7 +1684,7 @@ object BookDownloader2 {
         )
     }
 
-    fun download(load: LoadResponse, context: Context) {
+    fun download(load: LoadResponse, context: Context, indices: List<Int>? = null) {
         DownloadFileWorkManager.download(load, context)
     }
 
@@ -2740,6 +2740,88 @@ object BookDownloader2 {
             currentDownloadsMutex.withLock {
                 currentDownloads -= id
             }
+        }
+    }
+
+    @WorkerThread
+    suspend fun downloadWorkThread(
+        load: StreamResponse,
+        api: APIRepository,
+        indices: List<Int>
+    ) {
+        val filesDir = context?.filesDir ?: return
+        val sApiName = BookDownloader2Helper.sanitizeFilename(api.name)
+        val sAuthor = BookDownloader2Helper.sanitizeFilename(load.author ?: "")
+        val sName = BookDownloader2Helper.sanitizeFilename(load.name)
+        val id = generateId(load, api.name)
+
+        val totalItems = indices.size.toLong()
+        setPrefixData(load, api.name, totalItems, 0L)
+
+        var downloadedTotal = 0L
+
+        try {
+            downloadImage(load, sApiName, sAuthor, sName, filesDir)
+            var currentState = DownloadState.IsDownloading
+
+            for ((indexInBatch, index) in indices.withIndex()) {
+                val data = load.data.getOrNull(index) ?: continue
+
+                while (true) {
+                    when (consumeAction(id)) {
+                        DownloadActionType.Pause -> DownloadState.IsPaused
+                        DownloadActionType.Resume -> DownloadState.IsDownloading
+                        DownloadActionType.Stop -> DownloadState.IsStopped
+                        else -> null
+                    }?.let { newState ->
+                        changeDownload(id) { state = newState }?.let { progressState ->
+                            createNotification(id, load, progressState)
+                        }
+                        currentState = newState
+                    }
+                    if (currentState != DownloadState.IsPaused) break
+                    delay(200)
+                }
+
+                val filepath = filesDir.toString() + BookDownloader2Helper.getFilename(sApiName, sAuthor, sName, index)
+                val rFile = File(filepath)
+                if (rFile.exists() && rFile.length() > 10) {
+                    downloadedTotal += 1
+                    continue
+                }
+
+                val hasDownloadedChapter = BookDownloader2Helper.downloadIndividualChapter(filepath, api, data)
+                if (hasDownloadedChapter) {
+                    downloadedTotal += 1
+                } else {
+                    currentState = DownloadState.IsFailed
+                }
+
+                changeDownload(id) {
+                    this.progress = indexInBatch.toLong() + 1L
+                    this.downloaded = downloadedTotal
+                    this.state = currentState
+                }?.let { progressState ->
+                    createNotification(id, load, progressState)
+                }
+
+                if (currentState == DownloadState.IsStopped || currentState == DownloadState.IsFailed) break
+            }
+
+            if (downloadedTotal > 0) setSuffixData(load, api.name)
+
+            changeDownload(id) {
+                this.progress = totalItems
+                this.downloaded = downloadedTotal
+                state = DownloadState.IsDone
+            }?.let { progressState ->
+                if (downloadedTotal > 0) createNotification(id, load, progressState)
+            }
+        } catch (t: Throwable) {
+            if (downloadedTotal > 0) setSuffixData(load, api.name)
+            logError(t)
+        } finally {
+            currentDownloadsMutex.withLock { currentDownloads -= id }
         }
     }
 

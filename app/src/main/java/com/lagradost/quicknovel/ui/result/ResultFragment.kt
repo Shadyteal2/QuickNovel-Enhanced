@@ -427,6 +427,17 @@ class ResultFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Expand backdrop to 1.5x screen height so parallax never exposes a gap at the bottom.
+        // At 0.25x parallax factor, max upward shift ≈ (contentHeight - screenHeight) * 0.25.
+        // Making the backdrop 50% taller than screen guarantees full coverage for typical page lengths.
+        view.post {
+            val screenHeight = resources.displayMetrics.heightPixels
+            val backdropParams = binding.resultBackdropHolder.layoutParams
+            backdropParams.height = (screenHeight * 1.5f).toInt()
+            binding.resultBackdropHolder.layoutParams = backdropParams
+        }
+
         
 
 
@@ -585,6 +596,7 @@ class ResultFragment : Fragment() {
             }
 
             // Using indices 0 (Novel) and 3 (Chapters) for tabIds to maintain existing mapping but filter to only two tabs
+            resultViewpager.offscreenPageLimit = 2
             resultViewpager.adapter = ResultFragmentAdapter(
                 tabIds = listOf(0, 3),
                 bindingGetter = { tabView, tabId ->
@@ -899,8 +911,8 @@ class ResultFragment : Fragment() {
         }
 
         binding.resultMainscroll.setOnScrollChangeListener { v: NestedScrollView, _, scrollY, _, oldScrollY ->
-            // Scroll backdrop with layout to fix wallpaper disconnect
-            binding.resultBackdropHolder.translationY = -scrollY.toFloat()
+            // Gentle parallax: backdrop moves at 0.25x speed so it always fills the screen
+            binding.resultBackdropHolder.translationY = -scrollY * 0.25f
             
             // Removed reviewsFab alpha logic since it's gone
             
@@ -928,8 +940,112 @@ class ResultFragment : Fragment() {
                 }
             }*/
         }
-    }
 
+        // --- Selection Management Wiring (End of onViewCreated) ---
+        
+        val backCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                viewModel.setSelectionMode(false)
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
+
+        observe(viewModel.isInSelectionMode) { enabled ->
+            backCallback.isEnabled = enabled
+            val visibility = if (enabled) View.VISIBLE else View.GONE
+            val selToolbar = binding.resultSelectionToolbar
+            if (selToolbar.visibility != visibility) {
+                selToolbar.clearAnimation()
+                if (enabled) {
+                    selToolbar.visibility = View.VISIBLE
+                    selToolbar.translationY = 100f.toPx.toFloat()
+                    selToolbar.animate().translationY(0f).setDuration(300).start()
+                } else {
+                    selToolbar.animate().translationY(100f.toPx.toFloat())
+                        .setDuration(300).withEndAction {
+                            selToolbar.visibility = View.GONE
+                        }.start()
+                }
+            }
+            // Refresh adapter to show/hide checkboxes
+            chaptersTabBinding?.chapterList?.adapter?.notifyDataSetChanged()
+        }
+
+        observe(viewModel.selectedChapters) { selected ->
+            val count = selected.size
+            binding.resultSelectionCount.text = if (count == 0) getString(R.string.no_data) else "$count Selected"
+        }
+
+
+
+        binding.resultSelectionClose.apply {
+            setOnClickListener { 
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                viewModel.setSelectionMode(false) 
+            }
+            setOnLongClickListener {
+                com.lagradost.quicknovel.CommonActivity.showToast(getString(R.string.close))
+                true
+            }
+        }
+
+        binding.resultSelectionSelectAll.apply {
+            setOnClickListener { 
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                viewModel.selectAll() 
+            }
+            setOnLongClickListener {
+                com.lagradost.quicknovel.CommonActivity.showToast("Select All / Range")
+                true
+            }
+        }
+
+
+
+        binding.resultSelectionBookmark.apply {
+            setOnClickListener { 
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                viewModel.executeBatchBookmark(true) 
+            }
+            setOnLongClickListener {
+                com.lagradost.quicknovel.CommonActivity.showToast("Bookmark Selected")
+                true
+            }
+        }
+
+        binding.resultSelectionUnbookmark.apply {
+            setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                viewModel.executeBatchBookmark(false)
+            }
+            setOnLongClickListener {
+                com.lagradost.quicknovel.CommonActivity.showToast("Unbookmark Selected")
+                true
+            }
+        }
+
+        binding.resultSelectionMarkRead.apply {
+            setOnClickListener { 
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                viewModel.executeBatchMarkRead(true) 
+            }
+            setOnLongClickListener {
+                com.lagradost.quicknovel.CommonActivity.showToast("Mark as Read")
+                true
+            }
+        }
+
+        binding.resultSelectionMarkUnread.apply {
+            setOnClickListener { 
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                viewModel.executeBatchMarkRead(false) 
+            }
+            setOnLongClickListener {
+                com.lagradost.quicknovel.CommonActivity.showToast("Mark as Unread")
+                true
+            }
+        }
+    }
 
     private fun onBindingCreated(tabView: View) {
         val binding = ResultNovelTabBinding.bind(tabView)
@@ -1000,11 +1116,17 @@ class ResultFragment : Fragment() {
                 if (hasFocus) {
                     val scrollHandler = android.os.Handler(android.os.Looper.getMainLooper())
                     scrollHandler.postDelayed({
-                        val scrollPos = this@ResultFragment.binding.resultViewpager.top + resultNotesLayout.top - 100.toPx
-                        this@ResultFragment.binding.resultMainscroll.smoothScrollTo(0, Math.max(0, scrollPos))
+                        val scrollPos =
+                            this@ResultFragment.binding.resultViewpager.top + resultNotesLayout.top - 100.toPx
+                        this@ResultFragment.binding.resultMainscroll.smoothScrollTo(
+                            0,
+                            Math.max(0, scrollPos)
+                        )
                     }, 400)
                 }
             }
+
+            // --- End of binding.apply block ---
         }
     }
     private fun showFilterBottomSheet(act: android.app.Activity) {

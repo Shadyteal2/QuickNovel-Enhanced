@@ -17,7 +17,9 @@ import android.speech.tts.Voice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.TextView
 import android.widget.AbsListView
 import android.widget.ArrayAdapter
 import android.widget.FrameLayout
@@ -58,6 +60,11 @@ import com.lagradost.quicknovel.TTSNotifications.TTS_NOTIFICATION_ID
 import com.lagradost.quicknovel.databinding.ColorRoundCheckmarkBinding
 import com.lagradost.quicknovel.databinding.DialogMlDownloadBinding
 import com.lagradost.quicknovel.databinding.ReadBottomSettingsBinding
+import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
+import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
+import com.lagradost.quicknovel.util.UIHelper.getStatusBarHeight
+import com.lagradost.quicknovel.util.UIHelper.popupMenu
+import com.lagradost.quicknovel.util.UIHelper.systemFonts
 import com.lagradost.quicknovel.databinding.ReadMainBinding
 import com.lagradost.quicknovel.databinding.SingleOverscrollChapterBinding
 import com.lagradost.quicknovel.mvvm.Resource
@@ -80,11 +87,6 @@ import com.lagradost.quicknovel.ui.TranslationBottomSheet
 import com.lagradost.quicknovel.ui.ViewHolderState
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
-import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
-import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
-import com.lagradost.quicknovel.util.UIHelper.getStatusBarHeight
-import com.lagradost.quicknovel.util.UIHelper.popupMenu
-import com.lagradost.quicknovel.util.UIHelper.systemFonts
 import com.lagradost.quicknovel.util.divCeil
 import com.lagradost.quicknovel.util.toPx
 import java.lang.Integer.max
@@ -1957,11 +1959,25 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         } else {
             val items = currentAliases.keys.toTypedArray()
             val displayItems = items.map { "$it -> ${currentAliases[it]}" }.toTypedArray()
-            builder.setItems(displayItems) { _, which ->
+            val adapter = object : ArrayAdapter<String>(this, android.R.layout.select_dialog_item, displayItems) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getView(position, convertView, parent) as TextView
+                    view.setTextColor(viewModel.textColor)
+                    return view
+                }
+            }
+            builder.setAdapter(adapter) { _, which ->
                 val key = items[which]
                 val options = arrayOf(getString(R.string.edit_alias), getString(R.string.delete_alias))
+                val optAdapter = object : ArrayAdapter<String>(this@ReadActivity2, android.R.layout.select_dialog_item, options) {
+                    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                        val view = super.getView(position, convertView, parent) as TextView
+                        view.setTextColor(viewModel.textColor)
+                        return view
+                    }
+                }
                 com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
-                    .setItems(options) { _, optionIdx ->
+                    .setAdapter(optAdapter) { _, optionIdx ->
                         if (optionIdx == 0) {
                             showAddAliasDialog(key, currentAliases[key])
                         } else {
@@ -1983,24 +1999,16 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
         builder.setTitle(if (editKey == null) R.string.add_alias else R.string.edit_alias)
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            val padding = 20.toPx
-            setPadding(padding, padding, padding, padding)
-        }
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_alias, null)
+        val originalInput = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.original_input)
+        val replacementInput = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.replacement_input)
 
-        val originalInput = EditText(this).apply {
-            hint = getString(R.string.original_name)
-            setText(editKey)
-        }
-        val replacementInput = EditText(this).apply {
-            hint = getString(R.string.new_name)
-            setText(editValue)
-        }
+        originalInput.setText(editKey)
+        originalInput.setTextColor(viewModel.textColor)
+        replacementInput.setText(editValue)
+        replacementInput.setTextColor(viewModel.textColor)
 
-        layout.addView(originalInput)
-        layout.addView(replacementInput)
-        builder.setView(layout)
+        builder.setView(dialogView)
 
         builder.setPositiveButton(android.R.string.ok) { _, _ ->
             val original = originalInput.text.toString().trim()

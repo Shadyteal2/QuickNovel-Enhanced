@@ -56,9 +56,11 @@ import com.lagradost.quicknovel.ui.download.SortingMethod
 import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.ResultCached
+import com.lagradost.quicknovel.RESULT_CHAPTER_BOOKMARK
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Collections
 
 
 class ResultViewModel : ViewModel() {
@@ -89,7 +91,113 @@ class ResultViewModel : ViewModel() {
             true,
             Boolean::class
         )
+    }
 
+    val selectedChapters = MutableLiveData<Set<String>>(emptySet())
+    val isInSelectionMode = MutableLiveData<Boolean>(false)
+    val isBatchDownloading = MutableLiveData<Boolean>(false)
+
+    fun toggleSelection(url: String) {
+        val current = selectedChapters.value ?: emptySet()
+        if (current.contains(url)) {
+            selectedChapters.postValue(current - url)
+        } else {
+            selectedChapters.postValue(current + url)
+        }
+    }
+
+    fun selectRange(urls: List<String>) {
+        val current = selectedChapters.value ?: emptySet()
+        selectedChapters.postValue(current + urls)
+    }
+
+    fun selectAll() {
+        val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        selectedChapters.postValue(streamRes.data.map { it.url }.toSet())
+    }
+
+    fun clearSelection() {
+        selectedChapters.postValue(emptySet())
+    }
+
+    fun setSelectionMode(enabled: Boolean) {
+        if (!enabled) clearSelection()
+        isInSelectionMode.postValue(enabled)
+    }
+
+    fun isChapterBookmarked(chapter: ChapterData): Boolean {
+        return getKey(RESULT_CHAPTER_BOOKMARK, chapter.url, false) ?: false
+    }
+
+    fun setChapterBookmark(chapter: ChapterData, bookmark: Boolean) {
+        if (bookmark) {
+            setKey(RESULT_CHAPTER_BOOKMARK, chapter.url, true)
+        } else {
+            removeKey(RESULT_CHAPTER_BOOKMARK, chapter.url)
+        }
+    }
+
+    fun toggleChapterBookmark(chapter: ChapterData) {
+        setChapterBookmark(chapter, !isChapterBookmarked(chapter))
+    }
+
+    fun executeBatchMarkRead(read: Boolean) {
+        val selected = selectedChapters.value ?: return
+        val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        val ctx = context ?: return
+        val editor = com.lagradost.quicknovel.DataStore.editor(ctx)
+        val timeToSet = System.currentTimeMillis()
+        streamRes.data.filter { selected.contains(it.url) }.forEach { chapterData ->
+            val index = chapterIndex(chapterData) ?: return@forEach
+            val path = com.lagradost.quicknovel.DataStore.getFolderName(EPUB_CURRENT_POSITION_READ_AT, "${streamRes.name}/$index")
+            if (read) {
+                editor.setKey(path, timeToSet)
+            } else {
+                editor.removeKey(path)
+            }
+        }
+        editor.apply()
+        chapters.postValue(orderChapters(streamRes.data))
+        setSelectionMode(false)
+    }
+
+    fun executeBatchBookmark(bookmark: Boolean) {
+        val selected = selectedChapters.value ?: return
+        val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        val ctx = context ?: return
+        val editor = com.lagradost.quicknovel.DataStore.editor(ctx)
+        streamRes.data.filter { selected.contains(it.url) }.forEach { chapterData ->
+            val path = com.lagradost.quicknovel.DataStore.getFolderName(RESULT_CHAPTER_BOOKMARK, chapterData.url)
+            if (bookmark) {
+                editor.setKey(path, true)
+            } else {
+                editor.removeKey(path)
+            }
+        }
+        editor.apply()
+        chapters.postValue(orderChapters(streamRes.data))
+        setSelectionMode(false)
+    }
+
+    fun executeBatchDownload() {
+        val selected = selectedChapters.value ?: return
+        val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        val indices = streamRes.data.mapIndexedNotNull { index: Int, chapter: ChapterData ->
+            if (selected.contains(chapter.url)) index else null
+        }
+
+        if (indices.isEmpty()) return
+
+        isBatchDownloading.postValue(true)
+        viewModelScope.launchSafe {
+            val res = loadResponse.value
+            if (res is Resource.Success && res.value is StreamResponse) {
+                // We'll use a new batch download method in BookDownloader2
+                BookDownloader2.download(res.value, context ?: return@launchSafe, indices)
+            }
+            isBatchDownloading.postValue(false)
+            setSelectionMode(false)
+        }
     }
 
     fun reorderChapters() {
