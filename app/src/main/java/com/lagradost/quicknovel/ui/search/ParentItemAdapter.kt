@@ -1,7 +1,9 @@
 package com.lagradost.quicknovel.ui.search
 
+import android.view.MotionEvent
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.RecyclerView
 import com.lagradost.quicknovel.HomePageList
 import com.lagradost.quicknovel.databinding.HomepageParentBinding
 import com.lagradost.quicknovel.ui.BaseDiffCallback
@@ -51,6 +53,18 @@ class ParentItemAdapter(
                 homeChildRecyclerview.adapter = newAdapter
                 newAdapter.submitList(item.list)
             }
+
+            homeChildRecyclerview.addOnItemTouchListener(object : RecyclerView.OnItemTouchListener {
+                override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                    if (e.action == MotionEvent.ACTION_DOWN) {
+                        rv.parent.requestDisallowInterceptTouchEvent(true)
+                    }
+                    return false
+                }
+
+                override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {}
+                override fun onRequestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {}
+            })
         }
     }
 }

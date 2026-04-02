@@ -21,6 +21,7 @@ class ResultFragmentAdapter(
             else -> R.layout.result_novel_tab
         }
         val view = LayoutInflater.from(parent.context).inflate(layoutRes, parent, false)
+        view.background = null // Ensure tab pages are transparent over the blur backdrop
         return TabViewHolder(view)
     }
 

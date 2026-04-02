@@ -439,6 +439,10 @@ data class ChapterUpdate(
 )
 
 class ReadActivityViewModel : ViewModel() {
+    private var context: Context? = null
+    private var loadId: Int = -1
+    private var hasInit: Boolean = false
+    private var isEpub: Boolean = false
     lateinit var book: AbstractBook
     private lateinit var markwon: Markwon
     private var isInApp: Boolean = true
@@ -491,8 +495,57 @@ class ReadActivityViewModel : ViewModel() {
     private val _translationLoadingStatus = MutableLiveData<Resource<String>>(null)
     val translationLoadingStatus: LiveData<Resource<String>> = _translationLoadingStatus
 
+    private val _aliases = MutableLiveData<Map<String, String>>(emptyMap())
+    val aliases: LiveData<Map<String, String>> = _aliases
+
+    private fun loadAliases() {
+        val map = getKey<Map<String, String>>(folder = NOVEL_REPLACEMENTS, path = loadId.toString()) ?: emptyMap()
+        _aliases.postValue(map)
+    }
+
+    fun addAlias(original: String, replacement: String) {
+        val current = (_aliases.value ?: emptyMap()).toMutableMap()
+        current[original] = replacement
+        _aliases.postValue(current)
+        setKey(folder = NOVEL_REPLACEMENTS, path = loadId.toString(), value = current)
+        // Reload current chapters to apply renames
+        reloadChapter(currentIndex)
+    }
+
+    fun removeAlias(original: String) {
+        val current = (_aliases.value ?: emptyMap()).toMutableMap()
+        current.remove(original)
+        _aliases.postValue(current)
+        setKey(folder = NOVEL_REPLACEMENTS, path = loadId.toString(), value = current)
+        // Reload current chapters to apply renames
+        reloadChapter(currentIndex)
+    }
+
+    private fun applyAliases(text: String): String {
+        val map = _aliases.value ?: return text
+        if (map.isEmpty()) return text
+        
+        var result = text
+        for ((original, replacement) in map) {
+            // Use word boundaries \b to avoid partial matches (e.g. Ash -> Satoshi, but Asher stays Asher)
+            val regex = "\\b${Regex.escape(original)}\\b".toRegex(RegexOption.IGNORE_CASE)
+            result = regex.replace(result, replacement)
+        }
+        return result
+    }
+
     fun postLoadingStatus(resource: Resource<String>) {
         _loadingStatus.postValue(resource)
+    }
+
+    fun init(id: Int, isEpub: Boolean, context: Context) {
+        this.context = context
+        this.loadId = id
+        this.isEpub = isEpub
+        loadAliases()
+        
+        if (hasInit) return
+        hasInit = true
     }
 
     private val _chaptersTitles: MutableLiveData<List<UiText>> =
@@ -850,7 +903,7 @@ class ReadActivityViewModel : ViewModel() {
             val data = safeApiCall {
                 book.getChapterData(index, reload)
             }.map { text ->
-                val rawText = preParseHtml(text, authorNotes)
+                val rawText = applyAliases(preParseHtml(text, authorNotes))
                 // val renderedBuilder = SpannableStringBuilder()
                 // val lengths : IntArray
                 // val nodes : Array<Node>
@@ -1381,7 +1434,17 @@ class ReadActivityViewModel : ViewModel() {
 
     fun init(book: AbstractBook, context: Context) {
         this.book = book
+        this.context = context
         _title.postValue(book.title())
+
+        // Ensure loadId is initialized for persistence (Character Aliases, etc.)
+        if (book is QuickBook) {
+            this.loadId = BookDownloader2Helper.generateId(book.data.meta.apiName, book.data.meta.author, book.data.meta.name)
+        } else {
+            // For RegularBooks (EPUB), use the title hash as a unique enough identifier
+            this.loadId = book.title().hashCode()
+        }
+        loadAliases()
 
         updateChapters()
         val imageLoader: ImageLoader = SingletonImageLoader.get(context)

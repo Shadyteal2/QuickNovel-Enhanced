@@ -427,6 +427,8 @@ class ResultFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        
+
 
         val url = savedInstanceState?.getString("url") ?: arguments?.getString("url") ?: throw NotImplementedError()
         val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
@@ -722,12 +724,14 @@ class ResultFragment : Fragment() {
 
         observe(viewModel.readState) { state ->
             val context = context ?: return@observe
-            val currentStateId = com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.RESULT_BOOKMARK_STATE, viewModel.id.value.toString()) ?: -1
+            val currentStateId = com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.RESULT_BOOKMARK_STATE, viewModel.loadId.toString()) ?: -1
+            val duplicateState = viewModel.duplicateBookmarkState.value
             
             var title = getString(R.string.bookmark)
             var hasBookmark = false
 
             if (currentStateId != -1) {
+                // Bookmarked in THIS provider
                 val systemCat = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories.find { it.id == currentStateId }
                 if (systemCat != null) {
                     title = getString(systemCat.stringRes ?: R.string.bookmark)
@@ -743,6 +747,15 @@ class ResultFragment : Fragment() {
                         hasBookmark = true
                     }
                 }
+            } else if (duplicateState != null) {
+                // Bookmarked in ANOTHER provider
+                val systemCat = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories.find { it.id == duplicateState }
+                title = if (systemCat != null) {
+                    "In Library (${getString(systemCat.stringRes ?: R.string.bookmark)})"
+                } else {
+                    "In Library"
+                }
+                hasBookmark = true // Fill icon
             }
 
             binding.resultBookmark.text = title
@@ -750,7 +763,7 @@ class ResultFragment : Fragment() {
                 if (!hasBookmark) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
             binding.resultBookmark.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_START
-            novelTabBinding?.resultUpdatesToggle?.isVisible = hasBookmark
+            novelTabBinding?.resultUpdatesToggle?.isVisible = (currentStateId != -1) // Sync only for current provider
 
             // Update notes UI when read status changes
             novelTabBinding?.apply {
@@ -774,6 +787,11 @@ class ResultFragment : Fragment() {
                     resultNotesEdittext.setText(saved)
                 }
             }
+        }
+
+        observeNullable(viewModel.duplicateBookmarkState) {
+            // Force a refresh of the bookmark UI logic
+            viewModel.readState.postValue(viewModel.readState.value)
         }
 
         observeNullable(viewModel.chapters) { chapters ->
@@ -1122,4 +1140,5 @@ class ResultFragment : Fragment() {
         dialog.setContentView(frame)
         dialog.show()
     }
+
 }

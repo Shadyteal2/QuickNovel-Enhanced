@@ -9,8 +9,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lagradost.quicknovel.APIRepository
 import kotlinx.coroutines.Job
+import com.lagradost.quicknovel.CommonActivity.showToast
 import com.lagradost.quicknovel.BaseApplication.Companion.context
 import com.lagradost.quicknovel.BaseApplication.Companion.getKey
+import com.lagradost.quicknovel.BaseApplication.Companion.getKeys
 import com.lagradost.quicknovel.BaseApplication.Companion.removeKey
 import com.lagradost.quicknovel.BaseApplication.Companion.setKey
 import com.lagradost.quicknovel.BookDownloader2
@@ -194,6 +196,7 @@ class ResultViewModel : ViewModel() {
 
     var id: MutableLiveData<Int> = MutableLiveData<Int>(-1)
     var readState: MutableLiveData<ReadType> = MutableLiveData<ReadType>(ReadType.NONE)
+    val duplicateBookmarkState = MutableLiveData<Int?>(null)
 
     var apiName : String = ""
 
@@ -211,7 +214,7 @@ class ResultViewModel : ViewModel() {
 
     private val loadMutex = Mutex()
     private lateinit var load: LoadResponse
-    private var loadId: Int = 0
+    internal var loadId: Int = 0
     private var loadUrl: String = ""
     var hasLoaded: Boolean = false
     val userNote: MutableLiveData<String?> = MutableLiveData(null)
@@ -579,11 +582,65 @@ class ResultViewModel : ViewModel() {
             loadMutex.withLock {
                 if (!hasLoaded) return@launch
                 updateBookmarkData()
+                checkDuplicates()
                 addToHistory()
             }
         }
     }
+    private fun String.normalize(): String {
+        return this.lowercase().replace(Regex("[^a-z0-9]"), "").trim()
+    }
+
+    private fun findDuplicateState(name: String, author: String?): Int? {
+        val cleanName = name.normalize()
+        if (cleanName.isEmpty()) return null
+        val cleanAuthor = author?.normalize()
+
+        val bookmarkedKeys = getKeys(RESULT_BOOKMARK) ?: return null
+        for (key in bookmarkedKeys) {
+            val idStr = key.substringAfter("/")
+            if (idStr == loadId.toString()) continue // Skip current provider
+
+            val cached = getKey<ResultCached>(RESULT_BOOKMARK, idStr)
+            if (cached != null) {
+                val cachedName = cached.name.normalize()
+                val cachedAuthor = cached.author?.normalize()
+
+                if (cachedName == cleanName && (cleanAuthor.isNullOrEmpty() || cachedAuthor == cleanAuthor)) {
+                    val state = getKey<Int>(RESULT_BOOKMARK_STATE, idStr) ?: -1
+                    if (state != -1) return state
+                }
+            }
+        }
+        return null
+    }
+
+    private fun checkDuplicates() {
+        val novel = (loadResponse.value as? Resource.Success)?.value ?: return
+        duplicateBookmarkState.postValue(findDuplicateState(novel.name, novel.author))
+    }
+
     fun bookmark(state: Int) = viewModelScope.launch {
+        if (state != -1) { // -1 is Unbookmark
+            // 1. Check current ID (Standard flow)
+            val currentState = getKey<Int>(folder = RESULT_BOOKMARK_STATE, path = loadId.toString()) ?: -1
+            if (currentState != -1 && currentState != state) {
+                showToast(R.string.already_in_library)
+            }
+
+            // 2. Synchronous robust duplicate check (Cross-provider)
+            val novel = (loadResponse.value as? Resource.Success)?.value
+            if (novel != null) {
+                val duplicate = findDuplicateState(novel.name, novel.author)
+                if (duplicate != null && currentState == -1) {
+                    showToast(R.string.already_in_library)
+                    // Trigger UI to show where it is
+                    duplicateBookmarkState.postValue(duplicate)
+                    return@launch
+                }
+            }
+        }
+
         loadMutex.withLock {
             if (!hasLoaded) return@launch
             setKey(
@@ -763,6 +820,7 @@ class ResultViewModel : ViewModel() {
         userNote.value = note
 
         updateBookmarkData()
+        checkDuplicates()
 
         hasLoaded = true
 
@@ -808,20 +866,17 @@ class ResultViewModel : ViewModel() {
 
         val data = repo?.load(url)
         loadMutex.withLock {
+            loadResponse.postValue(data) // Post data FIRST
             when (data) {
                 is Resource.Success -> {
                     val res = data.value
-
                     load = res
                     loadUrl = res.url
-
                     val tid = generateId(res, apiName)
-                    setState(tid)
+                    setState(tid) // Now checkDuplicates will see the data
                 }
-
                 else -> {}
             }
-            loadResponse.postValue(data)
         }
     }
 }

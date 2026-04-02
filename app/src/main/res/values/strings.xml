@@ -382,5 +382,18 @@
     <string name="translation_source_lang_key" translatable="false">translation_source_lang_key</string>
     <string name="content_type">Content Type</string>
     <string name="tone">Translation Tone</string>
+    <string name="already_in_library">This novel is already in your library</string>
+    <string name="character_aliases">Character Aliases</string>
+    <string name="add_alias">Add Alias</string>
+    <string name="original_name">Original Name</string>
+    <string name="new_name">New Name</string>
+    <string name="no_aliases">No aliases for this novel</string>
+    <string name="edit_alias">Edit Alias</string>
+    <string name="delete_alias">Delete Alias</string>
+    <string name="manage_data">Manage Notes &amp; Aliases</string>
+    <string name="manage_data_desc">View and delete saved notes and character renames</string>
+    <string name="manage_data_key" translatable="false">manage_data_key</string>
+    <string name="clear_all">Clear All</string>
+    <string name="clear_all_confirmation">Are you sure you want to delete ALL notes and character aliases? This cannot be undone.</string>
 </resources>
 

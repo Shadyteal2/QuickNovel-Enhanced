@@ -59,6 +59,7 @@ const val EPUB_CURRENT_POSITION_SCROLL_CHAR: String = "reader_epub_position_scro
 const val EPUB_CURRENT_ML: String = "reader_epub_ml"
 const val EPUB_CURRENT_POSITION_READ_AT: String = "reader_epub_position_read"
 const val EPUB_CURRENT_POSITION_CHAPTER: String = "reader_epub_position_chapter"
+const val NOVEL_REPLACEMENTS: String = "novel_replacements"
 const val RESULT_BOOKMARK: String = "result_bookmarked"
 const val RESULT_BOOKMARK_STATE: String = "result_bookmarked_state"
 const val HISTORY_FOLDER: String = "result_history"

@@ -11,6 +11,7 @@ import android.widget.ImageView
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.preference.PreferenceManager
@@ -121,6 +122,22 @@ class SearchFragment : Fragment() {
 
         val settingsManager = context?.let { PreferenceManager.getDefaultSharedPreferences(it) }
         val isAdvancedSearch = settingsManager?.getBoolean("advanced_search", true) == true
+
+        val backCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (viewModel.searchResponse.value != null) {
+                    viewModel.clearSearch()
+                    binding.mainSearch.setQuery("", false)
+                    binding.mainSearch.clearFocus()
+                } else {
+                    isEnabled = false
+                    activity?.onBackPressedDispatcher?.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        }
+        activity?.onBackPressedDispatcher?.addCallback(viewLifecycleOwner, backCallback)
+
         binding.searchMasterRecycler.isVisible = false
         binding.searchAllRecycler.isGone = false
 
@@ -136,6 +153,7 @@ class SearchFragment : Fragment() {
 
         observeNullable(viewModel.searchResponse) { response ->
             binding.homeBrowselist.isVisible = response == null
+            backCallback.isEnabled = response != null // Only intercept back if we have a response
             if (response == null) {
                 binding.searchAllRecycler.isVisible = false
                 allAdapter.submitIncomparableList(emptyList())

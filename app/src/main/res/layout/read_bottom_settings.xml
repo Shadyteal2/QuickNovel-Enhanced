@@ -227,6 +227,14 @@
                         android:layout_width="64dp"
                         android:layout_height="32dp" />
                 </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/read_settings_character_aliases"
+                    style="@style/BlackButton"
+                    android:layout_width="match_parent"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/character_aliases"
+                    app:icon="@drawable/ic_baseline_font_download_24" />
             </LinearLayout>
             
             <TextView

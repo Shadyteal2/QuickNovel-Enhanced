@@ -111,4 +111,11 @@
             android:layout_height="match_parent"
             tools:layout="@layout/fragment_reading_stats">
     </fragment>
+    <fragment
+            android:id="@+id/navigation_manage_data"
+            android:name="com.lagradost.quicknovel.ui.settings.ManageDataFragment"
+            android:label="Manage Data"
+            android:layout_height="match_parent"
+            tools:layout="@layout/fragment_manage_data">
+    </fragment>
 </navigation>

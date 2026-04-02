@@ -352,6 +352,16 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
             true
         }
+        
+        findPreference<Preference>(getString(R.string.manage_data_key))?.setOnPreferenceClickListener {
+            try {
+                androidx.navigation.fragment.NavHostFragment.findNavController(this)
+                    .navigate(R.id.navigation_manage_data)
+            } catch (e: Exception) {
+                logError(e)
+            }
+            true
+        }
 
         val updatePrefrence =
             findPreference<Preference>(getString(R.string.manual_check_update_key))!!

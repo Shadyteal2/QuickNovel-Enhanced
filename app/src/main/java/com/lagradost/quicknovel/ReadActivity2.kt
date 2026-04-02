@@ -22,6 +22,7 @@ import android.widget.AbsListView
 import android.widget.ArrayAdapter
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.graphics.RenderEffect
 import android.graphics.Shader
@@ -1458,6 +1459,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             val bottomSheetDialog = builder.create()
             bottomSheetDialog.show()
 
+            binding.readSettingsCharacterAliases.setOnClickListener {
+                showAliasManagementDialog()
+            }
+
             binding.readReadingType.setText(viewModel.readerType.stringRes)
             binding.readReadingType.setOnLongClickListener {
                 it.popupMenu(items = listOf(1 to R.string.reset_value), selectedItemId = null) {
@@ -1940,5 +1945,75 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             bottomSheetDialog.show()
         }
+    }
+
+    private fun showAliasManagementDialog() {
+        val currentAliases = viewModel.aliases.value ?: emptyMap()
+        val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
+        builder.setTitle(R.string.character_aliases)
+
+        if (currentAliases.isEmpty()) {
+            builder.setMessage(R.string.no_aliases)
+        } else {
+            val items = currentAliases.keys.toTypedArray()
+            val displayItems = items.map { "$it -> ${currentAliases[it]}" }.toTypedArray()
+            builder.setItems(displayItems) { _, which ->
+                val key = items[which]
+                val options = arrayOf(getString(R.string.edit_alias), getString(R.string.delete_alias))
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
+                    .setItems(options) { _, optionIdx ->
+                        if (optionIdx == 0) {
+                            showAddAliasDialog(key, currentAliases[key])
+                        } else {
+                            viewModel.removeAlias(key)
+                            showAliasManagementDialog()
+                        }
+                    }.show()
+            }
+        }
+
+        builder.setPositiveButton(R.string.add_alias) { _, _ ->
+            showAddAliasDialog()
+        }
+        builder.setNegativeButton(android.R.string.cancel, null)
+        builder.show()
+    }
+
+    private fun showAddAliasDialog(editKey: String? = null, editValue: String? = null) {
+        val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
+        builder.setTitle(if (editKey == null) R.string.add_alias else R.string.edit_alias)
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = 20.toPx
+            setPadding(padding, padding, padding, padding)
+        }
+
+        val originalInput = EditText(this).apply {
+            hint = getString(R.string.original_name)
+            setText(editKey)
+        }
+        val replacementInput = EditText(this).apply {
+            hint = getString(R.string.new_name)
+            setText(editValue)
+        }
+
+        layout.addView(originalInput)
+        layout.addView(replacementInput)
+        builder.setView(layout)
+
+        builder.setPositiveButton(android.R.string.ok) { _, _ ->
+            val original = originalInput.text.toString().trim()
+            val replacement = replacementInput.text.toString().trim()
+            if (original.isNotEmpty() && replacement.isNotEmpty()) {
+                if (editKey != null && editKey != original) {
+                    viewModel.removeAlias(editKey)
+                }
+                viewModel.addAlias(original, replacement)
+                showAliasManagementDialog()
+            }
+        }
+        builder.setNegativeButton(android.R.string.cancel, null)
+        builder.show()
     }
 }

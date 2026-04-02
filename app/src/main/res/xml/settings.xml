@@ -142,6 +142,13 @@
                 android:entryValues="@array/DownloadGridFormatData"
                 app:layout="@layout/setting_tile" />
 
+        <Preference
+                app:icon="@drawable/ic_baseline_edit_24"
+                android:key="@string/manage_data_key"
+                android:title="@string/manage_data"
+                android:summary="@string/manage_data_desc"
+                app:layout="@layout/setting_tile" />
+
         <ListPreference
                 android:key="@string/library_nav_style_key"
                 android:title="@string/library_nav_style"
