@@ -23,15 +23,18 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 
 ## Screenshots
 
-| <img src="app/assets/NeoQN v2.0.9 (7).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (8).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (9).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (10).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (11).png" width="250"/> |
+| <img src="app/assets/Neov2.1.0 (1).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (8).png" width="250"/> | <img src="app/assets/Neov2.1.0 (2).png" width="250"/> | <img src="app/assets/Neov2.1.0 (3).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (11).png" width="250"/> |
 |:---:|:---:|:---:|:---:|:---:|
 | **Library with Custom BG** | **Edit/Add Categories** | **Updates Section** | **Novel Providers** | **History** |
-| <img src="app/assets/NeoQN v2.0.9 (12).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (13).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (14).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (6).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (15).png" width="250"/> |
+| <img src="app/assets/Neov2.1.0 (4).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (13).png" width="250"/> | <img src="app/assets/Neov2.1.0 (11).png" width="250"/> | <img src="app/assets/Neov2.1.0 (5).png" width="250"/> | <img src="app/assets/Neov2.1.0 (12).png" width="250"/> |
 | **Settings** | **Novel Library** | **Novel Detail Screen** | **with Custom BG** | **Chapters Index** |
-| <img src="app/assets/NeoQN v2.0.9 (16).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (4).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (17).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (1)-1.webp" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (5).png" width="250"/> |
-| **with Custom BG** | **Flashbang theme** | **with Custom BG** | **Novel Reading** | **Flashbang theme** |
-| <img src="app/assets/NeoQN v2.0.9 (2).png" width="250"/> | <img src="app/assets/NeoQN v2.0.9 (3).png" width="250"/> 
-| **Reader Setting** | **Reader Setting 2nd** 
+| <img src="app/assets/Neov2.1.0 (13).png" width="250"/> | <img src="app/assets/Neov2.1.0 (15).png" width="250"/> | <img src="app/assets/Neov2.1.0 (9).png" width="250"/> | <img src="app/assets/Neov2.1.0 (6).png" width="250"/> | <img src="app/assets/Neov2.1.0 (14).png" width="250"/> |
+| **with Custom BG** | **Flashbang theme** | **with Custom BG** | **Novel Reader** | **Flashbang theme** |
+| <img src="app/assets/Neov2.1.0 (7).png" width="250"/> | <img src="app/assets/Neov2.1.0 (8).png" width="250"/> | <img src="app/assets/Neov2.1.0 (10).png" width="250"/>
+| **Reader Setting** | **Reader Setting 2nd** | **Reader Stats** 
+
+
+**New providers by me** - Fenrir realm (https://fenrirealm.com) , Chrysanthemum Garden (https://chrysanthemumgarden.com) , Lnori (https://lnori.com) , LightNovelWorld (https://lightnovelworld.org) , NovelArchive (https://novelarchive.cc) , Wuxia World (https://wuxiaworld.com) , WuxiaClick (https://wuxia.click). 
 
 
 ## Links:
@@ -44,13 +47,7 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 
 **Download Releases:** [Get the latest APK](https://github.com/Shadyteal2/QuickNovel-Enhanced/releases)
 
-## Todo:
-1) Web support
-2) Optimize the current providers.
-3) More Providers.
-
-
-**Providers used:** (Some of the providers listed below are currently non-functional. I’ve removed them for now and will reintroduce them once a reliable solution is found.)
+**Providers used:** (Some of the providers listed below are currently non-functional. I’ve removed them for now and will reintroduce them once a reliable solution is found.) 
 
 - https://allnovel.org
 - https://annas-archive.org
