@@ -41,24 +41,47 @@ class AnyAdapter(
 ) : NoStateAdapter<Any>(
     diffCallback = BaseDiffCallback(
         itemSame = { a, b ->
-            if (a is ResultCached && b is ResultCached) {
-                a.source == b.source
-            } else if (a is DownloadFragment.DownloadDataLoaded && b is DownloadFragment.DownloadDataLoaded) {
-                a.source == b.source
-            } else {
-                false
+            when {
+                a is ResultCached && b is ResultCached -> a.id == b.id
+                a is DownloadFragment.DownloadDataLoaded && b is DownloadFragment.DownloadDataLoaded -> a.id == b.id
+                else -> false
             }
         },
         contentSame = { a, b ->
-            a == b
+            when {
+                a is ResultCached && b is ResultCached -> a.id == b.id && a.source == b.source
+                a is DownloadFragment.DownloadDataLoaded && b is DownloadFragment.DownloadDataLoaded -> a.id == b.id && a.source == b.source
+                else -> a == b
+            }
         }
     )
 ) {
+    private var isBento3x3: Boolean = false
+    private var usePinterest: Boolean = false
+    private var isCompact: Boolean = false
+
+    private fun updatePrefs() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(resView.context)
+        isBento3x3 = prefs.getBoolean("library_bento_3x3", false)
+        usePinterest = prefs.getBoolean("library_pinterest_bento", false)
+        isCompact = resView.context.getDownloadIsCompact()
+    }
+
+    override fun submitList(list: Collection<Any>?, commitCallback: Runnable?) {
+        super.submitList(list, commitCallback)
+        updatePrefs()
+    }
+
+    init {
+        setHasStableIds(true)
+        updatePrefs()
+    }
+
     companion object {
         val sharedPool =
             newSharedPool {
-                setMaxRecycledViews(RESULT_CACHED, 20)
-                setMaxRecycledViews(DOWNLOAD_DATA_LOADED, 20)
+                setMaxRecycledViews(RESULT_CACHED, 25)
+                setMaxRecycledViews(DOWNLOAD_DATA_LOADED, 25)
             }
 
         const val RESULT_CACHED: Int = 1
@@ -68,25 +91,55 @@ class AnyAdapter(
     private fun getCorrectHeight(position: Int): Int {
         val manager = resView.layoutManager
         val baseWidth = resView.itemWidth
+        val context = resView.context
         
         return when (manager) {
             is StaggeredGridLayoutManager -> {
+                val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+                val usePinterest = prefs.getBoolean("library_pinterest_bento", false)
+                
                 // Pinterest True Masonry Style: 
                 // Deterministic variance based on position to create the "Staggered" look without gaps.
                 // We oscillate the aspect ratio slightly around the 2:3 (0.68) standard.
-                val variance = when (position % 5) {
-                    0 -> 0.64f // standard-tall
-                    1 -> 0.72f // standard-short
-                    2 -> 0.68f // standard
-                    3 -> 0.61f // tall
-                    else -> 0.75f // short
+                val variance = if (usePinterest) {
+                    when (position % 8) {
+                        0 -> 0.60f // XL-Tall
+                        1 -> 0.75f // XX-Short
+                        2 -> 0.68f // Standard
+                        3 -> 0.63f // Tall
+                        4 -> 0.85f // Tiny
+                        5 -> 0.66f // Medium-Tall
+                        6 -> 0.72f // Short
+                        else -> 0.68f // Standard
+                    }
+                } else {
+                    when (position % 5) {
+                        0 -> 0.64f // standard-tall
+                        1 -> 0.72f // standard-short
+                        2 -> 0.68f // standard
+                        3 -> 0.61f // tall
+                        else -> 0.75f // short
+                    }
                 }
                 (baseWidth / variance).roundToInt()
             }
             is GridLayoutManager -> {
                 val spanSize = manager.spanSizeLookup.getSpanSize(position)
                 val actualWidth = baseWidth * spanSize
-                (actualWidth / 0.68).roundToInt()
+                
+                if (isBento3x3) {
+                    // Bento 3x3 Logic: Big items (2 spans) are 16:9 for premium look, Square items are adjusted to match height
+                    // Heights must match to avoid gaps in standard GridLayoutManager rows.
+                    // Height(Big) = actualWidth(Big) / ratio(Big) = (2 * baseWidth) / ratio(Big)
+                    // Height(Small) = actualWidth(Small) / ratio(Small) = (1 * baseWidth) / ratio(Small)
+                    // To align: (2 / ratioBig) == (1 / ratioSmall)
+                    // If ratioBig = 2.0 (standard 2:1), ratioSmall = 1.0 (Square). 
+                    // Let's use 2.0 and 1.0 for perfect row alignment.
+                    val ratio = if (spanSize > 1) 2.0f else 1.0f
+                    (actualWidth / ratio).roundToInt()
+                } else {
+                    (actualWidth / 0.68).roundToInt()
+                }
             }
             else -> (baseWidth / 0.68).roundToInt()
         }
@@ -160,79 +213,39 @@ class AnyAdapter(
     }
 
     override fun onCreateCustomContent(parent: ViewGroup, viewType: Int): ViewHolderState<Any> {
-        val compact = parent.context.getDownloadIsCompact()
+        val inflater = LayoutInflater.from(parent.context)
         
-        // Extract base type and ratio variant from the consolidated viewType
-        // baseType is normalized back by BaseAdapter (viewType & CUSTOM_MASK)
-        val cleanType = viewType
-        val isCompactType = cleanType >= 1000
-        val typeWithoutCompact = if (isCompactType) cleanType - 1000 else cleanType
-        
-        val baseType = typeWithoutCompact % 100
-        val ratioVariant = typeWithoutCompact / 100 // 0 to 4
-        
-        val binding = when (baseType) {
-            RESULT_CACHED -> {
-                if (compact) {
-                    HistoryResultCompactBinding.inflate(
-                        LayoutInflater.from(parent.context),
-                        parent,
-                        false
-                    )
-                } else {
-                    DownloadResultGridBinding.inflate(
-                        LayoutInflater.from(parent.context),
-                        parent,
-                        false
-                    ).apply {
-                        // Standard masonry tall-portrait ratios (used as base)
-                        val ratio = when (ratioVariant) {
-                            0 -> "9:14"
-                            1 -> "9:15"
-                            2 -> "9:13"
-                            3 -> "9:14.5"
-                            else -> "9:13.5"
-                        }
-                        (backgroundCard.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let {
-                            it.dimensionRatio = ratio
-                            backgroundCard.layoutParams = it
-                        }
-                        // High Quality Physical Feedback: Attach ONLY ONCE
-                        KineticTiltHelper.applyKineticTilt(backgroundCard)
-                    }
-                }
-            }
+        // BITMASK EXTRACTION:
+        // Bits 0-3: Base Type (1=CACHED, 2=LOADED)
+        // Bits 4-7: Layout Type (0=Masonry, 1=Bento-Sq, 2=Bento-Wide)
+        // Bit 8: Compact Flag
+        val baseType = viewType and 0x0F
+        val layoutType = (viewType shr 4) and 0x0F
+        val isViewCompact = (viewType and 0x100) != 0
 
-            DOWNLOAD_DATA_LOADED -> {
-                if (compact) {
-                    DownloadResultCompactBinding.inflate(
-                        LayoutInflater.from(parent.context),
-                        parent,
-                        false
-                    )
-                } else {
-                    DownloadResultGridBinding.inflate(
-                        LayoutInflater.from(parent.context),
-                        parent,
-                        false
-                    ).apply {
-                        val ratio = when (ratioVariant) {
-                            0 -> "9:14"
-                            1 -> "9:15"
-                            2 -> "9:13"
-                            3 -> "9:14.5"
-                            else -> "9:13.5"
-                        }
-                        (backgroundCard.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let {
-                            it.dimensionRatio = ratio
-                            backgroundCard.layoutParams = it
-                        }
-                        KineticTiltHelper.applyKineticTilt(backgroundCard)
-                    }
-                }
+        val binding = if (isViewCompact) {
+            if (baseType == RESULT_CACHED) {
+                HistoryResultCompactBinding.inflate(inflater, parent, false)
+            } else {
+                DownloadResultCompactBinding.inflate(inflater, parent, false)
             }
-
-            else -> throw NotImplementedError()
+        } else {
+            val gridBinding = DownloadResultGridBinding.inflate(inflater, parent, false)
+            
+            // PRE-LAYOUT SETUP: Set ratios once during creation!
+            (gridBinding.backgroundCard.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let { lp ->
+                when (layoutType) {
+                    1 -> lp.dimensionRatio = "1:1" // Bento Square
+                    2 -> lp.dimensionRatio = "2:1" // Bento Wide
+                    else -> lp.dimensionRatio = "9:14" // Default Novel Portrait
+                }
+                gridBinding.backgroundCard.layoutParams = lp
+            }
+            
+            // Add premium hardware feedback
+            KineticTiltHelper.applyKineticTilt(gridBinding.backgroundCard)
+            
+            gridBinding
         }
 
         return ViewHolderState(binding)
@@ -244,13 +257,12 @@ class AnyAdapter(
             is HistoryResultCompactBinding -> {
                 val card = item as ResultCached
                 view.apply {
-                    imageText.text = card.name
-                    historyExtraText.text =
-                        "${card.lastChapterRead}/${card.currentTotalChapters} ${
-                            root.context.getString(
-                                R.string.read_action_chapters
-                            )
-                        }"
+                    if (imageText.text != card.name) imageText.text = card.name
+                    
+                    val progressText = "${card.lastChapterRead}/${card.currentTotalChapters} ${
+                        root.context.getString(R.string.read_action_chapters)
+                    }"
+                    if (historyExtraText.text != progressText) historyExtraText.text = progressText
 
                     imageView.setImage(card.poster)
 
@@ -278,19 +290,6 @@ class AnyAdapter(
                     is DownloadFragment.DownloadDataLoaded -> {
                         view.apply {
                             backgroundCard.apply {
-                                // QN-Enhanced: Synchronize Bento Grid aspect ratios via bind position to avoid gaps
-                                val isBento3x3 = PreferenceManager.getDefaultSharedPreferences(context ?: return@apply).getBoolean("library_bento_3x3", false)
-                                if (isBento3x3) {
-                                    val isFeatured = (position % 7 == 0 || position % 7 == 5)
-                                    val bentoRatio = if (isFeatured) "16:7" else "1:1"
-                                    (layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let { p ->
-                                        if (p.dimensionRatio != bentoRatio) {
-                                            p.dimensionRatio = bentoRatio
-                                            layoutParams = p
-                                        }
-                                    }
-                                }
-
                                 setOnClickListener {
                                     if (item.apiName == IMPORT_SOURCE_PDF && item.downloadedCount < item.downloadedTotal) {
                                         preloadPartialImportedPdf(item, context)
@@ -307,44 +306,35 @@ class AnyAdapter(
                                 }
                             }
                             
-                            downloadProgressbarIndeterment.isVisible = item.generating
+                            val isGenerating = item.generating
+                            if (downloadProgressbarIndeterment.isVisible != isGenerating) downloadProgressbarIndeterment.isVisible = isGenerating
+                            
                             val showDownloadLoading = item.state == DownloadState.IsPending
+                            val isAPdfDownloading = item.apiName == IMPORT_SOURCE_PDF && (item.downloadedTotal != item.downloadedCount)
+                            val showUpdateLoading = showDownloadLoading || isAPdfDownloading
+                            if (downloadUpdateLoading.isVisible != showUpdateLoading) downloadUpdateLoading.isVisible = showUpdateLoading
 
-                            val isAPdfDownloading =
-                                item.apiName == IMPORT_SOURCE_PDF && (item.downloadedTotal != item.downloadedCount)
-                            downloadUpdateLoading.isVisible =
-                                showDownloadLoading || isAPdfDownloading
+                            // DISK I/O REMOVED: Using card.readCount instead of getKey()
+                            val diff = item.downloadedCount - item.readCount
+                            val diffText = "+$diff "
+                            val showDiff = diff > 0 && !showDownloadLoading && !item.isImported
+                            
+                            if (imageTextMore.text != diffText) imageTextMore.text = diffText
+                            if (imageTextMore.isVisible != showDiff) imageTextMore.isVisible = showDiff
+                            
+                            if (imageText.text != item.name) imageText.text = item.name
 
-                            val epubSize = getKey(DOWNLOAD_EPUB_SIZE, item.id.toString()) ?: 0
-                            val diff = item.downloadedCount - epubSize
-                            imageTextMore.text = "+$diff "
-                            imageTextMore.isVisible =
-                                diff > 0 && !showDownloadLoading && !item.isImported
-                            imageText.text = item.name
-
-                            imageView.alpha = if (isAPdfDownloading) 0.6f else 1.0f
+                            val targetAlpha = if (isAPdfDownloading) 0.6f else 1.0f
+                            if (imageView.alpha != targetAlpha) imageView.alpha = targetAlpha
                             imageView.setImage(item.image)
 
-                            progressReading.isVisible = false
+                            if (progressReading.isVisible) progressReading.isVisible = false
                         }
                     }
 
                     is ResultCached -> {
                         view.apply {
                             backgroundCard.apply {
-                                // QN-Enhanced: Synchronize Bento Grid aspect ratios via bind position to avoid gaps
-                                val isBento3x3 = PreferenceManager.getDefaultSharedPreferences(context ?: return@apply).getBoolean("library_bento_3x3", false)
-                                if (isBento3x3) {
-                                    val isFeatured = (position % 7 == 0 || position % 7 == 5)
-                                    val bentoRatio = if (isFeatured) "16:7" else "1:1"
-                                    (layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let { p ->
-                                        if (p.dimensionRatio != bentoRatio) {
-                                            p.dimensionRatio = bentoRatio
-                                            layoutParams = p
-                                        }
-                                    }
-                                }
-
                                 setOnClickListener { v ->
                                     v.postDelayed({
                                         val transitionUrl = item.source
@@ -365,15 +355,14 @@ class AnyAdapter(
                                 }
                             }
                             
-                            imageView.setImage(
-                                item.image,
-                            ) // skipCache = false
+                            imageView.setImage(item.image)
 
-                            imageText.text = item.name
-                            imageTextMore.isVisible = false
+                            if (imageText.text != item.name) imageText.text = item.name
+                            if (imageTextMore.isVisible) imageTextMore.isVisible = false
 
-                            progressReading.text =
-                                "${item.lastChapterRead}/${item.currentTotalChapters}"
+                            val progressText = "${item.lastChapterRead}/${item.currentTotalChapters}"
+                            if (progressReading.text != progressText) progressReading.text = progressText
+                            if (!progressReading.isVisible) progressReading.isVisible = true
                         }
                     }
 
@@ -384,14 +373,21 @@ class AnyAdapter(
             is DownloadResultCompactBinding -> {
                 val card = item as DownloadFragment.DownloadDataLoaded
                 view.apply {
-                    downloadUpdateHolder.isGone =
-                        card.isImported && (card.apiName != IMPORT_SOURCE_PDF || card.downloadedTotal == card.downloadedCount)
-                    downloadDeleteTrash.isVisible = true
-                    downloadHolder.isGone = false
-                    val same = imageText.text == card.name
+                    val isImportedPdf = card.isImported && card.apiName == IMPORT_SOURCE_PDF
+                    val isDone = card.downloadedTotal == card.downloadedCount
+                    
+                    // 1. LAZY UPDATES & POLLUTION PREVENTION
+                    val updateHidden = card.isImported && (!isImportedPdf || isDone)
+                    if (downloadUpdateHolder.isGone != updateHidden) downloadUpdateHolder.isGone = updateHidden
+                    if (!downloadDeleteTrash.isVisible) downloadDeleteTrash.isVisible = true
+                    if (downloadHolder.isGone) downloadHolder.isGone = false
+                    
+                    val currentName = card.name
+                    val sameName = imageText.text == currentName
+                    
                     backgroundCard.apply {
                         setOnClickListener {
-                            if (card.apiName == IMPORT_SOURCE_PDF && card.downloadedCount < card.downloadedTotal)
+                            if (isImportedPdf && card.downloadedCount < card.downloadedTotal)
                                 preloadPartialImportedPdf(card, context)
                             downloadViewModel.readEpub(card)
                         }
@@ -401,10 +397,10 @@ class AnyAdapter(
                             return@setOnLongClickListener true
                         }
                     }
+                    
                     imageView.apply {
                         setOnClickListener {
-                            if (!item.isImported)
-                                downloadViewModel.load(card)
+                            if (!card.isImported) downloadViewModel.load(card)
                         }
                         setOnLongClickListener { v ->
                             hideKeyboard(v)
@@ -417,49 +413,41 @@ class AnyAdapter(
                         downloadViewModel.deleteAlert(card)
                     }
 
-                    val epubSize = getKey(DOWNLOAD_EPUB_SIZE, card.id.toString()) ?: 0
-                    val diff = card.downloadedCount - epubSize
-                    imageTextMore.text = if (diff > 0) "+$diff " else ""
+                    // 2. DISK I/O REMOVED: Using card.readCount instead of getKey()
+                    val diff = card.downloadedCount - card.readCount
+                    val diffText = if (diff > 0) "+$diff " else ""
+                    if (imageTextMore.text != diffText) imageTextMore.text = diffText
 
                     imageView.setImage(card.image)
 
-                    downloadProgressText.text =
-                        "${card.downloadedCount}/${card.downloadedTotal}" + if (card.ETA == "") "" else " - ${card.ETA}"
+                    val progressLabel = "${card.downloadedCount}/${card.downloadedTotal}${if (card.ETA == "") "" else " - ${card.ETA}"}"
+                    if (downloadProgressText.text != progressLabel) downloadProgressText.text = progressLabel
 
+                    // 3. CPU SPIKE REMOVAL: Smooth setProgress vs ObjectAnimator
                     downloadProgressbar.apply {
                         max = card.downloadedTotal.toInt() * 100
-
-                        // shitty check for non changed
-                        if (same || imageText.text.isEmpty()) {//the first time, imageText.text is empty
-                            val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                                this,
-                                "progress",
-                                progress,
-                                card.downloadedCount.toInt() * 100
-                            )
-
-                            animation.duration = 500
-                            animation.setAutoCancel(true)
-                            animation.interpolator = DecelerateInterpolator()
-                            animation.start()
-                        } else {
-                            progress = card.downloadedCount.toInt() * 100
+                        val targetProgress = card.downloadedCount.toInt() * 100
+                        
+                        if (targetProgress != progress) {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                                setProgress(targetProgress, true)
+                            } else {
+                                progress = targetProgress
+                            }
                         }
-                        //download_progressbar.progress = card.downloadedCount
-                        isIndeterminate = card.generating
-                        isVisible = card.generating || (card.downloadedCount < card.downloadedTotal)
+                        
+                        if (isIndeterminate != card.generating) isIndeterminate = card.generating
+                        val shouldShowBar = card.generating || (card.downloadedCount < card.downloadedTotal)
+                        if (isVisible != shouldShowBar) isVisible = shouldShowBar
                     }
 
-                    imageText.text = card.name
+                    if (!sameName) imageText.text = currentName
+                    
                     val realState = card.state
-                    /*if (card.downloadedCount >= card.downloadedTotal) {
-                        downloadUpdate.alpha = 0.5f
-                        downloadUpdate.isEnabled = false
-                    } else {*/
                     downloadUpdate.alpha = 1f
                     downloadUpdate.isEnabled = true
-                    //}
-                    downloadUpdate.contentDescription = when (realState) {
+                    
+                    val contentDesc = when (realState) {
                         DownloadState.IsDone -> "Done"
                         DownloadState.IsDownloading -> "Pause"
                         DownloadState.IsPaused -> "Resume"
@@ -468,28 +456,31 @@ class AnyAdapter(
                         DownloadState.IsPending -> "Pending"
                         DownloadState.Nothing -> "Update"
                     }
+                    if (downloadUpdate.contentDescription != contentDesc) downloadUpdate.contentDescription = contentDesc
 
-                    downloadUpdate.setImageResource(
-                        when (realState) {
-                            DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
-                            DownloadState.IsPaused -> R.drawable.netflix_play
-                            DownloadState.IsStopped -> R.drawable.ic_baseline_autorenew_24
-                            DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
-                            DownloadState.IsDone -> R.drawable.ic_baseline_check_24
-                            DownloadState.IsPending -> R.drawable.nothing
-                            DownloadState.Nothing -> R.drawable.ic_baseline_autorenew_24
-                        }
-                    )
+                    val iconRes = when (realState) {
+                        DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
+                        DownloadState.IsPaused -> R.drawable.netflix_play
+                        DownloadState.IsStopped -> R.drawable.ic_baseline_autorenew_24
+                        DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
+                        DownloadState.IsDone -> R.drawable.ic_baseline_check_24
+                        DownloadState.IsPending -> R.drawable.nothing
+                        DownloadState.Nothing -> R.drawable.ic_baseline_autorenew_24
+                    }
+                    // Avoid redundant image resource setting
+                    downloadUpdate.setImageResource(iconRes)
+                    
                     downloadUpdate.setOnClickListener {
                         when (realState) {
                             DownloadState.IsDownloading -> downloadViewModel.pause(card)
                             DownloadState.IsPaused -> downloadViewModel.resume(card)
                             DownloadState.IsPending -> {}
-                            else -> downloadViewModel.refreshCard(card)//this also resume download of imported pdfs
+                            else -> downloadViewModel.refreshCard(card)
                         }
                     }
 
-                    downloadUpdateLoading.isVisible = realState == DownloadState.IsPending
+                    val pendingVisibility = realState == DownloadState.IsPending
+                    if (downloadUpdateLoading.isVisible != pendingVisibility) downloadUpdateLoading.isVisible = pendingVisibility
                 }
             }
 
@@ -497,45 +488,28 @@ class AnyAdapter(
         }
     }
 
-    override fun customContentViewType(item: Any): Int {
-        val compact = resView.context.getDownloadIsCompact()
-        val offset = if (compact) 1000 else 0
-        
+    override fun customContentViewType(item: Any, position: Int): Int {
         val baseType = if (item is ResultCached) {
-            RESULT_CACHED + offset
+            RESULT_CACHED
         } else if (item is DownloadFragment.DownloadDataLoaded) {
-            DOWNLOAD_DATA_LOADED + offset
+            DOWNLOAD_DATA_LOADED
         } else {
             throw NotImplementedError()
         }
 
-        // QN-Enhanced: Deterministic Masonry Pooling.
-        // We hash the item ID to choose its bento ratio.
-        // This ensures the same novel always has the same height across sessions.
-        return if (!compact) {
-            val id = when (item) {
-                is ResultCached -> item.id
-                is DownloadFragment.DownloadDataLoaded -> item.id
-                else -> 0
-            }.toLong()
-            
-            val isBento3x3 = PreferenceManager
-                .getDefaultSharedPreferences(resView.context)
-                .getBoolean("library_bento_3x3", false)
+        // Bit 8: Compact Flag
+        var type = baseType
+        if (isCompact) type = type or 0x100
 
-            val variant = if (isBento3x3) {
-                // Bento Logic: We update dimensionRatio dynamically in onBindContent via position
-                // By returning 0 here, we pool ALL bento cards into a single recycled view pool
-                // This eliminates jitter completely and maximizes performance for 1000+ items
-                0
-            } else {
-                // Masonry logic: cycle of 5 based on stable ID
-                kotlin.math.abs((id % 5L).toInt())
+        // Bits 4-7: Bento Layout Type
+        if (!isCompact && isBento3x3) {
+            val layoutType = when (position % 7) {
+                0, 5 -> 2 // Wide (2:1)
+                else -> 1 // Square (1:1)
             }
-            
-            baseType + (variant * 100)
-        } else {
-            baseType
+            type = type or (layoutType shl 4)
         }
+        
+        return type
     }
 }

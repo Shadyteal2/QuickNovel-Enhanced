@@ -89,12 +89,15 @@ object BackupUtils {
         // QN-Enhanced: Strictly ignore all download-related meta/content to reduce backup size
         // and prevent ghost downloads from appearing post-restore.
         return key.startsWith("downloads_data/") ||
+               key.startsWith("downloads_data") || // Catch folder itself
                key.startsWith("download_settings") ||
                key.startsWith("downloads_size/") ||
                key.startsWith("downloads_total/") ||
                key.startsWith("downloads_offset/") ||
                key.startsWith("downloads_epub_size/") ||
-               key.startsWith("downloads_epub_last_access/")
+               key.startsWith("downloads_epub_last_access/") ||
+               key.startsWith("downloads_sort") || // Catch sorting preferences
+               key.contains("download_history") // Catch any history related to downloads
     }
 
     fun FragmentActivity.backup() {
@@ -118,13 +121,15 @@ object BackupUtils {
                     allDataFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
                 )
 
+                val allSettingsFiltered = allSettings.filterKeys { !isDownloadKey(it) }
+
                 val allSettingsSorted = BackupVars(
-                    allSettings.filter { it.value is Boolean } as? Map<String, Boolean>,
-                    allSettings.filter { it.value is Int } as? Map<String, Int>,
-                    allSettings.filter { it.value is String } as? Map<String, String>,
-                    allSettings.filter { it.value is Float } as? Map<String, Float>,
-                    allSettings.filter { it.value is Long } as? Map<String, Long>,
-                    allSettings.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
+                    allSettingsFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
+                    allSettingsFiltered.filter { it.value is Int } as? Map<String, Int>,
+                    allSettingsFiltered.filter { it.value is String } as? Map<String, String>,
+                    allSettingsFiltered.filter { it.value is Float } as? Map<String, Float>,
+                    allSettingsFiltered.filter { it.value is Long } as? Map<String, Long>,
+                    allSettingsFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
                 )
 
                 val backupFile = BackupFile(
@@ -273,6 +278,28 @@ object BackupUtils {
             restoreMap(backupFile.datastore._Float)
             restoreMap(backupFile.datastore._Long)
             restoreMap(backupFile.datastore._StringSet)
+        }
+
+        // QN-Enhanced: Trigger immediate, high-priority plugin synchronization post-restore.
+        // This ensures providers are available instantly so restored novels can be opened without delay.
+        try {
+            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>()
+                .setInputData(androidx.work.workDataOf("force" to true))
+                .setBackoffCriteria(
+                    androidx.work.BackoffPolicy.LINEAR,
+                    androidx.work.WorkRequest.MIN_BACKOFF_MILLIS,
+                    java.util.concurrent.TimeUnit.MILLISECONDS
+                )
+                .build()
+            
+            androidx.work.WorkManager.getInstance(this).enqueueUniqueWork(
+                "plugin_sync_restore",
+                androidx.work.ExistingWorkPolicy.REPLACE,
+                syncRequest
+            )
+            android.util.Log.i("BackupUtils", "Enqueued high-priority plugin sync post-restore")
+        } catch (e: Exception) {
+            com.lagradost.quicknovel.mvvm.logError(e)
         }
     }
 }

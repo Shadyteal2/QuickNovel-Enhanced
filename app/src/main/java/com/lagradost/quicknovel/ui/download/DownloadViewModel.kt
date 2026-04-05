@@ -28,6 +28,7 @@ import com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE_PDF
 import com.lagradost.quicknovel.CURRENT_TAB
 import com.lagradost.quicknovel.CommonActivity.activity
 import com.lagradost.quicknovel.DOWNLOAD_EPUB_LAST_ACCESS
+import com.lagradost.quicknovel.DOWNLOAD_EPUB_SIZE
 import com.lagradost.quicknovel.DOWNLOAD_NORMAL_SORTING_METHOD
 import com.lagradost.quicknovel.DOWNLOAD_SETTINGS
 import com.lagradost.quicknovel.DOWNLOAD_SORTING_METHOD
@@ -160,6 +161,7 @@ class DownloadViewModel : ViewModel() {
                             synopsis = novel.synopsis,
                             tags = novel.tags,
                             apiName = novel.apiName,
+                            readCount = getKey<Int>(DOWNLOAD_EPUB_SIZE, novel.id.toString()) ?: 0,
                             downloadedCount = if (novel.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE) 1L else info?.progress ?: 0L,
                             downloadedTotal = if (novel.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE) 1L else info?.total ?: 0L,
                             ETA = context?.let { ctx -> info?.eta(ctx) } ?: "",
@@ -534,31 +536,25 @@ class DownloadViewModel : ViewModel() {
         }.filter { matchesQuery(it.name) }
     }
 
-    // very shitty copy as we need to deep copy to actually update it
-    fun resortAllData() {
-        val data = _pages.value ?: return
-        if (data.isEmpty()) {
-            return
-        }
-        val list = arrayListOf<Page>()
-        list.add(
-            data[0].copy(
-                unsortedItems = data[0].unsortedItems,
-                items = sortArray(ArrayList(data[0].unsortedItems.map { (it as DownloadFragment.DownloadDataLoaded).copy() }))
-            )
-        )
-        for (i in 1..data.lastIndex) {
-            list.add(
-                data[i].copy(
-                    unsortedItems = data[i].unsortedItems,
-                    items = sortNormalArray(ArrayList(data[i].unsortedItems.map { (it as ResultCached).copy() }))
-                )
-            )
+    // QN-Enhanced: Optimized background sorting to prevent UI lag with 10k items
+    fun resortAllData() = viewModelScope.launch(Dispatchers.Default) {
+        val data = _pages.value ?: return@launch
+        if (data.isEmpty()) return@launch
+
+        val list = data.mapIndexed { index, page ->
+            if (index == 0) {
+                val sorted = sortArray(ArrayList(page.unsortedItems.map { (it as DownloadFragment.DownloadDataLoaded).copy() }))
+                page.copy(items = sorted, hash = page.title.hashCode() * 31 + sorted.hashCode())
+            } else {
+                val sorted = sortNormalArray(ArrayList(page.unsortedItems.map { (it as ResultCached).copy() }))
+                page.copy(items = sorted, hash = page.title.hashCode() * 31 + sorted.hashCode())
+            }
         }
         _pages.postValue(list)
     }
 
-    fun loadAllData(refreshAll: Boolean) = viewModelScope.launch {
+    // QN-Enhanced: Background data loading with pre-calculated layout ratios
+    fun loadAllData(refreshAll: Boolean) = viewModelScope.launch(Dispatchers.Default) {
         if (refreshAll) fetchAllData(false)
         val mapping: HashMap<Int, ArrayList<ResultCached>> = hashMapOf()
         val currentCategories = readList
@@ -566,41 +562,49 @@ class DownloadViewModel : ViewModel() {
             mapping[cat.id] = arrayListOf()
         }
 
-        withContext(Dispatchers.IO) {
-            val keys = getKeys(RESULT_BOOKMARK_STATE)
-            for (key in keys ?: emptyList()) {
-                val type = getKey<Int>(key) ?: continue
-                val id = key.replaceFirst(
-                    RESULT_BOOKMARK_STATE,
-                    RESULT_BOOKMARK
-                )
-                val cached = getKey<ResultCached>(id) ?: continue
-                if (mapping.containsKey(type)) {
-                    mapping[type]?.add(cached)
-                }
+        val keys = getKeys(RESULT_BOOKMARK_STATE)
+        for (key in keys ?: emptyList()) {
+            val type = getKey<Int>(key) ?: continue
+            val id = key.replaceFirst(
+                RESULT_BOOKMARK_STATE,
+                RESULT_BOOKMARK
+            )
+            val cached = getKey<ResultCached>(id) ?: continue
+            if (mapping.containsKey(type)) {
+                mapping[type]?.add(cached)
             }
         }
 
-        val pages = mutableListOf(
-            getDownloadedCards(),
-        )
+        val pages = mutableListOf<Page>()
+        
+        // Load Downloaded Cards (Index 0)
+        val downloadedCards = getDownloadedCards()
+        pages.add(downloadedCards)
+
         for (read in currentCategories) {
+            val unsorted = mapping[read.id] ?: arrayListOf()
+            val sorted = sortNormalArray(ArrayList(unsorted))
+            
             pages.add(
                 Page(
-                    if (read.isSystem && read.stringRes != null) context?.getString(read.stringRes) ?: read.name else read.name,
-                    unsortedItems = mapping[read.id] ?: arrayListOf(),
-                    items = sortNormalArray(mapping[read.id] ?: arrayListOf())
-                ),
+                    title = if (read.isSystem && read.stringRes != null) context?.getString(read.stringRes) ?: read.name else read.name,
+                    unsortedItems = unsorted,
+                    items = sorted,
+                    hash = read.id.hashCode() * 31 + sorted.hashCode()
+                )
             )
         }
         _pages.postValue(pages)
     }
 
     private suspend fun getDownloadedCards(): Page = cardsDataMutex.withLock {
+        val unsorted = ArrayList(cardsData.values)
+        val sorted = sortArray(ArrayList(unsorted))
         Page(
-            com.lagradost.quicknovel.ui.ReadType.NONE.name, unsortedItems = ArrayList(cardsData.values),
-            items =
-                sortArray(ArrayList(cardsData.values))
+            title = com.lagradost.quicknovel.ui.ReadType.NONE.name,
+            unsortedItems = unsorted,
+            items = sorted,
+            hash = com.lagradost.quicknovel.ui.ReadType.NONE.prefValue.hashCode() * 31 + sorted.hashCode()
         )
     }
 
@@ -713,6 +717,7 @@ class DownloadViewModel : ViewModel() {
                         generating = false,
                         lastUpdated = value.lastUpdated,
                         lastDownloaded = value.lastDownloaded,
+                        readCount = getKey(DOWNLOAD_EPUB_SIZE, id.toString()) ?: 0,
                     )
                 }
             }
@@ -743,6 +748,7 @@ class DownloadViewModel : ViewModel() {
                         generating = false,
                         lastUpdated = value.lastUpdated,
                         lastDownloaded = value.lastDownloaded,
+                        readCount = getKey(DOWNLOAD_EPUB_SIZE, key.toString()) ?: 0,
                     )
                 }
             }

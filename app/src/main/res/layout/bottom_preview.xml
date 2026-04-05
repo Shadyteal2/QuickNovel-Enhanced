@@ -1,20 +1,33 @@
-<?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
-
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@android:color/transparent">
-
+        android:layout_height="wrap_content"
+        android:paddingBottom="24dp"
+        android:background="@drawable/bottom_drawer_background">
 
     <LinearLayout
-            android:id="@+id/resultview_preview_result"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:visibility="gone"
-            tools:visibility="visible">
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+        <!-- Drag Handle -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="8dp"
+            android:background="?attr/grayTextColor"
+            android:alpha="0.2" />
+
+        <LinearLayout
+                android:id="@+id/resultview_preview_result"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
 
         <LinearLayout
                 android:layout_width="match_parent"
@@ -105,18 +118,16 @@
 
                     <TextView
                             android:id="@+id/resultview_preview_description"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-
-                            android:ellipsize="end"
-                            android:textColor="?attr/textColor"
-                            tools:text="Ryan Quicksave Romano is an eccentric adventurer with a strange power: he can create a save-point in time and redo his life whenever he dies. Arriving in New Rome, the glitzy capital of sin of a rebuilding Europe, he finds the city torn between mega-corporations, sponsored heroes, superpowered criminals, and true monsters. It's a time of chaos, where potions can grant the power to rule the world and dangers lurk everywhere. " />
-
-                    <View
                             android:layout_width="match_parent"
-                            android:layout_height="20dp"
-                            android:layout_gravity="bottom"
-                            android:background="@drawable/background_shadow" />
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:alpha="0.8"
+                            android:ellipsize="end"
+                            android:maxLines="6"
+                            android:lineSpacingExtra="4sp"
+                            android:textColor="?attr/textColor"
+                            android:textSize="14sp"
+                            tools:text="Ryan Quicksave Romano is an eccentric adventurer..." />
                 </FrameLayout>
             </LinearLayout>
         </LinearLayout>
@@ -169,7 +180,8 @@
     <FrameLayout
             android:id="@+id/resultview_preview_loading"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="200dp"
             android:visibility="gone"
             tools:visibility="gone">
 
@@ -230,6 +242,7 @@
             </LinearLayout>
         </com.facebook.shimmer.ShimmerFrameLayout>
     </FrameLayout>
+    </LinearLayout>
 </FrameLayout>
 
 

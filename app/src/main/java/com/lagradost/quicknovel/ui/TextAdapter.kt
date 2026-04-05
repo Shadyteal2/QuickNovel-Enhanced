@@ -527,7 +527,7 @@ class TextAdapter(
     // a full line of these characters is often used as a SEPARATOR
     val separatorRegex = Regex("[=\\-_\\s━*]*")
 
-    override fun customContentViewType(item: SpanDisplay): Int {
+    override fun customContentViewType(item: SpanDisplay, position: Int): Int {
         return when (item) {
             is TextSpan -> {
                 if (item.text.matches(separatorRegex)) {

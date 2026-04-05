@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.lagradost.quicknovel.util.DrawerHelper
 import com.lagradost.quicknovel.databinding.TranslationBottomSheetBinding
 import com.lagradost.quicknovel.util.TranslationEnginesManager
 import com.lagradost.quicknovel.mvvm.Resource
@@ -14,7 +15,7 @@ import com.lagradost.quicknovel.util.UIHelper.dismissSafe
 import com.lagradost.quicknovel.ui.txt
 import com.lagradost.quicknovel.R
 
-class TranslationBottomSheet(private val originalText: String) : BottomSheetDialogFragment() {
+class TranslationBottomSheet(private val originalText: String, private val backgroundViewId: Int? = null) : BottomSheetDialogFragment() {
     private var _binding: TranslationBottomSheetBinding? = null
     private val binding get() = _binding!!
 
@@ -30,6 +31,7 @@ class TranslationBottomSheet(private val originalText: String) : BottomSheetDial
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        setupScaling()
         binding.translationOriginalText.text = originalText
         
         val engine = TranslationEnginesManager.getActiveEngine(requireContext())
@@ -43,7 +45,33 @@ class TranslationBottomSheet(private val originalText: String) : BottomSheetDial
         }
     }
 
+    private fun setupScaling() {
+        val bgId = backgroundViewId ?: return
+        if (bgId == 0) return
+        val backgroundView = activity?.findViewById<View>(bgId) ?: return
+        
+        val dialog = dialog as? com.google.android.material.bottomsheet.BottomSheetDialog ?: return
+        val behavior = dialog.behavior
+        
+        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
+                    newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                    DrawerHelper.resetScaling(backgroundView)
+                }
+            }
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+            }
+        })
+    }
+
+    override fun getTheme(): Int {
+        return R.style.BottomSheetDrawerTheme
+    }
+
     private fun translate() = ioSafe {
+
         activity?.runOnUiThread {
             binding.translationLoading.visibility = View.VISIBLE
             binding.translationContentLayout.visibility = View.GONE

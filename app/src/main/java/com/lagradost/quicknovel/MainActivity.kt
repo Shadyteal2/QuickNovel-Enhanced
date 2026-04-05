@@ -10,6 +10,7 @@ import android.graphics.Shader
 import android.os.Build
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,6 +43,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.lagradost.nicehttp.Requests
 import com.lagradost.nicehttp.ResponseParser
 import com.lagradost.nicehttp.ignoreAllSSLErrors
@@ -89,6 +91,7 @@ import com.lagradost.quicknovel.util.UIHelper.html
 import com.lagradost.quicknovel.util.UIHelper.popupMenu
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.util.toPx
+import com.lagradost.quicknovel.util.DrawerHelper
 import com.lagradost.safefile.SafeFile
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
@@ -382,7 +385,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
     private fun hidePreviewPopupDialog() {
         viewModel.clear()
-        bottomPreviewPopup.dismissSafe(this)
+        bottomPreviewPopup?.dismiss()
     }
 
     fun loadPopup(
@@ -466,16 +469,41 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     }
 
     var bottomPreviewBinding: BottomPreviewBinding? = null
-    var bottomPreviewPopup: androidx.appcompat.app.AlertDialog? = null
+    var bottomPreviewPopup: BottomSheetDialog? = null
     private fun showPreviewPopupDialog(): BottomPreviewBinding {
         val ret = (bottomPreviewBinding ?: run {
-            val builder =
-                com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
-
+            val diag = BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
             val bottom = BottomPreviewBinding.inflate(layoutInflater, null, false)
-            builder.setView(bottom.root)
-            val diag = builder.create()
+            diag.setContentView(bottom.root)
+            
+            // Vaul-style scaling animation using DrawerHelper
+            val backgroundView = binding?.mainContentWrapper
+            val behavior = diag.behavior
+            behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+                override fun onStateChanged(bottomSheet: View, newState: Int) {
+                    if (newState == BottomSheetBehavior.STATE_HIDDEN || 
+                        newState == BottomSheetBehavior.STATE_COLLAPSED) {
+                        backgroundView?.let { DrawerHelper.resetScaling(it) }
+                        binding?.navBarContainer?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(250)?.start()
+                        if (newState == BottomSheetBehavior.STATE_HIDDEN) diag.dismiss()
+                    }
+                }
+
+                override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                    backgroundView?.let { DrawerHelper.applyScalingAnimation(it, slideOffset) }
+                    // Also scale nav bar
+                    val scale = 1f - (slideOffset * 0.05f)
+                    binding?.navBarContainer?.apply {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                }
+            })
+
             diag.setOnDismissListener {
+                backgroundView?.let { DrawerHelper.resetScaling(it) }
+                binding?.navBarContainer?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(200)?.start()
+                
                 bottomPreviewBinding = null
                 bottomPreviewPopup = null
                 viewModel.clear()
@@ -662,7 +690,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     try {
                         overlay.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         val anim = ViewAnimationUtils.createCircularReveal(overlay, cx.toInt(), cy.toInt(), finalRadius, 0f)
-                        anim.duration = 350 // Dramatically faster, premium snap
+                        anim.duration = 800 // Slower, more perceptible premium transition
                         anim.interpolator = FastOutSlowInInterpolator()
                         anim.addListener(object : AnimatorListenerAdapter() {
                             override fun onAnimationEnd(animation: Animator) {
@@ -827,7 +855,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 .build()
             androidx.work.WorkManager.getInstance(this).enqueueUniqueWork(
                 "PluginSyncImmediate",
-                androidx.work.ExistingWorkPolicy.REPLACE, // Always run fresh on launch if needed
+                androidx.work.ExistingWorkPolicy.KEEP,
                 immediatePluginSync
             )
         }
@@ -904,10 +932,12 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         binding?.homeSyncFab?.apply {
             setOnClickListener {
                 performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>().build()
+                val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>()
+                    .setInputData(androidx.work.workDataOf("force" to true))
+                    .build()
                 androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
                     "PluginSyncImmediate",
-                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    androidx.work.ExistingWorkPolicy.KEEP,
                     syncRequest
                 )
             }
@@ -1086,7 +1116,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
         observeNullable(viewModel.loadResponse) { resource ->
             if (resource == null) {
-                bottomPreviewPopup.dismissSafe(this)
+                bottomPreviewPopup?.dismiss()
                 return@observeNullable
             }
             when (resource) {
@@ -1316,7 +1346,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             }
 
             appBackgroundDim.alpha = dim / 100f
-            appBackgroundLightScrim.alpha = if (isLightTheme) 0.25f else 0f
+            appBackgroundLightScrim.alpha = 0f
         }
     }
 

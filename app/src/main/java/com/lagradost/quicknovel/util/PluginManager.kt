@@ -16,6 +16,7 @@ object PluginManager {
     private val contextCache = mutableMapOf<String, Context>()
     private val loaderCache = mutableMapOf<String, DexClassLoader>()
     private val classCache = mutableMapOf<String, Class<*>>()
+    private val verifiedSignatureCache = mutableSetOf<String>() // Set of absolute file paths that are already trusted
 
     private fun getCachedContext(base: Context, file: File): Context {
         return contextCache.getOrPut(file.absolutePath) {
@@ -136,11 +137,14 @@ object PluginManager {
     fun loadPlugin(context: Context, file: File, mainClass: String): MainAPI? {
         Log.d(TAG, "Attempting to load $mainClass from ${file.name}")
         return try {
-            // STEP 1: Verify Signature
-            val hash = getSignatureHash(context, file)
-            if (hash == null || !isSignatureTrusted(hash)) {
-                Log.w(TAG, "Plugin $mainClass rejected: Trusted signature mismatch! Hash: $hash")
-                return null
+            // STEP 1: Verify Signature (Skip if already verified in this session)
+            if (!verifiedSignatureCache.contains(file.absolutePath)) {
+                val hash = getSignatureHash(context, file)
+                if (hash == null || !isSignatureTrusted(hash)) {
+                    Log.w(TAG, "Plugin $mainClass rejected: Trusted signature mismatch! Hash: $hash")
+                    return null
+                }
+                verifiedSignatureCache.add(file.absolutePath)
             }
 
             // STEP 2: Load Class
@@ -200,6 +204,22 @@ object PluginManager {
         classLoaders.remove(mainClass)
         // Note: Java/Kotlin doesn't allow explicit ClassLoader unloading, 
         // but removing all references allows GC to reclaim it.
+    }
+
+    /**
+     * Clears all internal caches tied to a specific APK file path.
+     * Essential when updating a plugin bundle to ensure the new classloader is created.
+     */
+    fun removeCachesForPath(absolutePath: String) {
+        loaderCache.remove(absolutePath)
+        contextCache.remove(absolutePath)
+        verifiedSignatureCache.remove(absolutePath)
+        val iterator = classCache.keys.iterator()
+        while (iterator.hasNext()) {
+            if (iterator.next().startsWith("$absolutePath:")) {
+                iterator.remove()
+            }
+        }
     }
 
     /**

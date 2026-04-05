@@ -480,6 +480,7 @@
                         android:background="@drawable/ripple_regular"
                         android:contentDescription="@string/read_action_screen_rotation"
                         android:padding="@dimen/screenEdgeMargin"
+                        app:layout_constraintHorizontal_chainStyle="spread"
                         app:layout_constraintEnd_toStartOf="@id/read_action_tts"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"

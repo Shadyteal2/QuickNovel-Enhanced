@@ -250,7 +250,7 @@
     <string name="google_translate">Google Translate</string>
     <string name="google_ml">Google ML</string>
     <string name="ml_info_title">Google ML Kit</string>
-    <string name="ml_info_text">Fast, private, and offline translation. To translate, select your target language and tap \'Apply\'. Each language requires a one-time (~30MB) download. Once applied, use the translate icon in the reader toolbar to toggle between original and translated text.\n\nTip: If translation doesn\'t start immediately after a download, try restarting the app or re-applying the target language.</string>
+    <string name="ml_info_text">Fast, private, and offline translation. To translate, select your target language and tap \'Apply\'. Each language requires a one-time (~30MB) download. Downloading can take up to 10 mins depending on Google server. Once applied, use the translate icon in the reader toolbar to toggle between original and translated text.\n\nTip: If translation doesn\'t start immediately after a download, try restarting the app or re-applying the target language.</string>
     <string name="online_translate">Online translation</string>
     <string name="start_chapter">Skipped chapters</string>
     <string name="tts_speed">TTS Speed</string>
@@ -395,5 +395,10 @@
     <string name="manage_data_key" translatable="false">manage_data_key</string>
     <string name="clear_all">Clear All</string>
     <string name="clear_all_confirmation">Are you sure you want to delete ALL notes and character aliases? This cannot be undone.</string>
+    
+    <string name="restart_required">Restart Required</string>
+    <string name="restart_ml_message">Google ML model installed. Please restart the app for it to initialize correctly.</string>
+    <string name="restart">Restart</string>
+    <string name="later">Later</string>
 </resources>
 

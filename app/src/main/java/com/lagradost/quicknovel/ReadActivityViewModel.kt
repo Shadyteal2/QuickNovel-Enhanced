@@ -1206,17 +1206,21 @@ class ReadActivityViewModel : ViewModel() {
         _translationLoadingStatus.postValue(Resource.Loading("")) // Start feedback immediately
         currentCoroutineContext().ensureActive()
         val settings = MLSettings(from = mlFromLanguage, to = mlToLanguage)
-        if (settings.isValid() && allowDownload && (safeAsync { requireMLDownload() } == true)) {
+        val isDownloadNeeded = if (settings.isValid() && allowDownload) {
+            safeAsync { requireMLDownload() } == true
+        } else false
+        
+        if (isDownloadNeeded) {
             _translationLoadingStatus.postValue(Resource.Loading(context?.getString(R.string.download_ml)))
         }
         isTranslationActive = settings.isValid()
         if (isTranslationActive) {
             isShowingOriginalLive.postValue(false)
         }
-        initMLFromSettings(settings, allowDownload)
+        initMLFromSettings(settings, allowDownload, isDownloadNeeded)
         reloadMLForAllChapters(true)
         updateReadArea(seekToDesired = false)
-        _translationLoadingStatus.postValue(Resource.Success(""))
+        _translationLoadingStatus.postValue(Resource.Success(if (isDownloadNeeded) "Model applied" else ""))
     }
 
     private suspend fun reloadMLForAllChapters(toTranslationStatus: Boolean = false) {
@@ -1281,7 +1285,7 @@ class ReadActivityViewModel : ViewModel() {
         //refreshChapters()
     }
 
-    private suspend fun initMLFromSettings(settings: MLSettings, allowDownload: Boolean) {
+    private suspend fun initMLFromSettings(settings: MLSettings, allowDownload: Boolean, isDownloadNeeded: Boolean = false) {
         try {
             mlTranslator?.closeQuietly()
             mlTranslator = null
@@ -1307,7 +1311,7 @@ class ReadActivityViewModel : ViewModel() {
                     Tasks.await(
                         translator.downloadModelIfNeeded(), 300L, TimeUnit.SECONDS
                     )
-                    _translationLoadingStatus.postValue(Resource.Success("Model applied"))
+                    // Success will be posted by the caller after translation is done
                 } catch (e: Exception) {
                     _translationLoadingStatus.postValue(Resource.Failure(null, e.message ?: "Download failed"))
                     throw e

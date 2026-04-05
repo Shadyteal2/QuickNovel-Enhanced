@@ -34,6 +34,7 @@ import coil3.load
 import coil3.request.crossfade
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.lagradost.quicknovel.util.UsageStatsManager
+import com.lagradost.quicknovel.util.DrawerHelper
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
@@ -50,6 +51,7 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.slider.Slider
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
@@ -201,11 +203,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     private var readingSessionStartTime: Long = 0L
 
     fun showDictionary(word: String) {
-        DictionaryBottomSheet.newInstance(word).show(supportFragmentManager, "dictionary")
+        DictionaryBottomSheet.newInstance(word, binding.readNormalLayout.id).show(supportFragmentManager, "dictionary")
     }
 
     fun showTranslation(text: String) {
-        TranslationBottomSheet(text).show(supportFragmentManager, "translation")
+        TranslationBottomSheet(text, binding.readNormalLayout.id).show(supportFragmentManager, "dictionary")
     }
 
     private fun setBackgroundColor(color: Int) {
@@ -257,7 +259,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
 
             readerBackgroundDim.alpha = dim / 100f
-            readerBackgroundLightScrim.alpha = if (isLightTheme) 0.3f else 0f
+            readerBackgroundLightScrim.alpha = 0f
         }
     }
 
@@ -691,17 +693,15 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
     }*/
     private fun showFonts() {
-        val builder =
-            AlertDialog.Builder(this, R.style.AlertDialogCustom).setView(R.layout.font_bottom_sheet)
+        val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
+        val dialogView = layoutInflater.inflate(R.layout.font_bottom_sheet, null)
+        bottomSheetDialog.setContentView(dialogView)
 
-        val dialog = builder.create()
-        dialog.show()
-
-        val res = dialog.findViewById<RecyclerView>(R.id.sort_click)!!
-        val addButton = dialog.findViewById<android.widget.Button>(R.id.add_custom_font)
+        val res = dialogView.findViewById<RecyclerView>(R.id.sort_click)!!
+        val addButton = dialogView.findViewById<android.widget.Button>(R.id.add_custom_font)
 
         addButton?.setOnClickListener {
-            dialog.dismiss()
+            bottomSheetDialog.dismiss()
             selectFontLauncher.launch("*/*")
         }
 
@@ -718,18 +718,41 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             storingIndex,
             clickCallback = { file ->
                 viewModel.textFont = file.file?.name ?: ""
-                dialog.dismiss()
+                bottomSheetDialog.dismiss()
             },
             deleteCallback = { file ->
                 file.file?.delete()
                 showToast("Font deleted")
-                dialog.dismiss()
+                bottomSheetDialog.dismiss()
                 showFonts()
             }
         )
         res.adapter = adapter
         adapter.submitIncomparableList(items)
         res.scrollToPosition(storingIndex)
+
+        // Background scaling and blur
+        val activityBinding = this.binding
+        val backgroundView = activityBinding.readNormalLayout
+        val behavior = bottomSheetDialog.behavior
+        // Crucial fix: Reset scaling when dismissed regardless of how it's closed
+        bottomSheetDialog.setOnDismissListener {
+            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+        }
+
+        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
+                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
+                    newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                }
+            }
+            override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
+                com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+            }
+        })
+
+        bottomSheetDialog.show()
     }
 
     private fun saveCustomFont(uri: android.net.Uri) {
@@ -1097,7 +1120,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                                 R.style.AlertDialogCustom
                             )
                                 .setView(downloadProgressBinding?.root)
-                                .setCancelable(false)
+                                .setCancelable(true)
+                                .setOnDismissListener {
+                                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(binding.readNormalLayout)
+                                }
                                 .create()
                         downloadProgressDialog?.show()
                     }
@@ -1109,7 +1135,24 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 is Resource.Success<String> -> {
                     downloadProgressDialog?.dismiss()
                     downloadProgressDialog = null
-                    CommonActivity.showToast(this, "Applied successfully", Toast.LENGTH_SHORT)
+
+                    // Only show restart dialog if a new model was actually applied/downloaded
+                    if (resource.value == "Model applied") {
+                        com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
+                            .setTitle(R.string.restart_required)
+                            .setMessage(R.string.restart_ml_message)
+                            .setPositiveButton(R.string.restart) { _, _ ->
+                                val intent = Intent(this, MainActivity::class.java)
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                startActivity(intent)
+                                Runtime.getRuntime().exit(0)
+                            }
+                            .setNegativeButton(R.string.later, null)
+                            .setOnDismissListener {
+                                com.lagradost.quicknovel.util.DrawerHelper.resetScaling(binding.readNormalLayout)
+                            }
+                            .show()
+                    }
                 }
             }
         }
@@ -1143,12 +1186,63 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             binding.readActionRotate.apply {
                 setOnClickListener {
-                    popupMenu(
-                        items = OrientationType.entries.map { it.prefValue to it.stringRes },
-                        selectedItemId = org.prefValue
-                    ) {
-                        viewModel.orientation = itemId
+                    val items = OrientationType.entries.toList()
+                    val displayItems = items.map { getString(it.stringRes) }
+                    val currentIndex = items.indexOf(org)
+
+                    val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this@ReadActivity2, R.style.BottomSheetDrawerTheme)
+                    val dialogBinding = com.lagradost.quicknovel.databinding.ReadBottomChaptersBinding.inflate(layoutInflater, null, false)
+                    bottomSheetDialog.setContentView(dialogBinding.root)
+                    
+                    dialogBinding.readChaptersTitle.text = getString(R.string.read_action_screen_rotation)
+                    
+                    val arrayAdapter = object : android.widget.ArrayAdapter<String>(this@ReadActivity2, R.layout.chapter_select_dialog, displayItems) {
+                        override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                            val view = super.getView(position, convertView, parent) as android.widget.TextView
+                            if (position == currentIndex) {
+                                view.setTypeface(null, android.graphics.Typeface.BOLD)
+                                view.setTextColor(colorFromAttribute(R.attr.colorPrimary))
+                            } else {
+                                view.setTypeface(null, android.graphics.Typeface.NORMAL)
+                                view.setTextColor(viewModel.textColor)
+                            }
+                            return view
+                        }
                     }
+                    
+                    dialogBinding.readChaptersList.adapter = arrayAdapter
+                    if (currentIndex != -1) {
+                        dialogBinding.readChaptersList.setSelection(currentIndex)
+                    }
+                    
+                    dialogBinding.readChaptersList.setOnItemClickListener { _, _, which, _ ->
+                        viewModel.orientation = items[which].prefValue
+                        bottomSheetDialog.dismiss()
+                    }
+
+                    // Background scaling animation
+                    val activityBinding = this@ReadActivity2.binding
+                    val backgroundView = activityBinding.readNormalLayout
+                    val behavior = bottomSheetDialog.behavior
+                    
+                    // Crucial fix: Reset scaling when dismissed regardless of how it's closed
+                    bottomSheetDialog.setOnDismissListener {
+                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                    }
+
+                    behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                        override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
+                            if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN || 
+                                newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                                com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                            }
+                        }
+                        override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
+                            com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                        }
+                    })
+
+                    bottomSheetDialog.show()
                 }
             }
         }
@@ -1167,38 +1261,68 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         observe(viewModel.chaptersTitles) { titles ->
             binding.readActionChapters.setOnClickListener {
-                val builderSingle: AlertDialog.Builder = AlertDialog.Builder(this)
-                //builderSingle.setIcon(R.drawable.ic_launcher)
                 val currentChapter = viewModel.desiredIndex?.index
-                // cant be too safe here
-                val validChapter =
-                    currentChapter != null && currentChapter >= 0 && currentChapter < titles.size
-                if (validChapter) {
-                    builderSingle.setTitle(titles[currentChapter!!].asString(this)) //  "Select Chapter"
+                val validChapter = currentChapter != null && currentChapter >= 0 && currentChapter < titles.size
+                
+                val bottomSheetDialog = BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
+                val dialogBinding = com.lagradost.quicknovel.databinding.ReadBottomChaptersBinding.inflate(layoutInflater, null, false)
+                bottomSheetDialog.setContentView(dialogBinding.root)
+
+                dialogBinding.readChaptersTitle.text = if (validChapter) {
+                    titles[currentChapter!!].asString(this)
                 } else {
-                    builderSingle.setTitle(R.string.select_chapter)
+                    getString(R.string.select_chapter)
                 }
 
-                val arrayAdapter = ArrayAdapter<String>(this, R.layout.chapter_select_dialog)
-
+                val arrayAdapter = object : ArrayAdapter<String>(this, R.layout.chapter_select_dialog) {
+                    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                        val view = super.getView(position, convertView, parent) as TextView
+                        if (position == currentChapter) {
+                            view.setTypeface(null, android.graphics.Typeface.BOLD)
+                            view.setTextColor(colorFromAttribute(R.attr.colorPrimary))
+                        } else {
+                            view.setTypeface(null, android.graphics.Typeface.NORMAL)
+                            view.setTextColor(viewModel.textColor)
+                        }
+                        return view
+                    }
+                }
                 arrayAdapter.addAll(titles.map { it.asString(this) })
-
-                builderSingle.setNegativeButton(R.string.cancel) { dialog, _ -> dialog.dismiss() }
-
-                builderSingle.setAdapter(arrayAdapter) { _, which ->
-                    viewModel.seekToChapter(which)
-                }
-
-                val dialog = builderSingle.create()
-                dialog.show()
-
-                dialog.listView.choiceMode = AbsListView.CHOICE_MODE_SINGLE
+                dialogBinding.readChaptersList.adapter = arrayAdapter
+                
                 if (validChapter) {
-                    dialog.listView.setSelection(currentChapter!!)
-                    dialog.listView.setItemChecked(currentChapter, true)
+                    dialogBinding.readChaptersList.setSelection(currentChapter!!)
                 }
+
+                dialogBinding.readChaptersList.setOnItemClickListener { _, _, which, _ ->
+                    viewModel.seekToChapter(which)
+                    bottomSheetDialog.dismiss()
+                }
+
+                // Background scaling animation
+                val backgroundView = binding.readNormalLayout
+                val behavior = bottomSheetDialog.behavior
+                
+                // Crucial fix: Reset scaling when dismissed regardless of how it's closed
+                bottomSheetDialog.setOnDismissListener {
+                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                }
+
+                behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                    override fun onStateChanged(bottomSheet: View, newState: Int) {
+                        if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
+                            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                        }
+                    }
+                    override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                        com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                    }
+                })
+
+                bottomSheetDialog.show()
             }
         }
+
 
         /*binding.readToolbar.setOnMenuItemClickListener {
             TimePickerDialog(
@@ -1454,12 +1578,35 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         binding.readActionSettings.setOnClickListener {
-            val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
-
+            val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
             val binding = ReadBottomSettingsBinding.inflate(layoutInflater, null, false)
-            builder.setView(binding.root)
-            val bottomSheetDialog = builder.create()
+            bottomSheetDialog.setContentView(binding.root)
+            
+            // Background scaling animation using activity outer binding
+            val activityBinding = this@ReadActivity2.binding
+            val backgroundView = activityBinding.readNormalLayout
+            val behavior = bottomSheetDialog.behavior
+            
+            // Crucial fix: Reset scaling when dismissed regardless of how it's closed
+            bottomSheetDialog.setOnDismissListener {
+                DrawerHelper.resetScaling(backgroundView)
+            }
+
+            behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
+                    if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN || 
+                        newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                        DrawerHelper.resetScaling(backgroundView)
+                    }
+                }
+                override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
+                    DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                }
+            })
+
             bottomSheetDialog.show()
+
+
 
             binding.readSettingsCharacterAliases.setOnClickListener {
                 showAliasManagementDialog()
@@ -1476,14 +1623,55 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 return@setOnLongClickListener true
             }
             binding.readReadingType.setOnClickListener {
-                it.popupMenu(
-                    items = ReadingType.entries.map { v -> v.prefValue to v.stringRes },
-                    selectedItemId = viewModel.readerType.prefValue
-                ) {
-                    val set = ReadingType.fromSpinner(itemId)
+                val items = ReadingType.entries.toTypedArray()
+                val displayItems = items.map { getString(it.stringRes) }
+                val currentIndex = items.indexOf(viewModel.readerType)
+
+                val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
+                val scrollBinding = com.lagradost.quicknovel.databinding.ReadBottomChaptersBinding.inflate(layoutInflater, null, false)
+                bottomSheetDialog.setContentView(scrollBinding.root)
+                
+                scrollBinding.readChaptersTitle.text = getString(R.string.scroll_type)
+                
+                val arrayAdapter = object : ArrayAdapter<String>(this, R.layout.chapter_select_dialog, displayItems) {
+                    override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                        val view = super.getView(position, convertView, parent) as android.widget.TextView
+                        view.setTextColor(viewModel.textColor)
+                        return view
+                    }
+                }
+                
+                scrollBinding.readChaptersList.adapter = arrayAdapter
+                scrollBinding.readChaptersList.setOnItemClickListener { _, _, which, _ ->
+                    val set = items[which]
                     binding.readReadingType.setText(set.stringRes)
                     viewModel.readerType = set
+                    bottomSheetDialog.dismiss()
                 }
+
+                // Background scaling animation
+                val activityBinding = this@ReadActivity2.binding
+                val backgroundView = activityBinding.readNormalLayout
+                val behavior = bottomSheetDialog.behavior
+                
+                // Crucial fix: Reset scaling when dismissed regardless of how it's closed
+                bottomSheetDialog.setOnDismissListener {
+                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                }
+
+                behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                    override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
+                        if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN || 
+                            newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                        }
+                    }
+                    override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
+                        com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                    }
+                })
+
+                bottomSheetDialog.show()
             }
 
             binding.readSettingsTextSizeText.setOnClickListener {
@@ -1649,7 +1837,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         it.second
                     },
                     items.map { it.first }.indexOf(viewModel.mlToLanguage),
-                    context.getString(R.string.sleep_timer), false, {}
+                    context.getString(R.string.sleep_timer), false, {
+                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                    }
                 ) { index ->
                     viewModel.mlToLanguage = items[index].first
                     binding.readMlTo.text =
@@ -1668,7 +1858,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         it.second
                     },
                     items.map { it.first }.indexOf(viewModel.mlFromLanguage),
-                    context.getString(R.string.sleep_timer), false, {}
+                    context.getString(R.string.sleep_timer), false, {
+                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                    }
                 ) { index ->
                     viewModel.mlFromLanguage = items[index].first
                     binding.readMlFrom.text =
@@ -1687,6 +1879,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     .setTitle(R.string.ml_info_title)
                     .setMessage(R.string.ml_info_text)
                     .setPositiveButton(android.R.string.ok, null)
+                    .setOnDismissListener {
+                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                    }
                     .show()
             }
 
@@ -1723,7 +1918,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                                     it?.displayName ?: ctx.getString(R.string.default_text)
                                 },
                                 currentIndex,
-                                ctx.getString(R.string.tts_locale), false, {}
+                                ctx.getString(R.string.tts_locale), false, {
+                                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                                }
                             ) { index ->
                                 viewModel.setTTSVoice(null)
                             }
@@ -1772,7 +1969,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         it.first
                     },
                     items.map { it.second }.indexOf(viewModel.ttsTimer),
-                    context.getString(R.string.sleep_timer), false, {}
+                    context.getString(R.string.sleep_timer), false, {
+                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                    }
                 ) { index ->
                     viewModel.ttsTimer = items[index].second
                 }
@@ -1814,7 +2013,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                             ctx.showDialog(
                                 voices.map { it.first },
                                 selectedIndex,
-                                ctx.getString(R.string.tts_locale), false, {}
+                                ctx.getString(R.string.tts_locale), false, {
+                                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                                }
                             ) { index ->
                                 val voice = voices.getOrNull(index)?.second
                                 viewModel.setTTSVoice(voice?.name)
@@ -1910,8 +2111,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 }
 
                 setOnClickListener {
-                    val builder: AlertDialog.Builder = AlertDialog.Builder(this.context)
+                    val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this.context, R.style.AlertDialogCustom)
                     builder.setTitle(getString(R.string.reading_color))
+                    builder.setOnDismissListener {
+                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                    }
 
                     val colorAdapter =
                         ArrayAdapter<String>(this.context, R.layout.chapter_select_dialog)
@@ -1950,78 +2154,166 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private fun showAliasManagementDialog() {
+        val backgroundView = binding.readNormalLayout
         val currentAliases = viewModel.aliases.value ?: emptyMap()
-        val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
-        builder.setTitle(R.string.character_aliases)
+        val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
+        val dialogBinding = com.lagradost.quicknovel.databinding.ReadBottomAliasesBinding.inflate(layoutInflater, null, false)
+        bottomSheetDialog.setContentView(dialogBinding.root)
+
+        dialogBinding.readAliasesTitle.text = getString(R.string.character_aliases)
+        dialogBinding.readAddAliasBtn.setOnClickListener {
+            showAddAliasDialog()
+            bottomSheetDialog.dismiss()
+        }
 
         if (currentAliases.isEmpty()) {
-            builder.setMessage(R.string.no_aliases)
+            dialogBinding.readAliasesEmptyText.visibility = android.view.View.VISIBLE
+            dialogBinding.readAliasesList.visibility = android.view.View.GONE
         } else {
+            dialogBinding.readAliasesEmptyText.visibility = android.view.View.GONE
+            dialogBinding.readAliasesList.visibility = android.view.View.VISIBLE
+            
             val items = currentAliases.keys.toTypedArray()
             val displayItems = items.map { "$it -> ${currentAliases[it]}" }.toTypedArray()
-            val adapter = object : ArrayAdapter<String>(this, android.R.layout.select_dialog_item, displayItems) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getView(position, convertView, parent) as TextView
+            
+            val arrayAdapter = object : ArrayAdapter<String>(this, R.layout.chapter_select_dialog, displayItems) {
+                override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                    val view = super.getView(position, convertView, parent) as android.widget.TextView
                     view.setTextColor(viewModel.textColor)
+                    view.textSize = 16f
                     return view
                 }
             }
-            builder.setAdapter(adapter) { _, which ->
+            dialogBinding.readAliasesList.adapter = arrayAdapter
+            dialogBinding.readAliasesList.setOnItemClickListener { _, _, which, _ ->
                 val key = items[which]
                 val options = arrayOf(getString(R.string.edit_alias), getString(R.string.delete_alias))
-                val optAdapter = object : ArrayAdapter<String>(this@ReadActivity2, android.R.layout.select_dialog_item, options) {
-                    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                        val view = super.getView(position, convertView, parent) as TextView
-                        view.setTextColor(viewModel.textColor)
-                        return view
+                
+                val optionsDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this@ReadActivity2, R.style.BottomSheetDrawerTheme)
+                val optionsBinding = com.lagradost.quicknovel.databinding.ReadBottomChaptersBinding.inflate(layoutInflater, null, false)
+                optionsDialog.setContentView(optionsBinding.root)
+                
+                optionsBinding.readChaptersTitle.text = key
+                
+                val optAdapter = object : ArrayAdapter<String>(this@ReadActivity2, R.layout.chapter_select_dialog, options) {
+                    override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                        val v = super.getView(position, convertView, parent) as android.widget.TextView
+                        v.setTextColor(viewModel.textColor)
+                        return v
                     }
                 }
-                com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
-                    .setAdapter(optAdapter) { _, optionIdx ->
-                        if (optionIdx == 0) {
-                            showAddAliasDialog(key, currentAliases[key])
-                        } else {
-                            viewModel.removeAlias(key)
-                            showAliasManagementDialog()
+                
+                optionsBinding.readChaptersList.adapter = optAdapter
+                optionsBinding.readChaptersList.setOnItemClickListener { _, _, optIdx, _ ->
+                    if (optIdx == 0) {
+                        showAddAliasDialog(key, currentAliases[key])
+                        optionsDialog.dismiss()
+                        bottomSheetDialog.dismiss()
+                    } else {
+                        viewModel.removeAlias(key)
+                        optionsDialog.dismiss()
+                        showAliasManagementDialog()
+                        bottomSheetDialog.dismiss()
+                    }
+                }
+
+                // Background scaling and blur
+                val behavior2 = optionsDialog.behavior
+                
+                // Crucial fix: Reset scaling when dismissed regardless of how it's closed
+                optionsDialog.setOnDismissListener {
+                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                }
+
+                behavior2.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                    override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
+                        if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
+                            newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
                         }
-                    }.show()
+                    }
+                    override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
+                        com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                    }
+                })
+
+                optionsDialog.show()
             }
         }
 
-        builder.setPositiveButton(R.string.add_alias) { _, _ ->
-            showAddAliasDialog()
+        // Background scaling and blur animation
+        val behavior = bottomSheetDialog.behavior
+        
+        // Crucial fix: Reset scaling when dismissed regardless of how it's closed
+        bottomSheetDialog.setOnDismissListener {
+            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
         }
-        builder.setNegativeButton(android.R.string.cancel, null)
-        builder.show()
+
+        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
+                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
+                    newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                }
+            }
+            override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
+                com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+            }
+        })
+
+        bottomSheetDialog.show()
     }
 
+
     private fun showAddAliasDialog(editKey: String? = null, editValue: String? = null) {
-        val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
-        builder.setTitle(if (editKey == null) R.string.add_alias else R.string.edit_alias)
+        val backgroundView = binding.readNormalLayout
+        val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
+        val dialogBinding = com.lagradost.quicknovel.databinding.ReadBottomAddAliasBinding.inflate(layoutInflater, null, false)
+        bottomSheetDialog.setContentView(dialogBinding.root)
 
-        val dialogView = layoutInflater.inflate(R.layout.dialog_add_alias, null)
-        val originalInput = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.original_input)
-        val replacementInput = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.replacement_input)
+        dialogBinding.readAddAliasTitle.text = getString(if (editKey == null) R.string.add_alias else R.string.edit_alias)
+        dialogBinding.originalInput.setText(editKey)
+        dialogBinding.originalInput.setTextColor(viewModel.textColor)
+        dialogBinding.replacementInput.setText(editValue)
+        dialogBinding.replacementInput.setTextColor(viewModel.textColor)
 
-        originalInput.setText(editKey)
-        originalInput.setTextColor(viewModel.textColor)
-        replacementInput.setText(editValue)
-        replacementInput.setTextColor(viewModel.textColor)
+        dialogBinding.readAddAliasCancel.setOnClickListener {
+            bottomSheetDialog.dismiss()
+        }
 
-        builder.setView(dialogView)
-
-        builder.setPositiveButton(android.R.string.ok) { _, _ ->
-            val original = originalInput.text.toString().trim()
-            val replacement = replacementInput.text.toString().trim()
+        dialogBinding.readAddAliasSave.setOnClickListener {
+            val original = dialogBinding.originalInput.text.toString().trim()
+            val replacement = dialogBinding.replacementInput.text.toString().trim()
             if (original.isNotEmpty() && replacement.isNotEmpty()) {
                 if (editKey != null && editKey != original) {
                     viewModel.removeAlias(editKey)
                 }
                 viewModel.addAlias(original, replacement)
+                bottomSheetDialog.dismiss()
                 showAliasManagementDialog()
             }
         }
-        builder.setNegativeButton(android.R.string.cancel, null)
-        builder.show()
+
+        // Background scaling and blur animation
+        val behavior = bottomSheetDialog.behavior
+        
+        // Crucial fix: Reset scaling when dismissed regardless of how it's closed
+        bottomSheetDialog.setOnDismissListener {
+            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+        }
+
+        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
+                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
+                    newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                }
+            }
+            override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
+                com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+            }
+        })
+
+        bottomSheetDialog.show()
     }
 }

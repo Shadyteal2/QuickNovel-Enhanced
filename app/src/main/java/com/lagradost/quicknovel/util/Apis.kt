@@ -88,8 +88,8 @@ class Apis {
             }
         }
 
-        fun removePlugin(apiName: String) {
-            pluginApis.removeAll { it.name == apiName }
+        fun removePlugin(mainClass: String) {
+            pluginApis.removeAll { it.javaClass.name == mainClass }
             notifyChange()
         }
 

@@ -8,6 +8,16 @@
     android:background="@android:color/transparent"
     android:orientation="vertical">
 
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/drag_handle_background"
+        android:alpha="0.3" />
+
+
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -25,9 +35,10 @@
                 android:layout_marginTop="24dp"
                 android:layout_marginBottom="12dp"
                 android:text="@string/read_display_settings"
-                android:textColor="?attr/textColor"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
+
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -179,26 +190,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/inbuilt_dictionary"
-                        android:textSize="16sp"
-                        android:textColor="?attr/textColor" />
-                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
-                        android:id="@+id/read_settings_dictionary"
-                        android:layout_width="64dp"
-                        android:layout_height="32dp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp"
-                    android:gravity="center_vertical">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
                         android:text="@string/keep_screen_active"
                         android:textSize="16sp"
                         android:textColor="?attr/textColor" />
@@ -243,9 +234,10 @@
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="12dp"
                 android:text="@string/text_font"
-                android:textColor="?attr/textColor"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
+
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -296,9 +288,10 @@
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="12dp"
                 android:text="@string/tts_voice_title"
-                android:textColor="?attr/textColor"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
+
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -600,7 +593,9 @@
                     android:layout_marginTop="12dp"
                     android:text="@string/paragraph_spacing"
                     android:textSize="14sp"
-                    android:textColor="?attr/grayTextColor" />
+                    android:textColor="?attr/colorPrimary"
+                    android:textStyle="bold" />
+
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
@@ -653,9 +648,10 @@
                     android:layout_marginTop="12dp"
                     android:layout_marginBottom="12dp"
                     android:text="@string/google_ml"
-                    android:textColor="?attr/textColor"
+                    android:textColor="?attr/grayTextColor"
                     android:textSize="18sp"
                     android:textStyle="bold" />
+
                 
                 <ImageButton
                     android:id="@+id/read_ml_info_btn"
@@ -663,8 +659,19 @@
                     android:layout_height="40dp"
                     android:background="?selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_google_ml"
-                    app:tint="?attr/textColor" />
+                    app:tint="?attr/colorPrimary" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/google_ml_kit_info_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:textColor="?attr/grayTextColor"
+                android:textSize="12sp"
+                android:text="Downloading can take upto 10mins depending on google server" />
+
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -722,9 +729,10 @@
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="12dp"
                 android:text="@string/read_color"
-                android:textColor="?attr/textColor"
+                android:textColor="?attr/grayTextColor"
                 android:textSize="18sp"
                 android:textStyle="bold" />
+
 
             <LinearLayout
                 android:layout_width="match_parent"

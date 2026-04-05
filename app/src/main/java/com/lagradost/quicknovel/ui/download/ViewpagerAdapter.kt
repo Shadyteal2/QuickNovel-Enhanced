@@ -21,7 +21,8 @@ import java.lang.ref.WeakReference
 data class Page(
     val title: String,
     val unsortedItems: List<Any>,
-    val items: List<Any>
+    val items: List<Any>,
+    val hash: Int = (title.hashCode() * 31 + items.hashCode())
 )
 
 @Suppress("DEPRECATION")
@@ -57,7 +58,7 @@ class ViewpagerAdapter(
             a.title == b.title
         },
         contentSame = { a, b ->
-            a.items == b.items && a.title == b.title
+            a.hash == b.hash
         }
     )) {
 
@@ -123,6 +124,9 @@ class ViewpagerAdapter(
 
         binding.pageRecyclerview.tag = position
         binding.pageRecyclerview.apply {
+            setItemViewCacheSize(20) // Enterprise-grade pre-fetching for 10k items
+            setHasFixedSize(true)
+            
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
                 val navInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
                 val sliderOffset = (158 * resources.displayMetrics.density).toInt()

@@ -9,6 +9,10 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.lagradost.quicknovel.util.DrawerHelper
+
 import com.lagradost.quicknovel.databinding.DictionaryBottomSheetBinding
 import com.lagradost.quicknovel.databinding.DictionaryMeaningItemBinding
 import com.lagradost.quicknovel.databinding.DictionaryDefinitionItemBinding
@@ -28,13 +32,15 @@ class DictionaryBottomSheet : BottomSheetDialogFragment() {
     companion object {
         private const val ARG_WORD = "arg_word"
 
-        fun newInstance(word: String): DictionaryBottomSheet {
+        fun newInstance(word: String, backgroundViewId: Int? = null): DictionaryBottomSheet {
             return DictionaryBottomSheet().apply {
                 arguments = Bundle().apply {
                     putString(ARG_WORD, word)
+                    backgroundViewId?.let { putInt("arg_bg_view_id", it) }
                 }
             }
         }
+
     }
 
     override fun onCreateView(
@@ -49,8 +55,31 @@ class DictionaryBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val word = arguments?.getString(ARG_WORD) ?: return
+        
+        setupScaling()
         fetchDefinition(word)
     }
+
+    private fun setupScaling() {
+        val bgId = arguments?.getInt("arg_bg_view_id") ?: return
+        if (bgId == 0) return
+        val backgroundView = activity?.findViewById<View>(bgId) ?: return
+        
+        val dialog = dialog as? BottomSheetDialog ?: return
+        val behavior = dialog.behavior
+        
+        behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState == BottomSheetBehavior.STATE_HIDDEN || newState == BottomSheetBehavior.STATE_COLLAPSED) {
+                    DrawerHelper.resetScaling(backgroundView)
+                }
+            }
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+            }
+        })
+    }
+
 
     private fun fetchDefinition(word: String) {
         binding.dictionaryLoading.isVisible = true
@@ -156,6 +185,7 @@ class DictionaryBottomSheet : BottomSheetDialogFragment() {
     }
 
     override fun getTheme(): Int {
-        return R.style.AppBottomSheetDialogTheme
+        return R.style.BottomSheetDrawerTheme
     }
+
 }

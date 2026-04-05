@@ -48,6 +48,7 @@ import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 import com.lagradost.quicknovel.util.toPx
+import com.lagradost.quicknovel.util.DrawerHelper
 import com.lagradost.quicknovel.util.KineticTiltHelper
 import kotlinx.coroutines.launch
 import android.content.SharedPreferences
@@ -62,10 +63,14 @@ class DownloadFragment : Fragment() {
     private var tabsMediator: TabLayoutMediator? = null
 
     private val navStyleListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "library_nav_style_key") {
+        val navStyleKey = context?.getString(R.string.library_nav_style_key)
+        val bentoKey = context?.getString(R.string.library_pinterest_bento_key)
+        val downloadFormatKey = context?.getString(R.string.download_format_key)
+
+        if (key == navStyleKey) {
             updateNavStyleUI()
         }
-        if (key == "library_bento_3x3" || key == "library_pinterest_bento") {
+        if (key == "library_bento_3x3" || key == bentoKey || key == downloadFormatKey) {
             setupGridView()
         }
     }
@@ -147,6 +152,7 @@ class DownloadFragment : Fragment() {
         val synopsis: String?,
         val tags: List<String>?,
         val apiName: String,
+        val readCount: Int,
         val downloadedCount: Long,
         val downloadedTotal: Long,
         val ETA: String,
@@ -187,75 +193,54 @@ class DownloadFragment : Fragment() {
     }
 
 
-    @SuppressLint("NotifyDataSetChanged")
     private fun setupGridView() {
         val adapter = (binding.viewpager.adapter as? ViewpagerAdapter) ?: return
         val prefs = PreferenceManager.getDefaultSharedPreferences(context ?: return)
         val usePinterest = prefs.getBoolean("library_pinterest_bento", false)
         val use3x3Bento = prefs.getBoolean("library_bento_3x3", false)
-
+        
         for ((_, ref) in adapter.collectionsOfRecyclerView) {
             val rv = ref.get() ?: continue
             val compactView = rv.context.getDownloadIsCompact()
 
+            // CRITICAL: Clear shared pool to prevent "pollution" when switching mode
+            rv.setRecycledViewPool(androidx.recyclerview.widget.RecyclerView.RecycledViewPool())
+            
             rv.layoutManager = when {
                 use3x3Bento && !compactView -> {
-                    // True Bento Grid: 3-column base with featured wide cards
-                    // Pattern: every 7th item (0-indexed) is a featured 2-span card
-                    // Layout cycle of 7: [1,1,2,1,1,1,1] = fills 3+3+3+3+3+3+3 = nicely
-                    // Actually: cycle of 7 =[2,1,1,1,1,2,1] to create visual rhythm
                     val rvAdapter = rv.adapter
                     androidx.recyclerview.widget.GridLayoutManager(rv.context, 3).apply {
                         spanSizeLookup = object : androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup() {
                             override fun getSpanSize(position: Int): Int {
-                                // Footer always takes full width
                                 if (rvAdapter != null && position >= rvAdapter.itemCount - 1) return 3
-                                
-                                // Position-based packing perfectly fills all 3 columns without gaps:
-                                // Row 1: pos 0 (span 2), pos 1 (span 1) -> sum 3
-                                // Row 2: pos 2 (1), pos 3 (1), pos 4 (1) -> sum 3
-                                // Row 3: pos 5 (2), pos 6 (1) -> sum 3
                                 return when (position % 7) {
-                                    0, 5 -> 2   // wide/featured card
-                                    else -> 1   // regular square card
+                                    0, 5 -> 2
+                                    else -> 1
                                 }
                             }
                         }
-                        isItemPrefetchEnabled = true
                     }
                 }
                 usePinterest && !compactView -> {
-                    // Pinterest True Masonry: 2 columns, gapless vertical filling
-                    StaggeredGridLayoutManager(
-                        2, StaggeredGridLayoutManager.VERTICAL
-                    ).apply {
+                    StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL).apply {
                         gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
                     }
                 }
                 else -> {
-                    // Standard Grid: Clean blocks
-                    val spanCountLandscape = if (compactView) 2 else 6
-                    val spanCountPortrait = if (compactView) 1 else 3
-                    val orientation = rv.resources.configuration.orientation
-                    val totalSpan = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                        spanCountLandscape
+                    if (compactView) {
+                        androidx.recyclerview.widget.LinearLayoutManager(rv.context)
                     } else {
-                        spanCountPortrait
+                        androidx.recyclerview.widget.GridLayoutManager(rv.context, 3)
                     }
-                    androidx.recyclerview.widget.GridLayoutManager(rv.context, totalSpan)
                 }
             }
 
             // QN-Enhanced: Peak Performance Tuning
             rv.apply {
-                if (layoutAnimation == null) {
-                    layoutAnimation = android.view.animation.AnimationUtils.loadLayoutAnimation(context, R.anim.grid_layout_animation)
-                }
-                
                 setHasFixedSize(true)
-                setItemViewCacheSize(10) // Cache more items for fast scrolling
+                setItemViewCacheSize(20)
                 
-                // Kinetic Tilt Scroll-Lock: Disable tilt HUD while scrolling to ensure zero micro-stutter
+                // Kinetic Tilt Scroll-Lock
                 clearOnScrollListeners()
                 addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
                     override fun onScrollStateChanged(recyclerView: androidx.recyclerview.widget.RecyclerView, newState: Int) {
@@ -263,7 +248,7 @@ class DownloadFragment : Fragment() {
                     }
                 })
             }
-            (rv.adapter as? AnyAdapter)?.notifyDataSetChanged()
+            rv.adapter?.notifyDataSetChanged()
         }
     }
 
@@ -545,9 +530,9 @@ class DownloadFragment : Fragment() {
         }
 
         binding.downloadFab.setOnClickListener { view ->
-            val binding = SortBottomSheetBinding.inflate(layoutInflater, null, false)
-            val bottomSheetDialog = BottomSheetDialog(view.context)
-            bottomSheetDialog.setContentView(binding.root)
+            val sortBinding = SortBottomSheetBinding.inflate(layoutInflater, null, false)
+            val bottomSheetDialog = BottomSheetDialog(view.context, R.style.BottomSheetDrawerTheme)
+            bottomSheetDialog.setContentView(sortBinding.root)
 
             val (sorting, key) = if (isOnDownloads) {
                 DownloadViewModel.sortingMethods to DOWNLOAD_SORTING_METHOD
@@ -563,7 +548,23 @@ class DownloadFragment : Fragment() {
             }.apply {
                 submitList(sorting.toList())
             }
-            binding.sortClick.adapter = adapter
+            sortBinding.sortClick.adapter = adapter
+            
+            // Background scaling animation
+            val backgroundView = binding.downloadRoot
+            val behavior = bottomSheetDialog.behavior
+            behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                override fun onStateChanged(bottomSheet: View, newState: Int) {
+                    if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
+                        newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                        DrawerHelper.resetScaling(backgroundView)
+                    }
+                }
+                override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                    DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                }
+            })
+
             bottomSheetDialog.show()
         }
 
@@ -640,7 +641,7 @@ class DownloadFragment : Fragment() {
     }
 
     private fun showCategoriesManager() {
-        val dialog = BottomSheetDialog(requireContext())
+        val dialog = BottomSheetDialog(requireContext(), R.style.BottomSheetDrawerTheme)
         val view = layoutInflater.inflate(R.layout.dialog_categories_manager, null)
         dialog.setContentView(view)
 
@@ -748,6 +749,21 @@ class DownloadFragment : Fragment() {
                 }
             }
         }
+        
+        // Background scaling animation
+        val backgroundView = binding.downloadRoot
+        val behavior = dialog.behavior
+        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
+                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                }
+            }
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+            }
+        })
+
         dialog.show()
     }
 }

@@ -279,16 +279,40 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         } ?: "plugin.apk"
 
                         val baseName = apkName.substringBeforeLast(".")
+                        val jsonTarget = File(pluginsDir, "$baseName.json")
+                        
+                        // Clean up old metadata before overwriting
+                        if (jsonTarget.exists()) {
+                            try {
+                                val oldMetaStr = jsonTarget.readText()
+                                val oldMeta = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readValue(oldMetaStr, com.lagradost.quicknovel.util.PluginItem::class.java)
+                                oldMeta.mainClass?.let { com.lagradost.quicknovel.util.PluginManager.unloadPlugin(it) }
+                                oldMeta.mainClasses?.forEach { com.lagradost.quicknovel.util.PluginManager.unloadPlugin(it) }
+                            } catch (e: Exception) { }
+                        }
 
                         context.contentResolver.openInputStream(apkUri)?.use { input ->
                             val target = File(pluginsDir, apkName)
+                            com.lagradost.quicknovel.util.PluginManager.removeCachesForPath(target.absolutePath)
                             if (target.exists()) target.delete() // Clear existing to avoid EACCES
                             target.outputStream().use { output -> input.copyTo(output) }
                         }
                         context.contentResolver.openInputStream(jsonUri)?.use { input ->
                             val target = File(pluginsDir, "$baseName.json")
                             if (target.exists()) target.delete()
-                            target.outputStream().use { output -> input.copyTo(output) }
+                            
+                            // Load the JSON and set isManualImport to true before saving
+                            try {
+                                val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                                val meta = mapper.readValue(input.readBytes(), com.lagradost.quicknovel.util.PluginItem::class.java)
+                                val updatedMeta = meta.copy(isManualImport = true)
+                                target.writeText(mapper.writeValueAsString(updatedMeta))
+                            } catch (e: Exception) {
+                                // Fallback to raw copy if parsing fails
+                                context.contentResolver.openInputStream(jsonUri)?.use { freshInput ->
+                                    target.outputStream().use { output -> freshInput.copyTo(output) }
+                                }
+                            }
                         }
                     } else {
                         // Multiple files: copy all verified APKs and any JSONs
@@ -299,8 +323,22 @@ class SettingsFragment : PreferenceFragmentCompat() {
                                 cursor.getString(nameIndex)
                             } ?: uri.lastPathSegment ?: "unknown"
 
+                            val baseName = fileName.substringBeforeLast(".")
+                            val jsonTarget = File(pluginsDir, "$baseName.json")
+                            
+                            // Unload any old plugin classes associated with this APK using its JSON
+                            if (jsonTarget.exists()) {
+                                try {
+                                    val oldMetaStr = jsonTarget.readText()
+                                    val oldMeta = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readValue(oldMetaStr, com.lagradost.quicknovel.util.PluginItem::class.java)
+                                    oldMeta.mainClass?.let { com.lagradost.quicknovel.util.PluginManager.unloadPlugin(it) }
+                                    oldMeta.mainClasses?.forEach { com.lagradost.quicknovel.util.PluginManager.unloadPlugin(it) }
+                                } catch (e: Exception) { }
+                            }
+
                             context.contentResolver.openInputStream(uri)?.use { input ->
                                 val target = File(pluginsDir, fileName)
+                                com.lagradost.quicknovel.util.PluginManager.removeCachesForPath(target.absolutePath)
                                 if (target.exists()) target.delete()
                                 target.outputStream().use { output -> input.copyTo(output) }
                             }
@@ -315,7 +353,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
                             context.contentResolver.openInputStream(uri)?.use { input ->
                                 val target = File(pluginsDir, fileName)
                                 if (target.exists()) target.delete()
-                                target.outputStream().use { output -> input.copyTo(output) }
+                                
+                                // Load the JSON and set isManualImport to true before saving
+                                try {
+                                    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                                    val meta = mapper.readValue(input.readBytes(), com.lagradost.quicknovel.util.PluginItem::class.java)
+                                    val updatedMeta = meta.copy(isManualImport = true)
+                                    target.writeText(mapper.writeValueAsString(updatedMeta))
+                                } catch (e: Exception) {
+                                    // Fallback to raw copy
+                                    context.contentResolver.openInputStream(uri)?.use { freshInput ->
+                                        target.outputStream().use { output -> freshInput.copyTo(output) }
+                                    }
+                                }
                             }
                         }
                     }

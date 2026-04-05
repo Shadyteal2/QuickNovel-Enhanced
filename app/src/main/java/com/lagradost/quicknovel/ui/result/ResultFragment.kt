@@ -53,6 +53,7 @@ import com.lagradost.quicknovel.util.UIHelper.popupMenu
 import com.lagradost.quicknovel.util.UIHelper.popupMenuCustom
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.util.toPx
+import com.lagradost.quicknovel.util.DrawerHelper
 
 const val MAX_SYNO_LENGH = 300
 
@@ -364,18 +365,20 @@ class ResultFragment : Fragment() {
             R.string.download_from_chapter -> {
                 val chapters = ((viewModel.loadResponse.value as? Resource.Success)?.value as? StreamResponse)?.data ?: return
                 val act = CommonActivity.activity ?: return
-                val builder: AlertDialog.Builder = AlertDialog.Builder(act, R.style.AlertDialogCustom)
+                val bottomSheetDialog = BottomSheetDialog(act, R.style.BottomSheetDrawerTheme)
                 val diagBinding = ChapterDialogBinding.inflate(layoutInflater, null, false)
-                val dialogClickListener = DialogInterface.OnClickListener { _, which ->
-                    if (which == DialogInterface.BUTTON_POSITIVE) {
-                        viewModel.downloadFrom(diagBinding.chapterEdit.text?.toString()?.toIntOrNull())
+                bottomSheetDialog.setContentView(diagBinding.root)
+                
+                diagBinding.chapterEdit.hint = getString(R.string.download_from_chapter)
+                
+                diagBinding.chapterEdit.setOnEditorActionListener { _, _, _ ->
+                    val parsedInt = diagBinding.chapterEdit.text?.toString()?.toIntOrNull()
+                    if (parsedInt != null && parsedInt >= 0 && parsedInt < chapters.size) {
+                        viewModel.downloadFrom(parsedInt)
+                        bottomSheetDialog.dismiss()
                     }
+                    true
                 }
-                builder.setView(diagBinding.root)
-                    .setTitle(R.string.download_from_chapter)
-                    .setPositiveButton(R.string.download, dialogClickListener)
-                    .setNegativeButton(R.string.cancel, dialogClickListener)
-                    .show()
                 diagBinding.chapterEdit.doOnTextChanged { text, _, _, _ ->
                     val parsedInt = text?.toString()?.toIntOrNull()
                     if (parsedInt == null || parsedInt < 0 || parsedInt >= chapters.size) {
@@ -384,7 +387,25 @@ class ResultFragment : Fragment() {
                         diagBinding.chapterEdit.error = null
                     }
                 }
+
+                // Background scaling animation
+                val backgroundView = binding.resultMainscroll
+                val behavior = bottomSheetDialog.behavior
+                behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                    override fun onStateChanged(bottomSheet: View, newState: Int) {
+                        if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
+                            newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                            DrawerHelper.resetScaling(backgroundView)
+                        }
+                    }
+                    override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                        DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                    }
+                })
+
+                bottomSheetDialog.show()
             }
+
             R.string.delete -> viewModel.deleteAlert()
             R.string.pause -> viewModel.pause()
             R.string.stop -> viewModel.stop()
@@ -1130,7 +1151,7 @@ class ResultFragment : Fragment() {
         }
     }
     private fun showFilterBottomSheet(act: android.app.Activity) {
-         val bottomSheetDialog = BottomSheetDialog(act)
+         val bottomSheetDialog = BottomSheetDialog(act, R.style.BottomSheetDrawerTheme)
          val filterBinding = com.lagradost.quicknovel.databinding.ChapterFilterPopupBinding.inflate(act.layoutInflater, null, false)
          bottomSheetDialog.setContentView(filterBinding.root)
          
@@ -1138,6 +1159,7 @@ class ResultFragment : Fragment() {
          val sortTab = filterBinding.filterTabs.newTab().setText(getString(R.string.mainpage_sort_by_button_text))
          filterBinding.filterTabs.addTab(filterTab)
          filterBinding.filterTabs.addTab(sortTab)
+         
          filterBinding.filterTabs.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
              override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab?) {
                  filterBinding.filterContent.isVisible = tab?.position == 0
@@ -1168,8 +1190,24 @@ class ResultFragment : Fragment() {
                     ResultViewModel.filterChapterByDownloads = isChecked
              viewModel.reorderChapters()
          }
+
+         // Background scaling animation
+         val backgroundView = binding.resultMainscroll
+         val behavior = bottomSheetDialog.behavior
+         behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+             override fun onStateChanged(bottomSheet: View, newState: Int) {
+                 if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
+                     DrawerHelper.resetScaling(backgroundView)
+                 }
+             }
+             override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                 com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+             }
+         })
+
          bottomSheetDialog.show()
     }
+
 
     private fun showOceanOfPDFDownloadDialog(link: com.lagradost.quicknovel.DownloadLink) {
         val context = context ?: return

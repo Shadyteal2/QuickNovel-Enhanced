@@ -5,7 +5,15 @@
     android:insetTop="20dp"
     android:insetBottom="20dp">
     <layer-list>
-        <!-- Background Layer -->
+        <!-- Contrast Overlay to enhance backdrop readability -->
+        <item>
+            <shape>
+                <solid android:color="#0D000000" />
+                <corners android:radius="24dp" />
+            </shape>
+        </item>
+
+        <!-- Background Layer (Glass Translucency) -->
         <item>
             <shape>
                 <solid android:color="?attr/floatingNavBackground" />

@@ -11,6 +11,10 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 - **AMOLED and Light Mode Theme Templates**: Optimized adaptive displays supporting both full black background rendering and polished Light ('Flashbang') themes cleanly.
 - **Material You Dynamic Coloring Support**: Integrates native Monet-compatible dynamic tints for context-aware aesthetic uniformity (Android 12+).
 - **Custom Background Engine**: Personalize sheets with local background images supporting adjustable Blur and Dim framing parameters.
+- **External Plugin System**: Dynamically download and update novel providers directly from GitHub without needing full app updates.
+- **Reading Stats & Recommendations**: Track your reading journey with detailed statistics and discover new novels via "For You" suggestions.
+- **Pinterest Bento Grid & Tactile Covers**: Experience a gapless masonry library layout with interactive 3D Physical Tilt effects on book covers.
+- **Character Aliases & Dictionary**: Rename characters globally with the Replace Word system and look up definitions using the inbuilt dictionary.
 - **Visual Contrast Readability Overlays**: Shadow layer integrations guarantee adaptive text formatting accurately adapts over high-brightness layouts.
 
 ## Screenshots

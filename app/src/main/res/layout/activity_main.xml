@@ -32,9 +32,13 @@
         android:visibility="gone" />
 
     <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:id="@+id/homeRoot">
+        android:id="@+id/main_content_wrapper"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:id="@+id/homeRoot">
 
         <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_height="match_parent"
@@ -126,5 +130,6 @@
             </FrameLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
+        </FrameLayout>
     </FrameLayout>
 </FrameLayout>

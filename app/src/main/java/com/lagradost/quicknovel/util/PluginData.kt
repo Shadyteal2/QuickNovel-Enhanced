@@ -16,5 +16,6 @@ data class PluginItem(
     @JsonProperty("mainClass") val mainClass: String? = null,
     @JsonProperty("mainClasses") val mainClasses: List<String>? = null,
     @JsonProperty("url") val url: String,
-    @JsonProperty("iconUrl") val iconUrl: String? = null
+    @JsonProperty("iconUrl") val iconUrl: String? = null,
+    @JsonProperty("isManualImport") val isManualImport: Boolean = false
 )
