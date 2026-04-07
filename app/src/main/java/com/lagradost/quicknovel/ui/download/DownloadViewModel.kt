@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -135,9 +136,9 @@ class DownloadViewModel : ViewModel() {
     var activeQuery: String = ""
     val _pages: androidx.lifecycle.MutableLiveData<List<Page>> = androidx.lifecycle.MutableLiveData(null)
     val pages: androidx.lifecycle.LiveData<List<Page>> = _pages
-
     private val cardsDataMutex = kotlinx.coroutines.sync.Mutex()
     private val cardsData: java.util.HashMap<Int, com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded> = hashMapOf()
+    private val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: com.lagradost.quicknovel.BaseApplication.context!!).novelDao()
 
     init {
         viewModelScope.launch {
@@ -146,10 +147,14 @@ class DownloadViewModel : ViewModel() {
             }
         }
         viewModelScope.launch(Dispatchers.IO) {
-            com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@launch).novelDao().getAllAsFlow().collect { novels ->
+            dao.getAllAsFlow().collect { novels ->
                 cardsDataMutex.withLock {
                     for (novel in novels) {
                         val info = BookDownloader2.downloadProgress[novel.id]
+                        val progress = novel.downloadProgress ?: info?.progress ?: 0L
+                        val total = novel.downloadTotal ?: info?.total ?: 0L
+                        val state = novel.downloadStatus?.let { DownloadState.values().getOrNull(it) } ?: info?.state ?: DownloadState.Nothing
+                        
                         cardsData[novel.id] = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded(
                             source = novel.source,
                             name = novel.name,
@@ -162,17 +167,18 @@ class DownloadViewModel : ViewModel() {
                             tags = novel.tags,
                             apiName = novel.apiName,
                             readCount = getKey<Int>(DOWNLOAD_EPUB_SIZE, novel.id.toString()) ?: 0,
-                            downloadedCount = if (novel.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE) 1L else info?.progress ?: 0L,
-                            downloadedTotal = if (novel.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE) 1L else info?.total ?: 0L,
+                            downloadedCount = progress,
+                            downloadedTotal = total,
                             ETA = context?.let { ctx -> info?.eta(ctx) } ?: "",
-                            state = info?.state ?: DownloadState.Nothing,
+                            state = state,
                             id = novel.id,
                             generating = false,
                             lastUpdated = novel.lastUpdated,
                             lastDownloaded = novel.lastDownloaded,
                             filePath = novel.filePath,
                             formatType = novel.formatType,
-                            hash = novel.hash
+                            hash = novel.hash,
+                            bookmarkType = novel.bookmarkType
                         )
                     }
                 }
@@ -307,21 +313,13 @@ class DownloadViewModel : ViewModel() {
             }
         }
 
-        downloadInfoMutex.withLock {
-            for (card in values) {
-                downloadProgress[card.id]?.apply {
-                    state = DownloadState.IsPending
-                    lastUpdatedMs = System.currentTimeMillis()
-                    downloadProgressChanged.invoke(card.id to this)
-                }
-            }
-        }
-
-        for (card in values) {
+        // Disable automatic downloading of updates to prevent unintentional background activity.
+        // Users should manually start downloads for specific novels.
+        /*for (card in values) {
             if (card.downloadedTotal <= 0 || (card.downloadedCount * 100 / card.downloadedTotal) > 90) {
                 BookDownloader2.downloadWorkThread(card)
             }
-        }
+        }*/
     }
 
     fun refresh() {
@@ -370,9 +368,10 @@ class DownloadViewModel : ViewModel() {
     }
 
     fun delete(card: ResultCached) {
-        removeKey(RESULT_BOOKMARK, card.id.toString())
-        removeKey(RESULT_BOOKMARK_STATE, card.id.toString())
-        loadAllData(false)
+        ioSafe {
+            dao.updateBookmarkType(card.id, null)
+            loadAllData(false)
+        }
     }
 
     fun deleteAlert(card: DownloadFragment.DownloadDataLoaded) {
@@ -397,8 +396,10 @@ class DownloadViewModel : ViewModel() {
     }
 
     fun delete(card: DownloadFragment.DownloadDataLoaded) {
-        BookDownloader2.deleteNovel(card.author, card.name, card.apiName)
-        loadAllData(false)
+        ioSafe {
+            BookDownloader2.deleteNovel(card.author, card.name, card.apiName)
+            loadAllData(false)
+        }
     }
 
     private fun matchesQuery(x: String): Boolean {
@@ -553,7 +554,7 @@ class DownloadViewModel : ViewModel() {
         _pages.postValue(list)
     }
 
-    // QN-Enhanced: Background data loading with pre-calculated layout ratios
+    // QN-Enhanced: Background data loading from Room SSOT
     fun loadAllData(refreshAll: Boolean) = viewModelScope.launch(Dispatchers.Default) {
         if (refreshAll) fetchAllData(false)
         val mapping: HashMap<Int, ArrayList<ResultCached>> = hashMapOf()
@@ -562,14 +563,23 @@ class DownloadViewModel : ViewModel() {
             mapping[cat.id] = arrayListOf()
         }
 
-        val keys = getKeys(RESULT_BOOKMARK_STATE)
-        for (key in keys ?: emptyList()) {
-            val type = getKey<Int>(key) ?: continue
-            val id = key.replaceFirst(
-                RESULT_BOOKMARK_STATE,
-                RESULT_BOOKMARK
+        // Fetch from Room
+        val bookmarks = dao.getAllBookmarksAsFlow().first()
+        for (novel in bookmarks) {
+            val type = novel.bookmarkType ?: continue
+            val cached = ResultCached(
+                source = novel.source,
+                name = novel.name,
+                apiName = novel.apiName,
+                id = novel.id,
+                author = novel.author,
+                poster = novel.posterUrl,
+                tags = novel.tags,
+                rating = novel.rating,
+                totalChapters = novel.downloadTotal?.toInt() ?: 0,
+                cachedTime = novel.lastDownloaded ?: 0,
+                synopsis = novel.synopsis,
             )
-            val cached = getKey<ResultCached>(id) ?: continue
             if (mapping.containsKey(type)) {
                 mapping[type]?.add(cached)
             }
@@ -598,7 +608,12 @@ class DownloadViewModel : ViewModel() {
     }
 
     private suspend fun getDownloadedCards(): Page = cardsDataMutex.withLock {
-        val unsorted = ArrayList(cardsData.values)
+        // Filter: Only include in "Downloads" tab (index 0) if it has a download status, is imported, or is active
+        val unsorted = ArrayList(cardsData.values.filter { card ->
+            card.state != DownloadState.Nothing || 
+            card.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE || 
+            card.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE_PDF
+        })
         val sorted = sortArray(ArrayList(unsorted))
         Page(
             title = com.lagradost.quicknovel.ui.ReadType.NONE.name,

@@ -18,18 +18,26 @@ import com.lagradost.quicknovel.ui.download.DownloadViewModel
 import com.lagradost.quicknovel.util.Apis
 import java.lang.ref.WeakReference
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
+
 // This is needed to fix downloads, as newer android versions pause network connections in the background
 class DownloadFileWorkManager(val context: Context, private val workerParams: WorkerParameters) :
     CoroutineWorker(context, workerParams) {
 
     companion object {
         const val DATA = "data"
+        const val JSON_DATA = "json_data"
+        const val TYPE_DATA = "type_data"
         const val ID = "id"
 
         const val ID_REFRESH_DOWNLOADS = "REFRESH_DOWNLOADS"
         const val ID_REFRESH_READINGPROGRESS = "REFRESH_READINGPROGRESS"
         const val ID_DOWNLOAD = "ID_DOWNLOAD"
 
+        private val mapper = jacksonObjectMapper().apply {
+            configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        }
 
         private var _viewModel: WeakReference<DownloadViewModel> = WeakReference(null)
         var viewModel: DownloadViewModel?
@@ -90,17 +98,35 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
             )
         }
 
-        private fun startDownload(data: Any, context: Context) {
+        private fun startDownload(data: Any, context: Context, novelId: Int) {
+            val builder = Data.Builder()
+                .putString(ID, ID_DOWNLOAD)
+
+            var serialized = false
+            try {
+                val json = mapper.writeValueAsString(data)
+                // Limit is 10KB. We check if it's safe to pass via Data bundle.
+                if (json.length < 9000) {
+                    builder.putString(JSON_DATA, json)
+                    builder.putString(TYPE_DATA, data::class.java.name)
+                    serialized = true
+                }
+            } catch (e: Exception) {
+                Log.e("DownloadWork", "Failed to serialize work data", e)
+            }
+
+            if (!serialized) {
+                // Fallback to in-memory if too large or fails (less reliable on restart)
+                builder.putInt(DATA, insertWork(data))
+            }
+
             (WorkManager.getInstance(context)).enqueueUniqueWork(
-                ID_DOWNLOAD + System.currentTimeMillis(),
-                ExistingWorkPolicy.APPEND,
+                "${ID_DOWNLOAD}_$novelId",
+                ExistingWorkPolicy.REPLACE,
                 OneTimeWorkRequest.Builder(DownloadFileWorkManager::class.java)
-                    .setInputData(
-                        Data.Builder()
-                            .putString(ID, ID_DOWNLOAD)
-                            .putInt(DATA, insertWork(data))
-                            .build()
-                    )
+                    .setInputData(builder.build())
+                    .addTag(ID_DOWNLOAD)
+                    .addTag("${ID_DOWNLOAD}_$novelId")
                     .build()
             )
         }
@@ -109,21 +135,22 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
             card: DownloadFragment.DownloadDataLoaded,
             context: Context
         ) {
-            startDownload(card, context)
+            startDownload(card, context, card.id)
         }
 
         fun download(
             load: LoadResponse,
             context: Context,
+            novelId: Int,
             indices: List<Int>? = null
         ) {
             if (load.apiName == IMPORT_SOURCE || load.apiName == IMPORT_SOURCE_PDF) {
                 return
             }
             if (indices != null && load is StreamResponse) {
-                startDownload(DownloadBatch(load, indices), context)
+                startDownload(DownloadBatch(load, indices), context, novelId)
             } else {
-                startDownload(load, context)
+                startDownload(load, context, novelId)
             }
         }
     }
@@ -138,7 +165,27 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         val id = this.workerParams.inputData.getString(ID)
         when (id) {
             ID_DOWNLOAD -> {
-                when (val data = popWork(this.workerParams.inputData.getInt(DATA, -1))) {
+                val jsonData = this.workerParams.inputData.getString(JSON_DATA)
+                val typeData = this.workerParams.inputData.getString(TYPE_DATA)
+                
+                val data: Any? = if (jsonData != null && typeData != null) {
+                    try {
+                        when (typeData) {
+                            DownloadBatch::class.java.name -> mapper.readValue<DownloadBatch>(jsonData)
+                            StreamResponse::class.java.name -> mapper.readValue<StreamResponse>(jsonData)
+                            EpubResponse::class.java.name -> mapper.readValue<EpubResponse>(jsonData)
+                            DownloadFragment.DownloadDataLoaded::class.java.name -> mapper.readValue<DownloadFragment.DownloadDataLoaded>(jsonData)
+                            else -> popWork(this.workerParams.inputData.getInt(DATA, -1))
+                        }
+                    } catch (e: Exception) {
+                        Log.e("DownloadWork", "Failed to deserialize work data", e)
+                        popWork(this.workerParams.inputData.getInt(DATA, -1))
+                    }
+                } else {
+                    popWork(this.workerParams.inputData.getInt(DATA, -1))
+                }
+
+                when (data) {
                     is DownloadBatch -> {
                         BookDownloader2.downloadWorkThread(data.load, Apis.getApiFromName(data.load.apiName), data.indices)
                     }
@@ -177,4 +224,4 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         }
         return Result.success()
     }
-}
+}

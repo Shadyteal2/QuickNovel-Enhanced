@@ -5,7 +5,6 @@ import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 
 @Entity(tableName = "novel")
-@TypeConverters(StringListConverter::class)
 data class NovelEntity(
     @PrimaryKey val id: Int,
     val source: String,
@@ -22,7 +21,13 @@ data class NovelEntity(
     val lastDownloaded: Long?,
 
     // Import Engine Extensions
-    val filePath: String? = null,
-    val formatType: String? = null,
-    val hash: String? = null
+    @androidx.room.ColumnInfo(name = "filePath") val filePath: String? = null,
+    @androidx.room.ColumnInfo(name = "formatType") val formatType: String? = null,
+    @androidx.room.ColumnInfo(name = "hash") val hash: String? = null,
+    
+    // Bookmark and Download SSOT
+    @androidx.room.ColumnInfo(name = "bookmarkType") val bookmarkType: Int? = null,
+    @androidx.room.ColumnInfo(name = "downloadStatus") val downloadStatus: Int? = null,
+    @androidx.room.ColumnInfo(name = "downloadProgress") val downloadProgress: Long? = null,
+    @androidx.room.ColumnInfo(name = "downloadTotal") val downloadTotal: Long? = null
 )

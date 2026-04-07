@@ -665,6 +665,11 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
 
+        // Industrial-Grade: Migrate bookmarks from SharedPreferences to Room SSOT
+        ioSafe {
+            com.lagradost.quicknovel.util.BookmarkMigrationManager.migrateIfNeeded(this@MainActivity)
+        }
+
         // QN-Enhanced: Premium Circular Radial Reveal Transition (Material Design)
         if (CommonActivity.pendingThemeChangeScreenshot != null) {
             val screenshot = CommonActivity.pendingThemeChangeScreenshot

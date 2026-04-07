@@ -19,6 +19,8 @@ class ElasticSwitchPreference(context: Context, attrs: AttributeSet?) : SwitchPr
         super.onBindViewHolder(holder)
         val view = holder.findViewById(R.id.elastic_toggle) as? ElasticSwitch
         view?.let {
+            it.isEnabled = isEnabled
+            it.isClickable = isEnabled
             it.setOnCheckedChangeListener(null)
             it.isChecked = isChecked
             it.setOnCheckedChangeListener { _, checked ->

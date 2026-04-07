@@ -124,7 +124,7 @@ class ViewpagerAdapter(
 
         binding.pageRecyclerview.tag = position
         binding.pageRecyclerview.apply {
-            setItemViewCacheSize(20) // Enterprise-grade pre-fetching for 10k items
+            setItemViewCacheSize(40) // Premium pre-fetching for large grids
             setHasFixedSize(true)
             
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->

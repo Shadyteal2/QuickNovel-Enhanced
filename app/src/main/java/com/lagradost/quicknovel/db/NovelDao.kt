@@ -16,10 +16,22 @@ interface NovelDao {
     fun getAllAsFlow(): Flow<List<NovelEntity>>
 
     @Query("SELECT * FROM novel WHERE id = :id LIMIT 1")
+    fun getByIdAsFlow(id: Int): Flow<NovelEntity?>
+
+    @Query("SELECT * FROM novel WHERE id = :id LIMIT 1")
     fun getById(id: Int): NovelEntity?
 
     @Query("SELECT * FROM novel WHERE hash = :hash LIMIT 1")
     fun getByHash(hash: String): NovelEntity?
+
+    @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0")
+    fun getAllBookmarksAsFlow(): Flow<List<NovelEntity>>
+
+    @Query("UPDATE novel SET bookmarkType = :type WHERE id = :id")
+    fun updateBookmarkType(id: Int, type: Int?)
+
+    @Query("UPDATE novel SET downloadStatus = :status, downloadProgress = :progress, downloadTotal = :total WHERE id = :id")
+    fun updateDownloadProgress(id: Int, status: Int?, progress: Long?, total: Long?)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(novel: NovelEntity)

@@ -1,5 +1,6 @@
 package com.lagradost.quicknovel.ui.download
 
+import android.content.Context
 import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.view.LayoutInflater
@@ -33,55 +34,80 @@ import com.lagradost.quicknovel.util.KineticTiltHelper
 import kotlin.math.roundToInt
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
+import androidx.recyclerview.widget.DiffUtil
 import androidx.preference.PreferenceManager
 
 class AnyAdapter(
     private val resView: AutofitRecyclerView,
     private val downloadViewModel: DownloadViewModel,
 ) : NoStateAdapter<Any>(
-    diffCallback = BaseDiffCallback(
-        itemSame = { a, b ->
-            when {
+    object : DiffUtil.ItemCallback<Any>() {
+        override fun areItemsTheSame(a: Any, b: Any): Boolean {
+            return when {
                 a is ResultCached && b is ResultCached -> a.id == b.id
                 a is DownloadFragment.DownloadDataLoaded && b is DownloadFragment.DownloadDataLoaded -> a.id == b.id
                 else -> false
             }
-        },
-        contentSame = { a, b ->
-            when {
-                a is ResultCached && b is ResultCached -> a.id == b.id && a.source == b.source
-                a is DownloadFragment.DownloadDataLoaded && b is DownloadFragment.DownloadDataLoaded -> a.id == b.id && a.source == b.source
+        }
+        
+        override fun areContentsTheSame(a: Any, b: Any): Boolean {
+            return when {
+                a is ResultCached && b is ResultCached -> a.id == b.id && a.lastChapterRead == b.lastChapterRead && a.currentTotalChapters == b.currentTotalChapters
+                a is DownloadFragment.DownloadDataLoaded && b is DownloadFragment.DownloadDataLoaded -> 
+                    a.id == b.id && 
+                    a.state == b.state && 
+                    a.downloadedCount == b.downloadedCount && 
+                    a.downloadedTotal == b.downloadedTotal &&
+                    a.generating == b.generating
                 else -> a == b
             }
         }
-    )
+        
+        override fun getChangePayload(a: Any, b: Any): Any? {
+            val payloads = mutableSetOf<String>()
+            if (a is DownloadFragment.DownloadDataLoaded && b is DownloadFragment.DownloadDataLoaded) {
+                if (a.downloadedCount != b.downloadedCount || a.downloadedTotal != b.downloadedTotal || a.ETA != b.ETA) payloads.add("PAYLOAD_PROGRESS")
+                if (a.state != b.state || a.generating != b.generating) payloads.add("PAYLOAD_STATE")
+            } else if (a is ResultCached && b is ResultCached) {
+                if (a.lastChapterRead != b.lastChapterRead || a.currentTotalChapters != b.currentTotalChapters) payloads.add("PAYLOAD_PROGRESS")
+            }
+            return if (payloads.isEmpty()) null else payloads
+        }
+    }
 ) {
     private var isBento3x3: Boolean = false
     private var usePinterest: Boolean = false
     private var isCompact: Boolean = false
 
-    private fun updatePrefs() {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(resView.context)
-        isBento3x3 = prefs.getBoolean("library_bento_3x3", false)
-        usePinterest = prefs.getBoolean("library_pinterest_bento", false)
-        isCompact = resView.context.getDownloadIsCompact()
+    fun updatePrefs(context: Context): Boolean {
+        val newCompact = context.getDownloadIsCompact()
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        val usePinterestNew = prefs.getBoolean("library_pinterest_bento", false)
+        val newBento3x3 = usePinterestNew && prefs.getBoolean("library_bento_3x3", false)
+        
+        val changed = isCompact != newCompact || isBento3x3 != newBento3x3 || usePinterest != usePinterestNew
+        isCompact = newCompact
+        isBento3x3 = newBento3x3
+        usePinterest = usePinterestNew
+        return changed
     }
 
     override fun submitList(list: Collection<Any>?, commitCallback: Runnable?) {
         super.submitList(list, commitCallback)
-        updatePrefs()
+        updatePrefs(resView.context)
     }
 
     init {
         setHasStableIds(true)
-        updatePrefs()
+        updatePrefs(resView.context)
     }
 
     companion object {
         val sharedPool =
             newSharedPool {
-                setMaxRecycledViews(RESULT_CACHED, 25)
-                setMaxRecycledViews(DOWNLOAD_DATA_LOADED, 25)
+                // Increased pool size for thousands of items to avoid inflation lag
+                setMaxRecycledViews(RESULT_CACHED, 100)
+                setMaxRecycledViews(DOWNLOAD_DATA_LOADED, 100)
             }
 
         const val RESULT_CACHED: Int = 1
@@ -249,6 +275,68 @@ class AnyAdapter(
         }
 
         return ViewHolderState(binding)
+    }
+
+    @SuppressLint("SetTextI18n")
+    override fun onBindViewHolder(holder: ViewHolderState<Any>, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads)
+            return
+        }
+        
+        val item = getItem(position)
+        for (rawPayload in payloads) {
+            val payload = rawPayload as? Set<String> ?: continue
+            val view = holder.view
+            
+            if (payload.contains("PAYLOAD_PROGRESS")) {
+                when (view) {
+                    is DownloadResultCompactBinding -> {
+                        val card = item as DownloadFragment.DownloadDataLoaded
+                        val progressLabel = "${card.downloadedCount}/${card.downloadedTotal}${if (card.ETA == "") "" else " - ${card.ETA}"}"
+                        if (view.downloadProgressText.text != progressLabel) view.downloadProgressText.text = progressLabel
+                        
+                        view.downloadProgressbar.apply {
+                            max = card.downloadedTotal.toInt() * 100
+                            val targetProgress = card.downloadedCount.toInt() * 100
+                            if (targetProgress != progress) {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) setProgress(targetProgress, true)
+                                else progress = targetProgress
+                            }
+                        }
+                    }
+                    is HistoryResultCompactBinding -> {
+                        val card = item as ResultCached
+                        val progressText = "${card.lastChapterRead}/${card.currentTotalChapters} ${view.root.context.getString(R.string.read_action_chapters)}"
+                        if (view.historyExtraText.text != progressText) view.historyExtraText.text = progressText
+                    }
+                    is DownloadResultGridBinding -> {
+                        if (item is ResultCached) {
+                            val progressText = "${item.lastChapterRead}/${item.currentTotalChapters}"
+                            if (view.progressReading.text != progressText) view.progressReading.text = progressText
+                        }
+                    }
+                }
+            }
+            
+            if (payload.contains("PAYLOAD_STATE")) {
+                if (view is DownloadResultCompactBinding && item is DownloadFragment.DownloadDataLoaded) {
+                    val realState = item.state
+                    val iconRes = when (realState) {
+                        DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
+                        DownloadState.IsPaused -> R.drawable.netflix_play
+                        DownloadState.IsStopped -> R.drawable.ic_baseline_autorenew_24
+                        DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
+                        DownloadState.IsDone -> R.drawable.ic_baseline_check_24
+                        DownloadState.IsPending -> R.drawable.nothing
+                        DownloadState.Nothing -> R.drawable.ic_baseline_autorenew_24
+                    }
+                    view.downloadUpdate.setImageResource(iconRes)
+                    view.downloadUpdateLoading.isVisible = realState == DownloadState.IsPending
+                    view.downloadProgressbar.isIndeterminate = item.generating
+                }
+            }
+        }
     }
 
     @SuppressLint("SetTextI18n")

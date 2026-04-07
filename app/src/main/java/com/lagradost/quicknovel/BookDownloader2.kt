@@ -121,7 +121,10 @@ data class DownloadProgressState(
     // How many is there in total
     var total: Long,
     var lastUpdatedMs: Long,
-    var etaMs: Long?
+    var etaMs: Long?,
+    // Internal fields for DB throttling
+    var lastDbUpdateMs: Long = 0,
+    var lastDbProgress: Long = -1
 ) {
     fun eta(context: Context): String {
         return when (state) {
@@ -227,14 +230,14 @@ object BookDownloader2Helper {
     }
 
     fun Activity.checkWrite(): Boolean {
+        // Since Android 13 (API 33), WRITE_EXTERNAL_STORAGE is deprecated and not requestable.
+        // On modern Android, we rely on Scoped Storage or SAF.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return true
+        
         return (ContextCompat.checkSelfPermission(
             this,
             WRITE_EXTERNAL_STORAGE
-        )
-                == PackageManager.PERMISSION_GRANTED
-                // Since Android 13, we can't request external storage permission,
-                // so don't check it.
-                || Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+        ) == PackageManager.PERMISSION_GRANTED)
     }
 
     fun Activity.requestRW() {
@@ -688,12 +691,24 @@ object BookDownloader2Helper {
             val subDir = activity.getBasePath().first ?: getDefaultDir(activity)
             ?: throw IOException("No file")
 
-            //val subDir = baseFile.gotoDirectoryOrThrow("Epub", createMissingDirectories = true)
             val displayName = "${sanitizeFilename(name)}.epub"
-
-            //val relativePath = (Environment.DIRECTORY_DOWNLOADS + "${fs}Epub${fs}")
             subDir.findFile(displayName)?.delete()
-            val file = subDir.createFileOrThrow(displayName)
+            
+            val file = try {
+                subDir.createFileOrThrow(displayName)
+            } catch (e: SecurityException) {
+                // FALLBACK: If we don't have SAF permission for the chosen directory, 
+                // use the app's internal files directory so the user isn't blocked.
+                logError(e)
+                val fallbackRoot = SafeFile.fromUri(activity, File(activity.filesDir, "Fallback-Epub").apply { mkdirs() }.toUri())
+                fallbackRoot?.findFile(displayName)?.delete()
+                activity.runOnUiThread {
+                    Toast.makeText(activity, "Storage inaccessible, using internal fallback", Toast.LENGTH_LONG).show()
+                }
+                val result = fallbackRoot?.createFileOrThrow(displayName)
+                if (result == null) throw IOException("Failed to create fallback file")
+                result
+            }
 
             val fileStream =
                 file.openOutputStream(append = false) ?: throw IOException("No outputfile")
@@ -1200,7 +1215,7 @@ object BookDownloader2 {
             }
 
             if (!path.isNullOrEmpty()) {
-                val originalFile = java.io.File(path)
+                val originalFile = java.io.File(path!!)
                 if (originalFile.exists()) {
                     val isExternal = !originalFile.absolutePath.startsWith(ctx.filesDir.absolutePath)
                     val shadowedFile = if (isExternal) {
@@ -1442,7 +1457,7 @@ object BookDownloader2 {
                     formatType = novel.formatType
                 )
 
-                val localId = generateId(res.apiName, res.author, res.name)
+                val id = novel.id
 
                 BookDownloader2Helper.downloadInfo(
                     context,
@@ -1450,16 +1465,52 @@ object BookDownloader2 {
                     res.name,
                     res.apiName
                 )?.let { info ->
-                    downloadData[localId] = res
+                    downloadData[id] = res
 
-                    downloadProgress[localId] = DownloadProgressState(
-                        state = DownloadState.Nothing,
-                        progress = info.progress,
-                        total = info.total,
-                        downloaded = info.downloaded,
+                    val state = novel.downloadStatus?.let { DownloadState.values().getOrNull(it) } ?: DownloadState.Nothing
+                    downloadProgress[id] = DownloadProgressState(
+                        state = state,
+                        progress = novel.downloadProgress ?: info.progress,
+                        total = novel.downloadTotal ?: info.total,
+                        downloaded = novel.downloadProgress ?: info.downloaded,
                         lastUpdatedMs = System.currentTimeMillis(),
-                        etaMs = null
+                        etaMs = null,
+                        lastDbUpdateMs = System.currentTimeMillis(),
+                        lastDbProgress = novel.downloadProgress ?: info.progress
                     )
+                    
+                    // We do NOT add it to currentDownloads here. 
+                    // The background thread (triggered below) will add itself when it starts.
+                    // This prevents the thread from exiting early due to a 'duplicate' check.
+                    if (state == DownloadState.IsDownloading || state == DownloadState.IsPending) {
+                        // Explicitly resume the download task
+                        val card = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded(
+                            source = novel.source,
+                            name = novel.name,
+                            author = novel.author,
+                            posterUrl = novel.posterUrl,
+                            rating = novel.rating,
+                            peopleVoted = novel.peopleVoted,
+                            views = novel.views,
+                            synopsis = novel.synopsis,
+                            tags = novel.tags,
+                            apiName = novel.apiName,
+                            readCount = 0,
+                            downloadedCount = novel.downloadProgress ?: 0L,
+                            downloadedTotal = novel.downloadTotal ?: 0L,
+                            ETA = "",
+                            state = state,
+                            id = novel.id,
+                            generating = false,
+                            lastUpdated = novel.lastUpdated,
+                            lastDownloaded = novel.lastDownloaded,
+                            filePath = novel.filePath,
+                            formatType = novel.formatType,
+                            hash = novel.hash,
+                            bookmarkType = novel.bookmarkType
+                        )
+                        DownloadFileWorkManager.download(card, context!!)
+                    }
                 }
             }
         }
@@ -1478,10 +1529,15 @@ object BookDownloader2 {
     }
 
     private suspend fun addPendingActionAsync(id: Int, action: DownloadActionType) {
-        currentDownloadsMutex.withLock {
-            if (!currentDownloads.contains(id)) {
-                return
-            }
+        // SSOT: Allow actions if the novel is in the download map and is in an active state.
+        // We check state because currentDownloads might not be populated yet if the thread is just starting up.
+        val isActive = downloadInfoMutex.withLock {
+            val progress = downloadProgress[id]
+            progress != null && (progress.state == DownloadState.IsDownloading || progress.state == DownloadState.IsPending || progress.state == DownloadState.IsPaused)
+        }
+
+        if (!isActive) {
+            return
         }
 
         pendingActionMutex.withLock {
@@ -1516,15 +1572,57 @@ object BookDownloader2 {
         id: Int,
         action: DownloadProgressState.() -> Unit
     ): DownloadProgressState? {
-        val data = downloadInfoMutex.withLock {
-            downloadProgress[id]?.apply {
+        val (data, stateChanged, progressJumped, timePassed) = downloadInfoMutex.withLock {
+            val progressState = downloadProgress[id] ?: return@withLock null
+            val oldState = progressState.state
+            val oldProgress = progressState.progress
+            
+            progressState.apply {
                 action()
                 lastUpdatedMs = System.currentTimeMillis()
             }
+            
+            val currentTime = System.currentTimeMillis()
+            val stateChanged = progressState.state != oldState
+            
+            // Progress jump: 5% or more
+            val progressJumped = if (progressState.total > 0 && progressState.lastDbProgress >= 0) {
+                val currentPct = (progressState.progress * 100.0 / progressState.total)
+                val lastPct = (progressState.lastDbProgress * 100.0 / progressState.total)
+                Math.abs(currentPct - lastPct) >= 5.0
+            } else true
+            
+            val timePassed = (currentTime - progressState.lastDbUpdateMs) >= 3000 // 3 seconds
+            
+            // Return whether we should update DB
+            val shouldUpdateDb = stateChanged || progressJumped || timePassed
+            
+            if (shouldUpdateDb) {
+                progressState.lastDbUpdateMs = currentTime
+                progressState.lastDbProgress = progressState.progress
+            }
+            
+            Quadruple(progressState.copy(), stateChanged, progressJumped, timePassed)
+        } ?: return null
+
+        // SSOT: Update DB on state change or throttled progress
+        if (stateChanged || progressJumped || timePassed) {
+            ioSafe {
+                val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@ioSafe).novelDao()
+                dao.updateDownloadProgress(id, data.state.ordinal, data.progress, data.total)
+            }
         }
-        downloadProgressChanged.invoke(id to (data ?: return null))
+
+        downloadProgressChanged.invoke(id to data)
         return data
     }
+
+    private data class Quadruple<out A, out B, out C, out D>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D
+    )
 
     private fun migrateKeys(from: Int, to: Int, oldName: String, newName: String) {
         setKey(
@@ -1685,7 +1783,8 @@ object BookDownloader2 {
     }
 
     fun download(load: LoadResponse, context: Context, indices: List<Int>? = null) {
-        DownloadFileWorkManager.download(load, context)
+        val id = generateId(load, load.apiName)
+        DownloadFileWorkManager.download(load, context, id, indices)
     }
 
     private suspend fun setSuffixData(load: LoadResponse, apiName: String) {

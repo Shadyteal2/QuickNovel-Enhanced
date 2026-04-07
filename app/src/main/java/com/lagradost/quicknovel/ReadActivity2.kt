@@ -89,6 +89,7 @@ import com.lagradost.quicknovel.ui.TranslationBottomSheet
 import com.lagradost.quicknovel.ui.ViewHolderState
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
+import com.lagradost.quicknovel.util.applyGlassStyle
 import com.lagradost.quicknovel.util.divCeil
 import com.lagradost.quicknovel.util.toPx
 import java.lang.Integer.max
@@ -753,6 +754,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         })
 
         bottomSheetDialog.show()
+        bottomSheetDialog.applyGlassStyle()
     }
 
     private fun saveCustomFont(uri: android.net.Uri) {
@@ -1605,7 +1607,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             })
 
             bottomSheetDialog.show()
-
+            bottomSheetDialog.applyGlassStyle()
 
 
             binding.readSettingsCharacterAliases.setOnClickListener {
@@ -1672,6 +1674,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 })
 
                 bottomSheetDialog.show()
+                bottomSheetDialog.applyGlassStyle()
             }
 
             binding.readSettingsTextSizeText.setOnClickListener {
@@ -2143,13 +2146,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                             .show(readActivity ?: return@setAdapter)
                     }
 
-                    builder.show()
+                    builder.show().applyGlassStyle()
                     updateImages()
                 }
             }
             updateImages()
 
             bottomSheetDialog.show()
+            bottomSheetDialog.applyGlassStyle()
         }
     }
 
@@ -2238,6 +2242,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 })
 
                 optionsDialog.show()
+                optionsDialog.applyGlassStyle()
             }
         }
 
@@ -2262,6 +2267,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         })
 
         bottomSheetDialog.show()
+        bottomSheetDialog.applyGlassStyle()
     }
 
 
@@ -2315,5 +2321,6 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         })
 
         bottomSheetDialog.show()
+        bottomSheetDialog.applyGlassStyle()
     }
 }

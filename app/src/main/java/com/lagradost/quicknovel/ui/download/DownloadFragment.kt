@@ -164,6 +164,7 @@ class DownloadFragment : Fragment() {
         val filePath: String? = null,
         val formatType: String? = null,
         val hash: String? = null,
+        val bookmarkType: Int? = null,
     ) {
         val image by lazy {
             if(isImported) {
@@ -197,56 +198,72 @@ class DownloadFragment : Fragment() {
         val adapter = (binding.viewpager.adapter as? ViewpagerAdapter) ?: return
         val prefs = PreferenceManager.getDefaultSharedPreferences(context ?: return)
         val usePinterest = prefs.getBoolean("library_pinterest_bento", false)
-        val use3x3Bento = prefs.getBoolean("library_bento_3x3", false)
+        val use3x3Bento = usePinterest && prefs.getBoolean("library_bento_3x3", false)
         
         for ((_, ref) in adapter.collectionsOfRecyclerView) {
             val rv = ref.get() ?: continue
             val compactView = rv.context.getDownloadIsCompact()
 
-            // CRITICAL: Clear shared pool to prevent "pollution" when switching mode
-            rv.setRecycledViewPool(androidx.recyclerview.widget.RecyclerView.RecycledViewPool())
+            // QN-Enhanced: Instead of destructive recreation, we update the existing manager if possible
+            // to preserve scroll position and minimize layout thrashing.
+            val currentManager = rv.layoutManager
             
-            rv.layoutManager = when {
+            val targetManager = when {
                 use3x3Bento && !compactView -> {
-                    val rvAdapter = rv.adapter
-                    androidx.recyclerview.widget.GridLayoutManager(rv.context, 3).apply {
-                        spanSizeLookup = object : androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup() {
-                            override fun getSpanSize(position: Int): Int {
-                                if (rvAdapter != null && position >= rvAdapter.itemCount - 1) return 3
-                                return when (position % 7) {
-                                    0, 5 -> 2
-                                    else -> 1
+                    if (currentManager is androidx.recyclerview.widget.GridLayoutManager && currentManager.spanCount == 3 && currentManager.spanSizeLookup !is androidx.recyclerview.widget.GridLayoutManager.DefaultSpanSizeLookup) {
+                        null // Keep existing
+                    } else {
+                        androidx.recyclerview.widget.GridLayoutManager(rv.context, 3).apply {
+                            spanSizeLookup = object : androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup() {
+                                override fun getSpanSize(position: Int): Int {
+                                    val rvAdapter = rv.adapter
+                                    if (rvAdapter != null && position >= rvAdapter.itemCount - 1) return 3
+                                    return when (position % 7) {
+                                        0, 5 -> 2
+                                        else -> 1
+                                    }
                                 }
                             }
                         }
                     }
                 }
                 usePinterest && !compactView -> {
-                    StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL).apply {
+                    if (currentManager is StaggeredGridLayoutManager) null
+                    else StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL).apply {
                         gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
                     }
                 }
                 else -> {
                     if (compactView) {
-                        androidx.recyclerview.widget.LinearLayoutManager(rv.context)
+                        // Use GridLayoutManager with span 1 instead of LinearLayoutManager for consistency
+                        if (currentManager is androidx.recyclerview.widget.GridLayoutManager && currentManager.spanCount == 1) null
+                        else androidx.recyclerview.widget.GridLayoutManager(rv.context, 1)
                     } else {
-                        androidx.recyclerview.widget.GridLayoutManager(rv.context, 3)
+                        if (currentManager is androidx.recyclerview.widget.GridLayoutManager && currentManager.spanCount == 3 && currentManager.spanSizeLookup is androidx.recyclerview.widget.GridLayoutManager.DefaultSpanSizeLookup) null
+                        else androidx.recyclerview.widget.GridLayoutManager(rv.context, 3)
                     }
                 }
             }
 
-            // QN-Enhanced: Peak Performance Tuning
+            // Standardized Performance Tuning for Thousands of Items
             rv.apply {
                 setHasFixedSize(true)
-                setItemViewCacheSize(20)
+                setItemViewCacheSize(40) // Increased for better pre-fetching on high-refresh-rate screens
                 
-                // Kinetic Tilt Scroll-Lock
+                // Clear and re-add listener to avoid duplicates while ensuring kinetic tilt logic
                 clearOnScrollListeners()
                 addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
                     override fun onScrollStateChanged(recyclerView: androidx.recyclerview.widget.RecyclerView, newState: Int) {
                         KineticTiltHelper.isLocked = newState != androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE
                     }
                 })
+            }
+            
+            // Aggressive layout refresh to prevent "pollution" (mismatching view types in grid/list)
+            if (targetManager != null) {
+                rv.recycledViewPool.clear()
+                rv.layoutManager = targetManager
+                // Optional: rv.invalidateItemDecorations() if decorations are used
             }
             rv.adapter?.notifyDataSetChanged()
         }
@@ -282,7 +299,7 @@ class DownloadFragment : Fragment() {
     @SuppressLint("ClickableViewAccessibility")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.viewpager.reduceDragSensitivity(1)
+        binding.viewpager.reduceDragSensitivity(2) // Requires longer horizontal swipe to switch tabs, prevents accidental swipe while vertical scrolling
         viewModel.loadAllData(true)
         activity?.fixPaddingStatusbar(binding.downloadRoot)
 
@@ -398,6 +415,20 @@ class DownloadFragment : Fragment() {
         binding.viewpager.isUserInputEnabled = true
         binding.viewpager.offscreenPageLimit = 2
         
+        // Premium horizontal swipe transition
+        binding.viewpager.setPageTransformer { page, position ->
+            val absPos = Math.abs(position)
+            // Premium parallax & fade effect
+            page.alpha = 1f - (absPos * 0.4f)
+            val scale = 1f - (absPos * 0.10f)
+            page.scaleY = scale
+            page.scaleX = scale
+            // Removed translationX to prevent adjacent tab "leakage"
+            // Add slight rotation for premium feel
+            page.rotationY = position * 5f
+        }
+
+        binding.viewpager.post {
         val dotsHolder = binding.pillDotsHolder
         var initialTouchX = 0f
         var initialPillX = 0f
@@ -571,6 +602,8 @@ class DownloadFragment : Fragment() {
         binding.swipeContainer.apply {
             setColorSchemeColors(context.colorFromAttribute(R.attr.colorPrimary))
             setProgressBackgroundColorSchemeColor(context.colorFromAttribute(R.attr.primaryGrayBackground))
+            // Increase distance to trigger to prevent accidental refreshes during fast scrolling
+            setDistanceToTriggerSync(300.toPx) 
             setOnRefreshListener {
                 if(isOnDownloads){
                     viewModel.refresh()
@@ -639,6 +672,7 @@ class DownloadFragment : Fragment() {
             true // Important: Consume all events in the zone
         }
     }
+}
 
     private fun showCategoriesManager() {
         val dialog = BottomSheetDialog(requireContext(), R.style.BottomSheetDrawerTheme)

@@ -24,6 +24,7 @@ import com.google.android.material.chip.ChipDrawable
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.lagradost.quicknovel.CommonActivity
+import com.lagradost.quicknovel.DownloadProgressState
 import com.lagradost.quicknovel.DownloadState
 import com.lagradost.quicknovel.LoadResponse
 import com.lagradost.quicknovel.MainActivity.Companion.navigate
@@ -865,70 +866,7 @@ class ResultFragment : Fragment() {
         }
 
         observe(viewModel.downloadState) { progressState ->
-            if (progressState == null) return@observe
-            
-            novelTabBinding?.apply {
-                resultDownloadProgressText.text = "${progressState.progress}/${progressState.total}"
-
-                resultDownloadProgressBarNotDownloaded.apply {
-                    max = progressState.total.toInt() * 100
-                    val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                        this, "progress", this.progress,
-                        (progressState.progress - progressState.downloaded).toInt() * 100
-                    )
-                    animation.duration = 500
-                    animation.setAutoCancel(true)
-                    animation.interpolator = DecelerateInterpolator()
-                    animation.start()
-                }
-
-                resultDownloadProgressBar.apply {
-                    max = progressState.total.toInt() * 100
-                    val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                        this, "progress", this.progress,
-                        progressState.progress.toInt() * 100
-                    )
-                    animation.duration = 500
-                    animation.setAutoCancel(true)
-                    animation.interpolator = DecelerateInterpolator()
-                    animation.start()
-                }
-
-                val ePubGeneration = progressState.progress > 0
-                resultDownloadGenerateEpub.apply {
-                    isClickable = ePubGeneration
-                    alpha = if (ePubGeneration) 1f else 0.5f
-                }
-
-                val canDownload = progressState.progress < progressState.total
-                val canClick = progressState.total > 0
-                resultDownloadBtt.apply {
-                    isClickable = canClick
-                    alpha = if (canClick) 1f else 0.5f
-
-                    setText(
-                        when (progressState.state) {
-                            DownloadState.IsDone -> R.string.manage
-                            DownloadState.IsDownloading -> R.string.pause
-                            DownloadState.IsPaused -> R.string.resume
-                            DownloadState.IsFailed -> R.string.re_downloaded
-                            DownloadState.IsStopped -> R.string.downloaded
-                            DownloadState.Nothing -> if (canDownload) R.string.download else R.string.manage
-                            DownloadState.IsPending -> R.string.loading
-                        }
-                    )
-                    setIconResource(
-                        when (progressState.state) {
-                            DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
-                            DownloadState.IsPaused -> R.drawable.netflix_play
-                            DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
-                            DownloadState.IsDone -> R.drawable.ic_outline_settings_24
-                            DownloadState.Nothing -> if (canDownload) R.drawable.netflix_download else R.drawable.ic_outline_settings_24
-                            else -> R.drawable.netflix_download
-                        }
-                    )
-                }
-            }
+            updateDownloadInfo(progressState)
         }
 
         binding.resultMainscroll.setOnScrollChangeListener { v: NestedScrollView, _, scrollY, _, oldScrollY ->
@@ -1071,6 +1009,7 @@ class ResultFragment : Fragment() {
     private fun onBindingCreated(tabView: View) {
         val binding = ResultNovelTabBinding.bind(tabView)
         novelTabBinding = binding
+        updateDownloadInfo(viewModel.downloadState.value)
         
         binding.apply {
             resultUpdatesToggle.setOnClickListener { 
@@ -1301,4 +1240,74 @@ class ResultFragment : Fragment() {
         dialog.show()
     }
 
+    private fun updateDownloadInfo(progressState: DownloadProgressState?) {
+        val binding = novelTabBinding ?: return
+        if (progressState == null) return
+
+        binding.apply {
+            resultDownloadProgressText.text = "${progressState.progress}/${progressState.total}"
+
+            resultDownloadProgressBarNotDownloaded.apply {
+                max = progressState.total.toInt() * 100
+                val animation: ObjectAnimator = ObjectAnimator.ofInt(
+                    this, "progress", this.progress,
+                    (progressState.progress - progressState.downloaded).toInt() * 100
+                )
+                animation.duration = 500
+                animation.setAutoCancel(true)
+                animation.interpolator = DecelerateInterpolator()
+                animation.start()
+            }
+
+            resultDownloadProgressBar.apply {
+                max = progressState.total.toInt() * 100
+                val animation: ObjectAnimator = ObjectAnimator.ofInt(
+                    this, "progress", this.progress,
+                    progressState.progress.toInt() * 100
+                )
+                animation.duration = 500
+                animation.setAutoCancel(true)
+                animation.interpolator = DecelerateInterpolator()
+                animation.start()
+            }
+
+            val ePubGeneration = progressState.progress > 0
+            resultDownloadGenerateEpub.apply {
+                isClickable = ePubGeneration
+                alpha = if (ePubGeneration) 1f else 0.5f
+                isVisible = true
+            }
+
+            val canDownload = progressState.progress < progressState.total
+            val canClick = progressState.total > 0
+            resultDownloadBtt.apply {
+                isClickable = canClick
+                alpha = if (canClick) 1f else 0.5f
+                isVisible = true
+
+                setText(
+                    when (progressState.state) {
+                        DownloadState.IsDone -> R.string.manage
+                        DownloadState.IsDownloading -> R.string.pause
+                        DownloadState.IsPaused -> R.string.resume
+                        DownloadState.IsFailed -> R.string.re_downloaded
+                        DownloadState.IsStopped -> R.string.downloaded
+                        DownloadState.Nothing -> if (canDownload) R.string.download else R.string.manage
+                        DownloadState.IsPending -> R.string.loading
+                        else -> if (canDownload) R.string.download else R.string.manage
+                    }
+                )
+                setIconResource(
+                    when (progressState.state) {
+                        DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
+                        DownloadState.IsPaused -> R.drawable.netflix_play
+                        DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
+                        DownloadState.IsDone -> R.drawable.ic_outline_settings_24
+                        DownloadState.Nothing -> if (canDownload) R.drawable.netflix_download else R.drawable.ic_outline_settings_24
+                        else -> R.drawable.netflix_download
+                    }
+                )
+            }
+        }
+    }
 }

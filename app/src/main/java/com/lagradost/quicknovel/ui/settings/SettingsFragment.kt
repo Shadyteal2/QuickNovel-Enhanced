@@ -1,5 +1,7 @@
 package com.lagradost.quicknovel.ui.settings
 
+import com.lagradost.quicknovel.MainActivity
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -7,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -74,6 +77,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
+    private fun PreferenceFragmentCompat?.getPref(key: String): Preference? {
+        if (this == null) return null
+
+        return findPreference(key)
+    }
+
 
     companion object {
         fun getCurrentLocale(context: Context): String {
@@ -128,7 +137,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         fun getDefaultDir(context: Context): SafeFile? {
-            // See https://www.py4u.net/discuss/614761
+            // Priority 1: App's public external files directory (guaranteed accessible on Scoped Storage)
+            val externalDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            if (externalDir != null) {
+                 return SafeFile.fromUri(context, File(externalDir, "Epub").apply { mkdirs() }.toUri())
+            }
+            
+            // Priority 2: Traditional Downloads folder via MediaStore/SAF (Legacy fallback)
             return SafeFile.fromMedia(
                 context, MediaFileContentType.Downloads
             )?.gotoDirectory("Epub")
@@ -190,12 +205,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
             // It lies, it can be null if file manager quits.
             if (uri == null) return@registerForActivityResult
             val context = context ?: return@registerForActivityResult
-            // RW perms for the path
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-
-            context.contentResolver.takePersistableUriPermission(uri, flags)
-
             val file = SafeFile.fromUri(context, uri)
             val filePath = file?.filePath()
             println("Selected URI path: $uri - Full path: $filePath")
@@ -820,6 +829,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         AnyAdapter.sharedPool.clear()
                         putString(getString(R.string.download_format_key), prefValues[it])
                     }
+                    showRestartDialog()
                 }
             }
             return@setOnPreferenceClickListener true
@@ -857,6 +867,75 @@ class SettingsFragment : PreferenceFragmentCompat() {
             MainActivity.activeAPI = MainActivity.getApiFromName(newValue.toString())
             return@setOnPreferenceChangeListener true
         }*/
+        getPref(R.string.library_pinterest_bento_key)?.setOnPreferenceChangeListener { _, newValue ->
+             val enabled = newValue as? Boolean ?: false
+             updateBentoSettings(enabled)
+             true
+         }
+
+        getPref("library_bento_3x3")?.setOnPreferenceChangeListener { _, _ ->
+            showRestartDialog()
+            true
+        }
+
+        getPref(R.string.download_format_key)?.setOnPreferenceChangeListener { _, _ ->
+            showRestartDialog()
+            true
+        }
+        updateBentoSettings()
+    }
+
+    private fun updateBentoSettings(forceValue: Boolean? = null) {
+        val context = context ?: return
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+        val pinterestBento = forceValue ?: settingsManager.getBoolean(getString(R.string.library_pinterest_bento_key), false)
+        getPref("library_bento_3x3")?.let { bento3x3 ->
+            bento3x3.isEnabled = pinterestBento
+            // If Pinterest bento is disabled, we MUST ensure 3x3 is also disabled to avoid phantom state
+            if (!pinterestBento && settingsManager.getBoolean("library_bento_3x3", false)) {
+                settingsManager.edit { putBoolean("library_bento_3x3", false) }
+                // Update the UI switch state if it's currently showing
+                (bento3x3 as? androidx.preference.TwoStatePreference)?.isChecked = false
+            }
+        }
+    }
+
+    private fun restartApp() {
+        val ctx = activity?.applicationContext ?: context ?: return
+        val intent = Intent(ctx, MainActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        ctx.startActivity(intent)
+        // Force exit to ensure clean relaunch
+        android.os.Process.killProcess(android.os.Process.myPid())
+    }
+
+    private fun showRestartDialog() {
+        val ctx = context ?: return
+        val builder = AlertDialog.Builder(ctx, R.style.AlertDialogCustom)
+        val dialogBinding = com.lagradost.quicknovel.databinding.DialogRestartAppBinding.inflate(layoutInflater)
+        builder.setView(dialogBinding.root)
+        val dialog = builder.create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        dialogBinding.restartButton.setOnClickListener {
+            dialog.dismissSafe(activity)
+            restartApp()
+        }
+
+        dialogBinding.laterButton.setOnClickListener {
+            dialog.dismissSafe(activity)
+        }
+
+        dialog.show()
+        dialog.window?.let { window ->
+            window.setDimAmount(0.8f) // Darker dim for better readability
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // System-level blur for a premium glass feel on supported devices
+                window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                window.attributes.blurBehindRadius = 45 
+                window.attributes = window.attributes // Apply changes
+            }
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
