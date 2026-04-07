@@ -397,8 +397,10 @@
     <string name="clear_all_confirmation">Are you sure you want to delete ALL notes and character aliases? This cannot be undone.</string>
     
     <string name="restart_required">Restart Required</string>
+    <string name="backup_restored_message">Backup restored successfully. Please close and reopen the app from your recent apps to apply the changes and see your bookmarks.</string>
+    <string name="got_it">Got It</string>
     <string name="restart_ml_message">Google ML model installed. Please restart the app for it to initialize correctly.</string>
     <string name="restart">Restart</string>
     <string name="later">Later</string>
+    <string name="backup_restored_title">Backup Restored</string>
 </resources>
-

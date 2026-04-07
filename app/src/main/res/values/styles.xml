@@ -684,4 +684,9 @@
         <item name="colorPrimaryContainer">#33FFFFFF</item> 
         <item name="colorOnPrimaryContainer">#FFFFFF</item>
     </style>
+
+    <!-- Shape Appearance for Library Posters (Overdraw Optimized) -->
+    <style name="RoundedPoster">
+        <item name="cornerSize">12dp</item>
+    </style>
 </resources>

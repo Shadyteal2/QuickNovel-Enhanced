@@ -16,7 +16,7 @@
         android:layout_height="0dp"
         app:cardCornerRadius="12dp"
         app:cardElevation="0dp"
-        app:cardBackgroundColor="?attr/boxItemBackground"
+        app:cardBackgroundColor="?attr/colorSurface"
         app:strokeWidth="0dp"
         android:foreground="?android:attr/selectableItemBackgroundBorderless"
         app:layout_constraintTop_toTopOf="parent"

@@ -16,9 +16,11 @@ import com.lagradost.quicknovel.BookDownloader2Helper.checkWrite
 import com.lagradost.quicknovel.BookDownloader2Helper.requestRW
 import com.lagradost.quicknovel.CommonActivity.showToast
 import com.lagradost.quicknovel.DataStore
+import com.lagradost.quicknovel.DataStore.setKey
 import com.lagradost.quicknovel.DataStore.getDefaultSharedPrefs
 import com.lagradost.quicknovel.DataStore.getSharedPrefs
 import com.lagradost.quicknovel.DataStore.mapper
+import com.lagradost.quicknovel.util.BookmarkMigrationManager.MIGRATION_KEY
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.mvvm.logError
 import com.lagradost.quicknovel.ui.settings.SettingsFragment
@@ -46,7 +48,8 @@ object BackupUtils {
 
     data class BackupFile(
         @JsonProperty("datastore") val datastore: BackupVars,
-        @JsonProperty("settings") val settings: BackupVars
+        @JsonProperty("settings") val settings: BackupVars,
+        @JsonProperty("novels") val novels: List<com.lagradost.quicknovel.db.NovelEntity>? = null
     )
 
     fun setupStream(context: Context, displayName : String, ext : String, subDir : SafeFile?) : Pair<OutputStream?, Uri?> {
@@ -101,81 +104,88 @@ object BackupUtils {
     }
 
     fun FragmentActivity.backup() {
-        try {
-            if (checkWrite()) {
-                val subDir = SettingsFragment.getDefaultDir(context = this)//getBasePath().first
-                val date = SimpleDateFormat("yyyy_MM_dd_HH_mm").format(Date(currentTimeMillis()))
-                val displayName = "neoQN_Backup_${date}"
-
-                val allData = getSharedPrefs().all
-                val allSettings = getDefaultSharedPrefs().all
-
-                val allDataFiltered = allData.filterKeys { !isDownloadKey(it) }
-
-                val allDataSorted = BackupVars(
-                    allDataFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
-                    allDataFiltered.filter { it.value is Int } as? Map<String, Int>,
-                    allDataFiltered.filter { it.value is String } as? Map<String, String>,
-                    allDataFiltered.filter { it.value is Float } as? Map<String, Float>,
-                    allDataFiltered.filter { it.value is Long } as? Map<String, Long>,
-                    allDataFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
-                )
-
-                val allSettingsFiltered = allSettings.filterKeys { !isDownloadKey(it) }
-
-                val allSettingsSorted = BackupVars(
-                    allSettingsFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
-                    allSettingsFiltered.filter { it.value is Int } as? Map<String, Int>,
-                    allSettingsFiltered.filter { it.value is String } as? Map<String, String>,
-                    allSettingsFiltered.filter { it.value is Float } as? Map<String, Float>,
-                    allSettingsFiltered.filter { it.value is Long } as? Map<String, Long>,
-                    allSettingsFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
-                )
-
-                val backupFile = BackupFile(
-                    allDataSorted,
-                    allSettingsSorted
-                )
-                val (stream, fileUri) = setupStream(this,displayName,"json", subDir)
-                if (stream == null) throw IOException("Error creating export stream")
-
-                val printStream = PrintWriter(stream)
-                printStream.print(mapper.writeValueAsString(backupFile))
-                printStream.close()
-
-                showToast(
-                    R.string.backup_success,
-                    Toast.LENGTH_LONG
-                )
-
-                // QN-Enhanced: Open Share Panel immediately after backup
-                if (fileUri != null) {
-                    try {
-                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "application/json"
-                            putExtra(android.content.Intent.EXTRA_STREAM, fileUri)
-                            flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        }
-                        startActivity(android.content.Intent.createChooser(shareIntent, "Save or Share Backup"))
-                    } catch (e: Exception) {
-                        logError(e)
-                    }
-                }
-
-            } else {
-                showToast(getString(R.string.backup_failed), Toast.LENGTH_LONG)
-                requestRW()
-                return
-            }
-        } catch (e: Exception) {
-            logError(e)
+        thread {
             try {
-                showToast(
-                    getString(R.string.backup_failed_error_format).format(e.toString()),
-                    Toast.LENGTH_LONG
-                )
+                if (checkWrite()) {
+                    val subDir = SettingsFragment.getDefaultDir(context = this)//getBasePath().first
+                    val date = SimpleDateFormat("yyyy_MM_dd_HH_mm").format(Date(currentTimeMillis()))
+                    val displayName = "neoQN_Backup_${date}"
+
+                    val allData = getSharedPrefs().all
+                    val allSettings = getDefaultSharedPrefs().all
+
+                    val allDataFiltered = allData.filterKeys { !isDownloadKey(it) }
+
+                    val allDataSorted = BackupVars(
+                        allDataFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
+                        allDataFiltered.filter { it.value is Int } as? Map<String, Int>,
+                        allDataFiltered.filter { it.value is String } as? Map<String, String>,
+                        allDataFiltered.filter { it.value is Float } as? Map<String, Float>,
+                        allDataFiltered.filter { it.value is Long } as? Map<String, Long>,
+                        allDataFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
+                    )
+
+                    val allSettingsFiltered = allSettings.filterKeys { !isDownloadKey(it) }
+
+                    val allSettingsSorted = BackupVars(
+                        allSettingsFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
+                        allSettingsFiltered.filter { it.value is Int } as? Map<String, Int>,
+                        allSettingsFiltered.filter { it.value is String } as? Map<String, String>,
+                        allSettingsFiltered.filter { it.value is Float } as? Map<String, Float>,
+                        allSettingsFiltered.filter { it.value is Long } as? Map<String, Long>,
+                        allSettingsFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
+                    )
+
+                    val novels = com.lagradost.quicknovel.db.AppDatabase.getDatabase(this).novelDao().getAll()
+                        .filter { it.bookmarkType != null && it.bookmarkType != 0 }
+
+                    val backupFile = BackupFile(
+                        allDataSorted,
+                        allSettingsSorted,
+                        novels
+                    )
+                    val (stream, fileUri) = setupStream(this, displayName, "json", subDir)
+                    if (stream == null) throw IOException("Error creating export stream")
+
+                    val printStream = PrintWriter(stream)
+                    printStream.print(mapper.writeValueAsString(backupFile))
+                    printStream.close()
+
+                    showToast(
+                        R.string.backup_success,
+                        Toast.LENGTH_LONG
+                    )
+
+                    // QN-Enhanced: Open Share Panel immediately after backup
+                    if (fileUri != null) {
+                        runOnUiThread {
+                            try {
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "application/json"
+                                    putExtra(android.content.Intent.EXTRA_STREAM, fileUri)
+                                    flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                }
+                                startActivity(android.content.Intent.createChooser(shareIntent, "Save or Share Backup"))
+                            } catch (e: Exception) {
+                                logError(e)
+                            }
+                        }
+                    }
+
+                } else {
+                    showToast(getString(R.string.backup_failed), Toast.LENGTH_LONG)
+                    requestRW()
+                }
             } catch (e: Exception) {
                 logError(e)
+                try {
+                    showToast(
+                        getString(R.string.backup_failed_error_format).format(e.toString()),
+                        Toast.LENGTH_LONG
+                    )
+                } catch (e: Exception) {
+                    logError(e)
+                }
             }
         }
     }
@@ -201,7 +211,13 @@ object BackupUtils {
                                         restoreDataStore = true
                                     )
                                     activity.runOnUiThread {
-                                        activity.recreate()
+                                        com.google.android.material.dialog.MaterialAlertDialogBuilder(activity, R.style.AlertDialogCustom)
+                                            .setTitle(R.string.backup_restored_title)
+                                            .setMessage(R.string.backup_restored_message)
+                                            .setCancelable(false)
+                                            .setPositiveButton(R.string.got_it) { _, _ ->
+                                                activity.finishAffinity()
+                                            }.show()
                                     }
                                 }
                                 input.close()
@@ -278,6 +294,14 @@ object BackupUtils {
             restoreMap(backupFile.datastore._Float)
             restoreMap(backupFile.datastore._Long)
             restoreMap(backupFile.datastore._StringSet)
+
+            if (backupFile.novels != null && backupFile.novels.isNotEmpty()) {
+                com.lagradost.quicknovel.db.AppDatabase.getDatabase(this).novelDao().insertAll(backupFile.novels)
+            } else {
+                // QN-Enhanced: If novels are missing from the backup (legacy or bugged backup),
+                // we reset the migration flag to force a re-migration of SharedPreferences bookmarks.
+                this.setKey(MIGRATION_KEY, false)
+            }
         }
 
         // QN-Enhanced: Trigger immediate, high-priority plugin synchronization post-restore.

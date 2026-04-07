@@ -63,6 +63,9 @@ import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import kotlin.math.sign
 import androidx.core.graphics.drawable.toDrawable
+import coil3.request.crossfade
+import coil3.request.error
+import coil3.request.placeholder
 
 //import androidx.palette.graphics.Palette
 
@@ -218,6 +221,15 @@ object UIHelper {
         return color
     }
 
+    fun getPlaceholder(context: Context): android.graphics.drawable.Drawable {
+        return android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.parseColor("#212121"), Color.BLACK)
+        ).apply {
+            cornerRadius = 4.toPx.toFloat()
+        }
+    }
+
     fun ImageView?.setImage(
         url: String?,
         headers: Map<String, String>? = null,
@@ -228,7 +240,10 @@ object UIHelper {
         sample: Int = 3,
         //colorCallback: ((Palette) -> Unit)? = null
     ): Boolean {
-        if (url.isNullOrBlank()) return false
+        if (url.isNullOrBlank()) {
+            this?.setImageDrawable(getPlaceholder(this.context))
+            return false
+        }
         this.setImage(
             UiImage.Image(url, headers, errorImageDrawable),
             errorImageDrawable,
@@ -262,21 +277,32 @@ object UIHelper {
             )
         ) else emptyList()
 
+        val placeholder = getPlaceholder(context)
+        
         when (uiImage) {
             is UiImage.Image -> {
                 this.loadImage(uiImage.url, uiImage.headers) {
+                    if (fadeIn) crossfade(300)
+                    placeholder(placeholder)
+                    if (uiImage.errorDrawable != null) {
+                        error(uiImage.errorDrawable)
+                    }
                     transformations(transformations)
                 }
             }
 
             is UiImage.Bitmap -> {
                 this.loadImage(uiImage.bitmap) {
+                    if (fadeIn) crossfade(300)
+                    placeholder(placeholder)
                     transformations(transformations)
                 }
             }
 
             is UiImage.Drawable -> {
                 this.loadImage(uiImage.resId) {
+                    if (fadeIn) crossfade(300)
+                    placeholder(placeholder)
                     transformations(transformations)
                 }
             }

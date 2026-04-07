@@ -3,6 +3,8 @@ package com.lagradost.quicknovel.util
 import android.app.Activity
 import android.app.Dialog
 import android.content.Context
+import android.os.Build
+import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
@@ -102,6 +104,7 @@ object SingleSelectionHelper {
 
         val dialog = builder.create()
         dialog.show()
+        dialog.applyGlassStyle()
         showDialog(dialog, items, selectedIndex, name,
             showApply = true,
             isMultiSelect = true,
@@ -123,6 +126,7 @@ object SingleSelectionHelper {
 
         val dialog = builder.create()
         dialog.show()
+        dialog.applyGlassStyle()
         showDialog(
             dialog,
             items,
@@ -149,6 +153,7 @@ object SingleSelectionHelper {
 
         val dialog = builder.create()
         dialog.show()
+        dialog.applyGlassStyle()
         showDialog(
             dialog,
             items,
@@ -159,5 +164,16 @@ object SingleSelectionHelper {
             { if (it.isNotEmpty()) callback.invoke(it.first()) },
             dismissCallback
         )
+    }
+}
+
+fun Dialog.applyGlassStyle() {
+    this.window?.let { window ->
+        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        window.setDimAmount(0.8f)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes.blurBehindRadius = 45
+        }
     }
 }

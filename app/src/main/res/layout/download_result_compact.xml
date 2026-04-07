@@ -16,152 +16,123 @@
         android:focusable="true">
     <!-- USING CROP RATIO (182/268), centerCrop for fill -->
 
-    <androidx.cardview.widget.CardView
-            android:elevation="0dp"
-            app:cardCornerRadius="@dimen/roundedImageRadius"
-            android:layout_width="67.5dp"
-            android:layout_height="match_parent">
-
-        <ImageView
-                android:foreground="?android:attr/selectableItemBackgroundBorderless"
-                android:layout_gravity="left"
-                android:id="@+id/imageView"
-                android:scaleType="centerCrop"
-                android:layout_height="match_parent"
-                android:layout_width="match_parent"
-                tools:ignore="RtlHardcoded"
-                android:contentDescription="@string/poster_open_source_descript" />
-    </androidx.cardview.widget.CardView>
-
-    <androidx.core.widget.ContentLoadingProgressBar
-            android:indeterminate="true"
-            style="@android:style/Widget.Material.ProgressBar.Horizontal"
-            android:progressBackgroundTint="?attr/colorPrimary"
-            android:layout_gravity="bottom"
-            android:indeterminateTint="?attr/colorPrimary"
-            android:id="@+id/download_progressbar"
-            android:layout_width="match_parent"
-            tools:progress="10"
-            android:layout_marginStart="60dp"
-            android:layout_marginBottom="-5dp"
-            android:layout_marginTop="4dp"
-            android:progressTint="?attr/colorPrimary"
-            android:layout_height="15dp" />
-
     <androidx.constraintlayout.widget.ConstraintLayout
-            android:id="@+id/download_open_btt"
-            android:layout_marginEnd="10dp"
-            android:orientation="horizontal"
-            android:layout_marginStart="77.5dp"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-        <LinearLayout
-                android:layout_weight="1"
-                android:layout_width="0dp"
-
-                android:layout_gravity="center_vertical"
-                android:orientation="vertical"
-                android:layout_height="wrap_content"
+        <!-- Poster Image: Directly in Root to reduce Overdraw -->
+        <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/imageView"
+                android:layout_width="67.5dp"
+                android:layout_height="0dp"
+                android:scaleType="centerCrop"
+                app:shapeAppearanceOverlay="@style/RoundedPoster"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/poster_open_source_descript" />
+
+        <!-- Novel Name -->
+        <TextView
+                android:id="@+id/imageText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:layout_marginTop="12dp"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="?attr/textColor"
+                android:textSize="14sp"
+                app:layout_constraintEnd_toStartOf="@+id/download_holder"
+                app:layout_constraintStart_toEndOf="@+id/imageView"
+                app:layout_constraintTop_toTopOf="parent"
+                tools:text="Novel Name Overgeared Overgeared Overgeared" />
+
+        <!-- Progress Description -->
+        <TextView
+                android:id="@+id/download_progress_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="?attr/grayTextColor"
+                android:textSize="12sp"
+                app:layout_constraintEnd_toEndOf="@+id/imageText"
+                app:layout_constraintStart_toStartOf="@+id/imageText"
+                app:layout_constraintTop_toBottomOf="@+id/imageText"
+                tools:text="1034/1960 - Paused" />
+
+        <!-- Control Holder (Updates & Delete) -->
+        <LinearLayout
+                android:id="@+id/download_holder"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintEnd_toStartOf="@+id/download_holder">
+                app:layout_constraintTop_toTopOf="parent">
 
             <TextView
-                    tools:text="Overgeareddjadjakdjakldjajdaldjadjal\ndadwa"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="start|center_vertical"
-                    android:textColor="?attr/textColor"
-                    android:id="@+id/imageText"
-                    android:ellipsize="end"
-                    android:maxLines="2" />
-
-            <TextView
-                    android:id="@+id/download_progress_text"
-
-                    android:layout_marginTop="1dp"
-                    android:gravity="start"
-                    tools:text="1034/1960 - Paused"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-
-                    android:textColor="?attr/grayTextColor"
-                    android:maxLines="3" />
-        </LinearLayout>
-
-        <FrameLayout
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-
-                android:layout_width="120dp"
-                android:layout_height="match_parent"
-                android:id="@+id/download_holder">
-
-            <LinearLayout
+                    android:id="@+id/imageTextMore"
                     android:layout_width="wrap_content"
-                    android:layout_gravity="end|center_vertical"
-                    android:layout_height="match_parent">
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    tools:text="+27" />
 
-                <TextView
-                        tools:text="+27  "
-                        android:layout_gravity="center_vertical"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textColor="?attr/colorPrimary"
-                        android:id="@+id/imageTextMore"
-                        android:layout_marginEnd="4dp"
-                        android:ellipsize="end"
-                        android:maxLines="1" />
+            <FrameLayout
+                    android:id="@+id/download_update_holder"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp">
 
-                <FrameLayout
-                        android:id="@+id/download_update_holder"
-                        android:layout_width="60dp"
-                        android:layout_height="match_parent">
-
-                    <androidx.core.widget.ContentLoadingProgressBar
-                            android:id="@+id/download_update_loading"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            style="@style/Widget.AppCompat.ProgressBar"
-                            android:foregroundTint="@color/white"
-                            android:progressTint="@color/white"
-                            android:layout_gravity="center" />
-
-                    <ImageView
-                            android:id="@+id/download_update"
-                            android:background="?selectableItemBackgroundBorderless"
-                            android:src="@drawable/ic_baseline_autorenew_24"
-                            android:padding="10dp"
-                            android:layout_width="60dp"
-                            android:layout_height="match_parent"
-                            android:layout_gravity="end|center_vertical"
-                            android:scaleX="0.6"
-                            android:scaleY="0.6"
-                            app:tint="?attr/textColor" />
-                </FrameLayout>
-
+                <androidx.core.widget.ContentLoadingProgressBar
+                        android:id="@+id/download_update_loading"
+                        style="@style/Widget.AppCompat.ProgressBar"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:visibility="gone" />
 
                 <ImageView
-                        android:visibility="gone"
-                        android:id="@+id/download_delete_trash"
-                        android:background="?selectableItemBackgroundBorderless"
-                        android:src="@drawable/ic_baseline_delete_outline_24"
-                        android:layout_width="40dp"
+                        android:id="@+id/download_update"
+                        android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:layout_gravity="end|center_vertical"
-                        android:layout_marginRight="5dp"
-                        android:scaleX="0.6"
-                        android:scaleY="0.6"
-                        android:contentDescription="@string/delete"
+                        android:background="?selectableItemBackgroundBorderless"
+                        android:padding="12dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_baseline_autorenew_24"
                         app:tint="?attr/textColor" />
-            </LinearLayout>
+            </FrameLayout>
 
+            <ImageView
+                    android:id="@+id/download_delete_trash"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/delete"
+                    android:padding="12dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_baseline_delete_outline_24"
+                    app:tint="?attr/textColor" />
+        </LinearLayout>
 
-        </FrameLayout>
+        <!-- Progress Bar at bottom -->
+        <androidx.core.widget.ContentLoadingProgressBar
+                android:id="@+id/download_progressbar"
+                style="@android:style/Widget.Material.ProgressBar.Horizontal"
+                android:layout_width="0dp"
+                android:layout_height="4dp"
+                android:layout_marginStart="10dp"
+                android:progressTint="?attr/colorPrimary"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@+id/imageView"
+                tools:progress="50" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
