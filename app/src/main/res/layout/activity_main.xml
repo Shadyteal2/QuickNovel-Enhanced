@@ -46,6 +46,20 @@
                 android:clipChildren="false"
                 android:clipToPadding="false">
 
+            <fragment
+                    android:id="@+id/nav_host_fragment"
+                    android:name="androidx.navigation.fragment.NavHostFragment"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="invisible"
+                    android:alpha="0"
+                    app:defaultNavHost="true"
+                    app:navGraph="@navigation/mobile_navigation"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
             <androidx.viewpager2.widget.ViewPager2
                     android:id="@+id/main_viewpager"
                     android:layout_width="0dp"
@@ -61,7 +75,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="24dp"
-                    android:layout_marginBottom="100dp"
+                    android:layout_marginBottom="124dp"
                     android:contentDescription="Sync Extensions"
                     android:src="@drawable/ic_baseline_autorenew_24"
                     android:visibility="visible"
@@ -70,64 +84,125 @@
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent" />
 
-            <fragment
-                    android:id="@+id/nav_host_fragment"
-                    android:name="androidx.navigation.fragment.NavHostFragment"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="invisible"
-                    android:alpha="0"
-                    app:defaultNavHost="true"
-                    app:navGraph="@navigation/mobile_navigation"
+
+
+
+            <!-- New Floating Navigation Structure -->
+            <!-- ConstraintLayout ensures the 4-tab bar stays centered regardless of the Settings button visibility -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/nav_root_layout"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:layout_marginBottom="24dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:clickable="true"
+                android:focusable="true"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent">
+
+                <!-- Navigation Cluster (Bar + Settings) Centered as a unit -->
+                <!-- Use a Chain to keep them together while clamping to screen edges if needed -->
+                
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/nav_bar_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="58dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:background="@drawable/glass_nav_background"
+                    android:paddingHorizontal="4dp"
+                    android:minWidth="330dp"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent" />
+                    app:layout_constraintEnd_toStartOf="@+id/nav_extra_button"
+                    app:layout_constraintHorizontal_bias="0.5"
+                    app:layout_constraintHorizontal_chainStyle="packed"
+                    app:layout_constraintWidth_max="480dp">
 
-            <FrameLayout
-                    android:id="@+id/nav_bar_container"
-                    android:layout_width="0dp"
-                    android:layout_height="60dp"
-                    android:layout_marginHorizontal="30dp"
-                    android:layout_marginBottom="30dp"
-                    android:clipChildren="false"
-                    android:clipToPadding="false"
-                    android:baselineAligned="false"
-                    android:elevation="4dp"
-                    android:background="@drawable/glass_nav_background"
-                    android:outlineProvider="background"
-                    android:clipToOutline="true"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toStartOf="parent">
+                    <!-- The Pill (Constrained to selected tab in code) -->
+                    <View
+                        android:id="@+id/nav_indicator_pill"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_marginTop="5dp"
+                        android:layout_marginBottom="5dp"
+                        android:alpha="0"
+                        android:background="@drawable/nav_chip_selected_bg"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="@+id/nav_item_download"
+                        app:layout_constraintEnd_toEndOf="@+id/nav_item_download" />
 
-                <!-- Sliding Light Indicator -->
-                <View
-                        android:id="@+id/nav_indicator"
-                        android:layout_width="40dp"
-                        android:layout_height="4dp"
-                        android:layout_gravity="bottom"
-                        android:layout_marginBottom="6dp"
-                        android:background="@drawable/indicator_glow"
-                        android:alpha="0" />
-
-                <com.google.android.material.bottomnavigation.BottomNavigationView
-                        android:id="@+id/nav_view"
-                        android:layout_width="match_parent"
+                    <!-- Tabs in a weighted Chain -->
+                    <include layout="@layout/nav_item_chip" 
+                        android:id="@+id/nav_item_download"
+                        android:layout_width="0dp"
                         android:layout_height="match_parent"
-                        android:background="@android:color/transparent"
-                        android:theme="@style/FloatingNavTheme"
-                        app:elevation="0dp"
-                        app:labelVisibilityMode="unlabeled"
-                        app:itemRippleColor="@android:color/transparent"
-                        app:itemBackground="@android:color/transparent"
-                        app:itemIconSize="24dp"
-                        app:itemPaddingTop="8dp"
-                        app:itemPaddingBottom="12dp"
-                        app:itemIconTint="@color/nav_icon_color"
-                        app:itemTextColor="@color/nav_icon_color"
-                        app:menu="@menu/bottom_nav_menu" />
-            </FrameLayout>
+                        app:layout_constraintHorizontal_weight="1"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@+id/nav_item_search"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <include layout="@layout/nav_item_chip" 
+                        android:id="@+id/nav_item_search"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        app:layout_constraintHorizontal_weight="1"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@+id/nav_item_foryou"
+                        app:layout_constraintStart_toEndOf="@+id/nav_item_download"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <include layout="@layout/nav_item_chip" 
+                        android:id="@+id/nav_item_foryou"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        app:layout_constraintHorizontal_weight="1"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@+id/nav_item_history"
+                        app:layout_constraintStart_toEndOf="@+id/nav_item_search"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <include layout="@layout/nav_item_chip" 
+                        android:id="@+id/nav_item_history"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        app:layout_constraintHorizontal_weight="1"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toEndOf="@+id/nav_item_foryou"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <FrameLayout
+                    android:id="@+id/nav_extra_button"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="12dp"
+                    android:alpha="0"
+                    android:visibility="gone"
+                    android:background="@drawable/nav_extra_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_constraintTop_toTopOf="@id/nav_bar_container"
+                    app:layout_constraintBottom_toBottomOf="@id/nav_bar_container"
+                    app:layout_constraintStart_toEndOf="@id/nav_bar_container"
+                    app:layout_constraintEnd_toEndOf="parent">
+                    
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_baseline_settings_24"
+                        android:tint="?attr/iconColor" />
+                </FrameLayout>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
         </FrameLayout>

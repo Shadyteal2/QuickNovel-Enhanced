@@ -5,6 +5,8 @@
     <string name="title_settings">Settings</string>
     <string name="title_home">Explore</string>
     <string name="title_download">Library</string>
+    <string name="title_foryou_short">For You</string>
+
 
     <string name="locale_key" translatable="false">locale_key</string>
     <string name="provider_lang_key" translatable="false">provider_lang_key</string>

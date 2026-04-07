@@ -36,6 +36,7 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavOptions
+import androidx.navigation.navOptions
 import androidx.navigation.fragment.NavHostFragment
 import androidx.preference.PreferenceManager
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -116,6 +117,12 @@ import coil3.request.crossfade
 import coil3.asDrawable
 import com.lagradost.quicknovel.ui.TabNavigator
 
+import android.view.HapticFeedbackConstants
+import android.view.animation.OvershootInterpolator
+import android.animation.ValueAnimator
+import android.widget.LinearLayout
+import androidx.core.view.updateLayoutParams
+
 class MainActivity : AppCompatActivity(), TabNavigator {
     override fun switchToMainTab(index: Int) {
         binding?.mainViewpager?.setCurrentItem(index, true)
@@ -124,7 +131,37 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     override fun moveToTab(index: Int) {
         switchToMainTab(index)
     }
+
+    private var lastPillX = 0f
+    private var lastPillWidth = 0
+    private var hapticTickDone = false
+
+    private fun android.view.View.applySpringTouch() {
+        val springInterpolator = android.view.animation.OvershootInterpolator(1.5f)
+        this.setOnTouchListener { v, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(150).setInterpolator(springInterpolator).start()
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(250).setInterpolator(springInterpolator).start()
+                }
+            }
+            false
+        }
+    }
+
     companion object {
+        @JvmStatic
+        var navOptions: androidx.navigation.NavOptions = androidx.navigation.navOptions {
+            launchSingleTop = true
+            restoreState = true
+            popUpTo(R.id.nav_host_fragment) {
+                saveState = true
+            }
+        }
+
         private var _mainActivity: WeakReference<MainActivity>? = null
         private var mainActivity
             get() = _mainActivity?.get()
@@ -192,7 +229,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
 
         // === API ===
-        lateinit var navOptions: NavOptions
 
         @JvmStatic
         fun loadResult(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null) {
@@ -241,15 +277,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     null,
                     extras
                 )
-                /*supportFragmentManager.beginTransaction()
-                        .setCustomAnimations(
-                            R.anim.enter_anim,
-                            R.anim.exit_anim,
-                            R.anim.pop_enter,
-                            R.anim.pop_exit
-                        )
-                        .add(R.id.homeRoot, ResultFragment().newInstance(url, apiName, startAction))
-                        .commit()*/
             }
         }
 
@@ -268,80 +295,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
             return false
         }
-
-        /*fun AppCompatActivity.backPressed(): Boolean {
-            this.window?.navigationBarColor =
-                this.colorFromAttribute(R.attr.primaryGrayBackground)
-
-            val currentFragment = supportFragmentManager.fragments.last {
-                it.isVisible
-            }
-
-            if (currentFragment is NavHostFragment) {
-                val child = currentFragment.childFragmentManager.fragments.last {
-                    it.isVisible
-                }
-                if (child is MainPageFragment) {
-                    val navController = findNavController(R.id.nav_host_fragment)
-                    navController.navigate(R.id.navigation_homepage, Bundle(), navOptions)
-                    return true
-                }
-            }
-
-            if (currentFragment != null && supportFragmentManager.fragments.size > 2) {
-                if (supportFragmentManager.fragments.size == 3) {
-                    //window?.navigationBarColor =
-                    //    colorFromAttribute(R.attr.primaryBlackBackground)
-                }
-                //MainActivity.showNavbar()
-                supportFragmentManager.beginTransaction()
-                    .setCustomAnimations(
-                        R.anim.enter_anim,
-                        R.anim.exit_anim,
-                        R.anim.pop_enter,
-                        R.anim.pop_exit
-                    )
-                    .remove(currentFragment)
-                    .commitAllowingStateLoss()
-                supportFragmentManager
-                return true
-            }
-            return false
-        }*/
-
-        /* fun semihideNavbar() {
-             activity
-             val w: Window? = activity?.window // in Activity's onCreate() for instance
-             if (w != null) {
-                 val uiVisibility =
-                     View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                 w.decorView.systemUiVisibility = uiVisibility
-                 w.navigationBarColor =
-                     activity?.getResourceColor(android.R.attr.navigationBarColor, 0.7F)
-             }
-         }
-
-         fun showNavbar() {
-             val w: Window? = activity.window // in Activity's onCreate() for instance
-             if (w != null) {
-                 w.decorView.systemUiVisibility = 0
-                 w.navigationBarColor = android.R.attr.navigationBarColor
-             }
-         }
-
-         fun transNavbar(trans: Boolean) {
-             val w: Window? = activity.window // in Activity's onCreate() for instance
-             if (w != null) {
-                 if (trans) {
-                     w.setFlags(
-                         WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS,
-                         WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS
-                     )
-                 } else {
-                     w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-                 }
-             }
-         }*/
     }
 
     private fun NavDestination.matchDestination(@IdRes destId: Int): Boolean =
@@ -517,44 +470,20 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         return ret
     }
 
-    /* // MOON READER WONT RETURN THE DURATION, BUT THIS CAN BE USED FOR SOME USER FEEDBACK IN THE FUTURE??? SEE @moonreader
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-    }*/
-
     override fun onResume() {
         super.onResume()
         activity = this
         mainActivity = this
     }
 
-    /*override fun onBackPressed() {
-        if (backPressed()) return
-        super.onBackPressed()
-    }*/
-
     private fun updateUpdatesBadge() {
-        val count = com.lagradost.quicknovel.BaseApplication.Companion.getKey<Int>("NEW_UPDATES_COUNT") ?: 0
-        val navView: BottomNavigationView? = binding?.navView
-        if (navView != null && count > 0) {
-            // navigation_updates tab was removed to keep 5-tab limit.
-            // Badge could be moved to another tab if desired, but for now we disable it.
-            /*val badge = navView.getOrCreateBadge(R.id.navigation_updates)
-            badge.isVisible = true
-            badge.backgroundColor = colorFromAttribute(R.attr.colorPrimary)
-            badge.badgeTextColor = android.graphics.Color.WHITE
-            val displayCount = if (count > 9) 9 else count
-            badge.number = displayCount
-            if (count > 9) {
-                badge.maxCharacterCount = 3 
-            }*/
-        }
+        // updates badge logic disabled as tab is removed
     }
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
         if (intent.action == Intent.ACTION_SEND) {
-            val extraText = try { // I don't trust android
+            val extraText = try {
                 intent.getStringExtra(Intent.EXTRA_TEXT)
             } catch (e: Exception) {
                 null
@@ -563,7 +492,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             val item = if (cd != null && cd.itemCount > 0) cd.getItemAt(0) else null
             val url = item?.text?.toString()
 
-            // idk what I am doing, just hope any of these work
             if (item?.uri != null && loadResultFromUrl(item.uri?.toString())) {
                 return
             }
@@ -590,44 +518,81 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             R.id.navigation_search,
             R.id.navigation_foryou,
             R.id.navigation_history,
-            R.id.navigation_settings,
         )
         val isTab = tabIds.contains(destination.id)
 
         binding?.apply {
             val navHost = findViewById<android.view.View>(R.id.nav_host_fragment)
-            val isMainBar = isTab || destination.id == R.id.navigation_homepage || destination.id == R.id.navigation_mainpage
+            val isMainBar = isTab || destination.id == R.id.navigation_homepage || destination.id == R.id.navigation_mainpage || destination.id == R.id.navigation_settings
             
-            navBarContainer.isVisible = isMainBar
+            navBarContainer.visibility = if (isMainBar) android.view.View.VISIBLE else android.view.View.GONE
 
+            val slideDistance = 300f 
             if (isTab) {
-                // Return to Tabbed View (Dashboard)
                 if (!mainViewpager.isVisible || mainViewpager.alpha < 1f) {
+                    mainViewpager.animate().cancel()
                     mainViewpager.alpha = 0f
+                    mainViewpager.scaleX = 0.96f
+                    mainViewpager.scaleY = 0.96f
+                    mainViewpager.translationX = -slideDistance 
                     mainViewpager.isVisible = true
-                    mainViewpager.animate().alpha(1f).setDuration(250).start()
+                    mainViewpager.animate()
+                        .alpha(1f)
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .translationX(0f)
+                        .setDuration(350)
+                        .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                        .start()
                 }
-                navHost?.animate()?.alpha(0f)?.setDuration(250)?.withEndAction { 
-                    navHost.visibility = android.view.View.INVISIBLE 
-                }?.start()
+                navHost?.animate()?.cancel()
+                navHost?.animate()
+                    ?.alpha(0f)
+                    ?.scaleX(0.96f)
+                    ?.scaleY(0.96f)
+                    ?.translationX(slideDistance) 
+                    ?.setDuration(350)
+                    ?.setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                    ?.withEndAction { 
+                        navHost.visibility = android.view.View.INVISIBLE 
+                        navHost.translationX = 0f 
+                    }?.start()
             } else {
-                // Navigate to Sub-screen (Result/MainPage)
                 if (navHost?.isVisible == false || navHost?.alpha == 0f) {
+                    navHost?.animate()?.cancel()
                     navHost?.alpha = 0f
+                    navHost?.scaleX = 0.96f
+                    navHost?.scaleY = 0.96f
+                    navHost?.translationX = slideDistance 
                     navHost?.visibility = android.view.View.VISIBLE
-                    navHost?.animate()?.alpha(1f)?.setDuration(250)?.start()
+                    navHost?.animate()
+                        ?.alpha(1f)
+                        ?.scaleX(1f)
+                        ?.scaleY(1f)
+                        ?.translationX(0f)
+                        ?.setDuration(350)
+                        ?.setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                        ?.start()
                 }
-                // Don't hide ViewPager instantly, let it sit underneath during the fade
-                mainViewpager.animate().alpha(0f).setDuration(250).withEndAction { 
-                    mainViewpager.isVisible = false 
-                }.start()
+                mainViewpager.animate().cancel()
+                mainViewpager.animate()
+                    .alpha(0f)
+                    .scaleX(0.96f)
+                    .scaleY(0.96f)
+                    .translationX(-slideDistance) 
+                    .setDuration(350)
+                    .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                    .withEndAction { 
+                        mainViewpager.isVisible = false 
+                        mainViewpager.translationX = 0f 
+                    }.start()
             }
         }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        updateLocale() // android fucks me by chaining lang when rotating the phone
+        updateLocale()
         
         val tabs = listOf(
             R.id.navigation_download,
@@ -641,21 +606,12 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     }
 
     var binding: ActivityMainBinding? = null
-    private val navItemCache = mutableMapOf<Int, android.view.View>()
-
-    private fun getNavItem(id: Int): android.view.View? {
-        return navItemCache.getOrPut(id) {
-            findViewById(id) ?: return null
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         mainActivity = this
 
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
-
-// removed early listener
 
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         CommonActivity.loadThemes(this)
@@ -665,12 +621,10 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
 
-        // Industrial-Grade: Migrate bookmarks from SharedPreferences to Room SSOT
         ioSafe {
             com.lagradost.quicknovel.util.BookmarkMigrationManager.migrateIfNeeded(this@MainActivity)
         }
 
-        // QN-Enhanced: Premium Circular Radial Reveal Transition (Material Design)
         if (CommonActivity.pendingThemeChangeScreenshot != null) {
             val screenshot = CommonActivity.pendingThemeChangeScreenshot
             val decorView = window.decorView as android.view.ViewGroup
@@ -681,8 +635,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             decorView.addView(overlay, params)
 
             overlay.doOnPreDraw {
-                // QN-Enhanced: 10ms "Settling" delay. Just a tiny buffer to 
-                // finish heavy layout inflation after recreate() before starting the GPU-heavy animation.
                 it.postDelayed({
                     if (isFinishing || isDestroyed) return@postDelayed
                     
@@ -695,7 +647,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     try {
                         overlay.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         val anim = ViewAnimationUtils.createCircularReveal(overlay, cx.toInt(), cy.toInt(), finalRadius, 0f)
-                        anim.duration = 800 // Slower, more perceptible premium transition
+                        anim.duration = 800 
                         anim.interpolator = FastOutSlowInInterpolator()
                         anim.addListener(object : AnimatorListenerAdapter() {
                             override fun onAnimationEnd(animation: Animator) {
@@ -736,32 +688,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 windowInsets
             }
         }
-
-        binding?.let { b ->
-            ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, windowInsets ->
-                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-                val bottomInset = insets.bottom
-
-                b.navBarContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                    val threshold = 24.toPx
-                    if (bottomInset > threshold) {
-                        bottomMargin = 30.toPx + bottomInset
-                    } else {
-                        bottomMargin = 30.toPx
-                    }
-                }
-                windowInsets
-            }
-
-            ViewCompat.setOnApplyWindowInsetsListener(b.navView) { _, insets ->
-                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-                WindowInsetsCompat.Builder(insets)
-                    .setInsets(WindowInsetsCompat.Type.systemBars(), androidx.core.graphics.Insets.of(systemBars.left, systemBars.top, systemBars.right, 0))
-                    .setInsets(WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.of(navBars.left, navBars.top, navBars.right, 0))
-                    .build()
-            }
-        }
         
         updateGlobalBackground()
         settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)
@@ -773,15 +699,10 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHostFragment.navController
 
-        navController.addOnDestinationChangedListener { _: NavController, navDestination: NavDestination, bundle: Bundle? ->
-            // Intercept search and add a query
+        navController.addOnDestinationChangedListener { _: NavController, navDestination: NavDestination, _: Bundle? ->
             updateNavBar(navDestination)
 
-            // Background visibility scope
-            val hideBackgroundOn = listOf<Int>(
-                // R.id.global_to_navigation_results,
-                // R.id.navigation_results,
-            )
+            val hideBackgroundOn = listOf<Int>()
             val shouldHide = hideBackgroundOn.contains(navDestination.id)
             
             binding?.apply {
@@ -793,110 +714,43 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 appBackgroundDim.isVisible = hasBackground && !shouldHide
                 appBackgroundLightScrim.isVisible = hasBackground && !shouldHide
             }
-            // Updates badge logic removed as tab is no longer in bottom nav
         }
 
-        val navView: BottomNavigationView = findViewById(R.id.nav_view)
-        
-        /*val hasUpdates = com.lagradost.quicknovel.BaseApplication.Companion.getKey("HAS_NEW_UPDATES", false) ?: false
-        if (hasUpdates) {
-            val badge = navView.getOrCreateBadge(R.id.navigation_updates)
-            badge.isVisible = true
-        }*/
+        handleIntent(intent)
 
-        val updatesReceiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
-                /*navView.post {
-                    val badge = navView.getOrCreateBadge(R.id.navigation_updates)
-                    badge.isVisible = true
-                }*/
+        if (!checkWrite()) {
+            requestRW()
+        }
+        requestNotifications()
+
+        printProviders()
+
+        setupCustomNav()
+
+        binding?.mainViewpager?.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            private var lastSelectedPos = -1
+            
+            override fun onPageSelected(position: Int) {
+                if (lastSelectedPos == position) return
+                lastSelectedPos = position
+                
+                // Swipe-to-back enabled for all tabs except Library (0) which has internal horizontal swiping
+                binding?.mainViewpager?.isUserInputEnabled = position != 0
+                updateNavSelection(position)
+                updateSettingsButtonVisibility(position)
+                
+                val isDashboardVisible = binding?.mainViewpager?.isVisible == true
+                binding?.homeSyncFab?.visibility = if (position == 1 && isDashboardVisible) android.view.View.VISIBLE else android.view.View.GONE
             }
-        }
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(updatesReceiver, android.content.IntentFilter("com.lagradost.quicknovel.UPDATES_REFRESH"), android.content.Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(updatesReceiver, android.content.IntentFilter("com.lagradost.quicknovel.UPDATES_REFRESH"))
-        }
 
-        // Schedule Periodic Updates sync based on preference
-        val sharedPreferences = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
-        val intervalStr = sharedPreferences.getString("updates_sync_interval", "12") ?: "12"
-        val interval = intervalStr.toLongOrNull() ?: 12L
-
-        if (interval > 0) {
-            val syncRequest = androidx.work.PeriodicWorkRequestBuilder<com.lagradost.quicknovel.sync.UpdatesSyncWorker>(interval, java.util.concurrent.TimeUnit.HOURS)
-                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
-                .build()
-            androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                "UpdatesSync",
-                androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
-                syncRequest
-            )
-        } else {
-            // Run on open
-            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.UpdatesSyncWorker>()
-                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
-                .build()
-            androidx.work.WorkManager.getInstance(this).enqueueUniqueWork("UpdatesSyncOpen", androidx.work.ExistingWorkPolicy.KEEP, syncRequest)
-            androidx.work.WorkManager.getInstance(this).cancelUniqueWork("UpdatesSync")
-        }
-
-        // Trigger one-time library migration from SharedPreferences to Room
-        val migrationRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.LibraryMigrationWorker>()
-            .build()
-        androidx.work.WorkManager.getInstance(this).enqueueUniqueWork(
-            "LibraryMigration", 
-            androidx.work.ExistingWorkPolicy.KEEP, 
-            migrationRequest
-        )
-
-        // Remote Plugin Sync — run only on first launch or if providers are missing
-        val needsInitialSync = BaseApplication.getKey<Boolean>("PLUGINS_INITIAL_SYNC_DONE") != true || 
-                             com.lagradost.quicknovel.util.PluginManager.getPluginsDir(this).listFiles()?.isEmpty() == true
-        
-        if (needsInitialSync) {
-            val immediatePluginSync = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>()
-                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
-                .build()
-            androidx.work.WorkManager.getInstance(this).enqueueUniqueWork(
-                "PluginSyncImmediate",
-                androidx.work.ExistingWorkPolicy.KEEP,
-                immediatePluginSync
-            )
-        }
-
-        // Daily background check for plugin updates
-        val pluginSyncRequest = androidx.work.PeriodicWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>(24, java.util.concurrent.TimeUnit.HOURS)
-            .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
-            .build()
-        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "PluginSyncPeriodic",
-            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
-            pluginSyncRequest
-        )
-        
-        // Programmatically disable clipping on BottomNavigationItemViews
-        navView.apply {
-            val menuView = getChildAt(0) as? BottomNavigationMenuView
-            menuView?.apply {
-                clipChildren = false
-                clipToPadding = false
-                for (i in 0 until childCount) {
-                    val itemView = getChildAt(i) as? BottomNavigationItemView
-                    itemView?.apply {
-                        clipChildren = false
-                        clipToPadding = false
-                    }
-                }
-            }
-        }
+            override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {}
+        })
 
         val tabs = listOf(
             R.id.navigation_download,
             R.id.navigation_search,
             R.id.navigation_foryou,
             R.id.navigation_history,
-            R.id.navigation_settings,
         )
 
         class ZoomOutPageTransformer : androidx.viewpager2.widget.ViewPager2.PageTransformer {
@@ -907,10 +761,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
                 page.apply {
                     when {
-                        position < -1 -> { // [-Infinity,-1)
-                            alpha = 0f
-                        }
-                        position <= 1 -> { // [-1,1]
+                        position < -1 -> { alpha = 0f }
+                        position <= 1 -> {
                             val scaleFactor = Math.max(0.85f, 1 - absPos)
                             val vertMargin = pageHeight * (1 - scaleFactor) / 2
                             val horzMargin = pageWidth * (1 - scaleFactor) / 2
@@ -926,9 +778,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
                             alpha = 0.5f + (((scaleFactor - 0.85f) / (1 - 0.85f)) * (1 - 0.5f))
                         }
-                        else -> { // (1,+Infinity]
-                            alpha = 0f
-                        }
+                        else -> { alpha = 0f }
                     }
                 }
             }
@@ -949,11 +799,14 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         }
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            val isTopLevel = tabs.contains(destination.id)
-            val isProvidersTab = binding?.mainViewpager?.currentItem == 1
+            val isMainTabs = tabs.contains(destination.id)
+            val currentPos = binding?.mainViewpager?.currentItem ?: 0
             
-            // Only show FAB if we are on the dashboard, on the Search/Providers tab
-            binding?.homeSyncFab?.visibility = if (isTopLevel && isProvidersTab && binding?.mainViewpager?.isVisible == true) {
+            // Centralized visibility check
+            updateSettingsButtonVisibility(currentPos)
+
+            val isProvidersTab = currentPos == 1
+            binding?.homeSyncFab?.visibility = if (isMainTabs && isProvidersTab && binding?.mainViewpager?.isVisible == true) {
                 android.view.View.VISIBLE
             } else {
                 android.view.View.GONE
@@ -964,7 +817,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         com.lagradost.quicknovel.util.Apis.isSyncing.observe(this) { syncing ->
             if (syncing) {
                 syncSnackbar = com.google.android.material.snackbar.Snackbar.make(binding!!.container, "Checking for plugin updates...", com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE)
-                // Offset snackbar to be above the bottom nav
                 syncSnackbar?.setAnchorView(R.id.nav_bar_container)
                 syncSnackbar?.show()
             } else {
@@ -974,13 +826,12 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         }
 
         binding?.mainViewpager?.apply {
-            offscreenPageLimit = 4 // Keep all 5 main tabs loaded to prevent lag during slide
+            offscreenPageLimit = 4
             setPageTransformer(ZoomOutPageTransformer())
             adapter = object : FragmentStateAdapter(this@MainActivity) {
                 override fun getItemCount(): Int = tabs.size
                 override fun createFragment(position: Int) = when (tabs[position]) {
                     R.id.navigation_download -> DownloadFragment()
-                    R.id.navigation_updates -> com.lagradost.quicknovel.ui.updates.UpdatesFragment()
                     R.id.navigation_search -> SearchFragment()
                     R.id.navigation_foryou -> com.lagradost.quicknovel.ui.foryou.ForYouFragment()
                     R.id.navigation_history -> HistoryFragment()
@@ -991,114 +842,13 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 override fun getItemId(position: Int): Long = tabs[position].toLong()
                 override fun containsItem(itemId: Long): Boolean = tabs.contains(itemId.toInt())
             }
-            isUserInputEnabled = true // Enable swiping
-            
-            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-                override fun onPageSelected(position: Int) {
-                    navView.selectedItemId = tabs[position]
-                    
-                    // Disable main swiping for Library tab ONLY if Swipe Mode is active
-                    // This allows For You tab to switch tabs on background swipes
-                    val isSwipeMode = this@MainActivity.getLibraryNavStyle() == "1"
-                    binding?.mainViewpager?.isUserInputEnabled = !(position == 0 && isSwipeMode)
-
-                    // Show FAB only on Search/Providers tab (position 1) AND when dashboard is visible
-                    val isDashboardVisible = binding?.mainViewpager?.isVisible == true
-                    binding?.homeSyncFab?.visibility = if (position == 1 && isDashboardVisible) android.view.View.VISIBLE else android.view.View.GONE
-                    // Fade in indicator if it was hidden
-                    binding?.navIndicator?.animate()?.alpha(1f)?.setDuration(200)?.start()
-                }
-
-                override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
-                    binding?.apply {
-                        val itemViewCurrent = getNavItem(tabs[position])
-                        val itemViewNext = if (position + 1 < tabs.size) getNavItem(tabs[position + 1]) else itemViewCurrent
-
-                        if (itemViewCurrent != null && itemViewNext != null) {
-                            val currentCenterX = itemViewCurrent.left + itemViewCurrent.width / 2f
-                            val nextCenterX = itemViewNext.left + itemViewNext.width / 2f
-
-                            val currentX = currentCenterX + (nextCenterX - currentCenterX) * androidx.interpolator.view.animation.FastOutSlowInInterpolator().getInterpolation(positionOffset)
-                            navIndicator?.let { indicator ->
-                                indicator.translationX = currentX - indicator.width / 2f
-                            }
-                        }
-                    }
-                }
-
-                override fun onPageScrollStateChanged(state: Int) {
-                    if (state == ViewPager2.SCROLL_STATE_IDLE) {
-                        // Subtly fade alpha when idle
-                        binding?.navIndicator?.animate()?.alpha(0.6f)?.setDuration(1000)?.start()
-                    } else {
-                        binding?.navIndicator?.animate()?.alpha(1f)?.setDuration(200)?.start()
-                    }
-                }
-            })
+            // Swipe lock handled by the OnPageChangeCallback registered in onCreate
+            isUserInputEnabled = true
         }
 
-        navView.setOnItemSelectedListener { item ->
-            val index = tabs.indexOf(item.itemId)
-            if (index != -1) {
-                // If we are currently showing a sub-screen (like Results/MainPage), return to the dashboard
-                if (binding?.mainViewpager?.isVisible == false) {
-                    navController.popBackStack(navController.graph.startDestinationId, false)
-                    // If we are jumping to a different tab than the one we started from, sync ViewPager
-                    if (binding?.mainViewpager?.currentItem != index) {
-                        binding?.mainViewpager?.setCurrentItem(index, true)
-                    }
-                } else if (binding?.mainViewpager?.currentItem != index) {
-                    binding?.mainViewpager?.setCurrentItem(index, true)
-                }
-                syncIndicator(item.itemId)
-                
-                if (item.itemId == R.id.navigation_updates) {
-                    com.lagradost.quicknovel.BaseApplication.Companion.setKey("NEW_UPDATES_COUNT", 0)
-                }
-                true
-            } else {
-                onNavDestinationSelected(
-                    item,
-                    navController = navController
-                )
-            }
-        }
-
-        //val navController = findNavController(R.id.nav_host_fragment)
-
-        //window.navigationBarColor = colorFromAttribute(R.attr.darkBackground)
-        navOptions = NavOptions.Builder()
-            .setLaunchSingleTop(true)
-            .setEnterAnim(R.anim.nav_enter_anim)
-            .setExitAnim(R.anim.nav_exit_anim)
-            .setPopEnterAnim(R.anim.nav_pop_enter)
-            .setPopExitAnim(R.anim.nav_pop_exit)
-            .setPopUpTo(navController.graph.startDestinationId, false)
-            .build()
-        navView.setOnItemReselectedListener { item ->
-            val index = tabs.indexOf(item.itemId)
-            if (index != -1) {
-                if (binding?.mainViewpager?.isVisible == false) {
-                    navController.popBackStack(navController.graph.startDestinationId, false)
-                    if (binding?.mainViewpager?.currentItem != index) {
-                        binding?.mainViewpager?.setCurrentItem(index, true)
-                    }
-                } else if (binding?.mainViewpager?.currentItem == index) {
-                    // If already on the tab and it's visible, scroll tab header to top or refresh
-                } else {
-                    binding?.mainViewpager?.setCurrentItem(index, true)
-                }
-            }
-        }
-        
-        navView.post {
-            val firstItem = tabs.getOrNull(binding?.mainViewpager?.currentItem ?: 0) ?: return@post
-            val itemView = navView.findViewById<android.view.View>(firstItem)
-            if (itemView != null) {
-                binding?.navIndicator?.let { indicator ->
-                    indicator.translationX = (itemView.left + itemView.width / 2f) - (indicator.width / 2f)
-                }
-            }
+        binding?.navItemDownload?.root?.post {
+            if (isFinishing || isDestroyed) return@post
+            updateNavSelection(binding?.mainViewpager?.currentItem ?: 0, animate = false)
         }
 
 
@@ -1111,8 +861,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
         observe(viewModel.downloadState) { progressState ->
             val hasDownload = progressState != null && progressState.progress > 0
-
-
             bottomPreviewBinding?.downloadDeleteTrashFromResult?.apply {
                 isVisible = hasDownload
                 isClickable = hasDownload
@@ -1231,7 +979,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
                         resultviewPreviewMetaStatus.apply {
                             val statusTxt = d.status?.resource?.let { getString(it) } ?: ""
-
                             resultviewPreviewMetaStatus.text = statusTxt
                             resultviewPreviewMetaStatus.isVisible = statusTxt.isNotBlank()
                         }
@@ -1247,23 +994,14 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             }
         }
 
-        //navView.itemRippleColor =
-        //    ColorStateList.valueOf(getResourceColor(R.attr.colorPrimary, 0.1f))
-
         val apiNames = getApiSettings()
         providersActive.clear()
         providersActive.addAll(apiNames)
         val edit = settingsManager.edit()
         edit.putStringSet(getString(R.string.search_providers_list_key), providersActive)
         edit.apply()
-        /*
-        val apiName = settingsManager.getString(getString(R.string.provider_list_key), apis[0].name)
-        activeAPI = getApiFromName(apiName ?: apis[0].name)
-        val edit = settingsManager.edit()
-        edit.putString(getString(R.string.provider_list_key, activeAPI.name), activeAPI.name)
-        edit.apply()*/
 
-        thread { // IDK, WARMUP OR SMTH, THIS WILL JUST REDUCE THE INITIAL LOADING TIME FOR DOWNLOADS, NO REAL USAGE, SEE @WARMUP
+        thread {
             val keys = getKeys(DOWNLOAD_FOLDER)
             for (k in keys) {
                 getKey<DownloadFragment.DownloadData>(k)
@@ -1279,14 +1017,10 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         if (!checkWrite()) {
             requestRW()
         }
-        // Note that android can normally not request 2 permissions at once
-        // But storage permissions are not required for android 13, but notifications are
         requestNotifications()
 
         printProviders()
 
-        //loadResult("https://www.novelpassion.com/novel/battle-frenzy")
-        //loadResult("https://www.royalroad.com/fiction/40182/only-villains-do-that", MainActivity.activeAPI.name)
         thread {
             test()
         }
@@ -1296,10 +1030,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 override fun handleOnBackPressed() {
                     window?.navigationBarColor = colorFromAttribute(R.attr.primaryGrayBackground)
                     updateLocale()
-
-                    // If we don't disable we end up in a loop with default behavior calling
-                    // this callback as well, so we disable it, run default behavior,
-                    // then re-enable this callback so it can be used for next back press.
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
                     isEnabled = true
@@ -1309,8 +1039,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     }
 
     fun test() {
-        // val response = app.get("https://ranobes.net/up/a-bored-lich/936969-1.html")
-        // println(response.text)
     }
 
     fun updateGlobalBackground() {
@@ -1318,7 +1046,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
         val blur = settingsManager.getInt(getString(R.string.background_blur_key), 0)
         val dim = settingsManager.getInt(getString(R.string.background_dim_key), 0)
-        val isLightTheme = settingsManager.getString(getString(R.string.theme_key), "Amoled") == "Light"
 
         binding?.apply {
             if (imageUri.isNullOrBlank()) {
@@ -1355,27 +1082,171 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         }
     }
 
-    private fun syncIndicator(itemId: Int) {
-        val navView = binding?.navView ?: return
-        val navIndicator = binding?.navIndicator ?: return
-        val navBarContainer = binding?.navBarContainer ?: return
+    private fun setupCustomNav() {
+        val b = binding ?: return
 
-        navIndicator.postDelayed({
-            val itemView = navView.findViewById<android.view.View>(itemId) ?: return@postDelayed
-            val itemLocation = IntArray(2)
-            itemView.getLocationInWindow(itemLocation)
+        // 4-item pill navigation
+        val navItems = listOf(
+            b.navItemDownload to (R.drawable.ic_baseline_collections_bookmark_24 to R.string.title_download),
+            b.navItemSearch to (R.drawable.ic_baseline_search_24 to R.string.title_search),
+            b.navItemForyou to (R.drawable.ic_stars_special to R.string.title_foryou_short),
+            b.navItemHistory to (R.drawable.ic_baseline_history_24 to R.string.title_history)
+        )
 
-            val containerLocation = IntArray(2)
-            navBarContainer.getLocationInWindow(containerLocation)
-
-            val relativeX = itemLocation[0] - containerLocation[0]
-            val centerX = relativeX + itemView.width / 2f
-            val targetX = centerX - navIndicator.width / 2f
-
-            android.animation.ObjectAnimator.ofFloat(navIndicator, "translationX", targetX).apply {
-                duration = 200
-                start()
+        navItems.forEachIndexed { index, (itemBinding, data) ->
+            itemBinding.navItemIcon.setImageResource(data.first)
+            itemBinding.navItemLabel.setText(data.second)
+            
+            // Premium Spring Touch Feedback
+            itemBinding.navItemRoot.applySpringTouch()
+            
+            itemBinding.navItemRoot.setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE)
+                val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment
+                val navController = navHostFragment?.navController
+                
+                if (b.mainViewpager.isVisible == false && navController != null) {
+                    // Sync: Start the animation immediately via a dummy target, 
+                    // then pop fragments after a tiny delay to prevent the "ghosting" swap blink
+                    navHostFragment.view?.animate()?.alpha(0f)?.setDuration(100)?.start()
+                    
+                    b.mainViewpager.postDelayed({
+                        navController.popBackStack(navController.graph.startDestinationId, false)
+                        if (b.mainViewpager.currentItem != index) {
+                            b.mainViewpager.setCurrentItem(index, true)
+                        }
+                    }, 50)
+                } else if (b.mainViewpager.currentItem != index) {
+                    b.mainViewpager.setCurrentItem(index, true)
+                }
             }
-        }, 50)
+        }
+
+        // Dedicated Settings button navigates manually (NOT via ViewPager2 swiping)
+        b.navExtraButton.setOnClickListener {
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            
+            val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment
+            val navController = navHostFragment?.navController
+            
+            // Navigate to settings destination explicitly
+            navController?.navigate(R.id.navigation_settings)
+        }
+    }
+
+    private fun updateSettingsButtonVisibility(selectedIndex: Int, animate: Boolean = true) {
+        val b = binding ?: return
+        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment
+        val navController = navHostFragment?.navController ?: return
+        
+        // The settings button should ONLY be visible when on the main Library tab (index 0)
+        // and NOT when we've navigated to a sub-screen (like Updates or Search result)
+        val isAtLibraryFragment = navController.currentDestination?.id == R.id.navigation_download
+        val isLibraryTabActive = selectedIndex == 0 && isAtLibraryFragment && b.mainViewpager.isVisible == true
+        
+        if (isLibraryTabActive) {
+            if (b.navExtraButton.visibility != android.view.View.VISIBLE) {
+                b.navExtraButton.visibility = android.view.View.VISIBLE
+                b.navExtraButton.alpha = 0f
+                b.navExtraButton.scaleX = 0.5f
+                b.navExtraButton.scaleY = 0.5f
+                b.navExtraButton.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(400)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(2.0f))
+                    .start()
+            }
+        } else {
+            if (animate && b.navExtraButton.visibility == android.view.View.VISIBLE) {
+                b.navExtraButton.animate()
+                    .alpha(0f)
+                    .scaleX(0.7f)
+                    .scaleY(0.7f)
+                    .setDuration(250)
+                    .setInterpolator(null)
+                    .withEndAction { b.navExtraButton.visibility = android.view.View.GONE }
+                    .start()
+            } else if (b.navExtraButton.visibility == android.view.View.VISIBLE) {
+                b.navExtraButton.visibility = android.view.View.GONE
+            }
+        }
+    }
+
+    private fun updateNavSelection(selectedIndex: Int, animate: Boolean = true) {
+        val b = binding ?: return
+        
+        val navItems = listOf(
+            b.navItemDownload,
+            b.navItemSearch,
+            b.navItemForyou,
+            b.navItemHistory
+        )
+
+        val textColor = colorFromAttribute(R.attr.textColor)
+        val iconColor = colorFromAttribute(R.attr.iconColor)
+        val primaryColor = colorFromAttribute(R.attr.colorPrimary)
+        val onPrimaryColor = android.graphics.Color.WHITE // High-contrast inversion
+
+        // 1. Prepare ConstraintSet for the Pill
+        val constraintSet = androidx.constraintlayout.widget.ConstraintSet()
+        constraintSet.clone(b.navBarContainer)
+        
+        var targetId: Int? = null
+
+        navItems.forEachIndexed { index, itemBinding ->
+            val isSelected = index == selectedIndex
+            val weight = if (isSelected) 3.2f else 0.6f 
+            
+            // Priority: Update the ConstraintLayout LayoutParams of the included view (the chip itself)
+            val root = itemBinding.root
+            root.updateLayoutParams<androidx.constraintlayout.widget.ConstraintLayout.LayoutParams> {
+                this.horizontalWeight = weight
+            }
+
+            itemBinding.navItemLabel.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
+            
+            // Premium Color Inversion
+            val tint = if (isSelected) onPrimaryColor else iconColor
+            val labelColor = if (isSelected) onPrimaryColor else textColor
+            
+            itemBinding.navItemIcon.imageTintList = android.content.res.ColorStateList.valueOf(tint)
+            itemBinding.navItemLabel.setTextColor(labelColor)
+            
+            if (isSelected) targetId = itemBinding.root.id
+        }
+
+        // Apply theme-aware solid primary tint (90% alpha)
+        b.navIndicatorPill.backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor).withAlpha(230)
+
+        // Index 4 or -1 is Settings (icon only, no pill)
+        if (selectedIndex == 4 || selectedIndex == -1 || targetId == null) {
+            b.navIndicatorPill.animate().alpha(0f).setDuration(200).start()
+        } else {
+            // Constrain pill to target tab bounds
+            constraintSet.connect(R.id.nav_indicator_pill, androidx.constraintlayout.widget.ConstraintSet.START, targetId!!, androidx.constraintlayout.widget.ConstraintSet.START)
+            constraintSet.connect(R.id.nav_indicator_pill, androidx.constraintlayout.widget.ConstraintSet.END, targetId!!, androidx.constraintlayout.widget.ConstraintSet.END)
+            
+            if (animate) {
+                val transition = android.transition.AutoTransition()
+                    .setDuration(280)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(1.2f))
+                
+                android.transition.TransitionManager.beginDelayedTransition(b.navBarContainer, transition)
+                
+                // Add "pop" animation
+                b.navIndicatorPill.scaleX = 0.92f
+                b.navIndicatorPill.scaleY = 0.92f
+                b.navIndicatorPill.animate().scaleX(1f).scaleY(1f).setDuration(400).start()
+            }
+            
+            constraintSet.applyTo(b.navBarContainer)
+            b.navIndicatorPill.alpha = 1f
+        }
+    }
+
+    private fun syncIndicator(itemId: Int) {
+        updateNavSelection(itemId)
     }
 }
