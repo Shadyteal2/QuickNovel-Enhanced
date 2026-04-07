@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <Preference
+        android:key="hero_header"
+        app:isPreferenceVisible="true"
+        app:layout="@layout/setting_hero_card" />
+
+    <com.lagradost.quicknovel.ui.custom.BentoPreference
+        android:key="bento_grid"
+        app:layout="@layout/setting_bento_grid" />
+
+    <!-- Social Chips at the bottom of dashboard -->
+    <PreferenceCategory
+        android:title="Community"
+        app:allowDividerAbove="true">
+        <com.lagradost.quicknovel.ui.custom.SocialChipsPreference
+            android:key="social_chips"
+            app:layout="@layout/setting_social_chips" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

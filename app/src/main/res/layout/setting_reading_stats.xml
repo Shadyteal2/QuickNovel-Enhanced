@@ -50,6 +50,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/hero_stats_value"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="View your reading progress and achievements"

@@ -136,6 +136,15 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     private var lastPillWidth = 0
     private var hapticTickDone = false
 
+    private val tabIds = listOf(
+        R.id.navigation_download,
+        R.id.navigation_search,
+        R.id.navigation_foryou,
+        R.id.navigation_history,
+    )
+    
+    private var lastActiveTab: Int = 0
+
     private fun android.view.View.applySpringTouch() {
         val springInterpolator = android.view.animation.OvershootInterpolator(1.5f)
         this.setOnTouchListener { v, event ->
@@ -512,57 +521,74 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     }
 
 
-    private fun updateNavBar(destination: NavDestination) {
-        val tabIds = listOf(
-            R.id.navigation_download,
-            R.id.navigation_search,
-            R.id.navigation_foryou,
-            R.id.navigation_history,
-        )
-        val isTab = tabIds.contains(destination.id)
+    private fun updateNavBar(destinationId: Int) {
+        val isTab = tabIds.contains(destinationId)
+        val selectedIndex = tabIds.indexOf(destinationId)
 
         binding?.apply {
             val navHost = findViewById<android.view.View>(R.id.nav_host_fragment)
-            val isMainBar = isTab || destination.id == R.id.navigation_homepage || destination.id == R.id.navigation_mainpage || destination.id == R.id.navigation_settings
+            val isMainBar = isTab || destinationId == R.id.navigation_homepage || destinationId == R.id.navigation_mainpage || destinationId == R.id.navigation_settings
             
             navBarContainer.visibility = if (isMainBar) android.view.View.VISIBLE else android.view.View.GONE
 
-            val slideDistance = 300f 
+            val slideDistance = 400f 
             if (isTab) {
-                if (!mainViewpager.isVisible || mainViewpager.alpha < 1f) {
+                // If mainViewpager is already visible and at full alpha, just ensure it's not stuck shrunken
+                if (mainViewpager.visibility == android.view.View.VISIBLE && mainViewpager.alpha >= 1f) {
+                    mainViewpager.scaleX = 1f
+                    mainViewpager.scaleY = 1f
+                    mainViewpager.translationX = 0f
+                } else {
                     mainViewpager.animate().cancel()
                     mainViewpager.alpha = 0f
-                    mainViewpager.scaleX = 0.96f
-                    mainViewpager.scaleY = 0.96f
+                    mainViewpager.scaleX = 0.95f
+                    mainViewpager.scaleY = 0.95f
                     mainViewpager.translationX = -slideDistance 
-                    mainViewpager.isVisible = true
+                    mainViewpager.visibility = android.view.View.VISIBLE
                     mainViewpager.animate()
                         .alpha(1f)
                         .scaleX(1f)
                         .scaleY(1f)
                         .translationX(0f)
-                        .setDuration(350)
-                        .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                        .setDuration(400)
+                        .setInterpolator(android.view.animation.DecelerateInterpolator())
+                        .withEndAction {
+                            // Secondary safety lock
+                            mainViewpager.scaleX = 1f
+                            mainViewpager.scaleY = 1f
+                            mainViewpager.translationX = 0f
+                        }
                         .start()
                 }
-                navHost?.animate()?.cancel()
-                navHost?.animate()
-                    ?.alpha(0f)
-                    ?.scaleX(0.96f)
-                    ?.scaleY(0.96f)
-                    ?.translationX(slideDistance) 
-                    ?.setDuration(350)
-                    ?.setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
-                    ?.withEndAction { 
-                        navHost.visibility = android.view.View.INVISIBLE 
-                        navHost.translationX = 0f 
-                    }?.start()
+
+                if (selectedIndex != -1 && mainViewpager.currentItem != selectedIndex) {
+                    mainViewpager.setCurrentItem(selectedIndex, false)
+                }
+
+                if (navHost?.visibility == android.view.View.VISIBLE) {
+                    navHost.animate().setListener(null)
+                    navHost.animate().cancel()
+                    navHost.animate()
+                        .alpha(0f)
+                        .scaleX(0.95f)
+                        .scaleY(0.95f)
+                        .translationX(slideDistance) 
+                        .setDuration(300)
+                        .setInterpolator(android.view.animation.AccelerateInterpolator())
+                        .withEndAction { 
+                            navHost.visibility = android.view.View.INVISIBLE 
+                            navHost.translationX = 0f 
+                            navHost.scaleX = 1f
+                            navHost.scaleY = 1f
+                        }.start()
+                }
             } else {
-                if (navHost?.isVisible == false || navHost?.alpha == 0f) {
+                if (navHost?.visibility != android.view.View.VISIBLE || navHost?.alpha ?: 0f < 1f) {
+                    navHost?.animate()?.setListener(null)
                     navHost?.animate()?.cancel()
                     navHost?.alpha = 0f
-                    navHost?.scaleX = 0.96f
-                    navHost?.scaleY = 0.96f
+                    navHost?.scaleX = 0.95f
+                    navHost?.scaleY = 0.95f
                     navHost?.translationX = slideDistance 
                     navHost?.visibility = android.view.View.VISIBLE
                     navHost?.animate()
@@ -570,22 +596,32 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         ?.scaleX(1f)
                         ?.scaleY(1f)
                         ?.translationX(0f)
-                        ?.setDuration(350)
-                        ?.setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                        ?.setDuration(400)
+                        ?.setInterpolator(android.view.animation.DecelerateInterpolator())
+                        ?.withEndAction {
+                             navHost?.scaleX = 1f
+                             navHost?.scaleY = 1f
+                             navHost?.translationX = 0f
+                        }
                         ?.start()
                 }
-                mainViewpager.animate().cancel()
-                mainViewpager.animate()
-                    .alpha(0f)
-                    .scaleX(0.96f)
-                    .scaleY(0.96f)
-                    .translationX(-slideDistance) 
-                    .setDuration(350)
-                    .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
-                    .withEndAction { 
-                        mainViewpager.isVisible = false 
-                        mainViewpager.translationX = 0f 
-                    }.start()
+                if (mainViewpager.visibility == android.view.View.VISIBLE) {
+                    mainViewpager.animate().setListener(null)
+                    mainViewpager.animate().cancel()
+                    mainViewpager.animate()
+                        .alpha(0f)
+                        .scaleX(0.95f)
+                        .scaleY(0.95f)
+                        .translationX(-slideDistance) 
+                        .setDuration(300)
+                        .setInterpolator(android.view.animation.AccelerateInterpolator())
+                        .withEndAction { 
+                            mainViewpager.visibility = android.view.View.INVISIBLE 
+                            mainViewpager.translationX = 0f 
+                            mainViewpager.scaleX = 1f
+                            mainViewpager.scaleY = 1f
+                        }.start()
+                }
             }
         }
     }
@@ -599,7 +635,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             R.id.navigation_search,
             R.id.navigation_foryou,
             R.id.navigation_history,
-            R.id.navigation_settings,
         )
         val currentItem = tabs.getOrNull(binding?.mainViewpager?.currentItem ?: 0) ?: return
         syncIndicator(currentItem)
@@ -700,7 +735,16 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val navController = navHostFragment.navController
 
         navController.addOnDestinationChangedListener { _: NavController, navDestination: NavDestination, _: Bundle? ->
-            updateNavBar(navDestination)
+            // If return navigation lands on Download (startDestination) while viewpager is hidden, 
+            // it means we are popping back from Results/Settings to the main UI.
+            // We force it back to the lastActiveTab instead of defaulting to Tab 0.
+            val targetNavId = if (navDestination.id == R.id.navigation_download && binding?.mainViewpager?.isVisible == false) {
+                tabIds.getOrNull(lastActiveTab) ?: navDestination.id
+            } else {
+                navDestination.id
+            }
+            
+            updateNavBar(targetNavId)
 
             val hideBackgroundOn = listOf<Int>()
             val shouldHide = hideBackgroundOn.contains(navDestination.id)
@@ -737,7 +781,11 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 // Swipe-to-back enabled for all tabs except Library (0) which has internal horizontal swiping
                 binding?.mainViewpager?.isUserInputEnabled = position != 0
                 updateNavSelection(position)
-                updateSettingsButtonVisibility(position)
+                
+                // Track last active tab only if ViewPager is visible
+                if (binding?.mainViewpager?.isVisible == true) {
+                    lastActiveTab = position
+                }
                 
                 val isDashboardVisible = binding?.mainViewpager?.isVisible == true
                 binding?.homeSyncFab?.visibility = if (position == 1 && isDashboardVisible) android.view.View.VISIBLE else android.view.View.GONE
@@ -803,7 +851,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             val currentPos = binding?.mainViewpager?.currentItem ?: 0
             
             // Centralized visibility check
-            updateSettingsButtonVisibility(currentPos)
+            updateNavSelection(currentPos)
 
             val isProvidersTab = currentPos == 1
             binding?.homeSyncFab?.visibility = if (isMainTabs && isProvidersTab && binding?.mainViewpager?.isVisible == true) {
@@ -835,7 +883,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     R.id.navigation_search -> SearchFragment()
                     R.id.navigation_foryou -> com.lagradost.quicknovel.ui.foryou.ForYouFragment()
                     R.id.navigation_history -> HistoryFragment()
-                    R.id.navigation_settings -> SettingsFragment()
                     else -> DownloadFragment()
                 }
 
@@ -1106,16 +1153,13 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 val navController = navHostFragment?.navController
                 
                 if (b.mainViewpager.isVisible == false && navController != null) {
-                    // Sync: Start the animation immediately via a dummy target, 
-                    // then pop fragments after a tiny delay to prevent the "ghosting" swap blink
-                    navHostFragment.view?.animate()?.alpha(0f)?.setDuration(100)?.start()
+                    // Unified Sync: Let updateNavBar handle the cross-fade/slide
+                    // Just pop the stack, the listener will trigger the luxury transition
+                    navController.popBackStack(navController.graph.startDestinationId, false)
                     
-                    b.mainViewpager.postDelayed({
-                        navController.popBackStack(navController.graph.startDestinationId, false)
-                        if (b.mainViewpager.currentItem != index) {
-                            b.mainViewpager.setCurrentItem(index, true)
-                        }
-                    }, 50)
+                    if (b.mainViewpager.currentItem != index) {
+                        b.mainViewpager.setCurrentItem(index, true)
+                    }
                 } else if (b.mainViewpager.currentItem != index) {
                     b.mainViewpager.setCurrentItem(index, true)
                 }
@@ -1129,121 +1173,108 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment
             val navController = navHostFragment?.navController
             
-            // Navigate to settings destination explicitly
-            navController?.navigate(R.id.navigation_settings)
+            // Navigate to settings destination explicitly with luxury slide animations
+            navController?.navigate(R.id.navigation_settings, null, navOptions {
+                anim {
+                    enter = R.anim.slide_in_right
+                    exit = R.anim.slide_out_left
+                    popEnter = R.anim.slide_in_left
+                    popExit = R.anim.slide_out_right
+                }
+            })
         }
     }
 
-    private fun updateSettingsButtonVisibility(selectedIndex: Int, animate: Boolean = true) {
+    private fun updateNavAndSettings(selectedIndex: Int, animate: Boolean = true) {
         val b = binding ?: return
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment
-        val navController = navHostFragment?.navController ?: return
+        val navController = navHostFragment?.navController
         
-        // The settings button should ONLY be visible when on the main Library tab (index 0)
-        // and NOT when we've navigated to a sub-screen (like Updates or Search result)
-        val isAtLibraryFragment = navController.currentDestination?.id == R.id.navigation_download
-        val isLibraryTabActive = selectedIndex == 0 && isAtLibraryFragment && b.mainViewpager.isVisible == true
-        
-        if (isLibraryTabActive) {
+        // 1. Determine Settings Button Visibility Logic
+        val currentDest = navController?.currentDestination?.id
+        val isAtMainTabs = currentDest == null || tabIds.contains(currentDest)
+        val isLibraryTabActive = selectedIndex == 0 && b.mainViewpager.isVisible == true
+        val shouldShowSettings = isLibraryTabActive && isAtMainTabs
+
+        // 2. Prepare Unified Transition
+        // Skip layout transitions during theme reveal to avoid stuttering
+        if (animate && CommonActivity.pendingThemeChangeScreenshot == null) {
+            val transition = android.transition.TransitionSet()
+                .addTransition(android.transition.ChangeBounds().setInterpolator(android.view.animation.OvershootInterpolator(1.1f)))
+                .addTransition(android.transition.Fade())
+                .setDuration(350)
+            
+            android.transition.TransitionManager.beginDelayedTransition(b.navRootLayout, transition)
+        }
+
+        // 3. Update Settings Button Visibility
+        if (shouldShowSettings) {
             if (b.navExtraButton.visibility != android.view.View.VISIBLE) {
                 b.navExtraButton.visibility = android.view.View.VISIBLE
-                b.navExtraButton.alpha = 0f
-                b.navExtraButton.scaleX = 0.5f
-                b.navExtraButton.scaleY = 0.5f
-                b.navExtraButton.animate()
-                    .alpha(1f)
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(400)
-                    .setInterpolator(android.view.animation.OvershootInterpolator(2.0f))
-                    .start()
+                b.navExtraButton.alpha = 1f
+                b.navExtraButton.scaleX = 1f
+                b.navExtraButton.scaleY = 1f
             }
         } else {
-            if (animate && b.navExtraButton.visibility == android.view.View.VISIBLE) {
-                b.navExtraButton.animate()
-                    .alpha(0f)
-                    .scaleX(0.7f)
-                    .scaleY(0.7f)
-                    .setDuration(250)
-                    .setInterpolator(null)
-                    .withEndAction { b.navExtraButton.visibility = android.view.View.GONE }
-                    .start()
-            } else if (b.navExtraButton.visibility == android.view.View.VISIBLE) {
+            if (b.navExtraButton.visibility == android.view.View.VISIBLE) {
                 b.navExtraButton.visibility = android.view.View.GONE
             }
         }
-    }
 
-    private fun updateNavSelection(selectedIndex: Int, animate: Boolean = true) {
-        val b = binding ?: return
-        
-        val navItems = listOf(
-            b.navItemDownload,
-            b.navItemSearch,
-            b.navItemForyou,
-            b.navItemHistory
-        )
-
-        val textColor = colorFromAttribute(R.attr.textColor)
+        // 4. Update Nav Selection (Pill & Weights)
+        val navItems = listOf(b.navItemDownload, b.navItemSearch, b.navItemForyou, b.navItemHistory)
         val iconColor = colorFromAttribute(R.attr.iconColor)
+        val textColor = colorFromAttribute(R.attr.textColor)
         val primaryColor = colorFromAttribute(R.attr.colorPrimary)
-        val onPrimaryColor = android.graphics.Color.WHITE // High-contrast inversion
+        val onPrimaryColor = android.graphics.Color.WHITE
 
-        // 1. Prepare ConstraintSet for the Pill
+        // 5. Apply ConstraintSet for the Pill
         val constraintSet = androidx.constraintlayout.widget.ConstraintSet()
         constraintSet.clone(b.navBarContainer)
-        
         var targetId: Int? = null
 
         navItems.forEachIndexed { index, itemBinding ->
             val isSelected = index == selectedIndex
-            val weight = if (isSelected) 3.2f else 0.6f 
-            
-            // Priority: Update the ConstraintLayout LayoutParams of the included view (the chip itself)
-            val root = itemBinding.root
-            root.updateLayoutParams<androidx.constraintlayout.widget.ConstraintLayout.LayoutParams> {
-                this.horizontalWeight = weight
-            }
-
             itemBinding.navItemLabel.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
             
-            // Premium Color Inversion
             val tint = if (isSelected) onPrimaryColor else iconColor
             val labelColor = if (isSelected) onPrimaryColor else textColor
             
             itemBinding.navItemIcon.imageTintList = android.content.res.ColorStateList.valueOf(tint)
             itemBinding.navItemLabel.setTextColor(labelColor)
             
+            // Adjust weights for the luxury expanding effect
+            val root = itemBinding.root
+            root.updateLayoutParams<androidx.constraintlayout.widget.ConstraintLayout.LayoutParams> {
+                this.horizontalWeight = if (isSelected) 3.2f else 0.8f
+            }
+            
             if (isSelected) targetId = itemBinding.root.id
         }
 
-        // Apply theme-aware solid primary tint (90% alpha)
-        b.navIndicatorPill.backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor).withAlpha(230)
+        b.navIndicatorPill.backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor).withAlpha(225)
 
-        // Index 4 or -1 is Settings (icon only, no pill)
-        if (selectedIndex == 4 || selectedIndex == -1 || targetId == null) {
-            b.navIndicatorPill.animate().alpha(0f).setDuration(200).start()
-        } else {
-            // Constrain pill to target tab bounds
+        if (targetId != null) {
             constraintSet.connect(R.id.nav_indicator_pill, androidx.constraintlayout.widget.ConstraintSet.START, targetId!!, androidx.constraintlayout.widget.ConstraintSet.START)
             constraintSet.connect(R.id.nav_indicator_pill, androidx.constraintlayout.widget.ConstraintSet.END, targetId!!, androidx.constraintlayout.widget.ConstraintSet.END)
-            
-            if (animate) {
-                val transition = android.transition.AutoTransition()
-                    .setDuration(280)
-                    .setInterpolator(android.view.animation.OvershootInterpolator(1.2f))
-                
-                android.transition.TransitionManager.beginDelayedTransition(b.navBarContainer, transition)
-                
-                // Add "pop" animation
-                b.navIndicatorPill.scaleX = 0.92f
-                b.navIndicatorPill.scaleY = 0.92f
-                b.navIndicatorPill.animate().scaleX(1f).scaleY(1f).setDuration(400).start()
-            }
-            
             constraintSet.applyTo(b.navBarContainer)
             b.navIndicatorPill.alpha = 1f
+        } else {
+            b.navIndicatorPill.alpha = 0f
         }
+    }
+
+    private fun updateNavSelection(selectedIndex: Int, animate: Boolean = true) {
+        updateNavAndSettings(selectedIndex, animate)
+    }
+
+    /**
+     * Compatibility Bridge: Resolves "Unresolved reference" for legacy calls 
+     * while redirecting visibility logic to the unified updateNavAndSettings method.
+     */
+    private fun updateSettingsButtonVisibility() {
+        val currentPos = binding?.mainViewpager?.currentItem ?: 0
+        updateNavAndSettings(currentPos, animate = true)
     }
 
     private fun syncIndicator(itemId: Int) {

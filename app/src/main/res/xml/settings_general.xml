@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Flattened structure to eliminate category-induced vertical gaps -->
+    <Preference
+        android:icon="@drawable/ic_baseline_star_24"
+        android:key="@string/rating_format_key"
+        android:title="@string/rating_format"
+        app:defaultValue="star"
+        app:useSimpleSummaryProvider="true"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:icon="@drawable/ic_baseline_grid_view_24"
+        android:key="@string/download_format_key"
+        android:title="@string/library_display_mode"
+        app:defaultValue="list"
+        app:useSimpleSummaryProvider="true"
+        app:layout="@layout/setting_tile" />
+
+    <ListPreference
+        android:key="@string/library_nav_style_key"
+        android:title="@string/library_nav_style"
+        android:summary="@string/library_nav_style_desc"
+        app:defaultValue="0"
+        android:entries="@array/library_nav_style_entries"
+        android:entryValues="@array/library_nav_style_values"
+        android:icon="@drawable/ic_baseline_edit_24"
+        app:layout="@layout/setting_tile" />
+
+    <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+        android:key="@string/auto_update_key"
+        android:title="@string/show_app_updates"
+        android:summary="@string/show_app_updates_desc"
+        app:defaultValue="true"
+        android:icon="@drawable/ic_baseline_notifications_active_24"
+        app:layout="@layout/setting_tile" />
+
+    <ListPreference
+        android:key="@string/updates_sync_interval_key"
+        android:title="Updates Check Interval"
+        android:summary="Choose how often to check for bookmarked novel updates"
+        android:icon="@drawable/ic_baseline_autorenew_24"
+        app:defaultValue="12"
+        android:entries="@array/updates_interval_titles"
+        android:entryValues="@array/updates_interval_values"
+        app:layout="@layout/setting_tile" />
+
+    <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+        android:key="@string/remove_bloat_key"
+        android:title="@string/remove_bloat"
+        android:summary="@string/remove_bloat_desc"
+        app:defaultValue="true"
+        android:icon="@drawable/ic_baseline_delete_outline_24"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:title="@string/check_for_update"
+        android:key="@string/manual_check_update_key"
+        android:icon="@drawable/ic_baseline_system_update_24"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:icon="@drawable/baseline_save_as_24"
+        android:key="@string/backup_key"
+        android:title="@string/backup_settings"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:icon="@drawable/baseline_restore_page_24"
+        android:key="@string/restore_key"
+        android:title="@string/restore_settings"
+        app:layout="@layout/setting_tile" />
+
+</PreferenceScreen>

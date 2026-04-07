@@ -23,7 +23,7 @@ import com.lagradost.quicknovel.DataStore.mapper
 import com.lagradost.quicknovel.util.BookmarkMigrationManager.MIGRATION_KEY
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.mvvm.logError
-import com.lagradost.quicknovel.ui.settings.SettingsFragment
+import com.lagradost.quicknovel.ui.settings.getDefaultDir
 import com.lagradost.safefile.SafeFile
 import java.io.IOException
 import java.io.OutputStream
@@ -107,7 +107,7 @@ object BackupUtils {
         thread {
             try {
                 if (checkWrite()) {
-                    val subDir = SettingsFragment.getDefaultDir(context = this)//getBasePath().first
+                    val subDir = getDefaultDir(context = this)//getBasePath().first
                     val date = SimpleDateFormat("yyyy_MM_dd_HH_mm").format(Date(currentTimeMillis()))
                     val displayName = "neoQN_Backup_${date}"
 

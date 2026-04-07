@@ -2,12 +2,18 @@
 
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto">
-    <Preference
-        android:key="by_shady_header"
-        app:layout="@layout/settings_header" />
-    <Preference
-        android:key="reading_stats_header"
-        app:layout="@layout/setting_reading_stats" />
+    <com.lagradost.quicknovel.ui.custom.HeroPreference
+        android:key="hero_card"
+        app:layout="@layout/setting_hero_card" />
+
+    <com.lagradost.quicknovel.ui.custom.BentoPreference
+        android:key="bento_grid"
+        app:layout="@layout/setting_bento_grid" />
+
+    <com.lagradost.quicknovel.ui.custom.SocialChipsPreference
+        android:key="social_chips"
+        app:layout="@layout/setting_social_chips" />
+
     <PreferenceCategory
         android:key="appearance"
         android:title="@string/appearance_background"

@@ -27,7 +27,7 @@ import com.lagradost.quicknovel.mvvm.observeNullable
 import com.lagradost.quicknovel.ui.home.BrowseAdapter
 import com.lagradost.quicknovel.ui.home.HomeViewModel
 import com.lagradost.quicknovel.ui.setRecycledViewPool
-import com.lagradost.quicknovel.ui.settings.SettingsFragment
+import com.lagradost.quicknovel.ui.settings.showSearchProviders
 import com.lagradost.quicknovel.util.Event
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 
@@ -213,7 +213,7 @@ class SearchFragment : Fragment() {
         searchMagIcon.scaleY = 0.65f
 
         binding.searchFilter.setOnClickListener {
-            SettingsFragment.showSearchProviders(it.context)
+            com.lagradost.quicknovel.ui.settings.showSearchProviders(it.context)
         }
 
         binding.mainSearch.setOnQueryTextListener(object : SearchView.OnQueryTextListener {

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/info"
+        app:allowDividerAbove="false">
+
+        <Preference
+            android:title="Github"
+            android:icon="@drawable/ic_github_logo"
+            app:summary="https://github.com/Shadyteal2/QuickNovel-Enhanced"
+            app:layout="@layout/setting_tile">
+            <intent
+                android:action="android.intent.action.VIEW"
+                android:data="https://github.com/Shadyteal2/QuickNovel-Enhanced" />
+        </Preference>
+
+        <Preference
+            android:title="Telegram"
+            android:icon="@drawable/ic_baseline_language_24"
+            app:summary="https://t.me/+i9MSwgeoXzU0NTE1"
+            app:layout="@layout/setting_tile">
+            <intent
+                android:action="android.intent.action.VIEW"
+                android:data="https://t.me/+i9MSwgeoXzU0NTE1" />
+        </Preference>
+
+        <Preference
+            android:title="Discord"
+            android:icon="@drawable/ic_baseline_discord_24"
+            app:summary="https://discord.gg/njMumTKvVw"
+            app:layout="@layout/setting_tile">
+            <intent
+                android:action="android.intent.action.VIEW"
+                android:data="https://discord.gg/njMumTKvVw" />
+        </Preference>
+
+        <Preference
+            android:title="QuickNovel Dev (LagradOst)"
+            android:icon="@drawable/ic_github_logo"
+            app:summary="https://github.com/LagradOst"
+            app:layout="@layout/setting_tile">
+            <intent
+                android:action="android.intent.action.VIEW"
+                android:data="https://github.com/LagradOst" />
+        </Preference>
+    </PreferenceCategory>
+</PreferenceScreen>

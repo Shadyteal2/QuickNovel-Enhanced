@@ -1,4 +1,7 @@
 <resources>
+    <string name="back_btn">Back</string>
+    <string name="appearance">Appearance</string>
+    <string name="storage">Storage</string>
     <string name="app_name">NeoQN</string>
     <string name="title_search">Search</string>
     <string name="title_history">History</string>
@@ -39,6 +42,9 @@
     <string name="auto_update_key">auto_update</string>
     <string name="external_reader_key">external_reader</string>
     <string name="remove_external_key">remove_external</string>
+    <string name="remove_bloat_key" translatable="false">remove_bloat_key</string>
+    <string name="library_bento_3x3_key" translatable="false">library_bento_3x3</string>
+    <string name="updates_sync_interval_key" translatable="false">updates_sync_interval</string>
     <string name="manual_check_update_key">manual_check_update</string>
     <string name="backup_key">backup_key</string>
     <string name="rating_format_key">rating_format</string>
@@ -56,6 +62,8 @@
     <string name="search">Search</string>
     <string name="general">General</string>
     <string name="info">Info</string>
+    <string name="reader">Reader</string>
+    <string name="advanced">Advanced</string>
 
     <string name="advanced_search">Advanced Search</string>
     <string name="advanced_search_desc">Gives you the search results separated by provider</string>
@@ -161,8 +169,8 @@
     <string name="home_more_info">More info</string>
     <string name="home_expanded_hide">Hide</string>
     <string name="reload_chapter">Reload Chapter</string>
-    <string name="provider_lang_settings">Provider Languages</string>
-    <string name="locale_settings">App Languages</string>
+    <string name="provider_lang_settings">Provider Language Filter</string>
+    <string name="locale_settings">App Display Language</string>
     <string name="sort_apply">Apply</string>
     <string name="sort_cancel">Cancel</string>
     <string name="keep_screen_active">Keep screen active</string>
@@ -178,12 +186,12 @@
     <string name="tts_locale">Language</string>
     <string name="tts_voice">Voice</string>
     <string name="tts_voice_title">TTS Voice</string>
-    <string name="theme_key">theme_key</string>
-    <string name="theme">Theme</string>
-    <string name="primary_color_key">primary_color_key</string>
-    <string name="primary_color_settings">Main Color</string>
+    <string name="theme_key" translatable="false">theme_key</string>
+    <string name="theme">App Theme</string>
+    <string name="primary_color_key" translatable="false">primary_color_key</string>
+    <string name="primary_color_settings">Accent Color</string>
     <string name="library_display_mode">Library Display Mode</string>
-    <string name="rating_format">Rating Format</string>
+    <string name="rating_format">Book Rating Format</string>
     <string name="cancel">Cancel</string>
     <string name="remove">Remove</string>
     <string name="remove_from_history_format">This remove %s from your history.\nAre you sure?</string>
@@ -405,4 +413,5 @@
     <string name="restart">Restart</string>
     <string name="later">Later</string>
     <string name="backup_restored_title">Backup Restored</string>
+    
 </resources>

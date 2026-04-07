@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Flattened structure to eliminate category-induced vertical gaps -->
+    <Preference
+        android:key="@string/background_image_key"
+        android:title="@string/background_image"
+        android:summary="@string/background_image_summary"
+        android:icon="@drawable/ic_baseline_public_24"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:key="@string/reset_background_key"
+        android:title="@string/reset_background"
+        android:summary="@string/reset_background_summary"
+        android:icon="@drawable/baseline_restore_page_24"
+        app:layout="@layout/setting_tile" />
+
+    <SeekBarPreference
+        android:key="@string/background_blur_key"
+        android:title="@string/background_blur"
+        android:max="100"
+        app:defaultValue="0"
+        app:showSeekBarValue="true"
+        android:icon="@drawable/ic_baseline_tune_24"
+        app:layout="@layout/setting_seekbar_tile" />
+
+    <SeekBarPreference
+        android:key="@string/background_dim_key"
+        android:title="@string/background_dim"
+        android:max="100"
+        app:defaultValue="0"
+        app:showSeekBarValue="true"
+        android:icon="@drawable/ic_baseline_tune_24"
+        app:layout="@layout/setting_seekbar_tile" />
+
+    <Preference
+        android:key="@string/theme_key"
+        android:title="@string/theme"
+        android:icon="@drawable/ic_baseline_color_lens_24"
+        app:useSimpleSummaryProvider="true"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:key="@string/primary_color_key"
+        android:title="@string/primary_color_settings"
+        android:icon="@drawable/ic_stars_special"
+        app:useSimpleSummaryProvider="true"
+        app:layout="@layout/setting_tile" />
+
+    <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+        android:key="@string/reader_background_key"
+        android:title="@string/reader_background"
+        android:summary="@string/reader_background_summary"
+        app:defaultValue="false"
+        android:icon="@drawable/ic_baseline_menu_book_24"
+        app:layout="@layout/setting_tile" />
+
+    <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+        android:key="@string/library_pinterest_bento_key"
+        android:title="@string/library_pinterest_bento_title"
+        android:summary="@string/library_pinterest_bento_desc"
+        app:defaultValue="false"
+        android:icon="@drawable/ic_baseline_grid_view_24"
+        app:layout="@layout/setting_tile" />
+
+    <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+        android:key="library_bento_3x3"
+        android:title="3×3 Bento Grid"
+        android:summary="Display library as a 3-column grid with fixed-height bento cards"
+        app:defaultValue="false"
+        android:icon="@drawable/ic_baseline_grid_view_24"
+        app:layout="@layout/setting_tile" />
+
+    <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+        android:key="@string/library_tactile_response_key"
+        android:title="@string/library_tactile_response_title"
+        android:summary="@string/library_tactile_response_desc"
+        app:defaultValue="true"
+        android:icon="@drawable/ic_baseline_stay_current_portrait_24"
+        app:layout="@layout/setting_tile" />
+
+</PreferenceScreen>

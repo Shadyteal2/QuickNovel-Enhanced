@@ -116,8 +116,8 @@
     <style name="AmoledMode">
         <item name="primaryGrayBackground">@color/black</item>
         <item name="primaryBlackBackground">@color/black</item>
-        <item name="floatingNavBackground">#99000000</item> <!-- ~60% alpha amoled glass -->
-        <item name="floatingNavStroke">#33FFFFFF</item> <!-- Sutiler edge -->
+        <item name="floatingNavBackground">#CC000000</item> <!-- More opaque for better control isolation -->
+        <item name="floatingNavStroke">#4DFFFFFF</item> <!-- Clearer edge for AMOLED -->
         <item name="iconGrayBackground">@color/black</item>
         <item name="boxItemBackground">@color/black</item>
         <item name="textColor">@color/textColor</item>
@@ -459,8 +459,8 @@
         <item name="iconGrayBackground">@color/lightGrayBackground</item>
         <item name="boxItemBackground">@color/lightItemBackground</item>
         <item name="textColor">@color/lightTextColor</item>
-        <item name="floatingNavBackground">#E6FFFFFF</item> <!-- Slightly more opaque white glass -->
-        <item name="floatingNavStroke">#4D000000</item> <!-- Visible dark edge -->
+        <item name="floatingNavBackground">#F2F2F2F2</item> <!-- More solid glass for light mode -->
+        <item name="floatingNavStroke">#26000000</item> <!-- Subtle dark edge -->
         <item name="grayTextColor">@color/lightGrayTextColor</item>
         <item name="white">#000</item>
         <item name="colorOnPrimary">@color/blackText</item>

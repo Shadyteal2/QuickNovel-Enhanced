@@ -162,12 +162,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         fun higherBottomNavView(v: View) {
             v.isVisible = true
-            val params = v.layoutParams as? android.view.ViewGroup.MarginLayoutParams
-            val margin = params?.bottomMargin?.toFloat() ?: 0f
-            v.translationY = v.height.toFloat() + margin
-            ObjectAnimator.ofFloat(v, "translationY", 0f).apply {
-                duration = 200
-                start()
+            v.post {
+                val params = v.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+                val margin = params?.bottomMargin?.toFloat() ?: 0f
+                v.translationY = v.height.toFloat() + margin
+                ObjectAnimator.ofFloat(v, "translationY", 0f).apply {
+                    duration = 200
+                    start()
+                }
             }
         }
 
@@ -1580,6 +1582,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         binding.readActionSettings.setOnClickListener {
+            // Fix: Hide the main reader controls to prevent overlap with settings
+            hideSystemUI()
+            
             val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
             val binding = ReadBottomSettingsBinding.inflate(layoutInflater, null, false)
             bottomSheetDialog.setContentView(binding.root)
