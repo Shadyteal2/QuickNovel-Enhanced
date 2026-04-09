@@ -1,11 +1,22 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent"
-    android:padding="16dp">
+    android:background="@android:color/transparent">
+
+    <!-- Living Glass Background: Covers absolute root -->
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:scrollbars="none">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp">
 
     <!-- Top Toolbar (OpenTune style) -->
     <ImageView
@@ -60,7 +71,7 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/spatial_glass_card"
+            android:background="@drawable/vibe_glass_card"
             android:padding="20dp">
 
             <com.google.android.material.card.MaterialCardView
@@ -124,7 +135,7 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/spatial_glass_card"
+            android:background="@drawable/vibe_glass_card"
             android:padding="16dp">
 
             <com.google.android.material.card.MaterialCardView
@@ -201,7 +212,7 @@
                     <androidx.constraintlayout.widget.ConstraintLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:background="@drawable/spatial_glass_card"
+                        android:background="@drawable/vibe_glass_card"
                         android:padding="16dp">
 
                         <com.google.android.material.card.MaterialCardView
@@ -257,7 +268,7 @@
                     <androidx.constraintlayout.widget.ConstraintLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:background="@drawable/spatial_glass_card"
+                        android:background="@drawable/vibe_glass_card"
                         android:padding="16dp">
 
                         <com.google.android.material.card.MaterialCardView
@@ -320,7 +331,7 @@
                     <androidx.constraintlayout.widget.ConstraintLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:background="@drawable/spatial_glass_card"
+                        android:background="@drawable/vibe_glass_card"
                         android:padding="16dp">
 
                         <com.google.android.material.card.MaterialCardView
@@ -376,7 +387,7 @@
                     <androidx.constraintlayout.widget.ConstraintLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:background="@drawable/spatial_glass_card"
+                        android:background="@drawable/vibe_glass_card"
                         android:padding="16dp">
 
                         <com.google.android.material.card.MaterialCardView
@@ -412,6 +423,75 @@
                 </com.google.android.material.card.MaterialCardView>
             </FrameLayout>
         </LinearLayout>
+        
+        <!-- Row 3: Vibe & Aura (Full width for prototype feel) -->
+        <FrameLayout
+            android:id="@+id/bento_vibe"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:layout_margin="6dp">
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:cardBackgroundColor="@android:color/transparent"
+                app:cardCornerRadius="@dimen/roundedImageRadius"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/iconGrayBackground"
+                app:strokeWidth="1dp">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/vibe_glass_card"
+                    android:padding="16dp">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/vibe_icon_bg"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        app:cardBackgroundColor="?attr/iconGrayBackground"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="0dp"
+                        app:strokeColor="?attr/iconGrayBackground"
+                        app:strokeWidth="1dp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:padding="10dp"
+                            android:src="@drawable/ic_baseline_star_24"
+                            app:tint="?attr/white" />
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <TextView
+                        android:id="@+id/vibe_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:fontFamily="@font/productsans_bold"
+                        android:text="@string/vibe_aura"
+                        android:textColor="?attr/white"
+                        android:textSize="18sp"
+                        app:layout_constraintStart_toEndOf="@id/vibe_icon_bg"
+                        app:layout_constraintTop_toTopOf="@id/vibe_icon_bg" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:text="@string/vibe_aura_desc"
+                        android:textColor="?attr/grayTextColor"
+                        android:textSize="13sp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toEndOf="@id/vibe_icon_bg"
+                        app:layout_constraintTop_toBottomOf="@id/vibe_title" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </FrameLayout>
     </LinearLayout>
 
     <!-- Social Chips Row -->
@@ -522,5 +602,6 @@
 
         </LinearLayout>
     </HorizontalScrollView>
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.core.widget.NestedScrollView>
+</FrameLayout>

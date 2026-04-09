@@ -49,6 +49,7 @@ const val EPUB_ML_USEONLINETRANSLATION: String = "reader_epub_ml_use_online"
 
 const val EPUB_HAS_TIME: String = "reader_epub_has_time"
 const val EPUB_TWELVE_HOUR_TIME: String = "reader_epub_twelve_hour_time"
+const val EPUB_ZEN_READING: String = "reader_epub_zen_reading"
 const val EPUB_FONT: String = "reader_epub_font"
 const val EPUB_LANG: String = "reader_epub_lang"
 const val EPUB_VOICE: String = "reader_epub_voice"

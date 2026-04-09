@@ -49,5 +49,3 @@
             android:textSize="13sp"
             android:text="@string/import_epub" />
 </LinearLayout>
-
-

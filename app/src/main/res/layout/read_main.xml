@@ -25,11 +25,38 @@
         android:visibility="gone" />
 
     <View
+        android:id="@+id/reader_background_grain"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/reader_background_vignette"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_vignette"
+        android:alpha="0"
+        android:visibility="gone" />
+
+    <View
         android:id="@+id/reader_background_light_scrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#FFFFFF"
         android:alpha="0"
+        android:visibility="gone" />
+
+    <com.lagradost.quicknovel.ui.custom.LivingGlassView
+        android:id="@+id/reader_living_glass"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/reader_halo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/reader_halo_gradient"
         android:visibility="gone" />
 
     <FrameLayout
@@ -474,17 +501,17 @@
                     android:visibility="gone">
 
                 <ImageButton
-                        android:id="@+id/read_action_rotate"
+                        android:id="@+id/read_action_color_palette"
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_screen_rotation"
+                        android:contentDescription="@string/read_color"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintHorizontal_chainStyle="spread"
                         app:layout_constraintEnd_toStartOf="@id/read_action_tts"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
-                        app:srcCompat="@drawable/ic_baseline_screen_rotation_24"
+                        app:srcCompat="@drawable/ic_baseline_color_lens_24"
                         app:tint="?attr/white" />
 
                 <ImageButton
@@ -495,7 +522,7 @@
                         android:contentDescription="@string/read_action_tts"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toStartOf="@id/read_action_chapters"
-                        app:layout_constraintStart_toEndOf="@+id/read_action_rotate"
+                        app:layout_constraintStart_toEndOf="@+id/read_action_color_palette"
                         app:layout_constraintTop_toTopOf="parent"
                         app:srcCompat="@drawable/ic_baseline_volume_up_24"
                         app:tint="?attr/white" />

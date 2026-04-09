@@ -22,6 +22,20 @@
         android:background="#000000"
         android:alpha="0"
         android:visibility="gone" />
+
+    <View
+        android:id="@+id/app_background_grain"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/app_background_vignette"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_vignette"
+        android:alpha="0"
+        android:visibility="gone" />
     
     <View
         android:id="@+id/app_background_light_scrim"
@@ -29,6 +43,13 @@
         android:layout_height="match_parent"
         android:background="#FFFFFF"
         android:alpha="0"
+        android:visibility="gone" />
+
+    <!-- Global Living Glass Aura: Zero-cost when disabled (Visibility GONE) -->
+    <com.lagradost.quicknovel.ui.custom.LivingGlassView
+        android:id="@+id/app_living_glass"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:visibility="gone" />
 
     <FrameLayout

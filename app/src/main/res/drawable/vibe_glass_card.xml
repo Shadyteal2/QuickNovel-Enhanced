@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item android:id="@android:id/mask">
+        <shape>
+            <corners android:radius="@dimen/roundedImageRadius" />
+            <solid android:color="@android:color/white" />
+        </shape>
+    </item>
+    <item>
+        <layer-list>
+            <!-- Thinner Glass: 30% Alpha Slate for maximum background reveal -->
+            <item>
+                <shape>
+                    <solid android:color="#4D0F172A" /> 
+                    <corners android:radius="@dimen/roundedImageRadius" />
+                </shape>
+            </item>
+            
+            <!-- Premium Frosted Border Stroke: High contrast -->
+            <item>
+                <shape>
+                    <stroke android:width="1.2dp" android:color="?attr/floatingNavStroke" /> 
+                    <corners android:radius="@dimen/roundedImageRadius" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</ripple>

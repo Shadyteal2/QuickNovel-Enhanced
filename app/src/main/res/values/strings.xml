@@ -176,7 +176,6 @@
     <string name="keep_screen_active">Keep screen active</string>
     <string name="twelve_hour_time">12 Hour time</string>
 
-
     <string name="backup_settings">Backup data</string>
     <string name="restore_success">Loaded backup file</string>
     <string name="restore_failed_format" formatted="true">Failed to restore data from file %s</string>
@@ -311,13 +310,23 @@
     <string name="appearance_background">Appearance &amp; Background</string>
     <string name="background_image">Custom Background Image</string>
     <string name="background_image_summary">Pick a custom image for the app background</string>
+    <string name="background_effect_mode">Background Effect Preset</string>
+    <string name="background_effect_mode_summary">Choose a stylized treatment for the background image</string>
+    <string name="background_effect_none">None</string>
     <string name="background_blur">Background Blur</string>
     <string name="background_dim">Background Dim</string>
+    <string name="background_grain">Background Grain</string>
+    <string name="background_grain_summary">Add visible monochrome film grain to the background</string>
+    <string name="background_vignette">Background Vignette</string>
+    <string name="background_vignette_summary">Darken the edges more aggressively for focus</string>
     <string name="background_image_key" translatable="false">background_image</string>
+    <string name="background_effect_mode_key" translatable="false">background_effect_mode</string>
     <string name="background_blur_key" translatable="false">background_blur</string>
     <string name="background_dim_key" translatable="false">background_dim</string>
+    <string name="background_grain_key" translatable="false">background_grain</string>
+    <string name="background_vignette_key" translatable="false">background_vignette</string>
     <string name="reader_background">Custom Background in Reader</string>
-    <string name="reader_background_summary">Apply global background image and blur/dim settings to the reader</string>
+    <string name="reader_background_summary">Apply global background image and effect presets to the reader</string>
     <string name="reader_background_key" translatable="false">reader_background</string>
     <string name="reset_background">Reset Background</string>
     <string name="reset_background_summary">Remove custom background and return to default</string>
@@ -375,18 +384,6 @@
     <string name="translate">Translate</string>
     <string name="translation">Translation</string>
 
-    <string-array name="translation_engine_entries">
-        <item>None</item>
-        <item>Google ML Kit (Offline)</item>
-        <item>Google Translate (Online)</item>
-    </string-array>
-
-    <string-array name="translation_engine_values">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-    </string-array>
-
     <string name="translating_p">Translating</string>
     <string name="translation_source_lang">Source Language</string>
     <string name="translation_source_lang_key" translatable="false">translation_source_lang_key</string>
@@ -414,4 +411,44 @@
     <string name="later">Later</string>
     <string name="backup_restored_title">Backup Restored</string>
     
+    <string name="vibe_aura">Vibe &amp; Aura</string>
+    <string name="vibe_aura_desc">Experimental algorithmic art &amp; sensory enhancements</string>
+    <string name="experimental_visuals">Experimental Visuals</string>
+    <string name="living_glass">Living Glass Background</string>
+    <string name="living_glass_desc">Fluid organic gradients that morph with your interactions</string>
+    
+    <string name="vibe_aura_key" translatable="false">vibe_aura_key</string>
+    <string name="experimental_visuals_key" translatable="false">experimental_visuals_key</string>
+    <string name="living_glass_key" translatable="false">living_glass_key</string>
+    <string name="aura_intensity">Aura Visibility Intensity</string>
+    <string name="aura_palette">Aura Color Palette</string>
+    <string name="aura_speed">Animation Velocity</string>
+
+    <string name="aura_intensity_key" translatable="false">aura_intensity_key</string>
+    <string name="aura_palette_key" translatable="false">aura_palette_key</string>
+    <string name="aura_speed_key" translatable="false">aura_speed_key</string>
+
+    <string name="background_effect_noir">Noir</string>
+    <string name="background_effect_sepia">Sepia</string>
+    <string name="background_effect_blockify">Blockify</string>
+    <string name="background_effect_threshold">Threshold</string>
+    <string name="background_effect_edge_detection">Edge Detection</string>
+    <string name="background_effect_dots">Dots</string>
+    <string name="background_effect_dithering">Dithering</string>
+    <string name="background_effect_voronoi">Voronoi</string>
+    <string name="palette_nebula">Deep Nebula (Original)</string>
+    <string name="palette_garden">Zen Garden (Relaxing)</string>
+    <string name="palette_minimal">Minimalist Earth</string>
+    <string name="palette_shady">Shady</string>
+    <string name="palette_browny">Browny</string>
+
+    <string name="luminescent_reader">Luminescent Reader</string>
+    <string name="luminescent_reader_desc">Adds a soft atmospheric glow to text and screen edges</string>
+    <string name="luminescent_reader_key" translatable="false">luminescent_reader</string>
+    <string name="luminescent_intensity">Glow Intensity</string>
+    <string name="luminescent_intensity_key" translatable="false">luminescent_intensity</string>
+
+    <string name="zen_reading_mode">Zen Reading Mode</string>
+    <string name="zen_reading_mode_desc">Hide clock, battery, and status bar for ultimate immersion</string>
+    <string name="zen_reading_key" translatable="false">zen_reading_mode</string>
 </resources>

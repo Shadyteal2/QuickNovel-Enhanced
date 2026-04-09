@@ -25,3 +25,4 @@ todoprovide/
 .gemini/
 build_*.txt
 git_status.tmp
+visualizer preset/

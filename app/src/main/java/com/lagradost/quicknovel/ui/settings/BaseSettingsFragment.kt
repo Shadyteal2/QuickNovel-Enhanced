@@ -51,6 +51,8 @@ import com.lagradost.quicknovel.util.UIHelper.clipboardHelper
 import com.lagradost.quicknovel.util.UIHelper.dismissSafe
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 import com.lagradost.quicknovel.util.toPx
+import com.lagradost.quicknovel.util.backgroundEffectDisplayLabel
+import com.lagradost.quicknovel.util.backgroundEffectLabels
 import com.lagradost.safefile.MediaFileContentType
 import com.lagradost.safefile.SafeFile
 import java.io.BufferedReader
@@ -307,9 +309,46 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
             imagePicker.launch(arrayOf("image/*"))
             true
         }
+        getPref(R.string.background_effect_mode_key)?.let { pref ->
+            fun updateSummary() {
+                val current = settingsManager.getString(getString(R.string.background_effect_mode_key), "none")
+                pref.summary = backgroundEffectDisplayLabel(requireContext(), current)
+            }
+
+            updateSummary()
+
+            pref.setOnPreferenceClickListener {
+                val current = settingsManager.getString(getString(R.string.background_effect_mode_key), "none")
+                val options = backgroundEffectLabels(requireContext())
+                val names = options.map { it.first }
+                val values = options.map { it.second }
+                val index = values.indexOf(com.lagradost.quicknovel.util.BackgroundEffectMode.from(current).value).coerceAtLeast(0)
+                activity?.showBottomDialog(names, index, getString(R.string.background_effect_mode), false, {}) {
+                    settingsManager.edit { putString(getString(R.string.background_effect_mode_key), values[it]) }
+                    updateSummary()
+                }
+                true
+            }
+        }
         getPref(R.string.reset_background_key)?.setOnPreferenceClickListener {
-            settingsManager.edit().remove(getString(R.string.background_image_key)).apply()
-            showToast("Background reset")
+            val ctx = context ?: return@setOnPreferenceClickListener true
+            AlertDialog.Builder(ctx, R.style.AlertDialogCustom)
+                .setTitle(R.string.reset_background)
+                .setMessage(R.string.reset_background_summary)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.reset_background) { dialog, _ ->
+                    settingsManager.edit {
+                        remove(getString(R.string.background_image_key))
+                        remove(getString(R.string.background_effect_mode_key))
+                        remove(getString(R.string.background_blur_key))
+                        remove(getString(R.string.background_dim_key))
+                        remove(getString(R.string.background_grain_key))
+                        remove(getString(R.string.background_vignette_key))
+                    }
+                    showToast(R.string.background_reset_confirmed)
+                    dialog.dismiss()
+                }
+                .show()
             true
         }
 

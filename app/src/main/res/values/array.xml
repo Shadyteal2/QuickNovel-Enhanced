@@ -164,4 +164,20 @@
         <item>0</item>
         <item>1</item>
     </string-array>
+
+    <string-array name="aura_palette_entries">
+        <item>@string/palette_nebula</item>
+        <item>@string/palette_garden</item>
+        <item>@string/palette_minimal</item>
+        <item>@string/palette_shady</item>
+        <item>@string/palette_browny</item>
+    </string-array>
+
+    <string-array name="aura_palette_values">
+        <item>nebula</item>
+        <item>garden</item>
+        <item>minimal</item>
+        <item>shady</item>
+        <item>browny</item>
+    </string-array>
 </resources>

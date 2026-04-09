@@ -209,4 +209,23 @@
     <string name="download_path_key">download_path_key</string>
     <string name="download_path_pref">İndirme yolu</string>
     <string name="bionic_reading">Biyonik Okuma</string>
+
+    <string name="vibe_aura">Vibe &amp; Aura</string>
+    <string name="vibe_aura_desc">Deneysel algoritmik sanat ve duyusal geliştirmeler</string>
+    <string name="experimental_visuals">Deneysel Görseller</string>
+    <string name="living_glass">Living Glass Arka Plan</string>
+    <string name="living_glass_desc">Etkileşimlerinizle değişen akışkan organik degradeler</string>
+    
+    <string name="aura_intensity">Aura Görünürlük Yoğunluğu</string>
+    <string name="aura_palette">Aura Renk Paleti</string>
+
+    <string name="palette_nebula">Deep Nebula (Original)</string>
+    <string name="palette_garden">Zen Garden (Relaxing)</string>
+    <string name="palette_minimal">Minimalist Earth</string>
+    <string name="palette_shady">Shady</string>
+    <string name="palette_browny">Browny</string>
+
+    <string name="luminescent_reader">Luminescent Reader</string>
+    <string name="luminescent_reader_desc">Metne ve ekran kenarlarına yumuşak atmosferik bir parlaklık ekler</string>
+    <string name="luminescent_intensity">Lüminesans Derinliği</string>
 </resources>

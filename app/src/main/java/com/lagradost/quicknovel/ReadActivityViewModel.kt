@@ -2040,6 +2040,11 @@ class ReadActivityViewModel : ViewModel() {
         EPUB_HAS_TIME, true, Boolean::class, showTimeLive
     )
 
+    val zenModeLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var zenMode by PreferenceDelegateLiveView(
+        EPUB_ZEN_READING, false, Boolean::class, zenModeLive
+    )
+
     val paddingHorizontalLive: MutableLiveData<Int> = MutableLiveData(null)
     var paddingHorizontal by PreferenceDelegateLiveView(
         EPUB_TEXT_PADDING, DEF_HORIZONTAL_PAD, Int::class, paddingHorizontalLive

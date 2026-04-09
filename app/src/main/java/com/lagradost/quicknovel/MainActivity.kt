@@ -5,8 +5,6 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.os.Bundle
-import android.graphics.RenderEffect
-import android.graphics.Shader
 import android.os.Build
 import android.view.Menu
 import android.view.MenuItem
@@ -85,6 +83,8 @@ import com.lagradost.quicknovel.util.InAppUpdater.Companion.runAutoUpdate
 import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.util.SettingsHelper.getLibraryNavStyle
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
+import com.lagradost.quicknovel.util.bindBackgroundEffects
+import com.lagradost.quicknovel.util.getBackgroundEffectState
 import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.UIHelper.dismissSafe
 import com.lagradost.quicknovel.util.UIHelper.getResourceColor
@@ -112,8 +112,6 @@ import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.reflect.KClass
 import android.net.Uri
-import coil3.load
-import coil3.request.crossfade
 import coil3.asDrawable
 import com.lagradost.quicknovel.ui.TabNavigator
 
@@ -121,7 +119,6 @@ import android.view.HapticFeedbackConstants
 import android.view.animation.OvershootInterpolator
 import android.animation.ValueAnimator
 import android.widget.LinearLayout
-import androidx.core.view.updateLayoutParams
 
 class MainActivity : AppCompatActivity(), TabNavigator {
     override fun switchToMainTab(index: Int) {
@@ -335,10 +332,20 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
     private val backgroundListener = SharedPreferences.OnSharedPreferenceChangeListener { _: SharedPreferences, key: String? ->
         if (key == getString(R.string.background_image_key) ||
+            key == getString(R.string.background_effect_mode_key) ||
             key == getString(R.string.background_blur_key) ||
-            key == getString(R.string.background_dim_key)
+            key == getString(R.string.background_dim_key) ||
+            key == getString(R.string.background_grain_key) ||
+            key == getString(R.string.background_vignette_key)
         ) {
             updateGlobalBackground()
+        }
+        if (key == getString(R.string.living_glass_key) ||
+            key == getString(R.string.aura_intensity_key) ||
+            key == getString(R.string.aura_palette_key) ||
+            key == getString(R.string.aura_speed_key)
+        ) {
+            updateGlobalAura()
         }
         if (key == "NEW_UPDATES_COUNT") {
             updateUpdatesBadge()
@@ -725,6 +732,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         }
         
         updateGlobalBackground()
+        updateGlobalAura()
         settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)
         updateUpdatesBadge()
 
@@ -757,6 +765,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 appBackgroundImage.isVisible = hasBackground && !shouldHide
                 appBackgroundDim.isVisible = hasBackground && !shouldHide
                 appBackgroundLightScrim.isVisible = hasBackground && !shouldHide
+                appBackgroundGrain.isVisible = hasBackground && !shouldHide
+                appBackgroundVignette.isVisible = hasBackground && !shouldHide
             }
         }
 
@@ -1091,41 +1101,57 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     fun updateGlobalBackground() {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
-        val blur = settingsManager.getInt(getString(R.string.background_blur_key), 0)
-        val dim = settingsManager.getInt(getString(R.string.background_dim_key), 0)
 
         binding?.apply {
             if (imageUri.isNullOrBlank()) {
                 appBackgroundImage.isVisible = false
                 appBackgroundDim.isVisible = false
                 appBackgroundLightScrim.isVisible = false
+                appBackgroundGrain.isVisible = false
+                appBackgroundVignette.isVisible = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    appBackgroundImage.setRenderEffect(null)
+                }
+                appBackgroundImage.colorFilter = null
                 return@apply
             }
 
-            appBackgroundImage.isVisible = true
-            appBackgroundDim.isVisible = true
-            appBackgroundLightScrim.isVisible = true
+            bindBackgroundEffects(
+                context = this@MainActivity,
+                imageView = appBackgroundImage,
+                dimView = appBackgroundDim,
+                lightScrimView = appBackgroundLightScrim,
+                grainView = appBackgroundGrain,
+                vignetteView = appBackgroundVignette,
+                imageUri = imageUri,
+                enabled = true,
+                state = settingsManager.getBackgroundEffectState(this@MainActivity),
+            )
+        }
+    }
+    fun updateGlobalAura() {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+        val enabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
+        val intensity = settingsManager.getInt(getString(R.string.aura_intensity_key), 70)
+        val speed = settingsManager.getInt(getString(R.string.aura_speed_key), 100)
+        val palette = settingsManager.getString(getString(R.string.aura_palette_key), "nebula") ?: "nebula"
 
-            appBackgroundImage.load(Uri.parse(imageUri)) {
-                crossfade(true)
+        binding?.appLivingGlass?.apply {
+            if (enabled) {
+                visibility = android.view.View.VISIBLE
+                setAuraIntensity(intensity)
+                setAuraSpeed(speed)
+                setAuraPalette(palette)
+
+                // One-time shallow transparency on top-level shell containers only.
+                // Do NOT use a persistent listener — that causes cards/bars in fragments
+                // to lose their backgrounds on every layout pass.
+                val helper = com.lagradost.quicknovel.util.AuraTransparencyHelper
+                helper.forceTransparent(binding?.mainContentWrapper)
+                helper.forceTransparent(binding?.homeRoot)
+            } else {
+                visibility = android.view.View.GONE
             }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (blur > 0) {
-                    appBackgroundImage.setRenderEffect(
-                        RenderEffect.createBlurEffect(
-                            blur.toFloat(),
-                            blur.toFloat(),
-                            Shader.TileMode.CLAMP
-                        )
-                    )
-                } else {
-                    appBackgroundImage.setRenderEffect(null)
-                }
-            }
-
-            appBackgroundDim.alpha = dim / 100f
-            appBackgroundLightScrim.alpha = 0f
         }
     }
 
@@ -1195,7 +1221,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val isAtMainTabs = currentDest == null || tabIds.contains(currentDest)
         val isLibraryTabActive = selectedIndex == 0 && b.mainViewpager.isVisible == true
         val shouldShowSettings = isLibraryTabActive && isAtMainTabs
-
+ 
         // 2. Prepare Unified Transition
         // Skip layout transitions during theme reveal to avoid stuttering
         if (animate && CommonActivity.pendingThemeChangeScreenshot == null) {

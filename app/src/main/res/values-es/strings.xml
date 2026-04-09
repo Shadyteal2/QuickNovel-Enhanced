@@ -296,4 +296,23 @@
     <string name="operation_no_implemented">" Esta operación no está implementada."</string>
     <string name="conection_error">Error de conección.</string>
     <string name="unknown">Desconocido</string>
+
+    <string name="vibe_aura">Vibe &amp; Aura</string>
+    <string name="vibe_aura_desc">Arte algorítmico experimental y mejoras sensoriales</string>
+    <string name="experimental_visuals">Visuales Experimentales</string>
+    <string name="living_glass">Fondo Living Glass</string>
+    <string name="living_glass_desc">Gradientes orgánicos fluidos que cambian con tus interacciones</string>
+    
+    <string name="aura_intensity">Intensidad de visibilidad del Aura</string>
+    <string name="aura_palette">Paleta de colores del Aura</string>
+
+    <string name="palette_nebula">Deep Nebula (Original)</string>
+    <string name="palette_garden">Zen Garden (Relaxing)</string>
+    <string name="palette_minimal">Minimalist Earth</string>
+    <string name="palette_shady">Shady</string>
+    <string name="palette_browny">Browny</string>
+
+    <string name="luminescent_reader">Luminescent Reader</string>
+    <string name="luminescent_reader_desc">Añade un suave brillo atmosférico al texto y bordes</string>
+    <string name="luminescent_intensity">Profundidad de luminiscencia</string>
 </resources>

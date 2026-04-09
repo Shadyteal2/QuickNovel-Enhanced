@@ -16,6 +16,9 @@ import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 import android.content.Intent
 import android.net.Uri
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.preference.PreferenceManager
+import android.content.SharedPreferences
+import com.lagradost.quicknovel.MainActivity
 
 
 /**
@@ -32,6 +35,8 @@ class SettingsFragment : Fragment() {
     ): View {
         return inflater.inflate(R.layout.setting_bento_grid, container, false)
     }
+
+    private var prefListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -52,6 +57,37 @@ class SettingsFragment : Fragment() {
         setupBentoGrid(view)
         setupSocialChips(view)
         updateReadingStats(view)
+        setupExperimentalAesthetics(view)
+    }
+
+    private fun setupExperimentalAesthetics(view: View) {
+        val context = context ?: return
+        val settings = PreferenceManager.getDefaultSharedPreferences(context)
+
+        fun updateAura() {
+            (activity as? MainActivity)?.updateGlobalAura()
+        }
+
+        // Initial update
+        updateAura()
+
+        // Listen for changes
+        prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _: SharedPreferences, key: String? ->
+            if (key == getString(R.string.living_glass_key) || 
+                key == getString(R.string.aura_intensity_key) || 
+                key == getString(R.string.aura_palette_key) ||
+                key == getString(R.string.aura_speed_key)) {
+                (activity as? MainActivity)?.updateGlobalAura()
+            }
+        }
+        settings.registerOnSharedPreferenceChangeListener(prefListener)
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        val context = context ?: return
+        val settings = PreferenceManager.getDefaultSharedPreferences(context)
+        settings.unregisterOnSharedPreferenceChangeListener(prefListener)
     }
 
     private fun setupToolbar(view: View) {
@@ -98,12 +134,22 @@ class SettingsFragment : Fragment() {
                 putInt("title_res", R.string.advanced)
             })
         }
+
+        // Vibe & Aura (Experimental)
+        view.findViewById<View>(R.id.bento_vibe)?.setOnClickListener {
+            view.animate().alpha(0f).setDuration(150).start()
+            navController.navigate(R.id.action_navigation_settings_to_subSettings, Bundle().apply {
+                putInt(SubSettingsFragment.XML_RES_ID, R.xml.settings_vibe)
+                putInt("title_res", R.string.vibe_aura)
+            })
+        }
         
         // Spring Animations
         applySpringTouch(view.findViewById(R.id.bento_appearance))
         applySpringTouch(view.findViewById(R.id.bento_reader))
         applySpringTouch(view.findViewById(R.id.bento_storage))
         applySpringTouch(view.findViewById(R.id.bento_advanced))
+        applySpringTouch(view.findViewById(R.id.bento_vibe))
         applySpringTouch(view.findViewById(R.id.hero_about_card))
         applySpringTouch(view.findViewById(R.id.reading_stats_card))
 

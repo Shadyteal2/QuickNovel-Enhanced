@@ -213,4 +213,4 @@
             android:defaultValue="@string/info"
             app:argType="reference" />
     </fragment>
-</navigation>
+</navigation>

@@ -11,6 +11,13 @@
         app:layout="@layout/setting_tile" />
 
     <Preference
+        android:key="@string/background_effect_mode_key"
+        android:title="@string/background_effect_mode"
+        android:summary="@string/background_effect_mode_summary"
+        android:icon="@drawable/ic_baseline_tune_24"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
         android:key="@string/reset_background_key"
         android:title="@string/reset_background"
         android:summary="@string/reset_background_summary"
@@ -29,6 +36,26 @@
     <SeekBarPreference
         android:key="@string/background_dim_key"
         android:title="@string/background_dim"
+        android:max="100"
+        app:defaultValue="0"
+        app:showSeekBarValue="true"
+        android:icon="@drawable/ic_baseline_tune_24"
+        app:layout="@layout/setting_seekbar_tile" />
+
+    <SeekBarPreference
+        android:key="@string/background_grain_key"
+        android:title="@string/background_grain"
+        android:summary="@string/background_grain_summary"
+        android:max="100"
+        app:defaultValue="0"
+        app:showSeekBarValue="true"
+        android:icon="@drawable/ic_baseline_tune_24"
+        app:layout="@layout/setting_seekbar_tile" />
+
+    <SeekBarPreference
+        android:key="@string/background_vignette_key"
+        android:title="@string/background_vignette"
+        android:summary="@string/background_vignette_summary"
         android:max="100"
         app:defaultValue="0"
         app:showSeekBarValue="true"

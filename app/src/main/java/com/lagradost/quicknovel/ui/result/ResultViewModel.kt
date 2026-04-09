@@ -756,6 +756,40 @@ class ResultViewModel : ViewModel() {
             )
             updateBookmarkData()
             readState.postValue(ReadType.fromSpinner(state))
+
+            // SSOT: Sync with Room Database
+            val context = context ?: return@withLock
+            ioSafe {
+                val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao()
+                if (state == -1) {
+                    dao.updateBookmarkType(loadId, null)
+                } else {
+                    val existing = dao.getById(loadId)
+                    if (existing != null) {
+                        dao.updateBookmarkType(loadId, state)
+                    } else {
+                        dao.insert(
+                            com.lagradost.quicknovel.db.NovelEntity(
+                                id = loadId,
+                                source = loadUrl,
+                                name = load.name,
+                                author = load.author,
+                                posterUrl = load.posterUrl,
+                                rating = load.rating,
+                                peopleVoted = (load as? StreamResponse)?.peopleVoted,
+                                views = (load as? StreamResponse)?.views,
+                                synopsis = load.synopsis,
+                                tags = load.tags,
+                                apiName = apiName,
+                                lastUpdated = null,
+                                lastDownloaded = null,
+                                bookmarkType = state
+                            )
+                        )
+                    }
+                }
+            }
+
             com.lagradost.quicknovel.ui.download.DownloadViewModel.bookmarkChanged.emit(Unit)
         }
     }

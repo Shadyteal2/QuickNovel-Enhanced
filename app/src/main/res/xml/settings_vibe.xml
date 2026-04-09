@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="Experimental Aesthetics"
+        app:allowDividerAbove="false">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="@string/experimental_visuals_key"
+            android:summary="Enable premium generative visuals (Higher Power Consumption)"
+            android:title="@string/experimental_visuals" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:dependency="@string/experimental_visuals_key"
+        android:title="Living Elements">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="@string/living_glass_key"
+            android:summary="@string/living_glass_desc"
+            android:title="@string/living_glass" />
+
+        <SeekBarPreference
+            android:dependency="@string/living_glass_key"
+            android:key="@string/aura_intensity_key"
+            android:max="100"
+            android:title="@string/aura_intensity"
+            app:defaultValue="70"
+            app:showSeekBarValue="true" />
+
+        <ListPreference
+            android:dependency="@string/living_glass_key"
+            android:entries="@array/aura_palette_entries"
+            android:entryValues="@array/aura_palette_values"
+            android:key="@string/aura_palette_key"
+            android:title="@string/aura_palette"
+            app:defaultValue="nebula"
+            app:useSimpleSummaryProvider="true" />
+
+        <SeekBarPreference
+            android:dependency="@string/living_glass_key"
+            android:key="@string/aura_speed_key"
+            android:max="200"
+            android:title="@string/aura_speed"
+            app:defaultValue="100"
+            app:showSeekBarValue="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Luminescent Engine">
+        <SwitchPreferenceCompat
+            android:key="@string/luminescent_reader_key"
+            android:title="@string/luminescent_reader"
+            android:summary="@string/luminescent_reader_desc"
+            android:defaultValue="false" />
+
+        <SeekBarPreference
+            android:key="@string/luminescent_intensity_key"
+            android:title="@string/luminescent_intensity"
+            android:dependency="@string/luminescent_reader_key"
+            android:defaultValue="50"
+            android:max="100" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Zen Experience">
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="@string/zen_reading_key"
+            android:summary="@string/zen_reading_mode_desc"
+            android:title="@string/zen_reading_mode" />
+    </PreferenceCategory>
+
+</PreferenceScreen>
