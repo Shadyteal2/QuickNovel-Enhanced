@@ -93,6 +93,7 @@ import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
 import com.lagradost.quicknovel.util.applyGlassStyle
 import com.lagradost.quicknovel.util.divCeil
 import com.lagradost.quicknovel.util.toPx
+import com.lagradost.quicknovel.util.AuraTransparencyHelper
 import java.lang.Integer.max
 import java.lang.ref.WeakReference
 import java.util.Locale
@@ -234,8 +235,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     readerBackgroundImage.setRenderEffect(null)
                 }
                 readerBackgroundImage.colorFilter = null
-                // Restore solid background if disabled
-                root.setBackgroundColor(viewModel.backgroundColor)
+                // Restore solid background ONLY if no immersive mode is active
+                val auraEnabled = settingsManager.getBoolean(LIVING_GLASS, false)
+                if (!auraEnabled) {
+                    root.setBackgroundColor(viewModel.backgroundColor)
+                }
                 return@apply
             }
 
@@ -267,7 +271,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         val auraColor = if (auraEnabled) {
-            binding.readerLivingGlass.getCurrentAuraColor()
+            binding.readerLivingGlass.getAuraColorOpaque()
         } else {
             Color.parseColor("#FFE8B5") // Amber Warm
         }
@@ -276,7 +280,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         val alphaFactor = (intensity / 100f) * 0.8f
 
         val glowColor = Color.argb(
-            (Color.alpha(auraColor) * alphaFactor).toInt().coerceIn(0, 255),
+            (255 * alphaFactor).toInt().coerceIn(0, 255),
             Color.red(auraColor),
             Color.green(auraColor),
             Color.blue(auraColor)
@@ -325,6 +329,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         interpolator = AccelerateDecelerateInterpolator()
                         start()
                     }
+                } else {
                 }
             } else {
                 visibility = android.view.View.GONE
@@ -350,15 +355,25 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     setAuraIntensity(intensity)
                     setAuraPalette(palette)
                     setAuraSpeed(speed)
-                    // Ensure overlays are transparent if Aura is on
-                    root.setBackgroundColor(Color.TRANSPARENT)
-                    readNormalLayout.setBackgroundColor(Color.TRANSPARENT)
-                    readOverlay.setBackgroundColor(Color.TRANSPARENT)
+                    
+                    // Recursive structural cleaning to expose the visualizer
+                    try {
+                        AuraTransparencyHelper.forceTransparent(root)
+                        // Also clear the overlay containers specifically
+                        readNormalLayout.setBackgroundColor(Color.TRANSPARENT)
+                        readOverlay.setBackgroundColor(Color.TRANSPARENT)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 } else {
                     visibility = android.view.View.GONE
                     // Restore background color if Aura is OFF and no image is set
-                    if (!settingsManager.getBoolean(getString(R.string.reader_background_key), false)) {
+                    val bgImageEnabled = settingsManager.getBoolean(getString(R.string.reader_background_key), false)
+                    if (!bgImageEnabled) {
                         root.setBackgroundColor(viewModel.backgroundColor)
+                        // Reset other layouts to default (usually transparent but safety first)
+                        readNormalLayout.setBackground(null)
+                        realText.setBackground(null)
                     }
                 }
             }
@@ -1052,7 +1067,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 if (key == getString(R.string.living_glass_key) ||
                     key == getString(R.string.aura_intensity_key) ||
                     key == getString(R.string.aura_palette_key) ||
-                    key == getString(R.string.aura_speed_key)
+                    key == getString(R.string.aura_speed_key) ||
+                    key == LUMINESCENT_READER ||
+                    key == LUMINESCENT_INTENSITY
                 ) {
                     updateGlobalAura()
                 }
@@ -1171,8 +1188,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             updateOverlayVisibility()
         }
 
-        observe(viewModel.zenModeLive) { _ ->
-            updateOverlayVisibility()
+
+        observe(viewModel.luminescentLive) { _ ->
+            updateGlobalAura()
+        }
+
+        observe(viewModel.luminescentIntensityLive) { _ ->
+            updateGlobalAura()
+        }
+
+        observe(viewModel.auraIntensityLive) { _ ->
+            updateGlobalAura()
         }
         updateOverlayVisibility()
 
@@ -2485,9 +2511,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private fun updateOverlayVisibility() {
-        val zenMode = viewModel.zenMode
-        val showTime = viewModel.showTime && !zenMode
-        val showBattery = viewModel.showBattery && !zenMode
+        val showTime = viewModel.showTime
+        val showBattery = viewModel.showBattery
 
         binding.apply {
             readTimeClock.isVisible = showTime
@@ -2495,10 +2520,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             readOverlay.isVisible = showTime || showBattery
         }
 
-        if (zenMode) {
-            hideSystemUI()
-        } else if (viewModel.bottomVisibility.value != true) {
+        if (viewModel.bottomVisibility.value != true) {
             hideSystemUI()
         }
+
+        updateGlobalAura()
     }
 }

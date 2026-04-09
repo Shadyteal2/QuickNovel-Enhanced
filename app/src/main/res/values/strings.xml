@@ -448,7 +448,4 @@
     <string name="luminescent_intensity">Glow Intensity</string>
     <string name="luminescent_intensity_key" translatable="false">luminescent_intensity</string>
 
-    <string name="zen_reading_mode">Zen Reading Mode</string>
-    <string name="zen_reading_mode_desc">Hide clock, battery, and status bar for ultimate immersion</string>
-    <string name="zen_reading_key" translatable="false">zen_reading_mode</string>
 </resources>

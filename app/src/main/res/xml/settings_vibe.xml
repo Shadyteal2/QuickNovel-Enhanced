@@ -67,12 +67,5 @@
 
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="Zen Experience">
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="@string/zen_reading_key"
-            android:summary="@string/zen_reading_mode_desc"
-            android:title="@string/zen_reading_mode" />
-    </PreferenceCategory>
 
 </PreferenceScreen>

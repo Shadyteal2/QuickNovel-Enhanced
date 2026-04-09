@@ -96,6 +96,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import me.ag2s.epublib.domain.EpubBook
@@ -115,6 +117,8 @@ import java.util.concurrent.ExecutionException
 import kotlin.math.pow
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
+import com.lagradost.quicknovel.ui.reader.ReaderState
+import com.lagradost.quicknovel.ui.reader.ReaderAction
 
 const val DEF_FONT_SIZE: Int = 14
 const val DEF_HORIZONTAL_PAD: Int = 20
@@ -578,6 +582,36 @@ class ReadActivityViewModel : ViewModel() {
         MutableLiveData<TTSHelper.TTSLine?>(null)
     val ttsLine: LiveData<TTSHelper.TTSLine?> = _ttsLine
 
+    // ── MVI State Layer ──────────────────────────────────────────────────────
+    // Thin StateFlow layer on top of existing LiveData. Allows new code to
+    // observe state reactively while existing LiveData observers keep working.
+    private val _state = MutableStateFlow(ReaderState())
+    val state = _state.asStateFlow()
+
+    fun onAction(action: ReaderAction) {
+        _state.update { current ->
+            when (action) {
+                is ReaderAction.SetBookTitle -> current.copy(bookTitle = action.title)
+                is ReaderAction.SetCurrentIndex -> current.copy(currentIndex = action.index)
+                is ReaderAction.SetDesiredIndex -> current.copy(desiredIndex = action.index)
+                is ReaderAction.ToggleTranslation -> current.copy(isTranslationActive = action.active)
+                is ReaderAction.ToggleTTS -> current.copy(isTTSActive = action.active)
+                is ReaderAction.SetTTSLine -> current.copy(ttsLine = action.line)
+                is ReaderAction.ToggleOriginal -> current.copy(isShowingOriginal = action.showOriginal)
+                is ReaderAction.SwitchVisibility -> current.copy(bottomVisibility = !current.bottomVisibility)
+                is ReaderAction.UpdateTTSStatus -> current.copy(ttsStatus = action.status)
+                is ReaderAction.UpdateLoadingStatus -> current.copy(loadingStatus = action.status)
+                is ReaderAction.UpdateChapterData -> {
+                    val newMap = current.chapterDataMap.toMutableMap()
+                    newMap[action.index] = action.data
+                    current.copy(chapterDataMap = newMap)
+                }
+                is ReaderAction.ClearChapterData -> current.copy(chapterDataMap = emptyMap())
+                else -> current
+            }
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     /*  private val _orientation: MutableLiveData<OrientationType> =
           MutableLiveData<OrientationType>(null)
@@ -2043,6 +2077,21 @@ class ReadActivityViewModel : ViewModel() {
     val zenModeLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var zenMode by PreferenceDelegateLiveView(
         EPUB_ZEN_READING, false, Boolean::class, zenModeLive
+    )
+
+    val luminescentLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var luminescentReader by PreferenceDelegateLiveView(
+        LUMINESCENT_READER, false, Boolean::class, luminescentLive
+    )
+
+    val luminescentIntensityLive: MutableLiveData<Float> = MutableLiveData(null)
+    var luminescentIntensity by PreferenceDelegateLiveView(
+        LUMINESCENT_INTENSITY, 0.5f, Float::class, luminescentIntensityLive
+    )
+
+    val auraIntensityLive: MutableLiveData<Float> = MutableLiveData(null)
+    var auraIntensity by PreferenceDelegateLiveView(
+        AURA_INTENSITY, 0.6f, Float::class, auraIntensityLive
     )
 
     val paddingHorizontalLive: MutableLiveData<Int> = MutableLiveData(null)
