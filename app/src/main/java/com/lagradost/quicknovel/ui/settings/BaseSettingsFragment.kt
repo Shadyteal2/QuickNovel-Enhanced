@@ -462,6 +462,26 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
             showToast("Network cookies cleared")
             true
         }
+
+        // 3×3 Bento Grid — requires restart to take effect
+        getPref("library_bento_3x3")?.setOnPreferenceChangeListener { _, _ ->
+            val ctx = context ?: return@setOnPreferenceChangeListener true
+            val act = activity ?: return@setOnPreferenceChangeListener true
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(ctx, R.style.AlertDialogCustom)
+                .setTitle("Restart Required")
+                .setMessage("The 3×3 Bento Grid layout change takes effect after restarting the app.")
+                .setCancelable(true)
+                .setPositiveButton("Restart Now") { dialog, _ ->
+                    dialog.dismiss()
+                    val intent = act.packageManager.getLaunchIntentForPackage(act.packageName)
+                        ?.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    act.finishAffinity()
+                    if (intent != null) act.startActivity(intent)
+                }
+                .setNegativeButton("Later") { dialog, _ -> dialog.dismiss() }
+                .show()
+            true // Allow the pref to be saved regardless
+        }
     }
 
     private fun Preference.appThemeListener(settingsManager: android.content.SharedPreferences) {
