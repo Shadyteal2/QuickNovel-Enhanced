@@ -27,6 +27,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+
+
 enum class BackgroundEffectMode(val value: String) {
     NONE("none"),
     NOIR("noir"),
@@ -90,10 +92,10 @@ data class BackgroundEffectState(
 fun SharedPreferences.getBackgroundEffectState(context: Context): BackgroundEffectState {
     return BackgroundEffectState(
         mode = BackgroundEffectMode.from(getString(context.getString(R.string.background_effect_mode_key), BackgroundEffectMode.NONE.value)),
-        blur = getInt(context.getString(R.string.background_blur_key), 0),
-        dim = getInt(context.getString(R.string.background_dim_key), 0),
-        grain = getInt(context.getString(R.string.background_grain_key), 0),
-        vignette = getInt(context.getString(R.string.background_vignette_key), 0),
+        blur = getSafeInt(context.getString(R.string.background_blur_key), 0),
+        dim = getSafeInt(context.getString(R.string.background_dim_key), 0),
+        grain = getSafeInt(context.getString(R.string.background_grain_key), 0),
+        vignette = getSafeInt(context.getString(R.string.background_vignette_key), 0),
     )
 }
 

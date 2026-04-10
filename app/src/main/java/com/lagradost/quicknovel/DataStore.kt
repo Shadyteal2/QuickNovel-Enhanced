@@ -10,7 +10,21 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.lagradost.quicknovel.mvvm.logError
 import androidx.core.content.edit
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Preference key constants — LEGACY flat list.
+//
+// ⚠️  New code should use the organized typed objects in PreferenceKeys.kt:
+//        ReaderPrefs.TEXT_SIZE  instead of  EPUB_TEXT_SIZE
+//        ReaderPrefs.Tts.SPEED  instead of  EPUB_TTS_SET_SPEED
+//        ReaderPrefs.Effects.AURA_INTENSITY  instead of  AURA_INTENSITY
+//        DownloadPrefs.FOLDER   instead of  DOWNLOAD_FOLDER
+//        ResultPrefs.BOOKMARK   instead of  RESULT_BOOKMARK
+//
+// The string values below are identical to PreferenceKeys.kt — both systems
+// write to the same SharedPreferences file and are fully interoperable.
+// ─────────────────────────────────────────────────────────────────────────────
 const val PREFERENCES_NAME: String = "rebuild_preference"
+
 const val DOWNLOAD_FOLDER: String = "downloads_data"
 const val DOWNLOAD_SIZE: String = "downloads_size"
 const val DOWNLOAD_TOTAL: String = "downloads_total"
@@ -57,6 +71,7 @@ const val LIVING_GLASS: String = "living_glass_key"
 const val AURA_INTENSITY: String = "aura_intensity_key"
 const val AURA_SPEED: String = "aura_speed_key"
 const val AURA_PALETTE: String = "aura_palette_key"
+const val PREMIUM_ANIMATIONS: String = "premium_animations_key"
 const val EPUB_FONT: String = "reader_epub_font"
 const val EPUB_LANG: String = "reader_epub_lang"
 const val EPUB_VOICE: String = "reader_epub_voice"

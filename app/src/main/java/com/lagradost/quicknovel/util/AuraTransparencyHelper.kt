@@ -52,23 +52,26 @@ object AuraTransparencyHelper {
      * of their own. Excludes any view that is or contains functional UI.
      */
     private fun isShellContainer(view: View): Boolean {
-        // Never touch views whose IDs suggest functional UI that MUST be visible
+        // PRIORITY 1: Never touch views whose IDs suggest functional UI that MUST be visible
         val idName = try { view.resources.getResourceEntryName(view.id) } catch (e: Exception) { "" }
         val protected = listOf("nav", "search", "tab", "header", "bar", "chip", "pill",
                               "fab", "button", "card", "toolbar", "download", "bookmark",
-                              "history", "menu", "bottom_sheet", "dialog")
+                              "history", "menu", "bottom_sheet", "dialog", "settings", "preference",
+                              "holder", "wrap", "content", "progress", "control", "footer", "overlay")
                               
         if (protected.any { idName.contains(it, ignoreCase = true) }) return false
         
-        // Never touch material component containers that usually have shadows/colors
+        // PRIORITY 2: Never touch material component containers that usually have shadows/colors
         if (view is com.google.android.material.card.MaterialCardView) return false
         if (view is com.google.android.material.navigation.NavigationView) return false
         if (view is com.google.android.material.appbar.AppBarLayout) return false
         if (view is com.google.android.material.tabs.TabLayout) return false
         if (view is androidx.appcompat.widget.SearchView) return false
 
-        // Whitelist reader-specific layout components for absolute transparency
+        // PRIORITY 3: Whitelist reader-specific layout components for absolute transparency
         if (idName.contains("reader", ignoreCase = true) || idName.contains("read", ignoreCase = true)) {
+            // Protected check already failed above, so we know this isn't a settings root
+            
             // real_text (RecyclerView) and real_text_item (Paragraph TextView) must be transparent
             if (idName.contains("real_text", ignoreCase = true)) return true
             // structural containers like read_normal_layout, reader_lin_container

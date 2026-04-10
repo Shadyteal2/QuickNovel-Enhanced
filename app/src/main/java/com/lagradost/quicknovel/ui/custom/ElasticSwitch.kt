@@ -81,14 +81,14 @@ class ElasticSwitch @JvmOverloads constructor(
 
     private val thumbAnimation = SpringAnimation(this, thumbProperty).apply {
         spring = SpringForce().apply {
-            stiffness = 180f // Custom low stiffness for slower, more elastic feel
+            stiffness = 350f // Faster, snappier movement
             dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
         }
     }
 
     private val stretchAnimation = SpringAnimation(this, stretchProperty).apply {
         spring = SpringForce().apply {
-            stiffness = 150f // Slightly lower for the track "bulge" to stay visible longer
+            stiffness = 250f // Snappier recovery for the stretch effect
             dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
         }
     }
@@ -121,7 +121,7 @@ class ElasticSwitch @JvmOverloads constructor(
 
         // Minimum size
         val density = context.resources.displayMetrics.density
-        padding = 4 * density
+        padding = 3 * density // Reduced padding for a more compact, refined look
         
         // Optimize for hardware acceleration
         setLayerType(LAYER_TYPE_HARDWARE, null)
@@ -132,8 +132,9 @@ class ElasticSwitch @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredWidth = (64 * resources.displayMetrics.density).toInt()
-        val desiredHeight = (32 * resources.displayMetrics.density).toInt()
+        val density = resources.displayMetrics.density
+        val desiredWidth = (48 * density).toInt()   // Compact toggle width
+        val desiredHeight = (28 * density).toInt()  // Compact toggle height
 
         val width = resolveSize(desiredWidth, widthMeasureSpec)
         val height = resolveSize(desiredHeight, heightMeasureSpec)
@@ -168,7 +169,8 @@ class ElasticSwitch @JvmOverloads constructor(
         path.reset()
         val r = trackHeight / 2
         val inset = padding
-        val bulge = stretch * (trackHeight / 4f)
+        val maxBulge = 12 * resources.displayMetrics.density
+        val bulge = (stretch * (trackHeight / 4f)).coerceIn(-maxBulge, maxBulge)
         
         // Cache dimensions into RectF for better performance
         trackRect.set(inset, inset, width - inset, height - inset)
@@ -193,6 +195,23 @@ class ElasticSwitch @JvmOverloads constructor(
         val thumbColor = interpolateColor(thumbColorOff, thumbColorOn, progress)
         paint.color = thumbColor
         
+        // design-spell: Spectral Glow (Radial glow behind the thumb when on)
+        if (progress > 0.1f) {
+            val glowRadius = thumbRadius * 2.5f
+            val glowAlpha = (progress * 25).toInt() // Reduced from 40 for subtler glow
+            val glowColor = Color.argb(glowAlpha, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))
+            
+            val glowGradient = RadialGradient(
+                thumbX, height / 2f, glowRadius,
+                intArrayOf(glowColor, Color.TRANSPARENT),
+                null, Shader.TileMode.CLAMP
+            )
+            
+            val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            tempPaint.shader = glowGradient
+            canvas.drawCircle(thumbX, height / 2f, glowRadius, tempPaint)
+        }
+
         // Performance: Only draw shadow if interacted with or if high-end device (simplified here to only interaction)
         if (isPressed || stretch != 0f) {
             paint.setShadowLayer(8f, 0f, 4f, Color.parseColor("#40000000"))

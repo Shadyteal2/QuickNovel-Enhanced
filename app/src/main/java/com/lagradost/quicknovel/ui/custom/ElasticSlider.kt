@@ -146,6 +146,7 @@ class ElasticSlider @JvmOverloads constructor(
             valueFrom = a.getFloat(R.styleable.ElasticSlider_valueFrom, 0f)
             valueTo = a.getFloat(R.styleable.ElasticSlider_valueTo, 100f)
             stepSize = a.getFloat(R.styleable.ElasticSlider_stepSize, 0f)
+            valueSuffix = a.getString(R.styleable.ElasticSlider_valueSuffix) ?: ""
             _value = valueFrom
             
             progressColor = a.getColor(R.styleable.ElasticSlider_progressColor, progressColor)
@@ -176,7 +177,7 @@ class ElasticSlider @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val h = (72 * resources.displayMetrics.density).toInt() // Increased height for label
+        val h = (88 * resources.displayMetrics.density).toInt() // Increased height for bubble space
         setMeasuredDimension(resolveSize(200, widthMeasureSpec), h)
     }
 
@@ -198,7 +199,7 @@ class ElasticSlider @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         
-        val centerY = height * 0.7f // Lower track to make room for label
+        val centerY = height * 0.72f // Adjusted to keep track low and provide space above for bubble
         val startX = getStartPos()
         val endX = getEndPos()
 

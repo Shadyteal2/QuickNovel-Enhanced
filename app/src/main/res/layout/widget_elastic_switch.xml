@@ -4,4 +4,6 @@
     android:id="@+id/elastic_toggle"
     android:layout_width="56dp"
     android:layout_height="28dp"
+    android:minHeight="48dp"
+    android:minWidth="48dp"
     android:layout_gravity="center_vertical" />

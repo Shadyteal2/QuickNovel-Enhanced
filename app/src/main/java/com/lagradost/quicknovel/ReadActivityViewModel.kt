@@ -119,6 +119,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
 import com.lagradost.quicknovel.ui.reader.ReaderState
 import com.lagradost.quicknovel.ui.reader.ReaderAction
+import com.lagradost.quicknovel.ui.reader.reduce
 
 const val DEF_FONT_SIZE: Int = 14
 const val DEF_HORIZONTAL_PAD: Int = 20
@@ -589,27 +590,8 @@ class ReadActivityViewModel : ViewModel() {
     val state = _state.asStateFlow()
 
     fun onAction(action: ReaderAction) {
-        _state.update { current ->
-            when (action) {
-                is ReaderAction.SetBookTitle -> current.copy(bookTitle = action.title)
-                is ReaderAction.SetCurrentIndex -> current.copy(currentIndex = action.index)
-                is ReaderAction.SetDesiredIndex -> current.copy(desiredIndex = action.index)
-                is ReaderAction.ToggleTranslation -> current.copy(isTranslationActive = action.active)
-                is ReaderAction.ToggleTTS -> current.copy(isTTSActive = action.active)
-                is ReaderAction.SetTTSLine -> current.copy(ttsLine = action.line)
-                is ReaderAction.ToggleOriginal -> current.copy(isShowingOriginal = action.showOriginal)
-                is ReaderAction.SwitchVisibility -> current.copy(bottomVisibility = !current.bottomVisibility)
-                is ReaderAction.UpdateTTSStatus -> current.copy(ttsStatus = action.status)
-                is ReaderAction.UpdateLoadingStatus -> current.copy(loadingStatus = action.status)
-                is ReaderAction.UpdateChapterData -> {
-                    val newMap = current.chapterDataMap.toMutableMap()
-                    newMap[action.index] = action.data
-                    current.copy(chapterDataMap = newMap)
-                }
-                is ReaderAction.ClearChapterData -> current.copy(chapterDataMap = emptyMap())
-                else -> current
-            }
-        }
+        Log.d("ReaderMVI", "→ ${action.javaClass.simpleName}")
+        _state.update { it.reduce(action) }
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -2092,6 +2074,16 @@ class ReadActivityViewModel : ViewModel() {
     val auraIntensityLive: MutableLiveData<Float> = MutableLiveData(null)
     var auraIntensity by PreferenceDelegateLiveView(
         AURA_INTENSITY, 0.6f, Float::class, auraIntensityLive
+    )
+
+    val auraSpeedLive: MutableLiveData<Float> = MutableLiveData(null)
+    var auraSpeed by PreferenceDelegateLiveView(
+        AURA_SPEED, 1.0f, Float::class, auraSpeedLive
+    )
+
+    val premiumAnimationsLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var premiumAnimations by PreferenceDelegateLiveView(
+        "premium_animations_key", true, Boolean::class, premiumAnimationsLive
     )
 
     val paddingHorizontalLive: MutableLiveData<Int> = MutableLiveData(null)

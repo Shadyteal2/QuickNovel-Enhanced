@@ -34,21 +34,21 @@
             android:icon="@drawable/baseline_restore_page_24"
             app:layout="@layout/setting_tile" />
 
-        <SeekBarPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
             android:key="@string/background_blur_key"
             android:title="@string/background_blur"
-            android:max="100"
+            app:valueTo="100"
+            app:valueFrom="0"
             app:defaultValue="0"
-            app:showSeekBarValue="true"
             android:icon="@drawable/ic_baseline_color_lens_24"
             app:layout="@layout/setting_seekbar_tile" />
 
-        <SeekBarPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
             android:key="@string/background_dim_key"
             android:title="@string/background_dim"
-            android:max="100"
+            app:valueTo="100"
+            app:valueFrom="0"
             app:defaultValue="0"
-            app:showSeekBarValue="true"
             android:icon="@drawable/ic_baseline_color_lens_24"
             app:layout="@layout/setting_seekbar_tile" />
 

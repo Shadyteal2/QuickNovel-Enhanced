@@ -413,6 +413,9 @@
     
     <string name="vibe_aura">Vibe &amp; Aura</string>
     <string name="vibe_aura_desc">Experimental algorithmic art &amp; sensory enhancements</string>
+    <string name="premium_animations">Premium Animations</string>
+    <string name="premium_animations_desc">Enables staggered transitions, glowing progress bars, and reactive physics</string>
+    <string name="premium_animations_key" translatable="false">premium_animations_key</string>
     <string name="experimental_visuals">Experimental Visuals</string>
     <string name="living_glass">Living Glass Background</string>
     <string name="living_glass_desc">Fluid organic gradients that morph with your interactions</string>
@@ -448,4 +451,15 @@
     <string name="luminescent_intensity">Glow Intensity</string>
     <string name="luminescent_intensity_key" translatable="false">luminescent_intensity</string>
 
+    <!-- Accessibility Labels -->
+    <string name="a11y_rewind">Rewind</string>
+    <string name="a11y_stop">Stop</string>
+    <string name="a11y_pause">Pause</string>
+    <string name="a11y_play">Play</string>
+    <string name="a11y_fast_forward">Fast Forward</string>
+    <string name="a11y_translate_toggle">Toggle Translation</string>
+    <string name="a11y_stop_translation">Stop Translation</string>
+    <string name="a11y_drag_handle">Drag Handle</string>
+    <string name="a11y_info">Information</string>
+    <string name="a11y_theme_format">Select %s Theme</string>
 </resources>

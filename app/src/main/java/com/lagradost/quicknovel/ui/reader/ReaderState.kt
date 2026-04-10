@@ -20,7 +20,7 @@ data class ReaderState(
     val bottomVisibility: Boolean = false,
     val ttsStatus: TTSHelper.TTSStatus = TTSHelper.TTSStatus.IsStopped,
     val loadingStatus: Resource<String>? = null,
-    
+
     // We store the data references, not the 500-page text, as per "Avoid State Bloat" tip.
     val chapterDataMap: Map<Int, Resource<LiveChapterData>?> = emptyMap()
 )
@@ -41,4 +41,30 @@ sealed class ReaderAction {
     data class UpdateLoadingStatus(val status: Resource<String>?) : ReaderAction()
     data class UpdateChapterData(val index: Int, val data: Resource<LiveChapterData>?) : ReaderAction()
     object ClearChapterData : ReaderAction()
+}
+
+/**
+ * Pure state reducer — no side effects, no Android dependencies, fully unit-testable.
+ *
+ * Given a [ReaderState] and a [ReaderAction], returns the next [ReaderState].
+ * This is the single place where ALL state transitions are defined.
+ *
+ * Usage in ViewModel: `_state.update { it.reduce(action) }`
+ */
+fun ReaderState.reduce(action: ReaderAction): ReaderState = when (action) {
+    is ReaderAction.SetBookTitle        -> copy(bookTitle = action.title)
+    is ReaderAction.SetCurrentIndex     -> copy(currentIndex = action.index)
+    is ReaderAction.SetDesiredIndex     -> copy(desiredIndex = action.index)
+    is ReaderAction.ToggleTranslation   -> copy(isTranslationActive = action.active)
+    is ReaderAction.ToggleTTS           -> copy(isTTSActive = action.active)
+    is ReaderAction.SetTTSLine          -> copy(ttsLine = action.line)
+    is ReaderAction.ToggleOriginal      -> copy(isShowingOriginal = action.showOriginal)
+    is ReaderAction.SwitchVisibility    -> copy(bottomVisibility = !bottomVisibility)
+    is ReaderAction.UpdateTTSStatus     -> copy(ttsStatus = action.status)
+    is ReaderAction.UpdateLoadingStatus -> copy(loadingStatus = action.status)
+    is ReaderAction.UpdateChapterData   -> {
+        val updated = chapterDataMap.toMutableMap().also { it[action.index] = action.data }
+        copy(chapterDataMap = updated)
+    }
+    is ReaderAction.ClearChapterData    -> copy(chapterDataMap = emptyMap())
 }

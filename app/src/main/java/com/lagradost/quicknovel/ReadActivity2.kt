@@ -64,6 +64,8 @@ import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 import com.lagradost.quicknovel.util.UIHelper.getStatusBarHeight
 import com.lagradost.quicknovel.util.UIHelper.popupMenu
+import com.lagradost.quicknovel.util.getSafeInt
+import com.lagradost.quicknovel.util.getSafeFloat
 import com.lagradost.quicknovel.util.UIHelper.systemFonts
 import com.lagradost.quicknovel.databinding.ReadMainBinding
 import com.lagradost.quicknovel.databinding.SingleOverscrollChapterBinding
@@ -137,6 +139,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         lowerBottomNav(binding.readerBottomViewHolder)
+        
+        // Design Spell: Synchronize Progress Bar (Return to baseline in full-screen)
+        ObjectAnimator.ofFloat(binding.readerProgressContainer, "translationY", 0f).apply {
+            duration = if (viewModel.premiumAnimations) 600L else 300L
+            start()
+        }
 
         // Pixel-Perfect Translation: Pull actual dynamic margin to ensure it clears the notch/status bar
         val params = binding.readToolbarHolder.layoutParams as? android.view.ViewGroup.MarginLayoutParams
@@ -162,6 +170,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         binding.readToolbarHolder.isVisible = true
 
+        val isPremium = viewModel.premiumAnimations
+        val entranceDuration = if (isPremium) 600L else 300L
+
         fun higherBottomNavView(v: View) {
             v.isVisible = true
             v.post {
@@ -169,7 +180,15 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 val margin = params?.bottomMargin?.toFloat() ?: 0f
                 v.translationY = v.height.toFloat() + margin
                 ObjectAnimator.ofFloat(v, "translationY", 0f).apply {
-                    duration = 200
+                    duration = entranceDuration
+                    if (isPremium) interpolator = android.view.animation.OvershootInterpolator(1.1f)
+                    start()
+                }
+
+                // Design Spell: Synchronize Progress Bar (Move above settings bar)
+                ObjectAnimator.ofFloat(binding.readerProgressContainer, "translationY", -(v.height.toFloat() + margin)).apply {
+                    duration = entranceDuration
+                    if (isPremium) interpolator = android.view.animation.OvershootInterpolator(1.1f)
                     start()
                 }
             }
@@ -183,8 +202,23 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         binding.readToolbarHolder.translationY = -(binding.readToolbarHolder.height.toFloat() + topMargin)
 
         ObjectAnimator.ofFloat(binding.readToolbarHolder, "translationY", 0f).apply {
-            duration = 200
+            duration = entranceDuration
+            if (isPremium) interpolator = android.view.animation.OvershootInterpolator(1.1f)
             start()
+        }
+
+        // Kinetic Stagger: Animate children of toolbar for "burst" entrance
+        if (isPremium) {
+            binding.readToolbar.children.forEachIndexed { index, child ->
+                child.alpha = 0f
+                child.translationX = -20f
+                child.animate()
+                    .alpha(1f)
+                    .translationX(0f)
+                    .setDuration(300)
+                    .setStartDelay(100 + index * 30L)
+                    .start()
+            }
         }
     }
 
@@ -198,10 +232,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             _imageHolder = WeakReference(value)
         }
 
-    override fun onColorSelected(dialog: Int, color: Int) {
-        when (dialog) {
-            0 -> setBackgroundColor(color)
-            1 -> setTextColor(color)
+    override fun onColorSelected(dialogId: Int, color: Int) {
+        val activity = this ?: return
+        if (activity.isFinishing || activity.isDestroyed) return
+        
+        try {
+            when (dialogId) {
+                0 -> setBackgroundColor(color)
+                1 -> setTextColor(color)
+            }
+        } catch (e: Exception) {
+            com.lagradost.quicknovel.mvvm.logError(e)
         }
     }
 
@@ -297,7 +338,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     private fun updateLuminescentEffects() {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         val lEnabled = settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
-        val lIntensity = settingsManager.getInt(getString(R.string.luminescent_intensity_key), 50)
+        val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
         val gEnabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
 
         binding.readerHalo.apply {
@@ -344,9 +385,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     fun updateGlobalAura() {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         val enabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
-        val intensity = settingsManager.getInt(getString(R.string.aura_intensity_key), 70)
+        val intensity = settingsManager.getSafeInt(getString(R.string.aura_intensity_key), 70)
         val palette = settingsManager.getString(getString(R.string.aura_palette_key), "nebula") ?: "nebula"
-        val speed = settingsManager.getInt(getString(R.string.aura_speed_key), 100)
+        val speed = settingsManager.getSafeInt(getString(R.string.aura_speed_key), 100)
 
         binding.apply {
             readerLivingGlass.apply {
@@ -392,6 +433,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     private fun updateImages() {
         val bgColors = resources.getIntArray(R.array.readerBgColors)
         val textColors = resources.getIntArray(R.array.readerTextColors)
+        val themeNames = resources.getStringArray(R.array.reader_theme_names)
         val color = viewModel.backgroundColor
         val colorPrimary = colorFromAttribute(R.attr.colorPrimary)
         val colorPrim = ColorStateList.valueOf(colorPrimary)
@@ -403,7 +445,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         for ((index, imgHolder) in imageHolder?.children?.withIndex() ?: return) {
             val img = imgHolder.findViewById<ImageView>(R.id.image1) ?: return
 
+            if (index < themeNames.size) {
+                img.contentDescription = getString(R.string.a11y_theme_format, themeNames[index])
+            }
+
             if (index == bgColors.size) { // CUSTOM COLOR
+                img.contentDescription = getString(R.string.a11y_theme_format, "Custom")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     img.foregroundTintList = colorPrim
                     img.foreground = ContextCompat.getDrawable(
@@ -595,6 +642,60 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
     fun onScroll() {
         postLines(getAllLines())
+        updateReadingProgress()
+    }
+
+    /** Updates the chapter reading progress fill bar (0→1 via scaleX). Zero alloc per frame. */
+    private fun updateReadingProgress() {
+        val fill = binding.readerReadingProgressFill
+        fill.pivotX = 0f
+        
+        val currentIdx = viewModel.currentIndex
+        val items = textAdapter.immutableCurrentList
+        if (items.isEmpty()) {
+            fill.scaleX = 0f
+            return
+        }
+
+        // Find the range of items belonging to the current chapter
+        var firstPos = -1
+        var lastPos = -1
+        for (i in items.indices) {
+            val item = items[i]
+            if (item.index == currentIdx) {
+                if (firstPos == -1) firstPos = i
+                lastPos = i
+            } else if (firstPos != -1) {
+                // We've moved past the current chapter
+                break
+            }
+        }
+
+        if (firstPos == -1) {
+            fill.scaleX = 0f
+            return
+        }
+        val chapterItemCount = lastPos - firstPos + 1
+        val lm = binding.realText.layoutManager as? LinearLayoutManager
+        val firstVisible = lm?.findFirstVisibleItemPosition() ?: 0
+        val lastVisible = lm?.findLastVisibleItemPosition() ?: firstVisible
+        
+        // Improved Progress Logic:
+        // Calculation: (Current first visible - Chapter start) / (Max possible first visible - Chapter start)
+        // This ensures progress reaches 100% when the user reaches the end of the scroll for this chapter.
+        val visibleCount = (lastVisible - firstVisible).coerceAtLeast(0)
+        val maxFirstVisible = (lastPos - visibleCount).coerceAtLeast(firstPos)
+        val range = (maxFirstVisible - firstPos).coerceAtLeast(1)
+        val progress = ((firstVisible - firstPos).toFloat() / range).coerceIn(0f, 1f)
+        
+        fill.scaleX = progress
+        
+        // Design Spell: Quantum Progress Trail (Color mapping based on progress)
+        if (viewModel.premiumAnimations && this@ReadActivity2.binding.readerLivingGlass.isVisible) {
+            val auraColor = this@ReadActivity2.binding.readerLivingGlass.getCurrentAuraColor()
+            val trailColor = interpolateColor(Color.GRAY, auraColor, 0.4f + progress * 0.6f)
+            fill.backgroundTintList = ColorStateList.valueOf(trailColor)
+        }
     }
 
     private var cachedChapter: List<SpanDisplay> = emptyList()
@@ -1199,6 +1300,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         observe(viewModel.auraIntensityLive) { _ ->
             updateGlobalAura()
+            if (viewModel.premiumAnimations) binding.readerLivingGlass.flare()
         }
         updateOverlayVisibility()
 
@@ -1484,12 +1586,16 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     }
 
                     if (different) {
-                        binding.readNormalLayout.alpha = 0.01f
+                        binding.readNormalLayout.alpha = 0f
 
                         ObjectAnimator.ofFloat(binding.readNormalLayout, "alpha", 1f).apply {
-                            duration = 300
+                            duration = 400
+                            interpolator = android.view.animation.DecelerateInterpolator(1.5f)
                             start()
                         }
+                        // Reset progress bar on chapter change
+                        binding.readerReadingProgressFill.pivotX = 0f
+                        binding.readerReadingProgressFill.scaleX = 0f
                     } else {
                         binding.readNormalLayout.alpha = 1.0f
                     }
@@ -1533,7 +1639,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     val settingsManager = PreferenceManager.getDefaultSharedPreferences(this@ReadActivity2)
                     val lEnabled = settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
                     if (lEnabled) {
-                        val lIntensity = settingsManager.getInt(getString(R.string.luminescent_intensity_key), 50)
+                        val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
                         val gEnabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
                         applyLuminescenceToView(view, lEnabled, lIntensity, gEnabled)
                     }
@@ -1704,6 +1810,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             bottomSheetDialog.show()
             bottomSheetDialog.applyGlassStyle()
+
 
 
             binding.readSettingsCharacterAliases.setOnClickListener {
@@ -2064,15 +2171,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 }
 
                 context.showDialog(
-                    items.map {
-                        it.first
-                    },
+                    items.mapNotNull { it.first },
                     items.map { it.second }.indexOf(viewModel.ttsTimer),
                     context.getString(R.string.sleep_timer), false, {
-                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                        try {
+                            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                        } catch (e: Exception) {}
                     }
                 ) { index ->
-                    viewModel.ttsTimer = items[index].second
+                    if (index >= 0 && index < items.size) {
+                        viewModel.ttsTimer = items[index].second
+                    }
                 }
             }
 
@@ -2172,10 +2281,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     viewModel.showBattery = isChecked
                 }
 
-                readSettingsKeepScreenActive.isChecked = viewModel.screenAwake
                 readSettingsKeepScreenActive.setOnCheckedChangeListener { _, isChecked ->
                     viewModel.screenAwake = isChecked
                 }
+                
 
             }
 
@@ -2195,6 +2304,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         viewModel.backgroundColor = newBgColor
                         viewModel.textColor = newTextColor
                         updateImages()
+                        if (viewModel.premiumAnimations) this@ReadActivity2.binding.readerLivingGlass.flare()
                     }
                 }
             }
@@ -2525,5 +2635,15 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         updateGlobalAura()
+    }
+    private fun interpolateColor(a: Int, b: Int, proportion: Float): Int {
+        val hsvA = FloatArray(3)
+        val hsvB = FloatArray(3)
+        Color.colorToHSV(a, hsvA)
+        Color.colorToHSV(b, hsvB)
+        for (i in 0..2) {
+            hsvB[i] = hsvA[i] + (hsvB[i] - hsvA[i]) * proportion
+        }
+        return Color.HSVToColor(hsvB)
     }
 }

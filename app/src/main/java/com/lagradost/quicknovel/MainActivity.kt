@@ -100,6 +100,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationItemView
 import com.google.android.material.bottomnavigation.BottomNavigationMenuView
 import com.lagradost.quicknovel.ui.history.HistoryFragment
 import com.lagradost.quicknovel.ui.settings.SettingsFragment
+import com.lagradost.quicknovel.util.getSafeInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.content.SharedPreferences
@@ -1132,8 +1133,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     fun updateGlobalAura() {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         val enabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
-        val intensity = settingsManager.getInt(getString(R.string.aura_intensity_key), 70)
-        val speed = settingsManager.getInt(getString(R.string.aura_speed_key), 100)
+        val intensity = settingsManager.getSafeInt(getString(R.string.aura_intensity_key), 70)
+        val speed = settingsManager.getSafeInt(getString(R.string.aura_speed_key), 100)
         val palette = settingsManager.getString(getString(R.string.aura_palette_key), "nebula") ?: "nebula"
 
         binding?.appLivingGlass?.apply {

@@ -130,6 +130,37 @@ class LivingGlassView @JvmOverloads constructor(
         return Color.rgb(Color.red(color), Color.green(color), Color.blue(color))
     }
 
+    /**
+     * Design Spell: Flare
+     * Temporarily boosts aura intensity and speed for visual feedback.
+     */
+    fun flare() {
+        if (!isHardwareAccelerated) return
+        
+        val baseIntensity = intensity
+        val baseSpeed = speedMult
+        
+        val animator = ValueAnimator.ofFloat(0f, 1f, 0f)
+        animator.duration = 500
+        animator.interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+        
+        animator.addUpdateListener { anim ->
+            val f = anim.animatedValue as Float
+            intensity = baseIntensity + (f * 0.4f).coerceAtMost(1.0f - baseIntensity)
+            speedMult = baseSpeed + (f * 1.5f)
+            // No invalidate needed as it's already looping
+        }
+        
+        animator.addListener(object : android.animation.AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: android.animation.Animator) {
+                intensity = baseIntensity
+                speedMult = baseSpeed
+            }
+        })
+        
+        animator.start()
+    }
+
     private fun updateShaders() {
         val w = width.toFloat().takeIf { it > 0 } ?: return
         val h = height.toFloat().takeIf { it > 0 } ?: return

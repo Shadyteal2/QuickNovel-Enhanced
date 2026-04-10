@@ -14,7 +14,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <View
         android:id="@+id/reader_background_dim"
@@ -22,13 +23,15 @@
         android:layout_height="match_parent"
         android:background="#000000"
         android:alpha="0"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <View
         android:id="@+id/reader_background_grain"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <View
         android:id="@+id/reader_background_vignette"
@@ -36,7 +39,8 @@
         android:layout_height="match_parent"
         android:background="@drawable/bg_vignette"
         android:alpha="0"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <View
         android:id="@+id/reader_background_light_scrim"
@@ -44,20 +48,23 @@
         android:layout_height="match_parent"
         android:background="#FFFFFF"
         android:alpha="0"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <com.lagradost.quicknovel.ui.custom.LivingGlassView
         android:id="@+id/reader_living_glass"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <View
         android:id="@+id/reader_halo"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/reader_halo_gradient"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <FrameLayout
             android:id="@+id/read_loading"
@@ -91,7 +98,8 @@
                     android:src="@drawable/ic_google_translate"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
-                    app:tint="@color/colorPrimary" />
+                    app:tint="@color/colorPrimary"
+                    android:importantForAccessibility="no" />
 
                 <TextView
                     android:id="@+id/read_loading_title"
@@ -121,9 +129,12 @@
 
                 <ImageButton
                     android:id="@+id/read_stop_translation_btn"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:padding="8dp"
+                    android:scaleType="centerInside"
                     android:background="?selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/a11y_stop_translation"
                     android:src="@drawable/ic_sharp_clear_24"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
@@ -569,7 +580,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_screen_rotation"
+                        android:contentDescription="@string/a11y_rewind"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toStartOf="@id/tts_action_stop"
                         app:layout_constraintStart_toStartOf="parent"
@@ -582,7 +593,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_tts"
+                        android:contentDescription="@string/a11y_stop"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toStartOf="@id/tts_action_pause_play"
                         app:layout_constraintStart_toEndOf="@+id/tts_action_back"
@@ -595,7 +606,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_chapters"
+                        android:contentDescription="@string/a11y_pause"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toStartOf="@id/tts_action_forward"
                         app:layout_constraintStart_toEndOf="@+id/tts_action_stop"
@@ -609,7 +620,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_settings"
+                        android:contentDescription="@string/a11y_fast_forward"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toEndOf="@id/tts_action_pause_play"
@@ -653,6 +664,7 @@
                     android:layout_gravity="end|center_vertical"
                     android:layout_marginEnd="12dp"
                     android:background="?selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/a11y_translate_toggle"
                     android:src="@drawable/translate_24px"
                     android:visibility="gone"
                     app:tint="?attr/textColor"
@@ -660,5 +672,27 @@
 
             </com.google.android.material.appbar.MaterialToolbar>
         </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- ── Reading Progress Indicator ──────────────────────────────────────
+             A 4dp strip at the bottom of the reader that fills left→right
+             as you scroll. Updated via scaleX (GPU-accelerated, zero GC). -->
+        <FrameLayout
+            android:id="@+id/reader_progress_container"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_gravity="bottom"
+            android:layout_marginBottom="24dp"
+            android:background="@android:color/transparent">
+
+            <View
+                android:id="@+id/reader_reading_progress_fill"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="?attr/colorAccent"
+                android:scaleX="0"
+                android:alpha="0.9"
+                android:transformPivotX="0dp" />
+        </FrameLayout>
+
     </FrameLayout>
 </FrameLayout>

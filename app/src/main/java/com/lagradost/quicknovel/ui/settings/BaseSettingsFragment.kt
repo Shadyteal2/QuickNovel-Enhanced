@@ -481,6 +481,7 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
         super.onViewCreated(view, savedInstanceState)
         activity?.fixPaddingStatusbar(view)
         listView.layoutManager = LinearLayoutManager(context)
+        listView.clipChildren = false
     }
 
     companion object {

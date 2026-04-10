@@ -6,7 +6,7 @@
         android:title="Experimental Aesthetics"
         app:allowDividerAbove="false">
 
-        <SwitchPreferenceCompat
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
             android:defaultValue="false"
             android:key="@string/experimental_visuals_key"
             android:summary="Enable premium generative visuals (Higher Power Consumption)"
@@ -18,19 +18,20 @@
         android:dependency="@string/experimental_visuals_key"
         android:title="Living Elements">
 
-        <SwitchPreferenceCompat
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
             android:defaultValue="false"
             android:key="@string/living_glass_key"
             android:summary="@string/living_glass_desc"
             android:title="@string/living_glass" />
 
-        <SeekBarPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
             android:dependency="@string/living_glass_key"
             android:key="@string/aura_intensity_key"
-            android:max="100"
             android:title="@string/aura_intensity"
             app:defaultValue="70"
-            app:showSeekBarValue="true" />
+            app:valueFrom="0"
+            app:valueTo="100"
+            app:stepSize="1" />
 
         <ListPreference
             android:dependency="@string/living_glass_key"
@@ -41,29 +42,32 @@
             app:defaultValue="nebula"
             app:useSimpleSummaryProvider="true" />
 
-        <SeekBarPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
             android:dependency="@string/living_glass_key"
             android:key="@string/aura_speed_key"
-            android:max="200"
             android:title="@string/aura_speed"
             app:defaultValue="100"
-            app:showSeekBarValue="true" />
+            app:valueFrom="50"
+            app:valueTo="200"
+            app:stepSize="1" />
 
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Luminescent Engine">
-        <SwitchPreferenceCompat
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
             android:key="@string/luminescent_reader_key"
             android:title="@string/luminescent_reader"
             android:summary="@string/luminescent_reader_desc"
             android:defaultValue="false" />
 
-        <SeekBarPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
             android:key="@string/luminescent_intensity_key"
             android:title="@string/luminescent_intensity"
             android:dependency="@string/luminescent_reader_key"
-            android:defaultValue="50"
-            android:max="100" />
+            app:defaultValue="50"
+            app:valueFrom="0"
+            app:valueTo="100"
+            app:stepSize="1" />
 
     </PreferenceCategory>
 

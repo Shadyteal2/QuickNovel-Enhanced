@@ -57,6 +57,7 @@
     <attr name="valueFrom" format="float" />
     <attr name="valueTo" format="float" />
     <attr name="stepSize" format="float" />
+    <attr name="valueSuffix" format="string" />
 
     <!-- Custom View Attributes -->
     <declare-styleable name="ElasticSwitch">
@@ -73,6 +74,7 @@
         <attr name="valueFrom" />
         <attr name="valueTo" />
         <attr name="stepSize" />
+        <attr name="valueSuffix" />
     </declare-styleable>
 
     <declare-styleable name="TactileRulerSlider">

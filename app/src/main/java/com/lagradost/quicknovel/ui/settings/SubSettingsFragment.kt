@@ -82,6 +82,7 @@ class SubSettingsFragment : BaseSettingsFragment() {
 
             // Fix bottom padding for navigation pill (optimized)
             list.clipToPadding = false
+            list.clipChildren = false
             list.setPadding(0, 0, 0, 85.toPx)
         }
     }
