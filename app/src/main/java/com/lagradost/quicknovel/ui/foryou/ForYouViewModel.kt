@@ -70,8 +70,15 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _isLoading.postValue(true)
             try {
-                // If we have no providers and aren't syncing, trigger a one-time sync to recover
-                if (com.lagradost.quicknovel.util.Apis.apis.isEmpty() && com.lagradost.quicknovel.util.Apis.isSyncing.value != true) {
+                // If we have no providers and aren't syncing, trigger a one-time sync to recover.
+                // But ONLY if there are no plugin APKs on disk — if APKs exist the user has already
+                // installed providers (via manual import or prior sync) and we should not re-trigger
+                // the sync indicator just because the in-memory list hasn't populated yet.
+                val pluginsDir = com.lagradost.quicknovel.util.PluginManager.getPluginsDir(context)
+                val hasPluginsOnDisk = pluginsDir.listFiles()?.any { it.name.endsWith(".apk") } == true
+                if (com.lagradost.quicknovel.util.Apis.apis.isEmpty() &&
+                    !hasPluginsOnDisk &&
+                    com.lagradost.quicknovel.util.Apis.isSyncing.value != true) {
                     val request = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>()
                         .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
                         .build()
