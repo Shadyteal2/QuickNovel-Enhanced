@@ -55,6 +55,7 @@ import com.lagradost.quicknovel.util.UIHelper.popupMenuCustom
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.util.toPx
 import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.MagicAnimator
 
 const val MAX_SYNO_LENGH = 300
 
@@ -529,6 +530,13 @@ class ResultFragment : Fragment() {
             resultProviderChip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF"))
             resultProviderChip.setTextColor(if (isLightTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
 
+            // ─── MagicAnimator: Premium icon spring presses ──────────────────
+            MagicAnimator.applyIconPress(resultBack)
+            MagicAnimator.applyIconPress(resultShare)
+            MagicAnimator.applyIconPress(resultOpeninbrower)
+            MagicAnimator.applyCardPress(resultContinueReading)
+            // ────────────────────────────────────────────────────────────────
+
             resultReloadConnectionerror.setOnClickListener { viewModel.initState(apiName, url) }
             resultOpeninbrower.setOnClickListener { viewModel.openInBrowser() }
             resultReloadConnectionOpenInBrowser.setOnClickListener { viewModel.openInBrowser() }
@@ -558,6 +566,8 @@ class ResultFragment : Fragment() {
 
             resultShare.setOnClickListener { viewModel.share() }
 
+            // MagicAnimator: spring press on chapters FAB
+            MagicAnimator.applyIconPress(resultChaptersFab)
             resultChaptersFab.setOnClickListener { view ->
                 val act = activity ?: return@setOnClickListener
                 val popup = android.widget.ListPopupWindow(act)
@@ -671,6 +681,8 @@ class ResultFragment : Fragment() {
                 }
             })
 
+            // MagicAnimator: spring press on bookmark button
+            MagicAnimator.applyCardPress(resultBookmark)
             resultBookmark.setOnClickListener { view ->
                 view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 val context = view.context ?: return@setOnClickListener
@@ -738,6 +750,8 @@ class ResultFragment : Fragment() {
                 
                 popup.setOnItemClickListener { _, _, position, _ ->
                     viewModel.bookmark(menuItems[position].first)
+                    // MagicAnimator: pop pulse feedback when bookmarked
+                    MagicAnimator.popPulse(resultBookmark)
                     popup.dismiss()
                 }
                 popup.show()

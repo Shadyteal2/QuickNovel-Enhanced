@@ -22,6 +22,7 @@ import com.lagradost.quicknovel.mvvm.observeNullable
 import com.lagradost.quicknovel.ui.setRecycledViewPool
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
+import com.lagradost.quicknovel.util.MagicAnimator
 
 
 class MainPageFragment : Fragment() {
@@ -232,6 +233,8 @@ class MainPageFragment : Fragment() {
                             binding.mainpageList.post {
                                 binding.mainpageList.scrollToPosition(0)
                             }
+                            // MagicAnimator: cascade reveal for fresh first-page results
+                            MagicAnimator.runGridReveal(binding.mainpageList)
                         }
                         binding.mainpageList.isInvisible = false
                         //binding.mainpageList.isVisible = true
