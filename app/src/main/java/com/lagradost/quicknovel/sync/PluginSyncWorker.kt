@@ -65,7 +65,18 @@ class PluginSyncWorker(
             try {
                 com.lagradost.quicknovel.util.Apis.setSyncing(true)
                 android.util.Log.i("PluginSync", "Starting manifest fetch from $MANIFEST_URL")
-            
+
+                // ── Early dismiss: if providers already exist (manually imported or
+                //    previously synced), clear the "syncing" indicator right away so
+                //    the UI never hangs waiting for GitHub. The actual network sync
+                //    continues running silently in the background.
+                val pluginsDir = PluginManager.getPluginsDir(applicationContext)
+                val hasPluginsLocally = pluginsDir.listFiles()?.any { it.name.endsWith(".apk") } == true
+                if (hasPluginsLocally && !force) {
+                    android.util.Log.i("PluginSync", "Providers already installed — dismissing syncing indicator. Will sync silently.")
+                    com.lagradost.quicknovel.util.Apis.setSyncing(false)
+                }
+
             val response = syncApp.get(MANIFEST_URL)
             if (!response.isSuccessful) {
                 android.util.Log.e("PluginSync", "Manifest fetch failed: ${response.code}")
@@ -76,9 +87,6 @@ class PluginSyncWorker(
             val manifestText = response.text
             val currentHash = getManifestHash(manifestText)
             val lastHash = com.lagradost.quicknovel.BaseApplication.getKey<String>("LAST_MANIFEST_HASH")
-            
-            val pluginsDir = PluginManager.getPluginsDir(applicationContext)
-            val hasPluginsLocally = pluginsDir.listFiles()?.any { it.name.endsWith(".apk") } == true
 
             // If hash matches and we have plugins, skip everything
             if (!force && currentHash == lastHash && hasPluginsLocally) {
