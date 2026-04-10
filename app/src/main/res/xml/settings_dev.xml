@@ -17,11 +17,12 @@
         app:layout="@layout/setting_tile" />
 
     <Preference
-        android:title="@string/import_plugin"
-        android:key="@string/plugin_import_key"
-        android:summary="@string/import_plugin_desc"
+        android:title="@string/import_provider_apk"
+        android:key="@string/provider_apk_import_key"
+        android:summary="@string/import_provider_apk_desc"
         android:icon="@drawable/ic_baseline_add_24"
         app:layout="@layout/setting_tile" />
+
 
     <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
         android:title="@string/cloudflare_auto_solve_title"

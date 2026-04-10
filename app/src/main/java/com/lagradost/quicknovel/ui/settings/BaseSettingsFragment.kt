@@ -55,6 +55,8 @@ import com.lagradost.quicknovel.util.backgroundEffectDisplayLabel
 import com.lagradost.quicknovel.util.backgroundEffectLabels
 import com.lagradost.safefile.MediaFileContentType
 import com.lagradost.safefile.SafeFile
+import dalvik.system.DexClassLoader
+import dalvik.system.DexFile
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -66,6 +68,10 @@ import java.util.Locale
 import com.lagradost.quicknovel.util.TranslationEngineType
 import androidx.preference.ListPreference
 import androidx.preference.EditTextPreference
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.lagradost.quicknovel.API_VERSION
+import com.lagradost.quicknovel.MainAPI
+import com.lagradost.quicknovel.util.PluginItem
 
 /**
  * Universal SafeFile Extensions for NeoQN storage management.
@@ -222,10 +228,129 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                      // Simplification: set isManualImport in JSON if provided or just load all
                      PluginManager.loadAllPlugins(context)
                      activity?.runOnUiThread { showToast("Plugins updated!") }
-                 } catch (e: Exception) {
+                  } catch (e: Exception) {
                      logError(e)
                  }
              }
+        }
+
+    /**
+     * User-facing picker: select a single provider APK from storage.
+     * No JSON required — metadata is auto-synthesised by scanning the DEX.
+     * Works identically to the sync system under-the-hood; providers load right away.
+     */
+    protected val providerApkPicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            val ctx = context ?: return@registerForActivityResult
+            ioSafe {
+                try {
+                    // ── 1. Verify signature ─────────────────────────────────────────
+                    if (!PluginManager.verifyApkSignature(ctx, uri)) {
+                        activity?.runOnUiThread { showToast(getString(R.string.import_provider_apk_bad_sig)) }
+                        return@ioSafe
+                    }
+
+                    // ── 2. Resolve display name → stable bundle id ────────────────
+                    val displayName = ctx.contentResolver
+                        .query(uri, null, null, null, null)?.use { cursor ->
+                            val col = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            cursor.moveToFirst()
+                            cursor.getString(col)
+                        } ?: "provider.apk"
+
+                    val bundleId = displayName
+                        .removeSuffix(".apk").removeSuffix(".dex")
+                        .replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
+
+                    val pluginsDir = PluginManager.getPluginsDir(ctx)
+                    val destApk   = File(pluginsDir, "$bundleId.apk")
+                    val destJson  = File(pluginsDir, "$bundleId.json")
+
+                    // ── 3. Notify if this is already installed (update path) ──────
+                    if (destJson.exists()) {
+                        try {
+                            val old = jacksonObjectMapper().readValue(destJson.readText(), PluginItem::class.java)
+                            activity?.runOnUiThread {
+                                showToast(getString(R.string.import_provider_apk_duplicate_format, old.version))
+                            }
+                        } catch (_: Exception) {}
+                    }
+
+                    // ── 4. Copy APK bytes to plugins dir ─────────────────────────
+                    ctx.contentResolver.openInputStream(uri)?.use { input ->
+                        destApk.outputStream().use { out -> input.copyTo(out) }
+                    }
+                    destApk.setReadOnly() // DexClassLoader requires read-only on API 26+
+
+                    // Clear old classloader caches so the new file loads fresh
+                    PluginManager.removeCachesForPath(destApk.absolutePath)
+
+                    // ── 5. Scan DEX for all concrete MainAPI subclasses ───────────
+                    val foundClasses = mutableListOf<String>()
+                    try {
+                        @Suppress("DEPRECATION")
+                        val dex = DexFile(destApk.absolutePath)
+                        val loader = DexClassLoader(
+                            destApk.absolutePath,
+                            ctx.codeCacheDir.absolutePath,
+                            null,
+                            ctx.classLoader
+                        )
+                        val entries = dex.entries()
+                        while (entries.hasMoreElements()) {
+                            val className = entries.nextElement()
+                            // Fast-skip framework packages to keep scan time low
+                            if (className.startsWith("android.") ||
+                                className.startsWith("kotlin.") ||
+                                className.startsWith("kotlinx.") ||
+                                className.startsWith("java.")) continue
+                            try {
+                                val clazz = loader.loadClass(className)
+                                if (MainAPI::class.java.isAssignableFrom(clazz) &&
+                                    !java.lang.reflect.Modifier.isAbstract(clazz.modifiers) &&
+                                    !clazz.isInterface) {
+                                    foundClasses.add(className)
+                                    android.util.Log.d("ProviderApkImport", "Found provider: $className")
+                                }
+                            } catch (_: Throwable) { /* skip unloadable / abstract classes */ }
+                        }
+                        dex.close()
+                    } catch (e: Exception) {
+                        logError(e)
+                    }
+
+                    // ── 6. Abort if nothing was found ─────────────────────────────
+                    if (foundClasses.isEmpty()) {
+                        destApk.delete()
+                        activity?.runOnUiThread { showToast(getString(R.string.import_provider_apk_none_found)) }
+                        return@ioSafe
+                    }
+
+                    // ── 7. Write companion JSON  (isManualImport = true) ──────────
+                    //      Sync worker checks this flag and will SKIP auto-update for
+                    //      manually imported APKs, so the two paths never conflict.
+                    val meta = PluginItem(
+                        pluginId      = bundleId,
+                        name          = bundleId,
+                        version       = 1,
+                        minApiVersion = API_VERSION,
+                        mainClasses   = foundClasses,
+                        url           = "local://$bundleId",  // placeholder; sync skips isManualImport
+                        isManualImport = true
+                    )
+                    destJson.writeText(jacksonObjectMapper().writeValueAsString(meta))
+
+                    // ── 8. Hot-reload so providers appear immediately ──────────────
+                    PluginManager.loadAllPlugins(ctx)
+                    activity?.runOnUiThread {
+                        showToast(getString(R.string.import_provider_apk_success_format, foundClasses.size))
+                    }
+                } catch (e: Exception) {
+                    logError(e)
+                    activity?.runOnUiThread { showToast("Import failed: ${e.message}") }
+                }
+            }
         }
 
     fun PreferenceFragmentCompat?.getPref(id: Int): Preference? {
@@ -460,6 +585,12 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
         getPref(R.string.clear_cookies_key)?.setOnPreferenceClickListener {
             android.webkit.CookieManager.getInstance().removeAllCookies(null)
             showToast("Network cookies cleared")
+            true
+        }
+
+        // Manual provider APK import
+        getPref(R.string.provider_apk_import_key)?.setOnPreferenceClickListener {
+            providerApkPicker.launch(arrayOf("application/vnd.android.package-archive", "*/*"))
             true
         }
 

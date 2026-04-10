@@ -351,6 +351,13 @@
     <string name="dev_only_desc">For dev and beta testers only</string>
     <string name="plugin_import_invalid_apk">Invalid APK or DEX file selected</string>
     <string name="plugin_import_signature_error">Plugin rejected: Signature mismatch! Internal developer only.</string>
+    <string name="provider_apk_import_key" translatable="false">provider_apk_import_key</string>
+    <string name="import_provider_apk">Import Provider APK</string>
+    <string name="import_provider_apk_desc">Pick a provider APK file directly — bypass GitHub sync (same providers, different method)</string>
+    <string name="import_provider_apk_success_format" formatted="true">✓ Loaded %d provider(s) from APK</string>
+    <string name="import_provider_apk_none_found">No providers found in this APK. Is it the correct file?</string>
+    <string name="import_provider_apk_bad_sig">APK rejected — signature does not match trusted key</string>
+    <string name="import_provider_apk_duplicate_format" formatted="true">Provider already installed (v%d). Import will update it.</string>
     <string name="clear_cookies">Clear Network Cookies</string>
     <string name="clear_cookies_desc">Removes all stored Cloudflare and site cookies. Use if verification is stuck.</string>
     <string name="clear_cookies_key" translatable="false">clear_cookies_key</string>
