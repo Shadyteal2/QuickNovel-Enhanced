@@ -49,6 +49,7 @@ object ReaderPrefs {
     const val TEXT_PADDING_TOP      = "reader_epub_text_padding_top"
     const val FONT                  = "reader_epub_font"
     const val READER_TYPE           = "reader_reader_type"
+    const val SHOW_READER_PROGRESS  = "reader_epub_show_progress"
 
     // ── Status bar / overlay ──────────────────────────────────────────────────
     const val HAS_BATTERY           = "reader_epub_has_battery"

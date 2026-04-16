@@ -351,6 +351,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         if (key == "NEW_UPDATES_COUNT") {
             updateUpdatesBadge()
         }
+        if (key == getString(R.string.navbar_width_key)) {
+            updateNavBarWidth()
+        }
     }
 
     private fun hidePreviewPopupDialog() {
@@ -716,24 +719,29 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
 
         binding?.let { b ->
-            ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, windowInsets ->
-                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-                val bottomInset = insets.bottom
-
-                b.navBarContainer.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                    val threshold = 24.toPx
-                    if (bottomInset > threshold) {
-                        bottomMargin = 30.toPx + bottomInset
-                    } else {
-                        bottomMargin = 30.toPx
-                    }
+            // Target navRootLayout directly — it is the bottom-constrained parent.
+            // The old approach updated navBarContainer (a child inside navRootLayout)
+            // which had no effect on screen position.
+            // Setting on b.root (CoordinatorLayout) and updating a deep child also fails
+            // because intermediate FrameLayouts swallow insets without relaying them.
+            ViewCompat.setOnApplyWindowInsetsListener(b.navRootLayout) { view, windowInsets ->
+                val navBarInsets = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
+                val bottomInset = navBarInsets.bottom
+                val lp = view.layoutParams as? ViewGroup.MarginLayoutParams
+                if (lp != null) {
+                    lp.bottomMargin = if (bottomInset > 0) bottomInset + 16.toPx else 24.toPx
+                    view.layoutParams = lp
+                    view.requestLayout()
                 }
                 windowInsets
             }
+            // Force a re-dispatch: insets may have already fired before this listener was set
+            ViewCompat.requestApplyInsets(b.root)
         }
         
         updateGlobalBackground()
         updateGlobalAura()
+        updateNavBarWidth()
         settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)
         updateUpdatesBadge()
 
@@ -1307,4 +1315,31 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     private fun syncIndicator(itemId: Int) {
         updateNavSelection(itemId)
     }
+
+    private fun updateNavBarWidth() {
+        val b = binding ?: return
+        val settingsManager = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+        
+        // Handle potential type mismatch gracefully (Float is expected but handle Int just in case)
+        val widthDp = try {
+            settingsManager.getFloat(getString(R.string.navbar_width_key), 330f)
+        } catch (e: Exception) {
+            // Backup for manual values or legacy preference formats
+            settingsManager.getInt(getString(R.string.navbar_width_key), 330).toFloat()
+        }
+        
+        val widthPx = widthDp.toInt().toPx
+        
+        b.navBarContainer.apply {
+            minimumWidth = widthPx
+            updateLayoutParams<androidx.constraintlayout.widget.ConstraintLayout.LayoutParams> {
+                this.matchConstraintMinWidth = widthPx
+                this.matchConstraintDefaultWidth = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_CONSTRAINT_WRAP
+            }
+            // Force a re-layout of the container and its parent chain
+            requestLayout()
+        }
+        b.navRootLayout.requestLayout()
+    }
+
 }

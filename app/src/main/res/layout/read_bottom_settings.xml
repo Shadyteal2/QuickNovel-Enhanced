@@ -235,6 +235,27 @@
                         android:contentDescription="@string/show_authors_notes" />
                 </LinearLayout>
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/show_reading_progress"
+                        android:textSize="16sp"
+                        android:textColor="?attr/textColor" />
+                    <com.lagradost.quicknovel.ui.custom.ElasticSwitch
+                        android:id="@+id/read_settings_show_progress"
+                        android:layout_width="54dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="@string/show_reading_progress" />
+                </LinearLayout>
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/read_settings_character_aliases"
                     style="@style/BlackButton"

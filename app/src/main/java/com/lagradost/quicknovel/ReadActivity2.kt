@@ -1304,6 +1304,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
         updateOverlayVisibility()
 
+        observe(viewModel.showReaderProgressLive) { show ->
+            binding.readerProgressContainer.isVisible = show == true
+        }
+
         observe(viewModel.screenAwakeLive) { awake ->
             if (awake)
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -2279,6 +2283,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 readSettingsShowBattery.isChecked = viewModel.showBattery
                 readSettingsShowBattery.setOnCheckedChangeListener { _, isChecked ->
                     viewModel.showBattery = isChecked
+                }
+
+                readSettingsShowProgress.isChecked = viewModel.showReaderProgress
+                readSettingsShowProgress.setOnCheckedChangeListener { _, isChecked ->
+                    viewModel.showReaderProgress = isChecked
                 }
 
                 readSettingsKeepScreenActive.setOnCheckedChangeListener { _, isChecked ->

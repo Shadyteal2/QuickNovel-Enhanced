@@ -2096,10 +2096,14 @@ class ReadActivityViewModel : ViewModel() {
         EPUB_TEXT_PADDING_TOP, DEF_VERTICAL_PAD, Int::class, paddingVerticalLive
     )
 
-    //val time12HLive: MutableLiveData<Boolean> = MutableLiveData(null)
     //var time12H by PreferenceDelegateLiveView(
     //    EPUB_TWELVE_HOUR_TIME, false, Boolean::class, time12HLive
     //)
+
+    val showReaderProgressLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var showReaderProgress by PreferenceDelegateLiveView(
+        EPUB_SHOW_READER_PROGRESS, true, Boolean::class, showReaderProgressLive
+    )
 
     val screenAwakeLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var screenAwake by PreferenceDelegateLiveView(

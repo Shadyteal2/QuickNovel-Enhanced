@@ -108,4 +108,15 @@
         android:icon="@drawable/ic_baseline_stay_current_portrait_24"
         app:layout="@layout/setting_tile" />
 
+    <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
+        android:key="@string/navbar_width_key"
+        android:title="@string/navbar_width_title"
+        android:summary="@string/navbar_width_summary"
+        app:valueTo="440"
+        app:valueFrom="220"
+        app:defaultValue="330"
+        app:valueSuffix="dp"
+        android:icon="@drawable/ic_baseline_tune_24"
+        app:layout="@layout/setting_seekbar_tile" />
+
 </PreferenceScreen>

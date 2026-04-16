@@ -33,6 +33,9 @@ interface NovelDao {
     @Query("UPDATE novel SET downloadStatus = :status, downloadProgress = :progress, downloadTotal = :total WHERE id = :id")
     fun updateDownloadProgress(id: Int, status: Int?, progress: Long?, total: Long?)
 
+    @Query("UPDATE novel SET downloadStatus = NULL, downloadProgress = NULL, downloadTotal = NULL, filePath = NULL, lastDownloaded = NULL WHERE id = :id")
+    fun resetDownloadData(id: Int)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(novel: NovelEntity)
 

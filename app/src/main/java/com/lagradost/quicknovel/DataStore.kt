@@ -60,6 +60,7 @@ const val EPUB_SLEEP_TIMER: String = "reader_epub_tts_timer"
 const val EPUB_ML_FROM_LANGUAGE: String = "reader_epub_ml_from"
 const val EPUB_ML_TO_LANGUAGE: String = "reader_epub_ml_to"
 const val EPUB_ML_USEONLINETRANSLATION: String = "reader_epub_ml_use_online"
+const val EPUB_SHOW_READER_PROGRESS: String = "reader_epub_show_progress"
 
 const val EPUB_HAS_TIME: String = "reader_epub_has_time"
 const val EPUB_TWELVE_HOUR_TIME: String = "reader_epub_twelve_hour_time"

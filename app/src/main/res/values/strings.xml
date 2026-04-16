@@ -458,6 +458,10 @@
     <string name="luminescent_intensity">Glow Intensity</string>
     <string name="luminescent_intensity_key" translatable="false">luminescent_intensity</string>
 
+    <string name="navbar_width_key" translatable="false">navbar_width</string>
+    <string name="navbar_width_title">Navigation Bar Width</string>
+    <string name="navbar_width_summary">Adjust the width of the bottom navigation cluster</string>
+
     <!-- Accessibility Labels -->
     <string name="a11y_rewind">Rewind</string>
     <string name="a11y_stop">Stop</string>
@@ -469,4 +473,5 @@
     <string name="a11y_drag_handle">Drag Handle</string>
     <string name="a11y_info">Information</string>
     <string name="a11y_theme_format">Select %s Theme</string>
+    <string name="show_reading_progress">Show Reading Progress</string>
 </resources>

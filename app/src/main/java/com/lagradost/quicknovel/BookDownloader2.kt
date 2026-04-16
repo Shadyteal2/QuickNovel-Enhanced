@@ -322,8 +322,8 @@ object BookDownloader2Helper {
         fromDir.copyRecursively(toDir, overwrite = false)
     }
 
-    fun deleteNovel(activity: Activity?, author: String?, name: String, apiName: String) {
-        if (activity == null) return
+    fun deleteNovel(context: Context?, author: String?, name: String, apiName: String) {
+        if (context == null) return
         try {
             val sApiName = sanitizeFilename(apiName)
             val sAuthor = if (author == null) "" else sanitizeFilename(author)
@@ -332,7 +332,7 @@ object BookDownloader2Helper {
 
             val dir =
                 File(
-                    activity.filesDir.toString() + getDirectory(sApiName, sAuthor, sName)
+                    context.filesDir.toString() + getDirectory(sApiName, sAuthor, sName)
                 )
 
             removeKey(DOWNLOAD_SIZE, id.toString())
@@ -341,7 +341,16 @@ object BookDownloader2Helper {
             removeKey(DOWNLOAD_OFFSET, id.toString())
             removeKey(com.lagradost.quicknovel.DOWNLOAD_FOLDER, id.toString())
             ioSafe {
-                com.lagradost.quicknovel.db.AppDatabase.getDatabase(activity).novelDao().deleteById(id)
+                val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao()
+                val existing = dao.getById(id)
+                if (existing != null && existing.bookmarkType != null && existing.bookmarkType != 0) {
+                    // Novel is still bookmarked — preserve the row but clear all download state
+                    // so it vanishes from the Downloads tab while staying in its bookmark section.
+                    dao.resetDownloadData(id)
+                } else {
+                    // Not bookmarked: safe to delete the row entirely
+                    dao.deleteById(id)
+                }
             }
 
             if (dir.isDirectory) {
@@ -1312,7 +1321,7 @@ object BookDownloader2 {
             }
 
             // delete the novel
-            BookDownloader2Helper.deleteNovel(activity, author, name, apiName)
+            BookDownloader2Helper.deleteNovel(context, author, name, apiName)
 
             // remove from info
             downloadInfoMutex.withLock {
@@ -1809,6 +1818,7 @@ object BookDownloader2 {
 
         ioSafe {
             val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@ioSafe).novelDao()
+            val existing = dao.getById(id)
             dao.insert(com.lagradost.quicknovel.db.NovelEntity(
                 id = id,
                 source = newData.source,
@@ -1824,7 +1834,12 @@ object BookDownloader2 {
                 lastUpdated = newData.lastUpdated,
                 lastDownloaded = newData.lastDownloaded,
                 filePath = newData.filePath,
-                formatType = newData.formatType
+                formatType = newData.formatType,
+                hash = existing?.hash,
+                bookmarkType = existing?.bookmarkType,
+                downloadStatus = existing?.downloadStatus,
+                downloadProgress = existing?.downloadProgress,
+                downloadTotal = existing?.downloadTotal
             ))
         }
 
@@ -1902,7 +1917,12 @@ object BookDownloader2 {
                 lastUpdated = currentDownloadData.lastUpdated,
                 lastDownloaded = currentDownloadData.lastDownloaded,
                 filePath = currentDownloadData.filePath,
-                formatType = currentDownloadData.formatType
+                formatType = currentDownloadData.formatType,
+                hash = oldNovel?.hash,
+                bookmarkType = oldNovel?.bookmarkType,
+                downloadStatus = oldNovel?.downloadStatus,
+                downloadProgress = oldNovel?.downloadProgress,
+                downloadTotal = oldNovel?.downloadTotal
             ))
         }
         setKey(DOWNLOAD_TOTAL, id.toString(), total)
