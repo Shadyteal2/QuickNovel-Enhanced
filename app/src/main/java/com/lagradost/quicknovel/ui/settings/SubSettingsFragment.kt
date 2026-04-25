@@ -1,9 +1,9 @@
 package com.lagradost.quicknovel.ui.settings
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import com.lagradost.quicknovel.R
-import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
 import com.lagradost.quicknovel.util.toPx
 
 /**
@@ -14,11 +14,20 @@ class SubSettingsFragment : BaseSettingsFragment() {
 
     companion object {
         const val XML_RES_ID = "xml_res"
+        const val ICON_RES_ID = "icon_res"
+        const val TITLE_RES_ID = "title_res"
+        const val TRANSITION_NAME = "transition_name"
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // No special transitions, use navigation defaults (Slide)
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val xmlRes = arguments?.getInt(XML_RES_ID) ?: R.xml.settings_appearance
-        val titleRes = arguments?.getInt("title_res") ?: R.string.appearance
+        val titleRes = arguments?.getInt(TITLE_RES_ID) ?: R.string.appearance
+        val iconRes = arguments?.getInt(ICON_RES_ID) ?: R.drawable.ic_baseline_color_lens_24
         val title = getString(titleRes)
 
         setPreferencesFromResource(xmlRes, rootKey)
@@ -28,13 +37,12 @@ class SubSettingsFragment : BaseSettingsFragment() {
             init {
                 layoutResource = R.layout.layout_settings_header
                 key = "header_discovery"
-                order = -200 // Ensure it's absolutely at the top
+                order = -200 
                 isSelectable = false
             }
 
             override fun onBindViewHolder(holder: androidx.preference.PreferenceViewHolder) {
                 super.onBindViewHolder(holder)
-                // Set the specific layout parameters to remove horizontal margins if any
                 holder.itemView.setPadding(0, 0, 0, 0)
                 
                 holder.findViewById(R.id.settings_header_back)?.setOnClickListener {
@@ -45,45 +53,39 @@ class SubSettingsFragment : BaseSettingsFragment() {
                 holder.findViewById(R.id.settings_header_title)?.let { view ->
                     (view as? android.widget.TextView)?.let { tv ->
                         tv.text = title
-                        
-                        // Entrance Animation: Slide up + Fade in
-                        tv.alpha = 0f
-                        tv.translationY = 50f
-                        tv.animate()
-                            .alpha(1f)
-                            .translationY(0f)
-                            .setDuration(500)
-                            .setInterpolator(android.view.animation.DecelerateInterpolator())
-                            .start()
+                    }
+                }
+
+                holder.findViewById(R.id.settings_header_icon)?.let { view ->
+                    (view as? android.widget.ImageView)?.let { iv ->
+                        iv.setImageResource(iconRes)
                     }
                 }
             }
         })
 
         activity?.title = title
-        
-        // Setup shared listeners (themes, backup, etc.)
         setupPreferenceListeners()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
-        // Hide ActionBar to avoid double headlines
+        // Clear solid background to allow MainActivity's custom background to show through.
+        view.background = null
+        view.isClickable = true
+        view.isFocusable = true
+        
         (activity as? androidx.appcompat.app.AppCompatActivity)?.supportActionBar?.hide()
         
-        // Note: Status bar padding is now handled via fitsSystemWindows in layout_settings_header 
-        // to prevent double-padding or clipping.
-        
         listView?.let { list ->
+            list.background = null
             list.isDrawingCacheEnabled = false
-            // Premium simple decoration (dividers only, no boxes)
             list.addItemDecoration(com.lagradost.quicknovel.ui.custom.GroupedPreferenceDecoration())
-
-            // Fix bottom padding for navigation pill (optimized)
             list.clipToPadding = false
             list.clipChildren = false
-            list.setPadding(0, 0, 0, 85.toPx)
+            list.setPadding(0, 0, 0, 120.toPx) // Increased padding for safer clearance
         }
     }
+
 }

@@ -138,6 +138,10 @@ class DownloadFragment : Fragment() {
         val filePath: String? = null,
         @JsonProperty("formatType")
         val formatType: String? = null,
+        @JsonProperty("hash")
+        val hash: String? = null,
+        @JsonProperty("bookmarkType")
+        val bookmarkType: Int? = null,
     )
 
     data class DownloadDataLoaded(
@@ -174,10 +178,6 @@ class DownloadFragment : Fragment() {
                 }
             }
             img(posterUrl)
-        }
-
-        override fun hashCode(): Int {
-            return id
         }
 
         val isImported: Boolean get() = (apiName == IMPORT_SOURCE || apiName ==IMPORT_SOURCE_PDF)

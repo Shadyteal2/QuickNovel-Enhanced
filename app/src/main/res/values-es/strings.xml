@@ -263,6 +263,9 @@
     <string name="clipboard_permission_error">Error de permisos al acceder al portapapeles.</string>
     <string name="clipboard_unknown_error">Error desconocido al copiar datos.</string>
     <string name="show_log_cat">Ver registros (Logcat) 🐈</string>
+    <string name="show_read">Mostrar leídos</string>
+    <string name="show_unread">Mostrar sin leer</string>
+    <string name="show_downloaded">Mostrar descargados</string>
     <string name="unread">Sin leer</string>
     <string name="bookmark">Marcador</string>
     <string name="read">Leído</string>

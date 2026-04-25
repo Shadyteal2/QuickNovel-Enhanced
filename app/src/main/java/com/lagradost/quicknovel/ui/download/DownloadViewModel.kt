@@ -140,6 +140,47 @@ class DownloadViewModel : ViewModel() {
     private val cardsData: java.util.HashMap<Int, com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded> = hashMapOf()
     private val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: com.lagradost.quicknovel.BaseApplication.context!!).novelDao()
 
+    private fun getSavedCategories(): List<CategoryItem> {
+        val json = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+        return try {
+            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            val customList = mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {})
+            
+            val orderJson = getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
+            val orderList = mapper.readValue(orderJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {})
+
+            val allItems = systemCategories + customList
+            if (orderList.isNotEmpty()) {
+                allItems.sortedBy { orderList.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
+            } else {
+                allItems
+            }
+        } catch (t: Throwable) {
+            systemCategories
+        }
+    }
+
+    private val _readList = MutableStateFlow<List<CategoryItem>>(getSavedCategories())
+    val readList: List<CategoryItem> get() = _readList.value
+
+    fun updateCategories(newList: List<CategoryItem>) {
+        _readList.value = newList
+        val customList = newList.filter { !it.isSystem }
+        val orderList = newList.map { it.id }
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        setKey(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", mapper.writeValueAsString(customList))
+        setKey(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", mapper.writeValueAsString(orderList))
+        loadAllData(false)
+    }
+
+    fun addCategory(name: String) {
+        val current = readList
+        val maxId = (current.maxByOrNull { it.id }?.id ?: 10).coerceAtLeast(10)
+        val newItem = CategoryItem(maxId + 1, null, name, false)
+        updateCategories(current + newItem)
+    }
+
     init {
         viewModelScope.launch {
             bookmarkChanged.collect {
@@ -185,47 +226,6 @@ class DownloadViewModel : ViewModel() {
                 postCards()
             }
         }
-    }
-
-    private fun getSavedCategories(): List<CategoryItem> {
-        val json = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-        return try {
-            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
-                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            val customList = mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {})
-            
-            val orderJson = getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
-            val orderList = mapper.readValue(orderJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {})
-
-            val allItems = systemCategories + customList
-            if (orderList.isNotEmpty()) {
-                allItems.sortedBy { orderList.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
-            } else {
-                allItems
-            }
-        } catch (t: Throwable) {
-            systemCategories
-        }
-    }
-
-    private val _readList = MutableStateFlow<List<CategoryItem>>(getSavedCategories())
-    val readList: List<CategoryItem> get() = _readList.value
-
-    fun updateCategories(newList: List<CategoryItem>) {
-        _readList.value = newList
-        val customList = newList.filter { !it.isSystem }
-        val orderList = newList.map { it.id }
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
-        setKey(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", mapper.writeValueAsString(customList))
-        setKey(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", mapper.writeValueAsString(orderList))
-        loadAllData(false)
-    }
-
-    fun addCategory(name: String) {
-        val current = readList
-        val maxId = (current.maxByOrNull { it.id }?.id ?: 10).coerceAtLeast(10)
-        val newItem = CategoryItem(maxId + 1, null, name, false)
-        updateCategories(current + newItem)
     }
 
     fun deleteCategory(id: Int) {
@@ -289,7 +289,11 @@ class DownloadViewModel : ViewModel() {
         } finally {
             setKey(DOWNLOAD_EPUB_LAST_ACCESS, card.id.toString(), System.currentTimeMillis())
             cardsDataMutex.withLock {
-                cardsData[card.id] = cardsData[card.id]?.copy(generating = false) ?: return@withLock
+                val current = cardsData[card.id] ?: return@withLock
+                cardsData[card.id] = current.copy(
+                    generating = false,
+                    readCount = getKey<Int>(DOWNLOAD_EPUB_SIZE, card.id.toString()) ?: 0
+                )
             }
             postCards()
         }
@@ -625,15 +629,20 @@ class DownloadViewModel : ViewModel() {
 
 
     private suspend fun postCards() {
-        _pages.value?.let { data ->
-            val list = CopyOnWriteArrayList(data)
-            if (list.isEmpty()) {
-                list.add(getDownloadedCards())
-            } else {
-                list[0] = getDownloadedCards()
-            }
-            _pages.postValue(list)
+        val currentPages = _pages.value
+        if (currentPages == null) {
+            // If they haven't been loaded yet, trigger a full load
+            // This prevents the "silent fail" when postCards() is called before loadAllData()
+            loadAllData(false)
+            return
         }
+        val list = CopyOnWriteArrayList(currentPages)
+        if (list.isEmpty()) {
+            list.add(getDownloadedCards())
+        } else {
+            list[0] = getDownloadedCards()
+        }
+        _pages.postValue(list)
     }
 
     init {
@@ -678,12 +687,16 @@ class DownloadViewModel : ViewModel() {
             cardsDataMutex.withLock {
                 val (id, state) = data
                 val newState = state.eta(context ?: return@launchSafe)
-                cardsData[id] = cardsData[id]?.copy(
+                val current = cardsData[id] ?: return@withLock // Only update if we already know about this card
+                
+                cardsData[id] = current.copy(
                     downloadedCount = state.progress,
                     downloadedTotal = state.total,
                     state = state.state,
                     ETA = newState,
-                ) ?: return@launchSafe
+                    // Occasionally refresh readCount too, though it mostly changes on readEpub
+                    readCount = if (state.progress % 10 == 0L) getKey<Int>(DOWNLOAD_EPUB_SIZE, id.toString()) ?: current.readCount else current.readCount
+                )
             }
             postCards()
         }

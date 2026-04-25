@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -20,11 +21,29 @@
         android:scaleType="centerInside"
         android:contentDescription="@string/back_btn" />
 
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/settings_header_icon_container"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="8dp"
+        app:cardBackgroundColor="?attr/iconGrayBackground"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="0dp">
+
+        <ImageView
+            android:id="@+id/settings_header_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="6dp"
+            android:src="@drawable/ic_baseline_color_lens_24"
+            app:tint="?attr/white" />
+    </com.google.android.material.card.MaterialCardView>
+
     <TextView
         android:id="@+id/settings_header_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="12dp"
         android:fontFamily="@font/productsans_bold"
         android:text="Appearance"
         android:textColor="?attr/white"

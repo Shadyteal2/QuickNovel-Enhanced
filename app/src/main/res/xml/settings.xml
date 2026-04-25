@@ -99,41 +99,6 @@
             app:layout="@layout/setting_tile" />
     </PreferenceCategory>
 
-    <PreferenceCategory
-        android:key="search"
-        android:title="@string/search"
-        app:layout="@layout/setting_category_title">
-        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
-                android:icon="@drawable/search_icon_white"
-                app:key="advanced_search"
-                android:title="@string/advanced_search"
-                android:summary="@string/advanced_search_desc"
-                app:defaultValue="true"
-                app:layout="@layout/setting_tile" />
-        <Preference
-                app:icon="@drawable/ic_baseline_cloud_24"
-                android:key="@string/search_providers_list_key"
-                android:title="@string/search_providers"
-                app:useSimpleSummaryProvider="true"
-                app:layout="@layout/setting_tile" />
-        <Preference
-                android:key="@string/download_path_key"
-                android:title="@string/download_path_pref"
-                android:icon="@drawable/netflix_download"
-                app:layout="@layout/setting_tile" />
-        <Preference
-                android:icon="@drawable/ic_baseline_language_24"
-                android:key="@string/provider_lang_key"
-                android:title="@string/provider_lang_settings"
-                app:layout="@layout/setting_tile" />
-
-        <Preference
-                android:icon="@drawable/ic_baseline_language_24"
-                android:key="@string/locale_key"
-                android:title="@string/locale_settings"
-                app:layout="@layout/setting_tile" />
-    </PreferenceCategory>
-
 
     <PreferenceCategory
             android:key="general"
@@ -202,17 +167,6 @@
                 android:title="@string/check_for_update"
                 app:key="@string/manual_check_update_key"
                 app:icon="@drawable/ic_baseline_system_update_24"
-                app:layout="@layout/setting_tile" />
-        <Preference
-                android:icon="@drawable/baseline_save_as_24"
-                android:key="@string/backup_key"
-                android:title="@string/backup_settings"
-                app:layout="@layout/setting_tile" />
-
-        <Preference
-                android:icon="@drawable/baseline_restore_page_24"
-                android:key="@string/restore_key"
-                android:title="@string/restore_settings"
                 app:layout="@layout/setting_tile" />
     </PreferenceCategory>
 

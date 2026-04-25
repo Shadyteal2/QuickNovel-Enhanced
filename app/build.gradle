@@ -10,8 +10,10 @@ android {
         includeInBundle = false
     }
 
-    viewBinding {
-        enabled = true
+    buildFeatures {
+        viewBinding = true
+        dataBinding = true
+        buildConfig = true
     }
 
     defaultConfig {

@@ -101,46 +101,46 @@ class SettingsFragment : Fragment() {
 
         // Appearance
         view.findViewById<View>(R.id.bento_appearance)?.setOnClickListener {
-            view.animate().alpha(0f).setDuration(150).start()
             navController.navigate(R.id.action_navigation_settings_to_subSettings, Bundle().apply {
                 putInt(SubSettingsFragment.XML_RES_ID, R.xml.settings_appearance)
-                putInt("title_res", R.string.appearance)
+                putInt(SubSettingsFragment.ICON_RES_ID, R.drawable.ic_baseline_color_lens_24)
+                putInt(SubSettingsFragment.TITLE_RES_ID, R.string.appearance)
             })
         }
 
         // Reader
         view.findViewById<View>(R.id.bento_reader)?.setOnClickListener {
-            view.animate().alpha(0f).setDuration(150).start()
             navController.navigate(R.id.action_navigation_settings_to_subSettings, Bundle().apply {
                 putInt(SubSettingsFragment.XML_RES_ID, R.xml.settings_general)
-                putInt("title_res", R.string.reader)
+                putInt(SubSettingsFragment.ICON_RES_ID, R.drawable.ic_baseline_menu_book_24)
+                putInt(SubSettingsFragment.TITLE_RES_ID, R.string.reader)
             })
         }
 
         // Storage
         view.findViewById<View>(R.id.bento_storage)?.setOnClickListener {
-            view.animate().alpha(0f).setDuration(150).start()
             navController.navigate(R.id.action_navigation_settings_to_subSettings, Bundle().apply {
                 putInt(SubSettingsFragment.XML_RES_ID, R.xml.settings_storage)
-                putInt("title_res", R.string.storage)
+                putInt(SubSettingsFragment.ICON_RES_ID, R.drawable.ic_baseline_cloud_24)
+                putInt(SubSettingsFragment.TITLE_RES_ID, R.string.storage)
             })
         }
 
         // Advanced
         view.findViewById<View>(R.id.bento_advanced)?.setOnClickListener {
-            view.animate().alpha(0f).setDuration(150).start()
             navController.navigate(R.id.action_navigation_settings_to_subSettings, Bundle().apply {
                 putInt(SubSettingsFragment.XML_RES_ID, R.xml.settings_dev)
-                putInt("title_res", R.string.advanced)
+                putInt(SubSettingsFragment.ICON_RES_ID, R.drawable.ic_baseline_tune_24)
+                putInt(SubSettingsFragment.TITLE_RES_ID, R.string.advanced)
             })
         }
 
         // Vibe & Aura (Experimental)
         view.findViewById<View>(R.id.bento_vibe)?.setOnClickListener {
-            view.animate().alpha(0f).setDuration(150).start()
             navController.navigate(R.id.action_navigation_settings_to_subSettings, Bundle().apply {
                 putInt(SubSettingsFragment.XML_RES_ID, R.xml.settings_vibe)
-                putInt("title_res", R.string.vibe_aura)
+                putInt(SubSettingsFragment.ICON_RES_ID, R.drawable.ic_baseline_star_24)
+                putInt(SubSettingsFragment.TITLE_RES_ID, R.string.vibe_aura)
             })
         }
         

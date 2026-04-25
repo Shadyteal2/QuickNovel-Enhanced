@@ -187,6 +187,9 @@
     <string name="download_failed">İndirme başarısız</string>
     <string name="update">Güncelle</string>
     <string name="dont_show_again">Tekrar gösterme</string>
+    <string name="show_read">Okunanları Göster</string>
+    <string name="show_unread">Okunmayanları Göster</string>
+    <string name="show_downloaded">İndirilenleri Göster</string>
     <string name="downloaded">İndirildi</string>
     <string name="pause">Duraklat</string>
     <string name="resume">Devam Et</string>

@@ -531,7 +531,9 @@ class AnyAdapter(
 
                     if (!sameName) imageText.text = currentName
                     
-                    val realState = card.state
+                    val isDoneByCount = card.downloadedCount >= card.downloadedTotal && card.downloadedTotal > 0
+                    val realState = if (isDoneByCount && card.state != DownloadState.IsDownloading) DownloadState.IsDone else card.state
+                    
                     downloadUpdate.alpha = 1f
                     downloadUpdate.isEnabled = true
                     
@@ -563,6 +565,11 @@ class AnyAdapter(
                             DownloadState.IsDownloading -> downloadViewModel.pause(card)
                             DownloadState.IsPaused -> downloadViewModel.resume(card)
                             DownloadState.IsPending -> {}
+                            DownloadState.IsDone -> {
+                                // For completed downloads, we can either re-check for chapters or eventually open the reader.
+                                // Currently, refreshCard handles the standard "check for updates" flow.
+                                downloadViewModel.refreshCard(card)
+                            }
                             else -> downloadViewModel.refreshCard(card)
                         }
                     }

@@ -2,11 +2,11 @@
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:interpolator="@android:anim/decelerate_interpolator">
     <translate
-        android:duration="400"
+        android:duration="300"
         android:fromXDelta="0"
-        android:toXDelta="-25%" />
+        android:toXDelta="-100%" />
     <alpha
-        android:duration="400"
+        android:duration="300"
         android:fromAlpha="1.0"
-        android:toAlpha="0.5" />
+        android:toAlpha="0.0" />
 </set>

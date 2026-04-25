@@ -2,6 +2,14 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <Preference
+        android:icon="@drawable/ic_baseline_language_24"
+        android:key="@string/locale_key"
+        android:title="@string/locale_settings"
+        android:summary="Change the application display language"
+        app:useSimpleSummaryProvider="true"
+        app:layout="@layout/setting_tile" />
+
     <!-- Flattened structure to eliminate category-induced vertical gaps -->
     <Preference
         android:icon="@drawable/ic_baseline_star_24"
@@ -54,23 +62,11 @@
         app:defaultValue="true"
         android:icon="@drawable/ic_baseline_delete_outline_24"
         app:layout="@layout/setting_tile" />
-
     <Preference
         android:title="@string/check_for_update"
         android:key="@string/manual_check_update_key"
         android:icon="@drawable/ic_baseline_system_update_24"
         app:layout="@layout/setting_tile" />
 
-    <Preference
-        android:icon="@drawable/baseline_save_as_24"
-        android:key="@string/backup_key"
-        android:title="@string/backup_settings"
-        app:layout="@layout/setting_tile" />
-
-    <Preference
-        android:icon="@drawable/baseline_restore_page_24"
-        android:key="@string/restore_key"
-        android:title="@string/restore_settings"
-        app:layout="@layout/setting_tile" />
 
 </PreferenceScreen>

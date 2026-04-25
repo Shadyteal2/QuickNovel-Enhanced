@@ -18,6 +18,8 @@ import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.lagradost.quicknovel.ui.download.SortingMethod
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipDrawable
@@ -997,10 +999,12 @@ class ResultFragment : Fragment() {
             }
         }
 
+    
+
         binding.resultSelectionMarkRead.apply {
-            setOnClickListener { 
+            setOnClickListener {
                 it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                viewModel.executeBatchMarkRead(true) 
+                viewModel.executeBatchMarkRead(true)
             }
             setOnLongClickListener {
                 com.lagradost.quicknovel.CommonActivity.showToast("Mark as Read")
@@ -1009,9 +1013,9 @@ class ResultFragment : Fragment() {
         }
 
         binding.resultSelectionMarkUnread.apply {
-            setOnClickListener { 
+            setOnClickListener {
                 it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                viewModel.executeBatchMarkRead(false) 
+                viewModel.executeBatchMarkRead(false)
             }
             setOnLongClickListener {
                 com.lagradost.quicknovel.CommonActivity.showToast("Mark as Unread")
@@ -1143,6 +1147,13 @@ class ResultFragment : Fragment() {
                     ResultViewModel.filterChapterByDownloads = isChecked
              viewModel.reorderChapters()
          }
+         
+         filterBinding.sortContent.adapter = SortAdapter(ResultViewModel.chapterSortingMethods) { methodId ->
+             ResultViewModel.sortChapterBy = methodId
+             viewModel.reorderChapters()
+             // bottomSheetDialog.dismiss()
+         }
+         filterBinding.sortContent.layoutManager = LinearLayoutManager(act)
 
          // Background scaling animation
          val backgroundView = binding.resultMainscroll
@@ -1324,4 +1335,51 @@ class ResultFragment : Fragment() {
             }
         }
     }
-}
+
+    inner class SortAdapter(val sortMethods: Array<SortingMethod>, val onClick: (Int) -> Unit) :
+        RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+            return SortViewHolder(
+                SortByItemBinding.inflate(
+                    LayoutInflater.from(parent.context),
+                    parent,
+                    false
+                )
+            )
+        }
+
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            when (holder) {
+                is SortViewHolder -> {
+                    val method = sortMethods[position]
+                    val isCurrent =
+                        ResultViewModel.sortChapterBy == method.id || ResultViewModel.sortChapterBy == method.inverse
+                    val isReverse = ResultViewModel.sortChapterBy == method.inverse
+
+                    holder.binding.sortMethodTitle.setText(method.name)
+                    holder.binding.sortMethodCheck.isChecked = isCurrent
+                    holder.binding.sortMethodIcon.setImageResource(
+                        if (isReverse) R.drawable.ic_baseline_arrow_upward_24 else R.drawable.ic_baseline_arrow_downward_24
+                    )
+                    holder.binding.sortMethodIcon.isVisible = isCurrent
+
+                    holder.binding.root.setOnClickListener {
+                        if (isCurrent) {
+                            onClick(if (isReverse) method.id else method.inverse)
+                        } else {
+                            onClick(method.id)
+                        }
+                        notifyDataSetChanged()
+                    }
+                }
+            }
+        }
+
+        override fun getItemCount(): Int {
+            return sortMethods.size
+        }
+
+        inner class SortViewHolder(val binding: SortByItemBinding) :
+            RecyclerView.ViewHolder(binding.root)
+    }
+}

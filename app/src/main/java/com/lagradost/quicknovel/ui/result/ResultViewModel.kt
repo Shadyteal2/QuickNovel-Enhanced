@@ -67,7 +67,7 @@ class ResultViewModel : ViewModel() {
     companion object {
         val chapterSortingMethods = arrayOf(
             SortingMethod(R.string.chapter_sort, CHAPTER_SORT, REVERSE_CHAPTER_SORT),
-            SortingMethod(R.string.recently_sort, LAST_ACCES_SORT, REVERSE_LAST_ACCES_SORT),
+            SortingMethod(R.string.last_read_sort, LAST_ACCES_SORT, REVERSE_LAST_ACCES_SORT),
         )
         var sortChapterBy by PreferenceDelegate(RESULT_CHAPTER_SORT, CHAPTER_SORT, Int::class)
 
@@ -221,39 +221,37 @@ class ResultViewModel : ViewModel() {
     }
 
 
+    fun hasBookmarkedChapter(chapter: ChapterData): Boolean {
+        return getKey<Boolean>(RESULT_CHAPTER_BOOKMARK, chapter.url) == true
+    }
+
     private fun orderChapters(list: List<ChapterData>): List<ChapterData> {
         val filterRead = filterChapterByRead
         val filterUnread = filterChapterByUnread
-        // val filterBookmarked = filterChapterByBookmarked
         val filterDownloaded = filterChapterByDownloads
-        val sort = sortChapterBy
+        val filterBookmarked = filterChapterByBookmarked
         val state = downloadState.value
+        val sort = sortChapterBy
 
         return list.filter { chapter ->
             val read = hasReadChapter(chapter)
+            val bookmarked = hasBookmarkedChapter(chapter)
+            val downloaded = (state != null && state.progress > (chapterIndex(chapter) ?: Int.MAX_VALUE))
+            
+            val passesReadFilter = if (filterRead == filterUnread) true 
+                                   else if (filterRead) read 
+                                   else !read
 
-            (filterUnread && !read) || (filterRead && read) ||
-                    (filterDownloaded && (state != null && state.progress > (chapterIndex(chapter)
-                        ?: Int.MAX_VALUE)))
-        }.sortedBy { chapter ->
-            return@sortedBy when (sort) {
-                CHAPTER_SORT -> {
-                    chapterIndex(chapter)?.toLong()
-                }
+            val passesBookmarkFilter = if (filterBookmarked) bookmarked else true
+            val passesDownloadFilter = if (filterDownloaded) downloaded else true
 
-                REVERSE_CHAPTER_SORT -> {
-                    chapterIndex(chapter)?.toLong()?.unaryMinus()
-                }
-
-                LAST_ACCES_SORT -> {
-                    getChapterReadTime(chapter) ?: Long.MAX_VALUE
-                }
-
-                REVERSE_LAST_ACCES_SORT -> {
-                    -(getChapterReadTime(chapter) ?: Long.MAX_VALUE)
-                }
-
-                else -> null
+            passesReadFilter && passesBookmarkFilter && passesDownloadFilter
+        }.let { filtered ->
+            when (sort) {
+                REVERSE_CHAPTER_SORT -> filtered.asReversed()
+                LAST_ACCES_SORT -> filtered.sortedByDescending { getChapterReadTime(it) ?: 0L }
+                REVERSE_LAST_ACCES_SORT -> filtered.sortedBy { getChapterReadTime(it) ?: 0L }
+                else -> filtered // CHAPTER_SORT
             }
         }
     }

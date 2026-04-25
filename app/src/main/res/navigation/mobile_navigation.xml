@@ -154,20 +154,7 @@
             app:argType="reference" />
     </fragment>
 
-    <fragment
-        android:id="@+id/navigation_settings_search"
-        android:name="com.lagradost.quicknovel.ui.settings.SubSettingsFragment"
-        android:label="@string/search"
-        android:layout_height="match_parent">
-        <argument
-            android:name="xml_res"
-            android:defaultValue="@xml/settings_search"
-            app:argType="reference" />
-        <argument
-            android:name="title_res"
-            android:defaultValue="@string/search"
-            app:argType="reference" />
-    </fragment>
+
 
     <fragment
         android:id="@+id/navigation_settings_general"
