@@ -115,6 +115,13 @@ import kotlin.reflect.KClass
 import android.net.Uri
 import coil3.asDrawable
 import com.lagradost.quicknovel.ui.TabNavigator
+import com.lagradost.quicknovel.util.PluginManager
+import com.lagradost.quicknovel.util.PluginItem
+import com.lagradost.quicknovel.API_VERSION
+import com.lagradost.quicknovel.MainAPI
+import dalvik.system.DexClassLoader
+import dalvik.system.DexFile
+import java.io.File
 
 import android.view.HapticFeedbackConstants
 import android.view.animation.OvershootInterpolator
@@ -142,6 +149,144 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     )
     
     private var lastActiveTab: Int = 0
+
+    private val providerApkPicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            ioSafe {
+                try {
+                    // ── 1. Verify signature ─────────────────────────────────────────
+                    if (!PluginManager.verifyApkSignature(this@MainActivity, uri)) {
+                        runOnUiThread { showToast(getString(R.string.import_provider_apk_bad_sig)) }
+                        return@ioSafe
+                    }
+
+                    // ── 2. Resolve display name → stable bundle id ────────────────
+                    val displayName = contentResolver
+                        .query(uri, null, null, null, null)?.use { cursor ->
+                            val col = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            cursor.moveToFirst()
+                            cursor.getString(col)
+                        } ?: "provider.apk"
+
+                    val bundleId = displayName
+                        .removeSuffix(".apk").removeSuffix(".dex")
+                        .replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
+
+                    val pluginsDir = PluginManager.getPluginsDir(this@MainActivity)
+                    val destApk   = File(pluginsDir, "$bundleId.apk")
+                    val destJson  = File(pluginsDir, "$bundleId.json")
+
+                    // ── 3. Notify if this is already installed (update path) ──────
+                    if (destJson.exists()) {
+                        try {
+                            val old = jacksonObjectMapper().readValue(destJson.readText(), PluginItem::class.java)
+                            runOnUiThread {
+                                showToast(getString(R.string.import_provider_apk_duplicate_format, old.version))
+                            }
+                        } catch (_: Exception) {}
+                    }
+
+                    // ── 4. Copy APK bytes to plugins dir ─────────────────────────
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        destApk.outputStream().use { out -> input.copyTo(out) }
+                    }
+                    destApk.setReadOnly() // DexClassLoader requires read-only on API 26+
+
+                    // Clear old classloader caches so the new file loads fresh
+                    PluginManager.removeCachesForPath(destApk.absolutePath)
+
+                    // ── 5. Scan DEX for all concrete MainAPI subclasses ───────────
+                    val foundClasses = mutableListOf<String>()
+                    try {
+                        @Suppress("DEPRECATION")
+                        val dex = DexFile(destApk.absolutePath)
+                        val loader = DexClassLoader(
+                            destApk.absolutePath,
+                            codeCacheDir.absolutePath,
+                            null,
+                            classLoader
+                        )
+                        val entries = dex.entries()
+                        while (entries.hasMoreElements()) {
+                            val className = entries.nextElement()
+                            // Fast-skip framework packages to keep scan time low
+                            if (className.startsWith("android.") ||
+                                className.startsWith("kotlin.") ||
+                                className.startsWith("kotlinx.") ||
+                                className.startsWith("java.")) continue
+                            try {
+                                val clazz = loader.loadClass(className)
+                                if (MainAPI::class.java.isAssignableFrom(clazz) &&
+                                    !java.lang.reflect.Modifier.isAbstract(clazz.modifiers) &&
+                                    !clazz.isInterface) {
+                                    foundClasses.add(className)
+                                }
+                            } catch (_: Throwable) { /* skip unloadable / abstract classes */ }
+                        }
+                        dex.close()
+                    } catch (e: Exception) {
+                        logError(e)
+                    }
+
+                    // ── 6. Abort if nothing was found ─────────────────────────────
+                    if (foundClasses.isEmpty()) {
+                        destApk.delete()
+                        runOnUiThread { showToast(getString(R.string.import_provider_apk_none_found)) }
+                        return@ioSafe
+                    }
+
+                    // ── 7. Write companion JSON  (isManualImport = true) ──────────
+                    val meta = PluginItem(
+                        pluginId      = bundleId,
+                        name          = bundleId,
+                        version       = 1,
+                        minApiVersion = API_VERSION,
+                        mainClasses   = foundClasses,
+                        url           = "local://$bundleId",
+                        isManualImport = true
+                    )
+                    destJson.writeText(jacksonObjectMapper().writeValueAsString(meta))
+
+                    // ── 8. Hot-reload so providers appear immediately ──────────────
+                    PluginManager.loadAllPlugins(this@MainActivity)
+                    runOnUiThread {
+                        showToast(getString(R.string.import_provider_apk_success_format, foundClasses.size))
+                    }
+                } catch (e: Exception) {
+                    logError(e)
+                    runOnUiThread { showToast("Import failed: ${e.message}") }
+                }
+            }
+        }
+
+    private fun showProviderImportWarning() {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+        val skipWarning = settingsManager.getBoolean("SKIP_PROVIDER_IMPORT_WARNING", false)
+        
+        if (skipWarning) {
+            providerApkPicker.launch(arrayOf("application/vnd.android.package-archive", "*/*"))
+            return
+        }
+
+        val builder = AlertDialog.Builder(this, R.style.AlertDialogCustom)
+        builder.setTitle("Import Provider")
+        builder.setMessage("Join the NeoQN telegram/discord to get the latest providers apk, you can find the social links in settings and import it")
+        
+        val checkBoxView = android.view.LayoutInflater.from(this).inflate(R.layout.dialog_checkbox, null)
+        val checkBox = checkBoxView.findViewById<android.widget.CheckBox>(R.id.dialog_checkbox)
+        checkBox.text = "Do not show again"
+        builder.setView(checkBoxView)
+
+        builder.setPositiveButton("OK") { _, _ ->
+            if (checkBox.isChecked) {
+                settingsManager.edit().putBoolean("SKIP_PROVIDER_IMPORT_WARNING", true).apply()
+            }
+            providerApkPicker.launch(arrayOf("application/vnd.android.package-archive", "*/*"))
+        }
+        builder.setNegativeButton(R.string.cancel, null)
+        builder.show()
+    }
 
     private fun android.view.View.applySpringTouch() {
         val springInterpolator = android.view.animation.OvershootInterpolator(1.5f)
@@ -854,14 +999,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         binding?.homeSyncFab?.apply {
             setOnClickListener {
                 performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>()
-                    .setInputData(androidx.work.workDataOf("force" to true))
-                    .build()
-                androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
-                    "PluginSyncImmediate",
-                    androidx.work.ExistingWorkPolicy.KEEP,
-                    syncRequest
-                )
+                showProviderImportWarning()
             }
         }
 

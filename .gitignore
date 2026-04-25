@@ -19,6 +19,7 @@ stitch_screens/
 scripts/
 .kotlin/
 .vscode/
+gradle.properties
 .venv/
 /recommendation
 todoprovide/
