@@ -311,9 +311,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         var navOptions: androidx.navigation.NavOptions = androidx.navigation.navOptions {
             launchSingleTop = true
             restoreState = true
-            popUpTo(R.id.nav_host_fragment) {
-                saveState = true
-            }
         }
 
         private var _mainActivity: WeakReference<MainActivity>? = null
@@ -395,25 +392,6 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     val navHostFragment =
                         supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment?
 
-                    if (navigation == R.id.global_to_navigation_mainpage) {
-                        // Clear outer SupportFragmentManager
-                        supportFragmentManager.fragments.firstOrNull { it is MainPageFragment }?.let {
-                            supportFragmentManager.beginTransaction()
-                                .setReorderingAllowed(true)
-                                .remove(it)
-                                .commitNowAllowingStateLoss()
-                        }
-
-                        // Clear child FragmentManager
-                        val childFragments = navHostFragment?.childFragmentManager?.fragments
-                        val oldFragment = childFragments?.firstOrNull { it is MainPageFragment }
-                        if (oldFragment != null) {
-                            navHostFragment.childFragmentManager.beginTransaction()
-                                .setReorderingAllowed(true)
-                                .remove(oldFragment)
-                                .commitNowAllowingStateLoss()
-                        }
-                    }
 
                     navHostFragment?.navController?.navigate(navigation, arguments, options, extras)
                 }

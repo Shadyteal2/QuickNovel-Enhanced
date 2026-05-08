@@ -659,6 +659,8 @@ object BookDownloader2Helper {
             }
             val page = try {
                 api.loadHtml(data.url)
+            } catch (e: Exception) {
+                null
             } finally {
                 if (rateLimit) {
                     api.api.rateLimitMutex.unlock()
@@ -2812,8 +2814,8 @@ object BookDownloader2 {
         //println("totalItems:$totalItems")
         setPrefixData(load, api.name, totalItems.toLong(), alreadyDownloaded)
 
-        var downloadedTotal = 0L // how many successful get requests
-        var failedChapters = 0L  // chapters that failed all retries — tracked but do NOT abort the loop
+        val downloadedTotal = java.util.concurrent.atomic.AtomicLong(0L) // how many successful get requests
+        val failedChapters = java.util.concurrent.atomic.AtomicLong(0L)  // chapters that failed all retries — tracked but do NOT abort the loop
 
         try {
             // 1. download the image
@@ -2821,110 +2823,123 @@ object BookDownloader2 {
 
             // 2. download the text files
             var currentState = DownloadState.IsDownloading
-            var timePerLoadMs = 1000.0
+            val timePerLoadMs = java.util.concurrent.atomic.AtomicReference(1000.0)
+            val semaphore = Semaphore(5)
 
-            for (index in range.start..range.endInclusive) {
-                val data = load.data.getOrNull(index) ?: continue
+            coroutineScope {
+                val jobs = mutableListOf<kotlinx.coroutines.Job>()
 
-                // consume any action and wait until not paused
-                while (true) {
-                    when (consumeAction(id)) {
-                        DownloadActionType.Pause -> {
-                            DownloadState.IsPaused
+                for (index in range.start..range.endInclusive) {
+                    val data = load.data.getOrNull(index) ?: continue
+
+                    // consume any action and wait until not paused
+                    while (true) {
+                        when (consumeAction(id)) {
+                            DownloadActionType.Pause -> {
+                                DownloadState.IsPaused
+                            }
+
+                            DownloadActionType.Resume -> DownloadState.IsDownloading
+                            DownloadActionType.Stop -> DownloadState.IsStopped
+                            else -> null
+                        }?.let { newState ->
+                            // if a new state is consumed then push that data instantly
+                            changeDownload(id) {
+                                state = newState
+                            }?.let { progressState ->
+                                createNotification(id, load, progressState)
+                            }
+                            currentState = newState
                         }
-
-                        DownloadActionType.Resume -> DownloadState.IsDownloading
-                        DownloadActionType.Stop -> DownloadState.IsStopped
-                        else -> null
-                    }?.let { newState ->
-                        // if a new state is consumed then push that data instantly
-                        changeDownload(id) {
-                            state = newState
-                        }?.let { progressState ->
-                            createNotification(id, load, progressState)
+                        if (currentState != DownloadState.IsPaused) {
+                            break
                         }
-                        currentState = newState
+                        delay(200)
                     }
-                    if (currentState != DownloadState.IsPaused) {
+
+                    if (currentState == DownloadState.IsStopped) {
                         break
                     }
-                    delay(200)
-                }
 
-                val filepath =
-                    filesDir.toString() + BookDownloader2Helper.getFilename(
-                        sApiName,
-                        sAuthor,
-                        sName,
-                        index
-                    )
-                val rFile = File(filepath)
-                if (rFile.exists()) {
-                    if (rFile.length() > 10) { // TO PREVENT INVALID FILE FROM HAVING TO REMOVE EVERYTHING
-                        continue
-                    }
-                }
-
-                val beforeDownloadTime = System.currentTimeMillis()
-                val hasDownloadedChapter =
-                    BookDownloader2Helper.downloadIndividualChapter(filepath, api, data)
-
-                if (hasDownloadedChapter) {
-                    downloadedTotal += 1
-                    // Fix: Polite inter-chapter delay when the provider has no rate limit configured.
-                    // Avoids hammering the server and triggering anti-bot protection.
-                    if (api.rateLimitTime <= 0) {
-                        delay(300L)
-                    }
-                } else {
-                    // Fix: Skip the failed chapter and continue — one bad chapter should
-                    // not abort the entire download of a 2000-chapter novel.
-                    failedChapters += 1
-                }
-
-                val processedItems = index - range.start +
-                        if (hasDownloadedChapter) {
-                            1
-                        } else {
-                            0
+                    val filepath =
+                        filesDir.toString() + BookDownloader2Helper.getFilename(
+                            sApiName,
+                            sAuthor,
+                            sName,
+                            index
+                        )
+                    val rFile = File(filepath)
+                    if (rFile.exists()) {
+                        if (rFile.length() > 10) { // TO PREVENT INVALID FILE FROM HAVING TO REMOVE EVERYTHING
+                            continue
                         }
+                    }
 
-                val afterDownloadTime = System.currentTimeMillis()
-                timePerLoadMs =
-                    (afterDownloadTime - beforeDownloadTime) * 0.2 + timePerLoadMs * 0.8 // rolling average (more responsive)
+                    semaphore.acquire()
 
-                changeDownload(id) {
-                    this.progress = index.toLong() + 1L
-                    this.downloaded = processedItems.toLong() + alreadyDownloaded
-                    state = currentState
-                    etaMs = (timePerLoadMs * (range.endInclusive - index)).toLong()
-                }?.let { progressState ->
-                    createNotification(id, load, progressState)
+                    jobs.add(launch(Dispatchers.IO) {
+                        try {
+                            val beforeDownloadTime = System.currentTimeMillis()
+                            val hasDownloadedChapter =
+                                BookDownloader2Helper.downloadIndividualChapter(filepath, api, data)
+
+                            if (hasDownloadedChapter) {
+                                downloadedTotal.incrementAndGet()
+                                // Fix: Polite inter-chapter delay when the provider has no rate limit configured.
+                                // Avoids hammering the server and triggering anti-bot protection.
+                                if (api.rateLimitTime <= 0) {
+                                    delay(300L)
+                                }
+                            } else {
+                                // Fix: Skip the failed chapter and continue — one bad chapter should
+                                // not abort the entire download of a 2000-chapter novel.
+                                failedChapters.incrementAndGet()
+                            }
+
+                            val processedItems = index - range.start +
+                                    if (hasDownloadedChapter) {
+                                        1
+                                    } else {
+                                        0
+                                    }
+
+                            val afterDownloadTime = System.currentTimeMillis()
+                            val curTime = timePerLoadMs.get()
+                            timePerLoadMs.set((afterDownloadTime - beforeDownloadTime) * 0.2 + curTime * 0.8)
+
+                            changeDownload(id) {
+                                if (index.toLong() + 1L > this.progress) {
+                                    this.progress = index.toLong() + 1L
+                                }
+                                this.downloaded = downloadedTotal.get() + alreadyDownloaded
+                                state = currentState
+                                etaMs = (timePerLoadMs.get() * (range.endInclusive - index)).toLong()
+                            }?.let { progressState ->
+                                createNotification(id, load, progressState)
+                            }
+                        } finally {
+                            semaphore.release()
+                        }
+                    })
                 }
-
-                when (currentState) {
-                    // Only a deliberate Stop action aborts the loop.
-                    // Failed chapters are counted and skipped; the download continues.
-                    DownloadState.IsStopped -> return
-                    else -> {}
-                }
+                jobs.forEach { it.join() }
             }
 
             // finally call it before changeDownload
-            if (downloadedTotal > 0) {
+            if (downloadedTotal.get() > 0) {
                 setSuffixData(load, api.name)
             }
 
             // Fix: Determine final state from actual outcome.
             // Failed only if nothing was downloaded at all; otherwise Done (even if some chapters failed).
-            val finalState = if (downloadedTotal == 0L && failedChapters > 0L)
+            val finalState = if (downloadedTotal.get() == 0L && failedChapters.get() > 0L)
                 DownloadState.IsFailed else DownloadState.IsDone
             changeDownload(id) {
                 this.progress = totalItems.toLong()
                 this.downloaded = range.endInclusive + 1 - range.start + alreadyDownloaded
                 state = finalState
             }?.let { progressState ->
-                if (downloadedTotal > 0 || failedChapters > 0)
+                if (downloadedTotal.get() > 0 || failedChapters.get() > 0)
                     createNotification(
                         id,
                         load,
@@ -2933,7 +2948,7 @@ object BookDownloader2 {
             }
         } catch (t: Throwable) {
             // also set it here in case of exception
-            if (downloadedTotal > 0) {
+            if (downloadedTotal.get() > 0) {
                 setSuffixData(load, api.name)
             }
 
@@ -2960,73 +2975,89 @@ object BookDownloader2 {
         val totalItems = indices.size.toLong()
         setPrefixData(load, api.name, totalItems, 0L)
 
-        var downloadedTotal = 0L
-        var failedChapters = 0L  // chapters that failed all retries — tracked but do NOT break the loop
+        val downloadedTotal = java.util.concurrent.atomic.AtomicLong(0L)
+        val failedChapters = java.util.concurrent.atomic.AtomicLong(0L)  // chapters that failed all retries — tracked but do NOT break the loop
 
         try {
             downloadImage(load, sApiName, sAuthor, sName, filesDir)
             var currentState = DownloadState.IsDownloading
+            val semaphore = Semaphore(5)
 
-            for ((indexInBatch, index) in indices.withIndex()) {
-                val data = load.data.getOrNull(index) ?: continue
+            coroutineScope {
+                val jobs = mutableListOf<kotlinx.coroutines.Job>()
 
-                while (true) {
-                    when (consumeAction(id)) {
-                        DownloadActionType.Pause -> DownloadState.IsPaused
-                        DownloadActionType.Resume -> DownloadState.IsDownloading
-                        DownloadActionType.Stop -> DownloadState.IsStopped
-                        else -> null
-                    }?.let { newState ->
-                        changeDownload(id) { state = newState }?.let { progressState ->
-                            createNotification(id, load, progressState)
+                for ((indexInBatch, index) in indices.withIndex()) {
+                    val data = load.data.getOrNull(index) ?: continue
+
+                    while (true) {
+                        when (consumeAction(id)) {
+                            DownloadActionType.Pause -> DownloadState.IsPaused
+                            DownloadActionType.Resume -> DownloadState.IsDownloading
+                            DownloadActionType.Stop -> DownloadState.IsStopped
+                            else -> null
+                        }?.let { newState ->
+                            changeDownload(id) { state = newState }?.let { progressState ->
+                                createNotification(id, load, progressState)
+                            }
+                            currentState = newState
                         }
-                        currentState = newState
+                        if (currentState != DownloadState.IsPaused) break
+                        delay(200)
                     }
-                    if (currentState != DownloadState.IsPaused) break
-                    delay(200)
-                }
 
-                val filepath = filesDir.toString() + BookDownloader2Helper.getFilename(sApiName, sAuthor, sName, index)
-                val rFile = File(filepath)
-                if (rFile.exists() && rFile.length() > 10) {
-                    downloadedTotal += 1
-                    continue
-                }
+                    if (currentState == DownloadState.IsStopped) break
 
-                val hasDownloadedChapter = BookDownloader2Helper.downloadIndividualChapter(filepath, api, data)
-                if (hasDownloadedChapter) {
-                    downloadedTotal += 1
-                    // Polite inter-chapter delay when no provider rate limit is configured.
-                    if (api.rateLimitTime <= 0) delay(300L)
-                } else {
-                    // Skip the failed chapter; do not abort the batch download.
-                    failedChapters += 1
-                }
+                    val filepath = filesDir.toString() + BookDownloader2Helper.getFilename(sApiName, sAuthor, sName, index)
+                    val rFile = File(filepath)
+                    if (rFile.exists() && rFile.length() > 10) {
+                        downloadedTotal.incrementAndGet()
+                        continue
+                    }
 
-                changeDownload(id) {
-                    this.progress = indexInBatch.toLong() + 1L
-                    this.downloaded = downloadedTotal
-                    this.state = currentState
-                }?.let { progressState ->
-                    createNotification(id, load, progressState)
-                }
+                    semaphore.acquire()
 
-                if (currentState == DownloadState.IsStopped) break
+                    jobs.add(launch(Dispatchers.IO) {
+                        try {
+                            val hasDownloadedChapter = BookDownloader2Helper.downloadIndividualChapter(filepath, api, data)
+                            if (hasDownloadedChapter) {
+                                downloadedTotal.incrementAndGet()
+                                // Polite inter-chapter delay when no provider rate limit is configured.
+                                if (api.rateLimitTime <= 0) delay(300L)
+                            } else {
+                                // Skip the failed chapter; do not abort the batch download.
+                                failedChapters.incrementAndGet()
+                            }
+
+                            changeDownload(id) {
+                                if (indexInBatch.toLong() + 1L > this.progress) {
+                                    this.progress = indexInBatch.toLong() + 1L
+                                }
+                                this.downloaded = downloadedTotal.get()
+                                this.state = currentState
+                            }?.let { progressState ->
+                                createNotification(id, load, progressState)
+                            }
+                        } finally {
+                            semaphore.release()
+                        }
+                    })
+                }
+                jobs.forEach { it.join() }
             }
 
-            if (downloadedTotal > 0) setSuffixData(load, api.name)
+            if (downloadedTotal.get() > 0) setSuffixData(load, api.name)
 
-            val finalState = if (downloadedTotal == 0L && failedChapters > 0L)
+            val finalState = if (downloadedTotal.get() == 0L && failedChapters.get() > 0L)
                 DownloadState.IsFailed else DownloadState.IsDone
             changeDownload(id) {
                 this.progress = totalItems
-                this.downloaded = downloadedTotal
+                this.downloaded = downloadedTotal.get()
                 state = finalState
             }?.let { progressState ->
-                if (downloadedTotal > 0 || failedChapters > 0) createNotification(id, load, progressState)
+                if (downloadedTotal.get() > 0 || failedChapters.get() > 0) createNotification(id, load, progressState)
             }
         } catch (t: Throwable) {
-            if (downloadedTotal > 0) setSuffixData(load, api.name)
+            if (downloadedTotal.get() > 0) setSuffixData(load, api.name)
             logError(t)
         } finally {
             currentDownloadsMutex.withLock { currentDownloads -= id }

@@ -33,8 +33,8 @@ class SearchViewModel : ViewModel() {
         searchCounter++
         ongoingSearchJob?.cancel()
         ongoingSearchJob = null
-        _searchResponse.postValue(null)
-        _currentSearch.postValue(null)
+        _searchResponse.value = null
+        _currentSearch.value = null
     }
 
     fun load(card: SearchResponse) {

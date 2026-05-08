@@ -38,6 +38,8 @@
 
     <color name="searchColorTransparent">#1AFFFFFF</color> <!--DADADA-->
     <color name="transparent">#00000000</color>
+    <color name="vibe_glass_bg">#CC121215</color> <!-- 80% opacity dark grey -->
+    <color name="vibe_glass_stroke">#26FFFFFF</color> <!-- 15% white stroke -->
 
     <color name="white">#FFF</color>
     <color name="black">#000</color>

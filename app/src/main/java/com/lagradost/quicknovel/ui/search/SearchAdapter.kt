@@ -46,13 +46,12 @@ class SearchAdapter(
         val binding = holder.view as? SearchResultGridBinding ?: return
         binding.apply {
             val coverHeight: Int = (resView.itemWidth / 0.68).roundToInt()
-            imageView.apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    coverHeight
-                )
-                setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                setImage(item.image)
+                imageView.apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        coverHeight
+                    )
+                    setImage(item.image)
 
                 setOnClickListener {
                     viewModel.load(item)
