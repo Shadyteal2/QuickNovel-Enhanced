@@ -81,9 +81,36 @@ class ReadingStatsFragment : Fragment() {
         // 1. Get Totals
         val totalMs = context.getKey<Long>("TOTAL_READING_TIME", 0L) ?: 0L
         val currentStreak = context.getKey<Int>("CURRENT_STREAK", 0) ?: 0
+        
+        // Calculate Today, Week, Month
+        val calendar = java.util.Calendar.getInstance()
+        val todayMs = UsageStatsManager.getDailyTimeMs(context, calendar.time)
+        
+        var weekMs = 0L
+        val weekHeights = mutableListOf<Long>()
+        val weekLabels = mutableListOf<String>()
+        val dayFormat = java.text.SimpleDateFormat("E", java.util.Locale.getDefault())
 
-        val totalMinutes = totalMs / (1000 * 60)
-        val totalHours = totalMinutes / 60
+        for (i in 0 until 7) {
+            val dayTime = UsageStatsManager.getDailyTimeMs(context, calendar.time)
+            weekMs += dayTime
+            weekHeights.add(0, dayTime)
+            weekLabels.add(0, dayFormat.format(calendar.time).first().toString())
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+        
+        // Reset and calc Month (simplified to last 30 days)
+        calendar.time = java.util.Date()
+        var monthMs = 0L
+        for (i in 0 until 30) {
+            monthMs += UsageStatsManager.getDailyTimeMs(context, calendar.time)
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+
+        val totalMinutes = todayMs / (1000 * 60)
+        val weekMinutes = weekMs / (1000 * 60)
+        val monthMinutes = monthMs / (1000 * 60)
+        val totalHours = totalMs / (1000 * 60 * 60)
 
         // 2. Level System Ratio
         val hoursPerLevel = 5
@@ -119,15 +146,15 @@ class ReadingStatsFragment : Fragment() {
         binding.pbDailyGoal.progress = (totalMinutes.toFloat().coerceIn(0f, dailyGoal.toFloat()) / dailyGoal.toFloat() * 100f).toInt()
         binding.tvDailyGoalSub.text = "$totalMinutes / $dailyGoal min"
         
-        binding.pbWeeklyGoal.progress = (totalMinutes.toFloat().coerceIn(0f, weeklyGoal.toFloat()) / weeklyGoal.toFloat() * 100f).toInt()
-        binding.tvWeeklyGoalSub.text = "$totalMinutes / $weeklyGoal min"
+        binding.pbWeeklyGoal.progress = (weekMinutes.toFloat().coerceIn(0f, weeklyGoal.toFloat()) / weeklyGoal.toFloat() * 100f).toInt()
+        binding.tvWeeklyGoalSub.text = "$weekMinutes / $weeklyGoal min"
 
         // Times Grid
         binding.tvTimeToday.text = "${totalMinutes}m"
-        binding.tvTimeWeek.text = "${totalMinutes}m"
-        binding.tvTimeMonth.text = "${totalMinutes}m"
+        binding.tvTimeWeek.text = "${weekMinutes}m"
+        binding.tvTimeMonth.text = "${monthMinutes}m"
 
-        setupBarChart(totalMinutes)
+        setupBarChart(weekHeights, weekLabels)
         setupAchievements()
     }
 
@@ -301,31 +328,32 @@ class ReadingStatsFragment : Fragment() {
         startActivity(shareIntent)
     }
 
-    private fun setupBarChart(todayMinutes: Long) {
+    private fun setupBarChart(weekHeights: List<Long>, weekLabels: List<String>) {
         val chart = binding.layoutBarChart
         chart.removeAllViews()
 
-        val days = listOf("M", "T", "W", "T", "F", "S", "S")
-        val heights = listOf(10, 20, todayMinutes.toInt().coerceIn(10, 80), 30, 15, 25, 40) // Mock values for weight effects
+        val maxTime = weekHeights.maxOrNull()?.coerceAtLeast(1L) ?: 1L
 
-        for (i in days.indices) {
+        for (i in weekHeights.indices) {
             val barContainer = LinearLayout(context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
                 orientation = LinearLayout.VERTICAL
                 gravity = android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL
             }
 
+            val heightPercent = (weekHeights[i].toFloat() / maxTime.toFloat() * 80f).coerceAtLeast(5f)
+
             // The visual bar
             val bar = FrameLayout(context!!).apply {
                 val params = LinearLayout.LayoutParams(
                     (12 * resources.displayMetrics.density).toInt(),
                     0,
-                    heights[i].toFloat() // weight determines height
+                    heightPercent
                 )
                 layoutParams = params
                 background = resources.getDrawable(R.drawable.search_background, null)
                 
-                if (i == 2) { 
+                if (i == weekHeights.size - 1) { 
                     backgroundTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.colorPrimary, null))
                 } else {
                     backgroundTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.grayTextColor, null))
@@ -335,14 +363,14 @@ class ReadingStatsFragment : Fragment() {
 
             // Top spacer weight layout holder
             val spacer = FrameLayout(context!!).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 100f - heights[i].toFloat())
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 100f - heightPercent)
             }
 
             val text = TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     topMargin = (4 * resources.displayMetrics.density).toInt()
                 }
-                this.text = days[i]
+                this.text = weekLabels[i]
                 textSize = 10f
                 setTextColor(resources.getColor(R.color.grayTextColor, null))
             }

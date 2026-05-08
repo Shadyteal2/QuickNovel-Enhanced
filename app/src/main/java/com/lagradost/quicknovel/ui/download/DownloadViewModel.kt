@@ -374,6 +374,8 @@ class DownloadViewModel : ViewModel() {
     fun delete(card: ResultCached) {
         ioSafe {
             dao.updateBookmarkType(card.id, null)
+            removeKey(RESULT_BOOKMARK_STATE, card.id.toString())
+            removeKey(RESULT_BOOKMARK, card.id.toString())
             loadAllData(false)
         }
     }

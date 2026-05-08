@@ -702,17 +702,23 @@ class ResultViewModel : ViewModel() {
         if (cleanName.isEmpty()) return null
         val cleanAuthor = author?.normalize()
 
-        val bookmarkedKeys = getKeys(RESULT_BOOKMARK) ?: return null
+        val bookmarkedKeys = getKeys(RESULT_BOOKMARK_STATE) ?: return null
         for (key in bookmarkedKeys) {
             val idStr = key.substringAfter("/")
             if (idStr == loadId.toString()) continue // Skip current provider
 
+            // Robust check: must have both name and author match if author is available
             val cached = getKey<ResultCached>(RESULT_BOOKMARK, idStr)
             if (cached != null) {
                 val cachedName = cached.name.normalize()
                 val cachedAuthor = cached.author?.normalize()
 
-                if (cachedName == cleanName && (cleanAuthor.isNullOrEmpty() || cachedAuthor == cleanAuthor)) {
+                val nameMatch = cachedName == cleanName
+                val authorMatch = if (!cleanAuthor.isNullOrBlank() && !cachedAuthor.isNullOrBlank()) {
+                    cachedAuthor == cleanAuthor
+                } else true // Relaxed match if one is missing
+
+                if (nameMatch && authorMatch) {
                     val state = getKey<Int>(RESULT_BOOKMARK_STATE, idStr) ?: -1
                     if (state != -1) return state
                 }
@@ -749,10 +755,15 @@ class ResultViewModel : ViewModel() {
 
         loadMutex.withLock {
             if (!hasLoaded) return@launch
-            setKey(
-                RESULT_BOOKMARK_STATE, loadId.toString(), state
-            )
-            updateBookmarkData()
+            if (state == -1) {
+                removeKey(RESULT_BOOKMARK_STATE, loadId.toString())
+                removeKey(RESULT_BOOKMARK, loadId.toString())
+            } else {
+                setKey(
+                    RESULT_BOOKMARK_STATE, loadId.toString(), state
+                )
+                updateBookmarkData()
+            }
             readState.postValue(ReadType.fromSpinner(state))
 
             // SSOT: Sync with Room Database

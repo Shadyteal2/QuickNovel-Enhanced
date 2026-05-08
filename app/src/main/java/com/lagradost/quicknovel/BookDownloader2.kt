@@ -350,6 +350,8 @@ object BookDownloader2Helper {
                 } else {
                     // Not bookmarked: safe to delete the row entirely
                     dao.deleteById(id)
+                    removeKey(RESULT_BOOKMARK, id.toString())
+                    removeKey(RESULT_BOOKMARK_STATE, id.toString())
                 }
             }
 

@@ -14,6 +14,8 @@ object UsageStatsManager {
     private const val LAST_READ_TIMESTAMP = "LAST_READ_TIMESTAMP"
     private const val CUSTOMIZATION_COUNT = "CUSTOMIZATION_COUNT"
 
+    private const val DAILY_READING_TIME_PREFIX = "DAILY_READING_TIME_"
+
     fun incrementChapterRead(context: Context) {
         val current = context.getKey<Int>(TOTAL_CHAPTERS_READ, 0) ?: 0
         context.setKey(TOTAL_CHAPTERS_READ, current + 1)
@@ -22,9 +24,23 @@ object UsageStatsManager {
 
     fun addReadingTime(context: Context, timeMs: Long) {
         if (timeMs <= 0) return
-        val current = context.getKey<Long>(TOTAL_READING_TIME, 0L) ?: 0L
-        context.setKey(TOTAL_READING_TIME, current + timeMs)
+        
+        // 1. Update Total
+        val total = context.getKey<Long>(TOTAL_READING_TIME, 0L) ?: 0L
+        context.setKey(TOTAL_READING_TIME, total + timeMs)
+
+        // 2. Update Daily Total
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        val dailyKey = DAILY_READING_TIME_PREFIX + today
+        val currentDaily = context.getKey<Long>(dailyKey, 0L) ?: 0L
+        context.setKey(dailyKey, currentDaily + timeMs)
+
         updateStreak(context)
+    }
+
+    fun getDailyTimeMs(context: Context, date: java.util.Date): Long {
+        val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(date)
+        return context.getKey<Long>(DAILY_READING_TIME_PREFIX + dateStr, 0L) ?: 0L
     }
 
     fun incrementCustomization(context: Context) {
@@ -40,7 +56,8 @@ object UsageStatsManager {
         val nowCal = Calendar.getInstance().apply { timeInMillis = now }
 
         // Same day, nothing to update for streak count, just timestamp
-        if (lastReadCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR) &&
+        if (lastRead != 0L && 
+            lastReadCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR) &&
             lastReadCal.get(Calendar.DAY_OF_YEAR) == nowCal.get(Calendar.DAY_OF_YEAR)
         ) {
             context.setKey(LAST_READ_TIMESTAMP, now)
@@ -48,9 +65,14 @@ object UsageStatsManager {
         }
 
         // Check if yesterday
-        lastReadCal.add(Calendar.DAY_OF_YEAR, 1)
-        val wasYesterday = lastReadCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR) &&
-                lastReadCal.get(Calendar.DAY_OF_YEAR) == nowCal.get(Calendar.DAY_OF_YEAR)
+        val yesterdayCal = Calendar.getInstance().apply { 
+            timeInMillis = now
+            add(Calendar.DAY_OF_YEAR, -1)
+        }
+        
+        val wasYesterday = lastRead != 0L &&
+                lastReadCal.get(Calendar.YEAR) == yesterdayCal.get(Calendar.YEAR) &&
+                lastReadCal.get(Calendar.DAY_OF_YEAR) == yesterdayCal.get(Calendar.DAY_OF_YEAR)
 
         if (wasYesterday) {
             val currentStreak = context.getKey<Int>(CURRENT_STREAK, 0) ?: 0
@@ -61,11 +83,8 @@ object UsageStatsManager {
             if (newStreak > bestStreak) {
                 context.setKey(BEST_STREAK, newStreak)
             }
-        } else if (lastRead != 0L) {
-            // Gap in reading, reset streak
-            context.setKey(CURRENT_STREAK, 1)
         } else {
-            // First time reading
+            // Gap in reading or first time, reset streak to 1
             context.setKey(CURRENT_STREAK, 1)
         }
 

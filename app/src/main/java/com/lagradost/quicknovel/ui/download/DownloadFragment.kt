@@ -99,10 +99,8 @@ class DownloadFragment : Fragment() {
         binding.libraryPillMenu.isVisible = !isSwipeMode
         binding.tabGestureZone.isVisible = isSwipeMode
         
-        // If switching OUT of swipe mode, restore ViewPager2 input
-        if (!isSwipeMode) {
-            binding.viewpager.isUserInputEnabled = true
-        }
+        // Ensure swiping is only enabled during "Swipe View" mode
+        binding.viewpager.isUserInputEnabled = isSwipeMode
     }
 
     data class DownloadData(
@@ -412,7 +410,7 @@ class DownloadFragment : Fragment() {
         }
 
         binding.viewpager.adapter = adapter
-        binding.viewpager.isUserInputEnabled = true
+        updateNavStyleUI()
         binding.viewpager.offscreenPageLimit = 2
         
         // Premium horizontal swipe transition
@@ -668,8 +666,12 @@ class DownloadFragment : Fragment() {
         })
 
         binding.tabGestureZone.setOnTouchListener { _, event ->
-            gestureDetector.onTouchEvent(event)
-            true // Important: Consume all events in the zone
+            val handled = gestureDetector.onTouchEvent(event)
+            // If the gesture detector handled a fling, we consume the event.
+            // Otherwise, we return false to potentially allow touches to pass through,
+            // although ACTION_DOWN must be consumed to receive subsequent events.
+            if (event.action == android.view.MotionEvent.ACTION_DOWN) return@setOnTouchListener true
+            handled
         }
     }
 }

@@ -105,7 +105,10 @@
         <item name="android:drawablePadding">20dp</item>
     </style>
 
-    <style name="PreferenceTheme" parent="@style/AppTheme" />
+    <style name="PreferenceTheme" parent="AppTheme">
+        <item name="preferenceFragmentCompatStyle">@style/PreferenceFragment.Material</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
 
     <style name="ListViewStyle" parent="Widget.AppCompat.ListView">
         <item name="android:divider">@null</item>

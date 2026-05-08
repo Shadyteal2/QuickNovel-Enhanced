@@ -21,6 +21,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.view.doOnPreDraw
 import android.view.ViewGroup
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
@@ -499,6 +501,10 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         if (key == getString(R.string.navbar_width_key)) {
             updateNavBarWidth()
         }
+        if (key == getString(R.string.library_nav_style_key)) {
+            val currentPos = binding?.mainViewpager?.currentItem ?: 0
+            updateSwipeLock(currentPos)
+        }
     }
 
     private fun hidePreviewPopupDialog() {
@@ -639,6 +645,10 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         super.onResume()
         activity = this
         mainActivity = this
+        updateGlobalBackground()
+        updateGlobalAura()
+        val currentPos = binding?.mainViewpager?.currentItem ?: 0
+        updateSwipeLock(currentPos)
     }
 
     private fun updateUpdatesBadge() {
@@ -942,8 +952,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 if (lastSelectedPos == position) return
                 lastSelectedPos = position
                 
-                // Swipe-to-back enabled for all tabs except Library (0) which has internal horizontal swiping
-                binding?.mainViewpager?.isUserInputEnabled = position != 0
+                updateSwipeLock(position)
                 updateNavSelection(position)
                 
                 // Track last active tab only if ViewPager is visible
@@ -1046,8 +1055,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 override fun getItemId(position: Int): Long = tabs[position].toLong()
                 override fun containsItem(itemId: Long): Boolean = tabs.contains(itemId.toInt())
             }
-            // Swipe lock handled by the OnPageChangeCallback registered in onCreate
-            isUserInputEnabled = true
+            // Swipe lock handled by updateSwipeLock called via initial updateNavSelection
+            updateSwipeLock(currentItem)
         }
 
         binding?.navItemDownload?.root?.post {
@@ -1368,19 +1377,37 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val isAtMainTabs = currentDest == null || tabIds.contains(currentDest)
         val isLibraryTabActive = selectedIndex == 0 && b.mainViewpager.isVisible == true
         val shouldShowSettings = isLibraryTabActive && isAtMainTabs
- 
-        // 2. Prepare Unified Transition
-        // Skip layout transitions during theme reveal to avoid stuttering
-        if (animate && CommonActivity.pendingThemeChangeScreenshot == null) {
+
+        // 2. Fetch Theme Colors for dynamic indicator
+        val primaryColor = getResourceColor(R.attr.colorPrimary)
+        val onPrimaryColor = getResourceColor(R.attr.white)
+        val iconColor = getResourceColor(R.attr.iconColor)
+        val textColor = getResourceColor(R.attr.grayTextColor)
+        
+        val navItems = listOf(b.navItemDownload, b.navItemSearch, b.navItemForyou, b.navItemHistory)
+        var targetId: Int? = null
+
+        // 3. Update Global Nav Visibility with a single unified transition pass
+        if (animate) {
             val transition = android.transition.TransitionSet()
-                .addTransition(android.transition.ChangeBounds().setInterpolator(android.view.animation.OvershootInterpolator(1.1f)))
+                .addTransition(android.transition.ChangeBounds().setInterpolator(android.view.animation.DecelerateInterpolator()))
                 .addTransition(android.transition.Fade())
-                .setDuration(350)
-            
+                .setDuration(300)
             android.transition.TransitionManager.beginDelayedTransition(b.navRootLayout, transition)
         }
 
-        // 3. Update Settings Button Visibility
+        if (isAtMainTabs) {
+            if (b.navRootLayout.visibility != android.view.View.VISIBLE) {
+                b.navRootLayout.visibility = android.view.View.VISIBLE
+                b.navRootLayout.alpha = 1f
+            }
+        } else {
+            if (b.navRootLayout.visibility == android.view.View.VISIBLE) {
+                b.navRootLayout.visibility = android.view.View.GONE
+            }
+        }
+
+        // 4. Update Settings Button Visibility
         if (shouldShowSettings) {
             if (b.navExtraButton.visibility != android.view.View.VISIBLE) {
                 b.navExtraButton.visibility = android.view.View.VISIBLE
@@ -1394,18 +1421,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             }
         }
 
-        // 4. Update Nav Selection (Pill & Weights)
-        val navItems = listOf(b.navItemDownload, b.navItemSearch, b.navItemForyou, b.navItemHistory)
-        val iconColor = colorFromAttribute(R.attr.iconColor)
-        val textColor = colorFromAttribute(R.attr.textColor)
-        val primaryColor = colorFromAttribute(R.attr.colorPrimary)
-        val onPrimaryColor = android.graphics.Color.WHITE
+        // 5. Update Nav Selection (Pill & Weights)
 
-        // 5. Apply ConstraintSet for the Pill
-        val constraintSet = androidx.constraintlayout.widget.ConstraintSet()
-        constraintSet.clone(b.navBarContainer)
-        var targetId: Int? = null
-
+        // Apply weights and visibility updates
         navItems.forEachIndexed { index, itemBinding ->
             val isSelected = index == selectedIndex
             itemBinding.navItemLabel.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
@@ -1416,9 +1434,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             itemBinding.navItemIcon.imageTintList = android.content.res.ColorStateList.valueOf(tint)
             itemBinding.navItemLabel.setTextColor(labelColor)
             
-            // Adjust weights for the luxury expanding effect
             val root = itemBinding.root
-            root.updateLayoutParams<androidx.constraintlayout.widget.ConstraintLayout.LayoutParams> {
+            root.updateLayoutParams<ConstraintLayout.LayoutParams> {
                 this.horizontalWeight = if (isSelected) 3.2f else 0.8f
             }
             
@@ -1428,8 +1445,10 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         b.navIndicatorPill.backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor).withAlpha(225)
 
         if (targetId != null) {
-            constraintSet.connect(R.id.nav_indicator_pill, androidx.constraintlayout.widget.ConstraintSet.START, targetId!!, androidx.constraintlayout.widget.ConstraintSet.START)
-            constraintSet.connect(R.id.nav_indicator_pill, androidx.constraintlayout.widget.ConstraintSet.END, targetId!!, androidx.constraintlayout.widget.ConstraintSet.END)
+            val constraintSet = ConstraintSet()
+            constraintSet.clone(b.navBarContainer)
+            constraintSet.connect(R.id.nav_indicator_pill, ConstraintSet.START, targetId!!, ConstraintSet.START)
+            constraintSet.connect(R.id.nav_indicator_pill, ConstraintSet.END, targetId!!, ConstraintSet.END)
             constraintSet.applyTo(b.navBarContainer)
             b.navIndicatorPill.alpha = 1f
         } else {
@@ -1439,6 +1458,14 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
     private fun updateNavSelection(selectedIndex: Int, animate: Boolean = true) {
         updateNavAndSettings(selectedIndex, animate)
+        updateSwipeLock(selectedIndex)
+    }
+
+    private fun updateSwipeLock(position: Int) {
+        val navStyle = getLibraryNavStyle()
+        binding?.mainViewpager?.post {
+            binding?.mainViewpager?.isUserInputEnabled = (navStyle == "0") || (position != 0)
+        }
     }
 
     /**

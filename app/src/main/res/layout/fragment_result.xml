@@ -7,9 +7,7 @@
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
     android:clipChildren="false"
-    android:clipToPadding="false"
-    android:clickable="true"
-    android:focusable="true">
+    android:clipToPadding="false">
 
 
 
@@ -387,6 +385,28 @@
             android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
 
+
+
+    <com.facebook.shimmer.ShimmerFrameLayout
+        android:id="@+id/result_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?android:attr/colorBackground"
+        android:visibility="visible"
+        app:shimmer_auto_start="true"
+        app:shimmer_base_alpha="0.3"
+        app:shimmer_highlight_alpha="0.9"
+        app:shimmer_duration="800"
+        tools:visibility="gone">
+
+        <include layout="@layout/loading_skeleton_result" />
+
+    </com.facebook.shimmer.ShimmerFrameLayout>
+
+    <!-- Chapter Selection Toolbar (Glass Design) -->
+
+
+    <!-- Chapters FAB (Move to end for interactivity) -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/result_chapters_fab"
         android:layout_width="wrap_content"
@@ -395,9 +415,8 @@
         android:layout_margin="16dp"
         android:visibility="gone"
         app:cardCornerRadius="28dp"
-        app:cardElevation="6dp"
+        app:cardElevation="16dp"
         app:cardBackgroundColor="?attr/colorPrimary">
-        <!-- android:background removed, app:cardBackgroundColor added -->
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -414,25 +433,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <com.facebook.shimmer.ShimmerFrameLayout
-        android:id="@+id/result_loading"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="?android:attr/colorBackground"
-        android:clickable="true"
-        android:focusable="true"
-        android:visibility="visible"
-        app:shimmer_auto_start="true"
-        app:shimmer_base_alpha="0.3"
-        app:shimmer_highlight_alpha="0.9"
-        app:shimmer_duration="800"
-        tools:visibility="gone">
-
-        <include layout="@layout/loading_skeleton_result" />
-
-    </com.facebook.shimmer.ShimmerFrameLayout>
-
-    <!-- Chapter Selection Toolbar (Glass Design) -->
+    <!-- Chapter Selection Toolbar (Move to end for interactivity) -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/result_selection_toolbar"
         android:layout_width="match_parent"
@@ -442,7 +443,7 @@
         android:visibility="gone"
         app:cardBackgroundColor="?attr/primaryGrayBackground"
         app:cardCornerRadius="24dp"
-        app:cardElevation="12dp"
+        app:cardElevation="20dp"
         app:strokeColor="?attr/colorPrimary"
         app:strokeWidth="1.5dp"
         tools:visibility="visible">
@@ -466,6 +467,8 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:padding="12dp"
                     android:src="@drawable/ic_sharp_clear_24"
+                    android:clickable="true"
+                    android:focusable="true"
                     app:tint="?attr/textColor" />
 
                 <TextView
@@ -487,9 +490,10 @@
                     android:padding="10dp"
                     android:src="@drawable/ic_baseline_bookmark_24"
                     android:contentDescription="Bookmark"
+                    android:clickable="true"
+                    android:focusable="true"
                     app:tint="?attr/colorPrimary" />
 
-                <!-- Unbookmark -->
                 <ImageView
                     android:id="@+id/result_selection_unbookmark"
                     android:layout_width="44dp"
@@ -498,9 +502,10 @@
                     android:padding="10dp"
                     android:src="@drawable/ic_baseline_bookmark_border_24"
                     android:contentDescription="Unbookmark"
+                    android:clickable="true"
+                    android:focusable="true"
                     app:tint="?attr/colorPrimary" />
 
-                <!-- Read -->
                 <ImageView
                     android:id="@+id/result_selection_mark_read"
                     android:layout_width="44dp"
@@ -508,9 +513,10 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:padding="10dp"
                     android:src="@drawable/ic_baseline_check_24"
+                    android:clickable="true"
+                    android:focusable="true"
                     app:tint="?attr/textColor" />
 
-                <!-- Unread -->
                 <ImageView
                     android:id="@+id/result_selection_mark_unread"
                     android:layout_width="44dp"
@@ -518,6 +524,8 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:padding="10dp"
                     android:src="@drawable/ic_baseline_history_24"
+                    android:clickable="true"
+                    android:focusable="true"
                     app:tint="?attr/colorPrimary" />
 
                 <ImageView
@@ -527,6 +535,8 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:padding="10dp"
                     android:src="@drawable/ic_baseline_select_all_24"
+                    android:clickable="true"
+                    android:focusable="true"
                     app:tint="?attr/textColor" />
 
             </LinearLayout>

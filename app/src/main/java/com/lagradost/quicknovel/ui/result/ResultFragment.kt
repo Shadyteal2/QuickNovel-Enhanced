@@ -929,6 +929,16 @@ class ResultFragment : Fragment() {
             backCallback.isEnabled = enabled
             val visibility = if (enabled) View.VISIBLE else View.GONE
             val selToolbar = binding.resultSelectionToolbar
+            
+            // Add insets handling to ensure selection toolbar isn't hidden by system nav
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(selToolbar) { view, insets ->
+                val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                val params = view.layoutParams as androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+                params.bottomMargin = systemBars.bottom
+                view.layoutParams = params
+                insets
+            }
+
             if (selToolbar.visibility != visibility) {
                 selToolbar.clearAnimation()
                 if (enabled) {

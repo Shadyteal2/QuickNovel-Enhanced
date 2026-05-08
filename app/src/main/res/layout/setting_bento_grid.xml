@@ -499,32 +499,30 @@
     </LinearLayout>
 
     <!-- Social Chips Row -->
-    <HorizontalScrollView
-        android:id="@+id/social_scroll"
+    <LinearLayout
+        android:id="@+id/social_pill_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:clipToPadding="false"
-        android:scrollbars="none"
+        android:background="@drawable/vibe_glass_card"
         app:layout_constraintTop_toBottomOf="@id/bento_container">
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:background="@drawable/glass_nav_background"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingHorizontal="8dp">
+            android:paddingHorizontal="4dp">
 
             <LinearLayout
                 android:id="@+id/chip_discord"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
                 android:alpha="0.85"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:gravity="center"
-                android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:orientation="horizontal">
 
                 <ImageView
                     android:layout_width="18dp"
@@ -539,23 +537,23 @@
                     android:fontFamily="@font/productsans_bold"
                     android:text="Discord"
                     android:textColor="?attr/white"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
 
             <View
                 android:layout_width="1dp"
                 android:layout_height="24dp"
-                android:background="#33FFFFFF" />
+                android:background="#1AFFFFFF" />
 
             <LinearLayout
                 android:id="@+id/chip_telegram"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
                 android:alpha="0.85"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:gravity="center"
-                android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:orientation="horizontal">
 
                 <ImageView
                     android:layout_width="18dp"
@@ -570,23 +568,23 @@
                     android:fontFamily="@font/productsans_bold"
                     android:text="Telegram"
                     android:textColor="?attr/white"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
 
             <View
                 android:layout_width="1dp"
                 android:layout_height="24dp"
-                android:background="#33FFFFFF" />
+                android:background="#1AFFFFFF" />
 
             <LinearLayout
                 android:id="@+id/chip_github"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
                 android:alpha="0.85"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:gravity="center"
-                android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:orientation="horizontal">
 
                 <ImageView
                     android:layout_width="18dp"
@@ -601,16 +599,16 @@
                     android:fontFamily="@font/productsans_bold"
                     android:text="GitHub"
                     android:textColor="?attr/white"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
 
         </LinearLayout>
-    </HorizontalScrollView>
+    </LinearLayout>
 
     <Space
         android:layout_width="match_parent"
         android:layout_height="160dp"
-        app:layout_constraintTop_toBottomOf="@id/social_scroll" />
+        app:layout_constraintTop_toBottomOf="@id/social_pill_container" />
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>
 </FrameLayout>

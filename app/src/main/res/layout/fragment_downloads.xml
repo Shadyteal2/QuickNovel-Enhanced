@@ -212,7 +212,7 @@
             <View
                     android:id="@+id/tab_gesture_zone"
                     android:layout_width="match_parent"
-                    android:layout_height="120dp"
+                    android:layout_height="20dp"
                     android:layout_gravity="bottom"
                     android:background="@android:color/transparent"
                     android:visibility="gone" />

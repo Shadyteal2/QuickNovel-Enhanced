@@ -884,15 +884,21 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     override fun onResume() {
         viewModel.resumedApp()
         super.onResume()
-        readingSessionStartTime = System.currentTimeMillis()
+        readingSessionStartTime = android.os.SystemClock.elapsedRealtime()
     }
 
     override fun onPause() {
         viewModel.leftApp()
         super.onPause()
         if (readingSessionStartTime != 0L) {
-            val sessionTime = System.currentTimeMillis() - readingSessionStartTime
-            UsageStatsManager.addReadingTime(this, sessionTime)
+            val sessionTime = android.os.SystemClock.elapsedRealtime() - readingSessionStartTime
+            // Safety cap: No reading session can be > 12 hours (43,200,000 ms)
+            // This prevents massive outliers if the activity isn't paused correctly for days
+            // or if the system clock jumps.
+            if (sessionTime > 0) {
+                val cappedSessionTime = minOf(sessionTime, 12 * 60 * 60 * 1000L)
+                UsageStatsManager.addReadingTime(this, cappedSessionTime)
+            }
             readingSessionStartTime = 0L
         }
     }
@@ -1029,43 +1035,6 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
 
 
-    private fun saveReadingTime() {
-        if (readStartTime == 0L) return
-        val elapsed = System.currentTimeMillis() - readStartTime
-        readStartTime = 0L
-        if (elapsed < 1000) return
-
-        val currentTotal = getKey<Long>("TOTAL_READING_TIME", 0L) ?: 0L
-        setKey("TOTAL_READING_TIME", currentTotal + elapsed)
-
-        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
-        val lastReadDay = getKey<String>("LAST_READ_DAY", "") ?: ""
-        val currentStreak = getKey<Int>("CURRENT_STREAK", 0) ?: 0
-
-        if (lastReadDay != today) {
-            if (lastReadDay.isNotEmpty()) {
-                try {
-                    val format = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-                    val lastDate = format.parse(lastReadDay)
-                    val todayDate = format.parse(today)
-                    if (lastDate != null && todayDate != null) {
-                        val diff = (todayDate.time - lastDate.time) / (1000 * 60 * 60 * 24)
-                        if (diff == 1L) {
-                            setKey("CURRENT_STREAK", currentStreak + 1)
-                        } else if (diff > 1L) {
-                            setKey("CURRENT_STREAK", 1)
-                        }
-                    }
-                } catch (e: Exception) {
-                    com.lagradost.quicknovel.mvvm.logError(e)
-                }
-            } else {
-                setKey("CURRENT_STREAK", 1)
-            }
-            setKey("LAST_READ_DAY", today)
-        }
-    }
-
     /*  private fun updateTimeText() {
           val string = if (viewModel.time12H) "hh:mm a" else "HH:mm"
 
@@ -1074,7 +1043,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
           binding.readTime.text = currentTime
           binding.readTime.postDelayed({ -> updateTimeText() }, 1000)
       }*/
-    private var readStartTime: Long = 0L
+
     private var topBarHeight by Delegates.notNull<Int>()
 
 
@@ -1177,7 +1146,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
 
         registerBattery()
-        readingSessionStartTime = System.currentTimeMillis()
+        readingSessionStartTime = android.os.SystemClock.elapsedRealtime()
 
         viewModel.init(intent, this)
         // Dynamic Slotting: Set topBarHeight based on a slim 64dp standard + the system safe area
