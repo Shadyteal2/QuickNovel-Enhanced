@@ -68,20 +68,19 @@ class Apis {
 
         fun addPlugins(apis: List<MainAPI>) {
             synchronized(pluginApis) {
-                var addedCount = 0
                 for (api in apis) {
-                    if (pluginApis.any { it.name == api.name }) continue
+                    // Replace any existing provider with the same name so updates are applied immediately
+                    pluginApis.removeAll { it.name == api.name }
                     pluginApis.add(api)
                     com.lagradost.quicknovel.APIRepository.providersActive.add(api.name)
-                    addedCount++
                 }
-                if (addedCount > 0) notifyChange()
+                if (apis.isNotEmpty()) notifyChange()
             }
         }
 
         fun addPlugin(api: MainAPI) {
             synchronized(pluginApis) {
-                if (pluginApis.any { it.name == api.name }) return
+                pluginApis.removeAll { it.name == api.name }
                 pluginApis.add(api)
                 com.lagradost.quicknovel.APIRepository.providersActive.add(api.name)
                 notifyChange()
