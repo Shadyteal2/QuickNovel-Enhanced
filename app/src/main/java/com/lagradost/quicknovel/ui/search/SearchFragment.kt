@@ -199,7 +199,7 @@ class SearchFragment : Fragment() {
             }
         }
 
-        activity?.fixPaddingStatusbar(binding.searchToolbar)
+        activity?.fixPaddingStatusbar(binding.searchHeaderHolder)
         
         com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(binding.searchToolbar, binding.searchAllRecycler)
         com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(binding.searchToolbar, binding.homeBrowselist)

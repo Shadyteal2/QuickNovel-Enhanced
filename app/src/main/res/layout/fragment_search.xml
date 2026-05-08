@@ -52,68 +52,67 @@
         android:background="@color/transparent">
 
         <LinearLayout
-            android:id="@+id/search_toolbar"
+            android:id="@+id/search_header_holder"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/glass_header_background">
+            android:orientation="vertical">
 
-            <FrameLayout
+            <LinearLayout
+                android:id="@+id/search_toolbar"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginVertical="8dp"
-                android:background="?attr/searchBarBackground"
-                android:visibility="visible">
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="12dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="8dp">
 
-                <FrameLayout
+                <LinearLayout
+                    android:id="@+id/search_container"
                     android:layout_width="match_parent"
-                    android:layout_height="30dp"
-                    android:layout_gravity="center_vertical"
-                    android:layout_marginEnd="30dp">
+                    android:layout_height="54dp"
+                    android:background="@drawable/vibe_glass_card"
+                    android:elevation="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="6dp">
 
                     <androidx.appcompat.widget.SearchView
                         android:id="@+id/main_search"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="match_parent"
-                        android:layout_gravity="center_vertical"
+                        android:layout_weight="1"
                         android:animateLayoutChanges="true"
                         android:iconifiedByDefault="false"
-                        android:paddingStart="-10dp"
                         app:iconifiedByDefault="false"
                         app:queryBackground="@color/transparent"
                         app:queryHint="@string/search_hint"
-                        app:searchIcon="@drawable/search_icon"
-                        tools:ignore="RtlSymmetry">
+                        app:searchHintIcon="@null"
+                        app:searchIcon="@null">
 
                         <androidx.core.widget.ContentLoadingProgressBar
                             android:id="@+id/search_loading_bar"
                             style="@style/Widget.AppCompat.ProgressBar"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:layout_marginStart="-35dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginStart="-32dp"
+                            android:alpha="0"
                             android:foregroundTint="?attr/colorPrimary"
-                            android:progressTint="?attr/colorPrimary">
-
-                        </androidx.core.widget.ContentLoadingProgressBar>
-                        <!--app:queryHint="@string/search_hint"
-                         android:background="?attr/primaryGrayBackground" ?attr/itemBackground
-                                    app:searchHintIcon="@drawable/search_white"
-                                    -->
+                            android:progressTint="?attr/colorPrimary" />
                     </androidx.appcompat.widget.SearchView>
-                </FrameLayout>
 
-                <ImageView
-                    android:id="@+id/search_filter"
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:layout_gravity="end|center_vertical"
-                    android:layout_margin="10dp"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/change_providers_descript"
-                    android:src="@drawable/ic_baseline_tune_24"
-                    app:tint="?attr/iconColor" />
-            </FrameLayout>
+                    <ImageView
+                        android:id="@+id/search_filter"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/change_providers_descript"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_baseline_tune_24"
+                        app:tint="?attr/iconColor" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
