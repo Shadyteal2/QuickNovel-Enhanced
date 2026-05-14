@@ -19,7 +19,7 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 - **Character Aliases & Dictionary**: Rename characters for a novel with the Replace Word system and look up definitions using the inbuilt dictionary.
 - **Visual Contrast Readability Overlays**: Shadow layer integrations guarantee adaptive text formatting accurately adapts over high-brightness layouts.
 - **Many More**
-
+- Join my [telegram](https://t.me/+i9MSwgeoXzU0NTE1) for Latest Beta and Providers releases.
 
 ## Screenshots
 
@@ -34,14 +34,14 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 | **Reader Setting** | **Reader Setting 2nd** | **Reader Stats** 
 
 
-**New providers by me** - Fenrir realm (https://fenrirealm.com) , Chrysanthemum Garden (https://chrysanthemumgarden.com) , Lnori (https://lnori.com) , LightNovelWorld (https://lightnovelworld.org) , NovelArchive (https://novelarchive.cc) , Wuxia World (https://wuxiaworld.com) , WuxiaClick (https://wuxia.click). 
+**New providers by me** - Fenrir realm (https://fenrirealm.com) , Chrysanthemum Garden (https://chrysanthemumgarden.com) , Lnori (https://lnori.com) , LightNovelWorld (https://lightnovelworld.org) , NovelArchive (https://novelarchive.cc) , Wuxia World (https://wuxiaworld.com) , WuxiaClick (https://wuxia.click) and many more. Join my [telegram](https://t.me/+i9MSwgeoXzU0NTE1) for latest Providers and Beta release 
 
 
 ## Links:
 
 **Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
 
-**Telegram:** [Join Telegram community to get Beta Releases](https://t.me/+i9MSwgeoXzU0NTE1)
+**Telegram:** [Join Telegram community to get Beta and PROVIDERS Releases](https://t.me/+i9MSwgeoXzU0NTE1)
 
 **Discord:** [Join Discord Community](https://discord.gg/njMumTKvVw)
 
