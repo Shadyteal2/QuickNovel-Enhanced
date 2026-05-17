@@ -263,18 +263,32 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                         .removeSuffix(".apk").removeSuffix(".dex")
                         .replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
 
+                    val timestamp = System.currentTimeMillis()
+                    val destFileName = "${bundleId}_$timestamp"
                     val pluginsDir = PluginManager.getPluginsDir(ctx)
-                    val destApk   = File(pluginsDir, "$bundleId.apk")
-                    val destJson  = File(pluginsDir, "$bundleId.json")
+                    val destApk   = File(pluginsDir, "$destFileName.apk")
+                    val destJson  = File(pluginsDir, "$destFileName.json")
 
-                    // ── 3. Notify if this is already installed (update path) ──────
-                    if (destJson.exists()) {
+                    // ── 3. Legacy cleanup — remove stale bundles for these providers ──
+                    val mapper = jacksonObjectMapper()
+                    pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
                         try {
-                            val old = jacksonObjectMapper().readValue(destJson.readText(), PluginItem::class.java)
-                            activity?.runOnUiThread {
-                                showToast(getString(R.string.import_provider_apk_duplicate_format, old.version))
+                            val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
+                            val isStale = existingMeta.pluginId == bundleId || existingMeta.mainClasses?.any { oldClass ->
+                                val newName = oldClass.split(".").last()
+                                existingMeta.pluginId.replace("_", " ").equals(newName, ignoreCase = true)
+                            } ?: false
+                            if (isStale) {
+                                val baseName = jsonFile.nameWithoutExtension
+                                val staleApk = File(pluginsDir, "$baseName.apk")
+                                val staleDex = File(pluginsDir, "$baseName.dex")
+                                PluginManager.removeCachesForPath(staleApk.absolutePath)
+                                staleApk.delete()
+                                staleDex.delete()
+                                jsonFile.delete()
+                                android.util.Log.i("PluginImport", "Removed stale bundle: $baseName → replaced by $destFileName")
                             }
-                        } catch (_: Exception) {}
+                        } catch (_: Exception) { /* corrupt json */ }
                     }
 
                     // ── 4. Copy APK bytes to plugins dir ─────────────────────────

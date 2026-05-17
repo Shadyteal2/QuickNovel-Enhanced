@@ -19,7 +19,7 @@ import coil3.request.crossfade
 class BrowseAdapter : NoStateAdapter<MainAPI>(BaseDiffCallback(itemSame = { a, b ->
     a.name == b.name
 }, contentSame = { a, b ->
-    a.name == b.name
+    a === b
 })) {
 
     companion object {

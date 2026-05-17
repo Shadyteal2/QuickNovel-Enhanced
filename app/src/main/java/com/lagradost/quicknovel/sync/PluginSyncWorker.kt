@@ -152,16 +152,22 @@ class PluginSyncWorker(
         
         // Use a stable filename based on the URL or the first plugin's ID
         val bundleId = plugins.first().pluginId 
-        val apkFile = File(pluginsDir, "$bundleId.apk")
-        val jsonFile = File(pluginsDir, "$bundleId.json")
+        val mapper = jacksonObjectMapper()
 
-        // 1. Determine if any plugin in this bundle needs an update
+        // 1. Find existing json file for this bundleId
+        val existingJsons = pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.filter { json ->
+            try {
+                mapper.readValue(json.readText(), PluginItem::class.java).pluginId == bundleId
+            } catch (e: Exception) { false }
+        } ?: emptyList()
+
+        val currentJsonFile = existingJsons.maxByOrNull { it.lastModified() }
+
         var currentVersion = -1
         var isManual = false
-        if (jsonFile.exists()) {
+        if (currentJsonFile != null && currentJsonFile.exists()) {
             try {
-                val currentMeta = jacksonObjectMapper()
-                    .readValue(jsonFile.readText(), PluginItem::class.java)
+                val currentMeta = mapper.readValue(currentJsonFile.readText(), PluginItem::class.java)
                 currentVersion = currentMeta.version
                 isManual = currentMeta.isManualImport
             } catch (e: Exception) {}
@@ -183,7 +189,12 @@ class PluginSyncWorker(
                 return
             }
 
-            val partFile = File(pluginsDir, "$bundleId.part")
+            val timestamp = System.currentTimeMillis()
+            val destFileName = "${bundleId}_$timestamp"
+            val newApkFile = File(pluginsDir, "$destFileName.apk")
+            val newJsonFile = File(pluginsDir, "$destFileName.json")
+
+            val partFile = File(pluginsDir, "$destFileName.part")
             android.util.Log.i("PluginSync", "Downloading bundle from $url")
             
             // USE STREAMING DOWNLOAD to avoid OOM on large APKs
@@ -199,19 +210,25 @@ class PluginSyncWorker(
                         }
                         partFile.setReadOnly() // Security requirement for DexClassLoader
 
-                        // Clean up old metadata classes before renaming
-                        if (jsonFile.exists()) {
+                        // Clean up ALL old metadata classes and files for this bundle
+                        existingJsons.forEach { jsonFile ->
                             try {
-                                val oldMeta = jacksonObjectMapper().readValue(jsonFile.readText(), PluginItem::class.java)
+                                val oldMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
                                 oldMeta.mainClass?.let { PluginManager.unloadPlugin(it) }
                                 oldMeta.mainClasses?.forEach { PluginManager.unloadPlugin(it) }
+                                
+                                val baseName = jsonFile.nameWithoutExtension
+                                val staleApk = File(pluginsDir, "$baseName.apk")
+                                val staleDex = File(pluginsDir, "$baseName.dex")
+                                PluginManager.removeCachesForPath(staleApk.absolutePath)
+                                staleApk.delete()
+                                staleDex.delete()
+                                jsonFile.delete()
                             } catch (e: Exception) { }
                         }
 
-                        PluginManager.removeCachesForPath(apkFile.absolutePath)
-
-                        if (apkFile.exists()) apkFile.delete()
-                        partFile.renameTo(apkFile)
+                        if (newApkFile.exists()) newApkFile.delete()
+                        partFile.renameTo(newApkFile)
 
                         // Create a "Bundle" PluginItem for local tracking
                         val bundleItem = PluginItem(
@@ -228,7 +245,7 @@ class PluginSyncWorker(
                             url = url
                         )
 
-                        jsonFile.writeText(jacksonObjectMapper().writeValueAsString(bundleItem))
+                        newJsonFile.writeText(mapper.writeValueAsString(bundleItem))
                         android.util.Log.i("PluginSync", "Successfully saved bundle metadata for $bundleId")
                         // Note: PluginManager.loadAllPlugins() will be called at the end of doWork()
                     }
