@@ -9,8 +9,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lagradost.quicknovel.APIRepository
 import kotlinx.coroutines.Job
+import com.lagradost.quicknovel.CommonActivity.showToast
 import com.lagradost.quicknovel.BaseApplication.Companion.context
 import com.lagradost.quicknovel.BaseApplication.Companion.getKey
+import com.lagradost.quicknovel.BaseApplication.Companion.getKeys
 import com.lagradost.quicknovel.BaseApplication.Companion.removeKey
 import com.lagradost.quicknovel.BaseApplication.Companion.setKey
 import com.lagradost.quicknovel.BookDownloader2
@@ -54,16 +56,18 @@ import com.lagradost.quicknovel.ui.download.SortingMethod
 import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.ResultCached
+import com.lagradost.quicknovel.RESULT_CHAPTER_BOOKMARK
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Collections
 
 
 class ResultViewModel : ViewModel() {
     companion object {
         val chapterSortingMethods = arrayOf(
             SortingMethod(R.string.chapter_sort, CHAPTER_SORT, REVERSE_CHAPTER_SORT),
-            SortingMethod(R.string.recently_sort, LAST_ACCES_SORT, REVERSE_LAST_ACCES_SORT),
+            SortingMethod(R.string.last_read_sort, LAST_ACCES_SORT, REVERSE_LAST_ACCES_SORT),
         )
         var sortChapterBy by PreferenceDelegate(RESULT_CHAPTER_SORT, CHAPTER_SORT, Int::class)
 
@@ -87,7 +91,113 @@ class ResultViewModel : ViewModel() {
             true,
             Boolean::class
         )
+    }
 
+    val selectedChapters = MutableLiveData<Set<String>>(emptySet())
+    val isInSelectionMode = MutableLiveData<Boolean>(false)
+    val isBatchDownloading = MutableLiveData<Boolean>(false)
+
+    fun toggleSelection(url: String) {
+        val current = selectedChapters.value ?: emptySet()
+        if (current.contains(url)) {
+            selectedChapters.postValue(current - url)
+        } else {
+            selectedChapters.postValue(current + url)
+        }
+    }
+
+    fun selectRange(urls: List<String>) {
+        val current = selectedChapters.value ?: emptySet()
+        selectedChapters.postValue(current + urls)
+    }
+
+    fun selectAll() {
+        val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        selectedChapters.postValue(streamRes.data.map { it.url }.toSet())
+    }
+
+    fun clearSelection() {
+        selectedChapters.postValue(emptySet())
+    }
+
+    fun setSelectionMode(enabled: Boolean) {
+        if (!enabled) clearSelection()
+        isInSelectionMode.postValue(enabled)
+    }
+
+    fun isChapterBookmarked(chapter: ChapterData): Boolean {
+        return getKey(RESULT_CHAPTER_BOOKMARK, chapter.url, false) ?: false
+    }
+
+    fun setChapterBookmark(chapter: ChapterData, bookmark: Boolean) {
+        if (bookmark) {
+            setKey(RESULT_CHAPTER_BOOKMARK, chapter.url, true)
+        } else {
+            removeKey(RESULT_CHAPTER_BOOKMARK, chapter.url)
+        }
+    }
+
+    fun toggleChapterBookmark(chapter: ChapterData) {
+        setChapterBookmark(chapter, !isChapterBookmarked(chapter))
+    }
+
+    fun executeBatchMarkRead(read: Boolean) {
+        val selected = selectedChapters.value ?: return
+        val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        val ctx = context ?: return
+        val editor = com.lagradost.quicknovel.DataStore.editor(ctx)
+        val timeToSet = System.currentTimeMillis()
+        streamRes.data.filter { selected.contains(it.url) }.forEach { chapterData ->
+            val index = chapterIndex(chapterData) ?: return@forEach
+            val path = com.lagradost.quicknovel.DataStore.getFolderName(EPUB_CURRENT_POSITION_READ_AT, "${streamRes.name}/$index")
+            if (read) {
+                editor.setKey(path, timeToSet)
+            } else {
+                editor.removeKey(path)
+            }
+        }
+        editor.apply()
+        chapters.postValue(orderChapters(streamRes.data))
+        setSelectionMode(false)
+    }
+
+    fun executeBatchBookmark(bookmark: Boolean) {
+        val selected = selectedChapters.value ?: return
+        val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        val ctx = context ?: return
+        val editor = com.lagradost.quicknovel.DataStore.editor(ctx)
+        streamRes.data.filter { selected.contains(it.url) }.forEach { chapterData ->
+            val path = com.lagradost.quicknovel.DataStore.getFolderName(RESULT_CHAPTER_BOOKMARK, chapterData.url)
+            if (bookmark) {
+                editor.setKey(path, true)
+            } else {
+                editor.removeKey(path)
+            }
+        }
+        editor.apply()
+        chapters.postValue(orderChapters(streamRes.data))
+        setSelectionMode(false)
+    }
+
+    fun executeBatchDownload() {
+        val selected = selectedChapters.value ?: return
+        val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        val indices = streamRes.data.mapIndexedNotNull { index: Int, chapter: ChapterData ->
+            if (selected.contains(chapter.url)) index else null
+        }
+
+        if (indices.isEmpty()) return
+
+        isBatchDownloading.postValue(true)
+        viewModelScope.launchSafe {
+            val res = loadResponse.value
+            if (res is Resource.Success && res.value is StreamResponse) {
+                // We'll use a new batch download method in BookDownloader2
+                BookDownloader2.download(res.value, context ?: return@launchSafe, indices)
+            }
+            isBatchDownloading.postValue(false)
+            setSelectionMode(false)
+        }
     }
 
     fun reorderChapters() {
@@ -111,39 +221,37 @@ class ResultViewModel : ViewModel() {
     }
 
 
+    fun hasBookmarkedChapter(chapter: ChapterData): Boolean {
+        return getKey<Boolean>(RESULT_CHAPTER_BOOKMARK, chapter.url) == true
+    }
+
     private fun orderChapters(list: List<ChapterData>): List<ChapterData> {
         val filterRead = filterChapterByRead
         val filterUnread = filterChapterByUnread
-        // val filterBookmarked = filterChapterByBookmarked
         val filterDownloaded = filterChapterByDownloads
-        val sort = sortChapterBy
+        val filterBookmarked = filterChapterByBookmarked
         val state = downloadState.value
+        val sort = sortChapterBy
 
         return list.filter { chapter ->
             val read = hasReadChapter(chapter)
+            val bookmarked = hasBookmarkedChapter(chapter)
+            val downloaded = (state != null && state.progress > (chapterIndex(chapter) ?: Int.MAX_VALUE))
+            
+            val passesReadFilter = if (filterRead == filterUnread) true 
+                                   else if (filterRead) read 
+                                   else !read
 
-            (filterUnread && !read) || (filterRead && read) ||
-                    (filterDownloaded && (state != null && state.progress > (chapterIndex(chapter)
-                        ?: Int.MAX_VALUE)))
-        }.sortedBy { chapter ->
-            return@sortedBy when (sort) {
-                CHAPTER_SORT -> {
-                    chapterIndex(chapter)?.toLong()
-                }
+            val passesBookmarkFilter = if (filterBookmarked) bookmarked else true
+            val passesDownloadFilter = if (filterDownloaded) downloaded else true
 
-                REVERSE_CHAPTER_SORT -> {
-                    chapterIndex(chapter)?.toLong()?.unaryMinus()
-                }
-
-                LAST_ACCES_SORT -> {
-                    getChapterReadTime(chapter) ?: Long.MAX_VALUE
-                }
-
-                REVERSE_LAST_ACCES_SORT -> {
-                    -(getChapterReadTime(chapter) ?: Long.MAX_VALUE)
-                }
-
-                else -> null
+            passesReadFilter && passesBookmarkFilter && passesDownloadFilter
+        }.let { filtered ->
+            when (sort) {
+                REVERSE_CHAPTER_SORT -> filtered.asReversed()
+                LAST_ACCES_SORT -> filtered.sortedByDescending { getChapterReadTime(it) ?: 0L }
+                REVERSE_LAST_ACCES_SORT -> filtered.sortedBy { getChapterReadTime(it) ?: 0L }
+                else -> filtered // CHAPTER_SORT
             }
         }
     }
@@ -194,6 +302,7 @@ class ResultViewModel : ViewModel() {
 
     var id: MutableLiveData<Int> = MutableLiveData<Int>(-1)
     var readState: MutableLiveData<ReadType> = MutableLiveData<ReadType>(ReadType.NONE)
+    val duplicateBookmarkState = MutableLiveData<Int?>(null)
 
     var apiName : String = ""
 
@@ -211,7 +320,7 @@ class ResultViewModel : ViewModel() {
 
     private val loadMutex = Mutex()
     private lateinit var load: LoadResponse
-    private var loadId: Int = 0
+    internal var loadId: Int = 0
     private var loadUrl: String = ""
     var hasLoaded: Boolean = false
     val userNote: MutableLiveData<String?> = MutableLiveData(null)
@@ -286,9 +395,10 @@ class ResultViewModel : ViewModel() {
         loadMutex.withLock {
             if (!hasLoaded) return@launchSafe
             addToHistory()
+            val downloadedCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.DOWNLOAD_EPUB_SIZE, loadId.toString(), 0) ?: 0
             BookDownloader2.readEpub(
                 loadId,
-                downloadState.value?.progress?.toInt() ?: return@launchSafe,
+                downloadState.value?.progress?.toInt() ?: downloadedCount,
                 load.author,
                 load.name,
                 apiName,
@@ -578,18 +688,117 @@ class ResultViewModel : ViewModel() {
             loadMutex.withLock {
                 if (!hasLoaded) return@launch
                 updateBookmarkData()
+                checkDuplicates()
                 addToHistory()
             }
         }
     }
+    private fun String.normalize(): String {
+        return this.lowercase().replace(Regex("[^a-z0-9]"), "").trim()
+    }
+
+    private fun findDuplicateState(name: String, author: String?): Int? {
+        val cleanName = name.normalize()
+        if (cleanName.isEmpty()) return null
+        val cleanAuthor = author?.normalize()
+
+        val bookmarkedKeys = getKeys(RESULT_BOOKMARK_STATE) ?: return null
+        for (key in bookmarkedKeys) {
+            val idStr = key.substringAfter("/")
+            if (idStr == loadId.toString()) continue // Skip current provider
+
+            // Robust check: must have both name and author match if author is available
+            val cached = getKey<ResultCached>(RESULT_BOOKMARK, idStr)
+            if (cached != null) {
+                val cachedName = cached.name.normalize()
+                val cachedAuthor = cached.author?.normalize()
+
+                val nameMatch = cachedName == cleanName
+                val authorMatch = if (!cleanAuthor.isNullOrBlank() && !cachedAuthor.isNullOrBlank()) {
+                    cachedAuthor == cleanAuthor
+                } else true // Relaxed match if one is missing
+
+                if (nameMatch && authorMatch) {
+                    val state = getKey<Int>(RESULT_BOOKMARK_STATE, idStr) ?: -1
+                    if (state != -1) return state
+                }
+            }
+        }
+        return null
+    }
+
+    private fun checkDuplicates() {
+        val novel = (loadResponse.value as? Resource.Success)?.value ?: return
+        duplicateBookmarkState.postValue(findDuplicateState(novel.name, novel.author))
+    }
+
     fun bookmark(state: Int) = viewModelScope.launch {
+        if (state != -1) { // -1 is Unbookmark
+            // 1. Check current ID (Standard flow)
+            val currentState = getKey<Int>(folder = RESULT_BOOKMARK_STATE, path = loadId.toString()) ?: -1
+            if (currentState != -1 && currentState != state) {
+                showToast(R.string.already_in_library)
+            }
+
+            // 2. Synchronous robust duplicate check (Cross-provider)
+            val novel = (loadResponse.value as? Resource.Success)?.value
+            if (novel != null) {
+                val duplicate = findDuplicateState(novel.name, novel.author)
+                if (duplicate != null && currentState == -1) {
+                    showToast(R.string.already_in_library)
+                    // Trigger UI to show where it is
+                    duplicateBookmarkState.postValue(duplicate)
+                    return@launch
+                }
+            }
+        }
+
         loadMutex.withLock {
             if (!hasLoaded) return@launch
-            setKey(
-                RESULT_BOOKMARK_STATE, loadId.toString(), state
-            )
-            updateBookmarkData()
+            if (state == -1) {
+                removeKey(RESULT_BOOKMARK_STATE, loadId.toString())
+                removeKey(RESULT_BOOKMARK, loadId.toString())
+            } else {
+                setKey(
+                    RESULT_BOOKMARK_STATE, loadId.toString(), state
+                )
+                updateBookmarkData()
+            }
             readState.postValue(ReadType.fromSpinner(state))
+
+            // SSOT: Sync with Room Database
+            val context = context ?: return@withLock
+            ioSafe {
+                val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao()
+                if (state == -1) {
+                    dao.updateBookmarkType(loadId, null)
+                } else {
+                    val existing = dao.getById(loadId)
+                    if (existing != null) {
+                        dao.updateBookmarkType(loadId, state)
+                    } else {
+                        dao.insert(
+                            com.lagradost.quicknovel.db.NovelEntity(
+                                id = loadId,
+                                source = loadUrl,
+                                name = load.name,
+                                author = load.author,
+                                posterUrl = load.posterUrl,
+                                rating = load.rating,
+                                peopleVoted = (load as? StreamResponse)?.peopleVoted,
+                                views = (load as? StreamResponse)?.views,
+                                synopsis = load.synopsis,
+                                tags = load.tags,
+                                apiName = apiName,
+                                lastUpdated = null,
+                                lastDownloaded = null,
+                                bookmarkType = state
+                            )
+                        )
+                    }
+                }
+            }
+
             com.lagradost.quicknovel.ui.download.DownloadViewModel.bookmarkChanged.emit(Unit)
         }
     }
@@ -762,6 +971,7 @@ class ResultViewModel : ViewModel() {
         userNote.value = note
 
         updateBookmarkData()
+        checkDuplicates()
 
         hasLoaded = true
 
@@ -807,20 +1017,17 @@ class ResultViewModel : ViewModel() {
 
         val data = repo?.load(url)
         loadMutex.withLock {
+            loadResponse.postValue(data) // Post data FIRST
             when (data) {
                 is Resource.Success -> {
                     val res = data.value
-
                     load = res
                     loadUrl = res.url
-
                     val tid = generateId(res, apiName)
-                    setState(tid)
+                    setState(tid) // Now checkDuplicates will see the data
                 }
-
                 else -> {}
             }
-            loadResponse.postValue(data)
         }
     }
 }

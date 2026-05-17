@@ -41,6 +41,10 @@ set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 @rem FIX: Override GRADLE_USER_HOME to project directory to bypass permission errors
 set GRADLE_USER_HOME=%APP_HOME%\.gradle-home
 
+@rem FIX: Force JAVA_HOME to Android Studio's JDK and prepend to PATH to fix jlink errors
+set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr
+set PATH=%JAVA_HOME%\bin;%PATH%
+
 @rem Find java.exe
 if defined JAVA_HOME goto findJavaFromJavaHome
 

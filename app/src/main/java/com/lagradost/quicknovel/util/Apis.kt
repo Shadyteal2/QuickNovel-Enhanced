@@ -9,89 +9,107 @@ import com.lagradost.quicknovel.MainAPI
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.StreamResponse
-import com.lagradost.quicknovel.providers.AllNovelProvider
-import com.lagradost.quicknovel.providers.AnnasArchive
-import com.lagradost.quicknovel.providers.BestLightNovelProvider
-import com.lagradost.quicknovel.providers.FanMtlnProvider
-import com.lagradost.quicknovel.providers.FreewebnovelProvider
-import com.lagradost.quicknovel.providers.GraycityProvider
-import com.lagradost.quicknovel.providers.HiraethTranslationProvider
-import com.lagradost.quicknovel.providers.IndoWebNovelProvider
-import com.lagradost.quicknovel.providers.KolNovelProvider
-import com.lagradost.quicknovel.providers.LibReadProvider
-import com.lagradost.quicknovel.providers.LightNovelTranslationsProvider
-import com.lagradost.quicknovel.providers.MeioNovelProvider
-import com.lagradost.quicknovel.providers.MoreNovelProvider
-import com.lagradost.quicknovel.providers.MtlNovelProvider
-import com.lagradost.quicknovel.providers.NovLoveProvider
-import com.lagradost.quicknovel.providers.NovelBinProvider
-import com.lagradost.quicknovel.providers.NovelFireProvider
-import com.lagradost.quicknovel.providers.NovelFullNETProvider
-import com.lagradost.quicknovel.providers.NovelFullProvider
-import com.lagradost.quicknovel.providers.NovelsOnlineProvider
-import com.lagradost.quicknovel.providers.PawReadProver
-import com.lagradost.quicknovel.providers.ReadNovelFullProvider
-import com.lagradost.quicknovel.providers.ReadfromnetProvider
-import com.lagradost.quicknovel.providers.RedditProvider
-import com.lagradost.quicknovel.providers.RoyalRoadProvider
-import com.lagradost.quicknovel.providers.SakuraNovelProvider
-import com.lagradost.quicknovel.providers.ScribblehubProvider
-import com.lagradost.quicknovel.providers.WtrLabProvider
-import com.lagradost.quicknovel.providers.WuxiaBoxProvider
+
+
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
+import java.util.concurrent.ConcurrentHashMap
 
 class Apis {
     companion object {
-        val apis: List<MainAPI> = arrayOf(
-            //AllProvider(),
-            AllNovelProvider(),
-            //AnnasArchive(), // Broken/Offline
-            //AzynovelProvider(), // dont exist anymore
-            //BestLightNovelProvider(), //dont exist anymore
-            //ComrademaoProvider(), // domain sold/down?
-            //EfremnetProvider(), // domain is expired
-            //EngNovelProvider(),
-            FreewebnovelProvider(),
-            FanMtlnProvider(),
-            GraycityProvider(),
-            HiraethTranslationProvider(),
-            //IndoWebNovelProvider(),
-            //KolNovelProvider(),
-            LibReadProvider(),
-            //LightNovelPubProvider(), // Got cloudflare, but probably bypassable
-            LightNovelTranslationsProvider(),
-            //MeioNovelProvider(),
-            //MNovelFreeProvider(), // same as NovelFullVipProvider
-            //MoreNovelProvider(), // cloudflare?
-            MtlNovelProvider(),
-            NovelBinProvider(),
-            NovelFullNETProvider(),
-
-            NovelFullProvider(),
-            NovelFireProvider(),
-            //NovelPassionProvider(), // Site gone
-            NovelsOnlineProvider(),
-            //NovLoveProvider(),
-            PawReadProver(),
-            //RanobesProvider(), // custom capcha
-            //ReadAnyBookProvider(), // Books locked behind login
-            ReadfromnetProvider(),
-            //ReadLightNovelProvider(), // NOT WORKING?
-            ReadNovelFullProvider(),
-            //RewayatArProvider(), // removed url
-            RoyalRoadProvider(),
-            //SakuraNovelProvider(), // cloudflare?
-            //ScribblehubProvider(),
-            //WuxiaWorldOnlineProvider(), // Site does not work
-            //WuxiaWorldSiteProvider(),
-            //WattpadProvider(), // they have randomized the css classes
-            //WtrLabProvider(),
-            WuxiaBoxProvider(),
+        private val internalApis: List<MainAPI> = listOf<MainAPI>(
+            // All internal providers have been migrated to external extension bundles.
+            // Only non-migrated or core providers remain here.
         ).sortedBy { it.name }
 
 
+        private val pluginApis = java.util.concurrent.CopyOnWriteArrayList<MainAPI>()
+        private val apiRepositoryCache = ConcurrentHashMap<String, APIRepository>()
+        private var cachedApis: List<MainAPI>? = null
+
+        private val _apisLiveData = androidx.lifecycle.MutableLiveData<List<MainAPI>>()
+        val apisLiveData: androidx.lifecycle.LiveData<List<MainAPI>> get() = _apisLiveData
+
+        private val _isSyncing = androidx.lifecycle.MutableLiveData<Boolean>(false)
+        val isSyncing: androidx.lifecycle.LiveData<Boolean> get() = _isSyncing
+
+        fun setSyncing(value: Boolean) {
+            _isSyncing.postValue(value)
+        }
+
+        val apis: List<MainAPI>
+            get() {
+                val current = cachedApis
+                if (current != null) return current
+                val combined = synchronized(pluginApis) {
+                    (internalApis + pluginApis).sortedBy { it.name }
+                }
+                cachedApis = combined
+                return combined
+            }
+
+        private fun notifyChange() {
+            // Re-build repository cache with pre-initialized objects atomically
+            // Note: Caller already holds synchronized(pluginApis)
+            val current = (internalApis + pluginApis).sortedBy { it.name }
+            
+            val tempCache = ConcurrentHashMap<String, APIRepository>()
+            for (api in current) {
+                tempCache[api.name] = com.lagradost.quicknovel.APIRepository(api)
+            }
+            
+            // Atomic update
+            apiRepositoryCache.clear()
+            apiRepositoryCache.putAll(tempCache)
+            cachedApis = current
+            
+            Log.i("Apis", "Providers updated and pre-warmed. Total: ${current.size}")
+            _apisLiveData.postValue(current)
+        }
+
+        fun addPlugins(apis: List<MainAPI>) {
+            synchronized(pluginApis) {
+                for (api in apis) {
+                    // Replace any existing provider with the same name so updates are applied immediately
+                    pluginApis.removeAll { it.name == api.name }
+                    pluginApis.add(api)
+                    com.lagradost.quicknovel.APIRepository.providersActive.add(api.name)
+                }
+                if (apis.isNotEmpty()) notifyChange()
+            }
+        }
+
+        fun addPlugin(api: MainAPI) {
+            synchronized(pluginApis) {
+                pluginApis.removeAll { it.name == api.name }
+                pluginApis.add(api)
+                com.lagradost.quicknovel.APIRepository.providersActive.add(api.name)
+                notifyChange()
+            }
+        }
+
+        fun removePlugin(mainClass: String) {
+            pluginApis.removeAll { it.javaClass.name == mainClass }
+            notifyChange()
+        }
+
+
         fun getApiFromName(name: String): APIRepository {
-            return getApiFromNameOrNull(name) ?: APIRepository(apis[1])
+            return apiRepositoryCache.getOrPut(name) {
+                getApiFromNameNull(name)?.let { APIRepository(it) } ?: APIRepository(apis[0])
+            }
+        }
+
+        /**
+         * Returns pre-warmed repositories for all currently active providers.
+         * Uses the cached repository pool — O(1) lookup, zero allocation.
+         */
+        fun getActiveRepositories(): List<APIRepository> {
+            val active = com.lagradost.quicknovel.APIRepository.providersActive
+            return if (active.isEmpty()) {
+                apiRepositoryCache.values.toList()
+            } else {
+                active.mapNotNull { name -> apiRepositoryCache[name] }
+            }
         }
 
         fun getApiFromNameNull(apiName: String?): MainAPI? {
@@ -103,13 +121,7 @@ class Apis {
         }
 
         fun getApiFromNameOrNull(name: String): APIRepository? {
-            for (a in apis) {
-                if (a.name == name) {
-                    return APIRepository(a)
-                }
-            }
-            if (name == RedditProvider().name) return APIRepository(RedditProvider())
-            return null
+            return getApiFromNameNull(name)?.let { getApiFromName(it.name) }
         }
 
         fun printProviders() {
@@ -188,10 +200,22 @@ class Apis {
             val hashSet = HashSet<String>()
             hashSet.addAll(apis.map { it.name })
 
-            val set = settingsManager.getStringSet(
+            val savedSet = settingsManager.getStringSet(
                 this.getString(R.string.search_providers_list_key),
+                null
+            )
+
+            val set = if (savedSet == null) {
                 hashSet
-            )?.toHashSet() ?: hashSet
+            } else {
+                val updated = HashSet(savedSet)
+                for (api in apis) {
+                    if (!savedSet.contains(api.name)) {
+                        updated.add(api.name)
+                    }
+                }
+                updated
+            }
 
             val activeLangs = getApiProviderLangSettings()
             val list = HashSet<String>()

@@ -215,7 +215,7 @@ abstract class BaseAdapter<
         super.onDetachedFromRecyclerView(recyclerView)
     }
 
-    open fun customContentViewType(item: T): Int = 0
+    open fun customContentViewType(item: T, position: Int): Int = 0
     open fun customFooterViewType(): Int = 0
     open fun customHeaderViewType(): Int = 0
 
@@ -227,7 +227,8 @@ abstract class BaseAdapter<
         if (realPosition >= mDiffer.currentList.size) {
             return FOOTER or customFooterViewType()
         }
-        return CONTENT or customContentViewType(getItem(realPosition))
+        val item = getItem(realPosition)
+        return CONTENT or customContentViewType(item, realPosition)
     }
 
     final override fun onViewRecycled(holder: ViewHolderState<S>) {

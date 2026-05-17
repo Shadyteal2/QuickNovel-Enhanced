@@ -61,19 +61,19 @@
                     style="@style/WhiteCheckmark"
                     tools:checked="true"
                     android:id="@+id/filter_downloaded"
-                    android:text="@string/downloaded" />
+                    android:text="@string/show_downloaded" />
 
             <com.google.android.material.checkbox.MaterialCheckBox
                     style="@style/WhiteCheckmark"
                     tools:checked="true"
                     android:id="@+id/filter_read"
-                    android:text="@string/read" />
+                    android:text="@string/show_read" />
 
             <com.google.android.material.checkbox.MaterialCheckBox
                     style="@style/WhiteCheckmark"
                     tools:checked="true"
                     android:id="@+id/filter_unread"
-                    android:text="@string/unread" />
+                    android:text="@string/show_unread" />
 
             <com.google.android.material.checkbox.MaterialCheckBox
                     android:visibility="gone"

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Main Glass Panel -->
+    <item>
+        <shape>
+            <solid android:color="?attr/floatingNavBackground" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+
+    <!-- Subtle Border Edge Highlight (The "Glass" edge) -->
+    <item>
+        <shape>
+            <stroke android:width="1.2dp" android:color="?attr/floatingNavStroke" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+</layer-list>

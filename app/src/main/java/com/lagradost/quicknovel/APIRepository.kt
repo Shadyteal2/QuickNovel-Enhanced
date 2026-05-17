@@ -5,6 +5,7 @@ import com.lagradost.quicknovel.mvvm.logError
 import com.lagradost.quicknovel.mvvm.safeApiCall
 import com.lagradost.quicknovel.util.Coroutines.threadSafeListOf
 import org.jsoup.Jsoup
+import java.util.concurrent.ConcurrentHashMap
 
 data class OnGoingSearch(
     val apiName: String,
@@ -37,7 +38,7 @@ class APIRepository(val api: MainAPI) {
         get() = System.currentTimeMillis() / 1000L
 
     companion object {
-        var providersActive = HashSet<String>()
+        var providersActive = ConcurrentHashMap.newKeySet<String>()
 
         data class SavedLoadResponse(
             val unixTime: Long,
@@ -108,10 +109,33 @@ class APIRepository(val api: MainAPI) {
         }
     }
 
+    private val searchCache = HashMap<String, Pair<Long, List<SearchResponse>>>()
+    // Short-lived cache for page-1 main-page results (5 min TTL) — instant re-entry after back press
+    private val mainPageCache = ConcurrentHashMap<String, Pair<Long, HeadMainPageResponse>>()
+    private val mainPageCacheTtl = 60 * 5
+
     suspend fun search(query: String): Resource<List<SearchResponse>> {
-        return safeApiCall {
+        val q = query.lowercase().trim()
+        if (q.isEmpty()) return Resource.Success(emptyList())
+
+        synchronized(searchCache) {
+            searchCache[q]?.let { (time, data) ->
+                if ((unixTime - time) < cacheTimeSec) {
+                    return Resource.Success(data)
+                }
+            }
+        }
+
+        val res = safeApiCall {
             api.search(query) ?: throw ErrorLoadingException("No data")
         }
+
+        if (res is Resource.Success) {
+            synchronized(searchCache) {
+                searchCache[q] = unixTime to res.value
+            }
+        }
+        return res
     }
 
     /**
@@ -142,9 +166,16 @@ class APIRepository(val api: MainAPI) {
         orderBy: String?,
         tag: String?,
     ): Resource<HeadMainPageResponse> {
-        return safeApiCall {
-            api.loadMainPage(page, mainCategory, orderBy, tag)
+        if (page == 1) {
+            val key = "${api.name}|$mainCategory|$orderBy|$tag"
+            mainPageCache[key]?.let { (time, data) ->
+                if ((unixTime - time) < mainPageCacheTtl) return Resource.Success(data)
+            }
+            val result = safeApiCall { api.loadMainPage(page, mainCategory, orderBy, tag) }
+            if (result is Resource.Success) mainPageCache[key] = unixTime to result.value
+            return result
         }
+        return safeApiCall { api.loadMainPage(page, mainCategory, orderBy, tag) }
     }
 
 }

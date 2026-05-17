@@ -3,12 +3,12 @@
     android:id="@android:id/title"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingStart="24dp"
-    android:paddingTop="24dp"
+    android:paddingStart="28dp"
+    android:paddingTop="20dp"
     android:paddingEnd="24dp"
     android:paddingBottom="8dp"
     android:textColor="?attr/colorPrimary"
-    android:textSize="14sp"
+    android:textSize="13sp"
     android:textStyle="bold"
-    android:textAllCaps="true"
-    android:letterSpacing="0.1" />
+    android:textAllCaps="false"
+    android:letterSpacing="0.05" />

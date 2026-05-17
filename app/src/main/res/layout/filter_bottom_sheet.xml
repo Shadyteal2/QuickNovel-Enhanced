@@ -41,8 +41,7 @@
             android:paddingTop="30dp"
             android:layout_marginTop="-10dp"
             android:columnCount="2"
-            android:orientation="horizontal"
-            android:background="?attr/primaryBlackBackground"
+            android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 

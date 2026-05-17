@@ -16,4 +16,3 @@
             android:src="@drawable/color_selection_outline"
             android:contentDescription="@string/reading_color" />
 </FrameLayout>
-

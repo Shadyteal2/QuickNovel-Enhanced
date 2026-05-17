@@ -5,9 +5,10 @@ import android.util.AttributeSet
 import android.view.View
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import kotlin.math.abs
 
-class GrdLayoutManager(val context: Context, val spanCoun: Int) : GridLayoutManager(context, spanCoun) {
+class GrdLayoutManager(val context: Context, var spanCoun: Int) : GridLayoutManager(context, spanCoun) {
     override fun onFocusSearchFailed(
         focused: View,
         focusDirection: Int,
@@ -16,7 +17,6 @@ class GrdLayoutManager(val context: Context, val spanCoun: Int) : GridLayoutMana
     ): View? {
         return try {
             val fromPos = getPosition(focused)
-            println("Search failed $fromPos")
             val nextPos = getNextViewPos(fromPos, focusDirection)
             findViewByPosition(nextPos)
         } catch (e: Exception) {
@@ -30,7 +30,6 @@ class GrdLayoutManager(val context: Context, val spanCoun: Int) : GridLayoutMana
         child: View,
         focused: View?
     ): Boolean {
-        // android.widget.FrameLayout$LayoutParams cannot be cast to androidx.recyclerview.widget.RecyclerView$LayoutParams
         return try {
             val pos = maxOf(0, getPosition(focused!!) - 2)
             parent.scrollToPosition(pos)
@@ -40,7 +39,6 @@ class GrdLayoutManager(val context: Context, val spanCoun: Int) : GridLayoutMana
         }
     }
 
-    // Allows moving right and left with focus https://gist.github.com/vganin/8930b41f55820ec49e4d
     override fun onInterceptFocusSearch(focused: View, direction: Int): View? {
         return try {
             val fromPos = getPosition(focused)
@@ -53,51 +51,27 @@ class GrdLayoutManager(val context: Context, val spanCoun: Int) : GridLayoutMana
 
     private fun getNextViewPos(fromPos: Int, direction: Int): Int {
         val offset = calcOffsetToNextView(direction)
-
-        if (hitBorder(fromPos, offset)) {
-            return fromPos
-        }
-
+        if (hitBorder(fromPos, offset)) return fromPos
         return fromPos + offset
     }
 
     private fun calcOffsetToNextView(direction: Int): Int {
-        println("calc")
-
         val spanCount = this.spanCoun
         val orientation = this.orientation
 
         if (orientation == VERTICAL) {
             when (direction) {
-                View.FOCUS_DOWN -> {
-                    return spanCount
-                }
-                View.FOCUS_UP -> {
-                    return -spanCount
-                }
-                View.FOCUS_RIGHT -> {
-                    return 1
-                }
-                View.FOCUS_LEFT -> {
-                    return -1
-                }
-
+                View.FOCUS_DOWN -> return spanCount
+                View.FOCUS_UP -> return -spanCount
+                View.FOCUS_RIGHT -> return 1
+                View.FOCUS_LEFT -> return -1
             }
         } else if (orientation == HORIZONTAL) {
             when (direction) {
-                View.FOCUS_DOWN -> {
-                    return 1
-                }
-                View.FOCUS_UP -> {
-                    return -1
-                }
-                View.FOCUS_RIGHT -> {
-                    return spanCount
-                }
-                View.FOCUS_LEFT -> {
-                    return -spanCount
-                }
-
+                View.FOCUS_DOWN -> return 1
+                View.FOCUS_UP -> return -1
+                View.FOCUS_RIGHT -> return spanCount
+                View.FOCUS_LEFT -> return -spanCount
             }
         }
         return 0
@@ -105,7 +79,6 @@ class GrdLayoutManager(val context: Context, val spanCoun: Int) : GridLayoutMana
 
     private fun hitBorder(from: Int, offset: Int): Boolean {
         val spanCount = spanCount
-
         return if (abs(offset) == 1) {
             val spanIndex = from % spanCount
             val newSpanIndex = spanIndex + offset
@@ -120,20 +93,32 @@ class GrdLayoutManager(val context: Context, val spanCoun: Int) : GridLayoutMana
 class AutofitRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     RecyclerView(context, attrs) {
 
-    private val manager = GrdLayoutManager(context, 2) // THIS CONTROLS SPANS
-
+    private val gridManager = GrdLayoutManager(context, 2)
     private var columnWidth = -1
 
     var spanCount = 0
         set(value) {
             field = value
             if (value > 0) {
-                manager.spanCount = value
+                (layoutManager as? GridLayoutManager)?.spanCount = value
+                gridManager.spanCount = value
             }
         }
 
+    /**
+     * Pinterest Bento Evolution: Dynamic item width calculation
+     * that supports both Grid and Staggered Masonry modes.
+     */
     val itemWidth: Int
-        get() = measuredWidth / manager.spanCount
+        get() {
+            val manager = layoutManager
+            val count = when (manager) {
+                is GridLayoutManager -> manager.spanCount
+                is StaggeredGridLayoutManager -> manager.spanCount
+                else -> 2
+            }
+            return if (count > 0) measuredWidth / count else measuredWidth / 2
+        }
 
     init {
         if (attrs != null) {
@@ -142,16 +127,6 @@ class AutofitRecyclerView @JvmOverloads constructor(context: Context, attrs: Att
             columnWidth = array.getDimensionPixelSize(0, -1)
             array.recycle()
         }
-
-        layoutManager = manager
+        layoutManager = gridManager
     }
-
-
-    /*override fun onMeasure(widthSpec: Int, heightSpec: Int) {
-        super.onMeasure(widthSpec, heightSpec)
-        if (spanCount == 0 && columnWidth > 0) {
-            val count = max(1, measuredWidth / columnWidth)
-            spanCount = count
-        }
-    }*/
 }

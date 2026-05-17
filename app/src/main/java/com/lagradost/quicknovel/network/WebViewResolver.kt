@@ -61,10 +61,11 @@ class WebViewResolver(
         url: String,
         referer: String? = null,
         method: String = "GET",
+        showDialog: Boolean = false,
         requestCallBack: (Request) -> Boolean = { false },
     ): Pair<Request?, List<Request>> {
         return resolveUsingWebView(
-            requestCreator(method, url, referer = referer), requestCallBack
+            requestCreator(method, url, referer = referer), showDialog, requestCallBack
         )
     }
 
@@ -75,17 +76,20 @@ class WebViewResolver(
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun resolveUsingWebView(
         request: Request,
+        showDialog: Boolean = false,
         requestCallBack: (Request) -> Boolean = { false }
     ): Pair<Request?, List<Request>> {
         val url = request.url.toString()
         val headers = request.headers
-        println("Initial web-view request: $url")
+        println("Initial web-view request: $url (Dialog: $showDialog)")
         var webView: WebView? = null
+        var dialog: androidx.appcompat.app.AlertDialog? = null
         // Extra assurance it exits as it should.
         var shouldExit = false
 
         fun destroyWebView() {
             main {
+                dialog?.dismiss()
                 webView?.stopLoading()
                 webView?.destroy()
                 webView = null
@@ -101,21 +105,45 @@ class WebViewResolver(
             // Useful for debugging
             WebView.setWebContentsDebuggingEnabled(true)
             try {
-                webView = WebView(
-                    context
-                        ?: throw RuntimeException("No base context in WebViewResolver")
-                ).apply {
+                // IMPORTANT: For AlertDialog we MUST use an Activity context.
+                // We try to get the current activity from CommonActivity.
+                val activity = com.lagradost.quicknovel.CommonActivity.activity
+                val ctx = activity ?: context ?: return@main
+                
+                println("Creating WebView with context: $ctx (isActivity: ${ctx is android.app.Activity})")
+                
+                webView = WebView(ctx).apply {
                     // Bare minimum to bypass captcha
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
-
-                    webViewUserAgent = settings.userAgentString
-                    // Don't set user agent, setting user agent will make cloudflare break.
+                    
+                    // Force matching User-Agent
                     if (userAgent != null) {
                         settings.userAgentString = userAgent
                     }
-                    // Blocks unnecessary images, remove if captcha fucks.
-//                    settings.blockNetworkImage = true
+                    webViewUserAgent = settings.userAgentString
+                }
+
+                if (showDialog) {
+                    if (activity == null) {
+                        println("Cannot show dialog: No Activity context available!")
+                        return@main
+                    }
+                    
+                    val builder = androidx.appcompat.app.AlertDialog.Builder(activity)
+                        .setView(webView)
+                        .setTitle("Cloudflare Verification")
+                        .setNegativeButton("Cancel") { _, _ -> destroyWebView() }
+                        .setOnCancelListener { destroyWebView() }
+                    
+                    dialog = builder.create()
+                    dialog?.show()
+                    
+                    // Resize to be useful but not full screen
+                    dialog?.window?.setLayout(
+                        (activity.resources.displayMetrics.widthPixels * 0.9).toInt(),
+                        (activity.resources.displayMetrics.heightPixels * 0.8).toInt()
+                    )
                 }
 
                 webView?.webViewClient = object : WebViewClient() {
@@ -233,11 +261,19 @@ class WebViewResolver(
         // Timeouts after this amount, 60s
         val totalTime = 60000L
 
-        val delayTime = 100L
+        val delayTime = 500L
 
         // A bit sloppy, but couldn't find a better way
         while (loop < totalTime / delayTime && !shouldExit) {
             if (fixedRequest != null) return fixedRequest to extraRequestList
+            
+            // Periodically check if solved via the callback (e.g. cookie check)
+            if (requestCallBack(request)) {
+                println("Web-view solved via polling check!")
+                destroyWebView()
+                break
+            }
+            
             delay(delayTime)
             loop += 1
         }

@@ -10,7 +10,21 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.lagradost.quicknovel.mvvm.logError
 import androidx.core.content.edit
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Preference key constants — LEGACY flat list.
+//
+// ⚠️  New code should use the organized typed objects in PreferenceKeys.kt:
+//        ReaderPrefs.TEXT_SIZE  instead of  EPUB_TEXT_SIZE
+//        ReaderPrefs.Tts.SPEED  instead of  EPUB_TTS_SET_SPEED
+//        ReaderPrefs.Effects.AURA_INTENSITY  instead of  AURA_INTENSITY
+//        DownloadPrefs.FOLDER   instead of  DOWNLOAD_FOLDER
+//        ResultPrefs.BOOKMARK   instead of  RESULT_BOOKMARK
+//
+// The string values below are identical to PreferenceKeys.kt — both systems
+// write to the same SharedPreferences file and are fully interoperable.
+// ─────────────────────────────────────────────────────────────────────────────
 const val PREFERENCES_NAME: String = "rebuild_preference"
+
 const val DOWNLOAD_FOLDER: String = "downloads_data"
 const val DOWNLOAD_SIZE: String = "downloads_size"
 const val DOWNLOAD_TOTAL: String = "downloads_total"
@@ -24,6 +38,7 @@ const val EPUB_LOCK_ROTATION: String = "reader_epub_rotation"
 const val EPUB_TEXT_SIZE: String = "reader_epub_text_size"
 const val EPUB_TEXT_BIONIC: String = "reader_epub_bionic_reading"
 const val EPUB_TEXT_SELECTABLE: String = "reader_epub_text_selectable"
+const val EPUB_DICTIONARY_ENABLED: String = "reader_epub_dictionary_enabled"
 const val EPUB_SCROLL_VOL: String = "reader_epub_scroll_volume"
 const val EPUB_AUTHOR_NOTES: String = "reader_epub_author_notes"
 const val EPUB_TTS_LOCK: String = "reader_epub_scroll_lock"
@@ -44,9 +59,20 @@ const val EPUB_KEEP_SCREEN_ACTIVE: String = "reader_epub_keep_screen_active"
 const val EPUB_SLEEP_TIMER: String = "reader_epub_tts_timer"
 const val EPUB_ML_FROM_LANGUAGE: String = "reader_epub_ml_from"
 const val EPUB_ML_TO_LANGUAGE: String = "reader_epub_ml_to"
-const val EPUB_ML_USEONLINETRANSLATION: String = "reader_epub_ml_useOnlineTranslation"
+const val EPUB_ML_USEONLINETRANSLATION: String = "reader_epub_ml_use_online"
+const val EPUB_SHOW_READER_PROGRESS: String = "reader_epub_show_progress"
+
 const val EPUB_HAS_TIME: String = "reader_epub_has_time"
 const val EPUB_TWELVE_HOUR_TIME: String = "reader_epub_twelve_hour_time"
+const val EPUB_ZEN_READING: String = "reader_epub_zen_reading"
+
+const val LUMINESCENT_READER: String = "luminescent_reader"
+const val LUMINESCENT_INTENSITY: String = "luminescent_intensity"
+const val LIVING_GLASS: String = "living_glass_key"
+const val AURA_INTENSITY: String = "aura_intensity_key"
+const val AURA_SPEED: String = "aura_speed_key"
+const val AURA_PALETTE: String = "aura_palette_key"
+const val PREMIUM_ANIMATIONS: String = "premium_animations_key"
 const val EPUB_FONT: String = "reader_epub_font"
 const val EPUB_LANG: String = "reader_epub_lang"
 const val EPUB_VOICE: String = "reader_epub_voice"
@@ -57,9 +83,11 @@ const val EPUB_CURRENT_POSITION_SCROLL_CHAR: String = "reader_epub_position_scro
 const val EPUB_CURRENT_ML: String = "reader_epub_ml"
 const val EPUB_CURRENT_POSITION_READ_AT: String = "reader_epub_position_read"
 const val EPUB_CURRENT_POSITION_CHAPTER: String = "reader_epub_position_chapter"
+const val NOVEL_REPLACEMENTS: String = "novel_replacements"
 const val RESULT_BOOKMARK: String = "result_bookmarked"
 const val RESULT_BOOKMARK_STATE: String = "result_bookmarked_state"
 const val HISTORY_FOLDER: String = "result_history"
+const val RESULT_CHAPTER_BOOKMARK: String = "result_chapter_bookmarked"
 const val CURRENT_TAB : String = "current_tab"
 /** When inserting many keys use this function, this is because apply for every key is very expensive on memory */
 data class Editor(
@@ -86,6 +114,18 @@ data class Editor(
             return value.filterIsInstance<String>().size == value.size
         }
         return false
+    }
+
+    fun <T> setKey(path: String, value: T) {
+        try {
+            editor.putString(path, DataStore.mapper.writeValueAsString(value))
+        } catch (e: Exception) {
+            logError(e)
+        }
+    }
+
+    fun removeKey(path: String) {
+        editor.remove(path)
     }
 
     fun apply() {

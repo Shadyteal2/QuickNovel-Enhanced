@@ -28,6 +28,7 @@ import com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE_PDF
 import com.lagradost.quicknovel.CURRENT_TAB
 import com.lagradost.quicknovel.CommonActivity.activity
 import com.lagradost.quicknovel.DOWNLOAD_EPUB_LAST_ACCESS
+import com.lagradost.quicknovel.DOWNLOAD_EPUB_SIZE
 import com.lagradost.quicknovel.DOWNLOAD_NORMAL_SORTING_METHOD
 import com.lagradost.quicknovel.DOWNLOAD_SETTINGS
 import com.lagradost.quicknovel.DOWNLOAD_SORTING_METHOD
@@ -59,6 +60,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -131,13 +133,12 @@ class DownloadViewModel : ViewModel() {
         val bookmarkChanged = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 0)
     }
 
-    init {
-        viewModelScope.launch {
-            bookmarkChanged.collect {
-                loadAllData(false)
-            }
-        }
-    }
+    var activeQuery: String = ""
+    val _pages: androidx.lifecycle.MutableLiveData<List<Page>> = androidx.lifecycle.MutableLiveData(null)
+    val pages: androidx.lifecycle.LiveData<List<Page>> = _pages
+    private val cardsDataMutex = kotlinx.coroutines.sync.Mutex()
+    private val cardsData: java.util.HashMap<Int, com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded> = hashMapOf()
+    private val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: com.lagradost.quicknovel.BaseApplication.context!!).novelDao()
 
     private fun getSavedCategories(): List<CategoryItem> {
         val json = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
@@ -180,6 +181,53 @@ class DownloadViewModel : ViewModel() {
         updateCategories(current + newItem)
     }
 
+    init {
+        viewModelScope.launch {
+            bookmarkChanged.collect {
+                loadAllData(false)
+            }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.getAllAsFlow().collect { novels ->
+                cardsDataMutex.withLock {
+                    for (novel in novels) {
+                        val info = BookDownloader2.downloadProgress[novel.id]
+                        val progress = novel.downloadProgress ?: info?.progress ?: 0L
+                        val total = novel.downloadTotal ?: info?.total ?: 0L
+                        val state = novel.downloadStatus?.let { DownloadState.values().getOrNull(it) } ?: info?.state ?: DownloadState.Nothing
+                        
+                        cardsData[novel.id] = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded(
+                            source = novel.source,
+                            name = novel.name,
+                            author = novel.author,
+                            posterUrl = novel.posterUrl,
+                            rating = novel.rating,
+                            peopleVoted = novel.peopleVoted,
+                            views = novel.views,
+                            synopsis = novel.synopsis,
+                            tags = novel.tags,
+                            apiName = novel.apiName,
+                            readCount = getKey<Int>(DOWNLOAD_EPUB_SIZE, novel.id.toString()) ?: 0,
+                            downloadedCount = progress,
+                            downloadedTotal = total,
+                            ETA = context?.let { ctx -> info?.eta(ctx) } ?: "",
+                            state = state,
+                            id = novel.id,
+                            generating = false,
+                            lastUpdated = novel.lastUpdated,
+                            lastDownloaded = novel.lastDownloaded,
+                            filePath = novel.filePath,
+                            formatType = novel.formatType,
+                            hash = novel.hash,
+                            bookmarkType = novel.bookmarkType
+                        )
+                    }
+                }
+                postCards()
+            }
+        }
+    }
+
     fun deleteCategory(id: Int) {
         updateCategories(readList.filter { it.id != id })
     }
@@ -188,9 +236,7 @@ class DownloadViewModel : ViewModel() {
         updateCategories(readList.map { if (it.id == id) it.copy(name = newName) else it })
     }
 
-    var activeQuery: String = ""
-    val _pages: MutableLiveData<List<Page>> = MutableLiveData(null)
-    val pages: LiveData<List<Page>> = _pages
+
 
     var currentTab: MutableLiveData<Int> =
         MutableLiveData<Int>(getKey(DOWNLOAD_SETTINGS, CURRENT_TAB, 0))
@@ -243,7 +289,11 @@ class DownloadViewModel : ViewModel() {
         } finally {
             setKey(DOWNLOAD_EPUB_LAST_ACCESS, card.id.toString(), System.currentTimeMillis())
             cardsDataMutex.withLock {
-                cardsData[card.id] = cardsData[card.id]?.copy(generating = false) ?: return@withLock
+                val current = cardsData[card.id] ?: return@withLock
+                cardsData[card.id] = current.copy(
+                    generating = false,
+                    readCount = getKey<Int>(DOWNLOAD_EPUB_SIZE, card.id.toString()) ?: 0
+                )
             }
             postCards()
         }
@@ -267,21 +317,13 @@ class DownloadViewModel : ViewModel() {
             }
         }
 
-        downloadInfoMutex.withLock {
-            for (card in values) {
-                downloadProgress[card.id]?.apply {
-                    state = DownloadState.IsPending
-                    lastUpdatedMs = System.currentTimeMillis()
-                    downloadProgressChanged.invoke(card.id to this)
-                }
-            }
-        }
-
-        for (card in values) {
+        // Disable automatic downloading of updates to prevent unintentional background activity.
+        // Users should manually start downloads for specific novels.
+        /*for (card in values) {
             if (card.downloadedTotal <= 0 || (card.downloadedCount * 100 / card.downloadedTotal) > 90) {
                 BookDownloader2.downloadWorkThread(card)
             }
-        }
+        }*/
     }
 
     fun refresh() {
@@ -330,9 +372,12 @@ class DownloadViewModel : ViewModel() {
     }
 
     fun delete(card: ResultCached) {
-        removeKey(RESULT_BOOKMARK, card.id.toString())
-        removeKey(RESULT_BOOKMARK_STATE, card.id.toString())
-        loadAllData(false)
+        ioSafe {
+            dao.updateBookmarkType(card.id, null)
+            removeKey(RESULT_BOOKMARK_STATE, card.id.toString())
+            removeKey(RESULT_BOOKMARK, card.id.toString())
+            loadAllData(false)
+        }
     }
 
     fun deleteAlert(card: DownloadFragment.DownloadDataLoaded) {
@@ -357,7 +402,10 @@ class DownloadViewModel : ViewModel() {
     }
 
     fun delete(card: DownloadFragment.DownloadDataLoaded) {
-        BookDownloader2.deleteNovel(card.author, card.name, card.apiName)
+        ioSafe {
+            BookDownloader2.deleteNovel(card.author, card.name, card.apiName)
+            loadAllData(false)
+        }
     }
 
     private fun matchesQuery(x: String): Boolean {
@@ -495,31 +543,25 @@ class DownloadViewModel : ViewModel() {
         }.filter { matchesQuery(it.name) }
     }
 
-    // very shitty copy as we need to deep copy to actually update it
-    fun resortAllData() {
-        val data = _pages.value ?: return
-        if (data.isEmpty()) {
-            return
-        }
-        val list = arrayListOf<Page>()
-        list.add(
-            data[0].copy(
-                unsortedItems = data[0].unsortedItems,
-                items = sortArray(ArrayList(data[0].unsortedItems.map { (it as DownloadFragment.DownloadDataLoaded).copy() }))
-            )
-        )
-        for (i in 1..data.lastIndex) {
-            list.add(
-                data[i].copy(
-                    unsortedItems = data[i].unsortedItems,
-                    items = sortNormalArray(ArrayList(data[i].unsortedItems.map { (it as ResultCached).copy() }))
-                )
-            )
+    // QN-Enhanced: Optimized background sorting to prevent UI lag with 10k items
+    fun resortAllData() = viewModelScope.launch(Dispatchers.Default) {
+        val data = _pages.value ?: return@launch
+        if (data.isEmpty()) return@launch
+
+        val list = data.mapIndexed { index, page ->
+            if (index == 0) {
+                val sorted = sortArray(ArrayList(page.unsortedItems.map { (it as DownloadFragment.DownloadDataLoaded).copy() }))
+                page.copy(items = sorted, hash = page.title.hashCode() * 31 + sorted.hashCode())
+            } else {
+                val sorted = sortNormalArray(ArrayList(page.unsortedItems.map { (it as ResultCached).copy() }))
+                page.copy(items = sorted, hash = page.title.hashCode() * 31 + sorted.hashCode())
+            }
         }
         _pages.postValue(list)
     }
 
-    fun loadAllData(refreshAll: Boolean) = viewModelScope.launch {
+    // QN-Enhanced: Background data loading from Room SSOT
+    fun loadAllData(refreshAll: Boolean) = viewModelScope.launch(Dispatchers.Default) {
         if (refreshAll) fetchAllData(false)
         val mapping: HashMap<Int, ArrayList<ResultCached>> = hashMapOf()
         val currentCategories = readList
@@ -527,55 +569,82 @@ class DownloadViewModel : ViewModel() {
             mapping[cat.id] = arrayListOf()
         }
 
-        withContext(Dispatchers.IO) {
-            val keys = getKeys(RESULT_BOOKMARK_STATE)
-            for (key in keys ?: emptyList()) {
-                val type = getKey<Int>(key) ?: continue
-                val id = key.replaceFirst(
-                    RESULT_BOOKMARK_STATE,
-                    RESULT_BOOKMARK
-                )
-                val cached = getKey<ResultCached>(id) ?: continue
-                if (mapping.containsKey(type)) {
-                    mapping[type]?.add(cached)
-                }
+        // Fetch from Room
+        val bookmarks = dao.getAllBookmarksAsFlow().first()
+        for (novel in bookmarks) {
+            val type = novel.bookmarkType ?: continue
+            val cached = ResultCached(
+                source = novel.source,
+                name = novel.name,
+                apiName = novel.apiName,
+                id = novel.id,
+                author = novel.author,
+                poster = novel.posterUrl,
+                tags = novel.tags,
+                rating = novel.rating,
+                totalChapters = novel.downloadTotal?.toInt() ?: 0,
+                cachedTime = novel.lastDownloaded ?: 0,
+                synopsis = novel.synopsis,
+            )
+            if (mapping.containsKey(type)) {
+                mapping[type]?.add(cached)
             }
         }
 
-        val pages = mutableListOf(
-            getDownloadedCards(),
-        )
+        val pages = mutableListOf<Page>()
+        
+        // Load Downloaded Cards (Index 0)
+        val downloadedCards = getDownloadedCards()
+        pages.add(downloadedCards)
+
         for (read in currentCategories) {
+            val unsorted = mapping[read.id] ?: arrayListOf()
+            val sorted = sortNormalArray(ArrayList(unsorted))
+            
             pages.add(
                 Page(
-                    if (read.isSystem && read.stringRes != null) context?.getString(read.stringRes) ?: read.name else read.name,
-                    unsortedItems = mapping[read.id] ?: arrayListOf(),
-                    items = sortNormalArray(mapping[read.id] ?: arrayListOf())
-                ),
+                    title = if (read.isSystem && read.stringRes != null) context?.getString(read.stringRes) ?: read.name else read.name,
+                    unsortedItems = unsorted,
+                    items = sorted,
+                    hash = read.id.hashCode() * 31 + sorted.hashCode()
+                )
             )
         }
         _pages.postValue(pages)
     }
 
     private suspend fun getDownloadedCards(): Page = cardsDataMutex.withLock {
+        // Filter: Only include in "Downloads" tab (index 0) if it has a download status, is imported, or is active
+        val unsorted = ArrayList(cardsData.values.filter { card ->
+            card.state != DownloadState.Nothing || 
+            card.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE || 
+            card.apiName == com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE_PDF
+        })
+        val sorted = sortArray(ArrayList(unsorted))
         Page(
-            com.lagradost.quicknovel.ui.ReadType.NONE.name, unsortedItems = ArrayList(cardsData.values),
-            items =
-                sortArray(ArrayList(cardsData.values))
+            title = com.lagradost.quicknovel.ui.ReadType.NONE.name,
+            unsortedItems = unsorted,
+            items = sorted,
+            hash = com.lagradost.quicknovel.ui.ReadType.NONE.prefValue.hashCode() * 31 + sorted.hashCode()
         )
     }
 
 
     private suspend fun postCards() {
-        _pages.value?.let { data ->
-            val list = CopyOnWriteArrayList(data)
-            if (list.isEmpty()) {
-                list.add(getDownloadedCards())
-            } else {
-                list[0] = getDownloadedCards()
-            }
-            _pages.postValue(list)
+        val currentPages = _pages.value
+        if (currentPages == null) {
+            // If they haven't been loaded yet, trigger a full load
+            // This prevents the "silent fail" when postCards() is called before loadAllData()
+            loadAllData(false)
+            return
         }
+        val list = CopyOnWriteArrayList(currentPages)
+        if (list.isEmpty()) {
+            list.add(getDownloadedCards())
+        } else {
+            list[0] = getDownloadedCards()
+        }
+        _pages.postValue(list)
     }
 
     init {
@@ -613,20 +682,23 @@ class DownloadViewModel : ViewModel() {
         }
     }
 
-    private val cardsDataMutex = Mutex()
-    private val cardsData: HashMap<Int, DownloadFragment.DownloadDataLoaded> = hashMapOf()
+
 
     private fun progressChanged(data: Pair<Int, DownloadProgressState>) =
         viewModelScope.launchSafe {
             cardsDataMutex.withLock {
                 val (id, state) = data
                 val newState = state.eta(context ?: return@launchSafe)
-                cardsData[id] = cardsData[id]?.copy(
+                val current = cardsData[id] ?: return@withLock // Only update if we already know about this card
+                
+                cardsData[id] = current.copy(
                     downloadedCount = state.progress,
                     downloadedTotal = state.total,
                     state = state.state,
                     ETA = newState,
-                ) ?: return@launchSafe
+                    // Occasionally refresh readCount too, though it mostly changes on readEpub
+                    readCount = if (state.progress % 10 == 0L) getKey<Int>(DOWNLOAD_EPUB_SIZE, id.toString()) ?: current.readCount else current.readCount
+                )
             }
             postCards()
         }
@@ -675,6 +747,7 @@ class DownloadViewModel : ViewModel() {
                         generating = false,
                         lastUpdated = value.lastUpdated,
                         lastDownloaded = value.lastDownloaded,
+                        readCount = getKey(DOWNLOAD_EPUB_SIZE, id.toString()) ?: 0,
                     )
                 }
             }
@@ -705,6 +778,7 @@ class DownloadViewModel : ViewModel() {
                         generating = false,
                         lastUpdated = value.lastUpdated,
                         lastDownloaded = value.lastDownloaded,
+                        readCount = getKey(DOWNLOAD_EPUB_SIZE, key.toString()) ?: 0,
                     )
                 }
             }

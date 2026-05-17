@@ -2,7 +2,6 @@
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.Material3.Dark.NoActionBar">
         <!-- Opt out of edgeToEdge enforcement in >= Android 15 -->
-        <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
 
         <item name="android:windowBackground">@drawable/splash_background</item>
         <item name="android:navigationBarColor">?attr/primaryBlackBackground</item>
@@ -20,6 +19,8 @@
         <item name="materialButtonStyle">@style/AppMaterialButtonStyle</item>
         <item name="preferenceFragmentCompatStyle">@style/PreferenceTheme</item>
         <item name="bottomSheetDialogTheme">@style/AppBottomSheetDialogTheme</item>
+        <item name="android:windowBlurBehindEnabled" tools:targetApi="31">true</item>
+        <item name="android:windowBlurBehindRadius" tools:targetApi="31">30dp</item>
         <item name="searchViewStyle">@style/AppSearchViewStyle</item>
         <item name="android:searchViewStyle">@style/AndroidSearchView</item>
 
@@ -54,19 +55,16 @@
         <item name="grayTextColor">@color/grayTextColor</item>
         <item name="primaryGrayBackground">@color/primaryGrayBackground</item>
         <item name="primaryBlackBackground">#121212</item>
-        <item name="floatingNavBackground">#80121212</item> <!-- ~70% alpha dark glass -->
-        <item name="floatingNavStroke">#26FFFFFF</item> <!-- Subtle white glass edge -->
+        <item name="floatingNavBackground">#99121212</item> <!-- ~60% alpha dark glass -->
+        <item name="floatingNavStroke">#4DFFFFFF</item> <!-- Visible white glass edge -->
         <item name="iconGrayBackground">@color/iconGrayBackground</item>
         <item name="boxItemBackground">#121212</item>
         <item name="iconColor">?attr/textColor</item>
         <item name="white">#FFF</item>
         <item name="searchBarBackground">@drawable/search_background</item>
 
-        <!-- Checkboxes
-        <item name="colorControlNormal">?attr/white</item>
-        <item name="colorControlActivated">?attr/white</item>
-        <item name="colorControlHighlight">?attr/white</item>
-         -->
+        <!-- Checkboxes -->
+        <item name="colorControlActivated">?attr/colorAccent</item>
     </style>
 
     <!-- Custom Splash Theme to bypass Android 12+ system splash icon -->
@@ -107,7 +105,10 @@
         <item name="android:drawablePadding">20dp</item>
     </style>
 
-    <style name="PreferenceTheme" parent="@style/AppTheme" />
+    <style name="PreferenceTheme" parent="AppTheme">
+        <item name="preferenceFragmentCompatStyle">@style/PreferenceFragment.Material</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
 
     <style name="ListViewStyle" parent="Widget.AppCompat.ListView">
         <item name="android:divider">@null</item>
@@ -118,8 +119,8 @@
     <style name="AmoledMode">
         <item name="primaryGrayBackground">@color/black</item>
         <item name="primaryBlackBackground">@color/black</item>
-        <item name="floatingNavBackground">#B3000000</item> <!-- ~70% alpha amoled glass -->
-        <item name="floatingNavStroke">#26FFFFFF</item> <!-- Subtle white glass edge -->
+        <item name="floatingNavBackground">#CC000000</item> <!-- More opaque for better control isolation -->
+        <item name="floatingNavStroke">#4DFFFFFF</item> <!-- Clearer edge for AMOLED -->
         <item name="iconGrayBackground">@color/black</item>
         <item name="boxItemBackground">@color/black</item>
         <item name="textColor">@color/textColor</item>
@@ -180,7 +181,11 @@
         <item name="textColor">?attr/textColor</item>
     </style>
 
-    <style name="PopupMenu" parent="@style/Widget.AppCompat.PopupMenu">
+    <style name="PopupMenu" parent="@style/ThemeOverlay.AppCompat">
+        <item name="popupMenuStyle">@style/PopupMenuStyle</item>
+    </style>
+
+    <style name="PopupMenuStyle" parent="@style/Widget.AppCompat.PopupMenu">
         <item name="android:popupBackground">@drawable/spatial_glass_card</item>
     </style>
 
@@ -217,16 +222,21 @@
 
     <style name="AppBottomSheetDialogTheme" parent="Theme.Design.Light.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/AppModalStyle</item>
+        <item name="android:windowBlurBehindEnabled" tools:targetApi="31">true</item>
+        <item name="android:windowBlurBehindRadius" tools:targetApi="31">30dp</item>
     </style>
 
     <style name="AppModalStyle" parent="Widget.Design.BottomSheet.Modal">
-        <item name="android:background">@drawable/rounded_dialog</item>
+        <item name="android:background">@drawable/bottom_sheet_glass_background</item>
     </style>
 
     <style name="Theme.AlertDialog" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
         <item name="android:windowMinWidthMajor">@android:dimen/dialog_min_width_major</item>
         <item name="android:windowMinWidthMinor">@android:dimen/dialog_min_width_minor</item>
-        <item name="android:windowBackground">@drawable/dialog__window_background</item>
+        <item name="android:windowBackground">@drawable/dialog_glass_background</item>
 
         <item name="textColorAlertDialogListItem">?attr/textColor</item>
         <item name="android:textColor">?attr/textColor</item>
@@ -240,21 +250,44 @@
         <item name="android:windowBackground">?attr/primaryBlackBackground</item>
     </style>
 
-    <style name="AlertDialogCustom" parent="Theme.AppCompat.Dialog.Alert">
-        <item name="android:windowFullscreen">true</item>
+    <style name="AlertDialogCustom" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowBackground">@drawable/dialog_glass_background</item>
+        <item name="android:windowBlurBehindEnabled" tools:targetApi="31">true</item>
+        <item name="android:windowBlurBehindRadius" tools:targetApi="31">40dp</item>
+        <item name="android:windowClipToOutline">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowElevation">0dp</item>
+
+        <!-- Transparent backgrounds to reveal windowBackground -->
+        <item name="colorSurface">@android:color/transparent</item>
+        <item name="dialogCornerRadius">24dp</item>
+        <item name="background">@android:color/transparent</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:colorBackground">@android:color/transparent</item>
+
+        <!-- Text and Control Colors -->
         <item name="android:textColor">?attr/textColor</item>
         <item name="android:textColorPrimary">?attr/textColor</item>
-        <!--<item name="android:background">?attr/primaryBlackBackground</item>-->
         <item name="android:textAllCaps">false</item>
-        <!--<item name="android:colorBackground">?attr/primaryBlackBackground</item>-->
-        <item name="textColorAlertDialogListItem">?attr/textColor</item>
-        <item name="colorControlNormal">?attr/textColor</item>
-        <!-- colorPrimarySecond used because colorPrimary fails for no reason -->
         <item name="colorControlActivated">?attr/colorPrimary</item>
+        <item name="colorControlNormal">?attr/textColor</item>
+    </style>
 
-        <item name="android:windowMinWidthMajor">@android:dimen/dialog_min_width_major</item>
-        <item name="android:windowMinWidthMinor">@android:dimen/dialog_min_width_minor</item>
-        <item name="android:windowBackground">@drawable/dialog__window_background</item>
+    <style name="BottomSheetDrawerTheme" parent="Theme.Design.Light.BottomSheetDialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBlurBehindEnabled" tools:targetApi="31">true</item>
+        <item name="android:windowBlurBehindRadius" tools:targetApi="31">30dp</item>
+        <item name="android:windowElevation">0dp</item>
+        <item name="bottomSheetStyle">@style/BottomSheetStyleCustom</item>
+    </style>
+
+    <style name="BottomSheetStyleCustom" parent="Widget.Design.BottomSheet.Modal">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:backgroundTint">@android:color/transparent</item>
+        <item name="shapeAppearance">@null</item>
+        <item name="android:background">@android:color/transparent</item>
     </style>
 
     <style name="ResultInfoText">
@@ -276,7 +309,9 @@
     </style>
 
     <style name="AlertDialogCustomBlack" parent="Theme.AppCompat.Dialog.Alert">
-        <item name="android:windowBackground">?attr/primaryBlackBackground</item>
+        <item name="android:windowBackground">@drawable/dialog_glass_background</item>
+        <item name="android:windowBlurBehindEnabled" tools:targetApi="31">true</item>
+        <item name="android:windowBlurBehindRadius" tools:targetApi="31">30dp</item>
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">match_parent</item>
 
@@ -307,6 +342,8 @@
 
     <style name="AppEditStyle" parent="android:Widget.EditText">
         <item name="android:fontFamily">@font/google_sans</item>
+        <item name="android:textColor">?attr/textColor</item>
+        <item name="android:textColorHint">?attr/grayTextColor</item>
     </style>
 
     <style name="NiceButton">
@@ -425,8 +462,8 @@
         <item name="iconGrayBackground">@color/lightGrayBackground</item>
         <item name="boxItemBackground">@color/lightItemBackground</item>
         <item name="textColor">@color/lightTextColor</item>
-        <item name="floatingNavBackground">#E6FFFFFF</item> <!-- Clean white glass -->
-        <item name="floatingNavStroke">#33000000</item> <!-- Subtle dark edge -->
+        <item name="floatingNavBackground">#F2F2F2F2</item> <!-- More solid glass for light mode -->
+        <item name="floatingNavStroke">#26000000</item> <!-- Subtle dark edge -->
         <item name="grayTextColor">@color/lightGrayTextColor</item>
         <item name="white">#000</item>
         <item name="colorOnPrimary">@color/blackText</item>
@@ -643,8 +680,16 @@
         <item name="itemPaddingTop">8dp</item>
         <item name="itemPaddingBottom">12dp</item>
         <item name="navigationBarHeight">60dp</item>
-        <!-- Use color overrides to hide the M3 pill indicator safely without using missing attributes -->
-        <item name="colorPrimaryContainer">@android:color/transparent</item>
-        <item name="colorOnPrimaryContainer">?attr/textColor</item>
+        <!-- Use layered frosted white for the active pill indicator (Material 3 uses styling based on secondary container) -->
+        <item name="colorSecondaryContainer">#33FFFFFF</item> <!-- 20% white pill -->
+        <item name="colorOnSecondaryContainer">#FFFFFF</item>
+        <!-- Fallback for other M3 implementations -->
+        <item name="colorPrimaryContainer">#33FFFFFF</item> 
+        <item name="colorOnPrimaryContainer">#FFFFFF</item>
+    </style>
+
+    <!-- Shape Appearance for Library Posters (Overdraw Optimized) -->
+    <style name="RoundedPoster">
+        <item name="cornerSize">12dp</item>
     </style>
 </resources>

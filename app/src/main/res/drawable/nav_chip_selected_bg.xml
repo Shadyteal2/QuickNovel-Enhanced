@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/whiteRipple">
+    <item>
+        <layer-list>
+            <!-- Outer Glow (Subtle 8dp margin) -->
+            <item
+                android:bottom="1dp"
+                android:left="1dp"
+                android:right="1dp"
+                android:top="1dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#0DFFFFFF" /> <!-- 5% white glow -->
+                    <corners android:radius="40dp" />
+                </shape>
+            </item>
+            <!-- High-Vibrancy Solid Pill -->
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#FFFFFFFF" /> <!-- Ready for high-opacity primary tint -->
+                    <corners android:radius="40dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</ripple>

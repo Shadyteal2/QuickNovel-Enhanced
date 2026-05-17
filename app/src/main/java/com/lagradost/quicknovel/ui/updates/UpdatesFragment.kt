@@ -12,6 +12,9 @@ import com.lagradost.quicknovel.databinding.FragmentUpdatesBinding
 import com.lagradost.quicknovel.db.AppDatabase
 import com.lagradost.quicknovel.db.UpdateItem
 import com.lagradost.quicknovel.R
+import com.lagradost.quicknovel.RESULT_BOOKMARK
+import com.lagradost.quicknovel.RESULT_BOOKMARK_STATE
+import com.lagradost.quicknovel.util.ResultCached
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -109,11 +112,63 @@ class UpdatesFragment : Fragment() {
                 .show()
         }
 
+        binding.selectUpdates.setOnClickListener {
+            val context = requireContext()
+            val keys = com.lagradost.quicknovel.BaseApplication.Companion.getKeys(com.lagradost.quicknovel.RESULT_BOOKMARK_STATE) ?: emptyList()
+            val novels = keys.mapNotNull { key ->
+                val id = key.replaceFirst(com.lagradost.quicknovel.RESULT_BOOKMARK_STATE, com.lagradost.quicknovel.RESULT_BOOKMARK)
+                com.lagradost.quicknovel.BaseApplication.Companion.getKey<com.lagradost.quicknovel.util.ResultCached>(id)
+            }.sortedBy { it.name }
+
+            if (novels.isEmpty()) {
+                com.lagradost.quicknovel.CommonActivity.showToast("No bookmarks found")
+                return@setOnClickListener
+            }
+
+            val items = novels.map { it.name }.toTypedArray()
+            val checkedItems = novels.map { it.isSyncEnabled }.toBooleanArray()
+
+            androidx.appcompat.app.AlertDialog.Builder(context, R.style.AlertDialogCustom)
+                .setTitle("Enable Updates")
+                .setMultiChoiceItems(items, checkedItems) { _, which, isChecked ->
+                    checkedItems[which] = isChecked
+                }
+                .setPositiveButton("Save") { _, _ ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        var changed = false
+                        for (i in novels.indices) {
+                            if (novels[i].isSyncEnabled != checkedItems[i]) {
+                                val updated = novels[i].copy(isSyncEnabled = checkedItems[i])
+                                com.lagradost.quicknovel.BaseApplication.Companion.setKey(com.lagradost.quicknovel.RESULT_BOOKMARK, updated.id.toString(), updated)
+                                changed = true
+                            }
+                        }
+                        if (changed) {
+                            com.lagradost.quicknovel.CommonActivity.showToast("Settings Updated")
+                            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.UpdatesSyncWorker>()
+                                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+                                .build()
+                            androidx.work.WorkManager.getInstance(context.applicationContext).enqueueUniqueWork("UpdatesManualSync", androidx.work.ExistingWorkPolicy.REPLACE, syncRequest)
+                        }
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
         // Adjust for Edge-to-Edge Navigation Bars (3-button gesture supports)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.cleanupUpdates) { v, insets ->
             val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val params = v.layoutParams as android.view.ViewGroup.MarginLayoutParams
             params.bottomMargin = systemBars.bottom + (88 * resources.displayMetrics.density).toInt()
+            v.layoutParams = params
+            insets
+        }
+
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.selectUpdates) { v, insets ->
+            val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            val params = v.layoutParams as android.view.ViewGroup.MarginLayoutParams
+            params.bottomMargin = systemBars.bottom + (160 * resources.displayMetrics.density).toInt()
             v.layoutParams = params
             insets
         }

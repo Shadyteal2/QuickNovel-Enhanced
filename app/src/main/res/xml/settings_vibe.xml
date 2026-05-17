@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="Experimental Aesthetics"
+        app:allowDividerAbove="false">
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:defaultValue="false"
+            android:key="@string/experimental_visuals_key"
+            android:summary="Enable premium generative visuals (Higher Power Consumption)"
+            android:title="@string/experimental_visuals" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:dependency="@string/experimental_visuals_key"
+        android:title="Living Elements">
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:defaultValue="false"
+            android:key="@string/living_glass_key"
+            android:summary="@string/living_glass_desc"
+            android:title="@string/living_glass" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
+            android:dependency="@string/living_glass_key"
+            android:key="@string/aura_intensity_key"
+            android:title="@string/aura_intensity"
+            app:defaultValue="70"
+            app:valueFrom="0"
+            app:valueTo="100"
+            app:stepSize="1" />
+
+        <ListPreference
+            android:dependency="@string/living_glass_key"
+            android:entries="@array/aura_palette_entries"
+            android:entryValues="@array/aura_palette_values"
+            android:key="@string/aura_palette_key"
+            android:title="@string/aura_palette"
+            app:defaultValue="nebula"
+            app:useSimpleSummaryProvider="true" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
+            android:dependency="@string/living_glass_key"
+            android:key="@string/aura_speed_key"
+            android:title="@string/aura_speed"
+            app:defaultValue="100"
+            app:valueFrom="50"
+            app:valueTo="200"
+            app:stepSize="1" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Luminescent Engine">
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:key="@string/luminescent_reader_key"
+            android:title="@string/luminescent_reader"
+            android:summary="@string/luminescent_reader_desc"
+            android:defaultValue="false" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
+            android:key="@string/luminescent_intensity_key"
+            android:title="@string/luminescent_intensity"
+            android:dependency="@string/luminescent_reader_key"
+            app:defaultValue="50"
+            app:valueFrom="0"
+            app:valueTo="100"
+            app:stepSize="1" />
+
+    </PreferenceCategory>
+
+
+</PreferenceScreen>

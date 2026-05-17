@@ -6,8 +6,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
-    android:clickable="true"
-    android:focusable="true">
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
 
 
     <LinearLayout
@@ -46,20 +47,21 @@
     </LinearLayout>
 
     <!-- Full page backdrop -->
+    <!-- Full page ambient glass backdrop -->
     <FrameLayout
         android:id="@+id/result_backdrop_holder"
         android:layout_width="match_parent"
-        android:layout_height="400dp">
+        android:layout_height="match_parent">
         <ImageView
             android:id="@+id/result_poster_blur"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:alpha="0.4"
+            android:alpha="0.5"
             android:scaleType="centerCrop" />
         <View
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@drawable/cinematic_overlay" />
+            android:background="@drawable/dynamic_glass_gradient" />
     </FrameLayout>
 
     <!-- Scrollable container FLAT -->
@@ -289,12 +291,15 @@
                 android:focusable="false"
                 android:paddingHorizontal="16dp"
                 app:tabIndicatorFullWidth="true"
-                app:tabGravity="start"
-                app:tabIndicator="@drawable/indicator_background"
-                app:tabIndicatorColor="?attr/white"
+                app:tabGravity="center"
+                app:indicatorColor="@android:color/transparent"
+                app:tabIndicator="@drawable/tab_pill_indicator"
+                app:tabIndicatorAnimationMode="elastic"
                 app:tabIndicatorGravity="center"
-                app:tabIndicatorHeight="32dp"
-                app:tabMode="scrollable"
+                app:tabIndicatorHeight="36dp"
+                app:tabMode="fixed"
+                app:tabSelectedTextColor="?attr/white"
+                app:tabTextColor="#BDBDBD"
                 app:tabTextAppearance="@style/TabNoCaps" />
 
             <!-- Empty view has been REMOVED as spacing was flattened -->
@@ -380,6 +385,28 @@
             android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
 
+
+
+    <com.facebook.shimmer.ShimmerFrameLayout
+        android:id="@+id/result_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?android:attr/colorBackground"
+        android:visibility="visible"
+        app:shimmer_auto_start="true"
+        app:shimmer_base_alpha="0.3"
+        app:shimmer_highlight_alpha="0.9"
+        app:shimmer_duration="800"
+        tools:visibility="gone">
+
+        <include layout="@layout/loading_skeleton_result" />
+
+    </com.facebook.shimmer.ShimmerFrameLayout>
+
+    <!-- Chapter Selection Toolbar (Glass Design) -->
+
+
+    <!-- Chapters FAB (Move to end for interactivity) -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/result_chapters_fab"
         android:layout_width="wrap_content"
@@ -388,9 +415,8 @@
         android:layout_margin="16dp"
         android:visibility="gone"
         app:cardCornerRadius="28dp"
-        app:cardElevation="6dp"
+        app:cardElevation="16dp"
         app:cardBackgroundColor="?attr/colorPrimary">
-        <!-- android:background removed, app:cardBackgroundColor added -->
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -407,21 +433,114 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <com.facebook.shimmer.ShimmerFrameLayout
-        android:id="@+id/result_loading"
+    <!-- Chapter Selection Toolbar (Move to end for interactivity) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/result_selection_toolbar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="?android:attr/colorBackground"
-        android:clickable="true"
-        android:focusable="true"
-        android:visibility="visible"
-        app:shimmer_auto_start="true"
-        app:shimmer_base_alpha="0.3"
-        app:shimmer_highlight_alpha="0.9"
-        app:shimmer_duration="800"
-        tools:visibility="gone">
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="?attr/primaryGrayBackground"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="20dp"
+        app:strokeColor="?attr/colorPrimary"
+        app:strokeWidth="1.5dp"
+        tools:visibility="visible">
 
-        <include layout="@layout/loading_skeleton_result" />
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:scrollbars="none">
 
-    </com.facebook.shimmer.ShimmerFrameLayout>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="8dp">
+
+                <ImageView
+                    android:id="@+id/result_selection_close"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_sharp_clear_24"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:tint="?attr/textColor" />
+
+                <TextView
+                    android:id="@+id/result_selection_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/google_sans"
+                    android:paddingStart="8dp"
+                    android:textColor="?attr/textColor"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="1 Selected" />
+
+                <ImageView
+                    android:id="@+id/result_selection_bookmark"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_baseline_bookmark_24"
+                    android:contentDescription="Bookmark"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:tint="?attr/colorPrimary" />
+
+                <ImageView
+                    android:id="@+id/result_selection_unbookmark"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_baseline_bookmark_border_24"
+                    android:contentDescription="Unbookmark"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:tint="?attr/colorPrimary" />
+
+                <ImageView
+                    android:id="@+id/result_selection_mark_read"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_baseline_check_24"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:tint="?attr/textColor" />
+
+                <ImageView
+                    android:id="@+id/result_selection_mark_unread"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_baseline_history_24"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:tint="?attr/colorPrimary" />
+
+                <ImageView
+                    android:id="@+id/result_selection_select_all"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_baseline_select_all_24"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:tint="?attr/textColor" />
+
+            </LinearLayout>
+        </HorizontalScrollView>
+    </com.google.android.material.card.MaterialCardView>
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

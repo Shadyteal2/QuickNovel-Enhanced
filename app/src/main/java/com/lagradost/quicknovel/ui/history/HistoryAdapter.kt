@@ -11,6 +11,7 @@ import com.lagradost.quicknovel.ui.ViewHolderState
 import com.lagradost.quicknovel.ui.newSharedPool
 import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.util.UIHelper.setImage
+import com.lagradost.quicknovel.util.MagicAnimator
 
 class HistoryAdapter(private val viewModel: HistoryViewModel) :
     NoStateAdapter<ResultCached>(DiffCallback()) {
@@ -39,6 +40,10 @@ class HistoryAdapter(private val viewModel: HistoryViewModel) :
             historyExtraText.text = "${item.totalChapters} " + root.context.getString(R.string.read_action_chapters)
             imageView.setImage(item.poster)
 
+            // MagicAnimator: spring feedback on action icons
+            MagicAnimator.applyIconPress(historyPlay)
+            MagicAnimator.applyIconPress(historyDelete)
+
             historyPlay.setOnClickListener {
                 viewModel.stream(item)
             }
@@ -52,6 +57,10 @@ class HistoryAdapter(private val viewModel: HistoryViewModel) :
                 viewModel.showMetadata(item)
                 return@setOnLongClickListener true
             }
+
+            // MagicAnimator: subtle staggered reveal per item (capped delay for large lists)
+            val cappedDelay = minOf(position * 35L, 350L)
+            MagicAnimator.revealView(root, delay = cappedDelay, fromY = 24f)
         }
     }
 

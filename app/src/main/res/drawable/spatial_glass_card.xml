@@ -3,33 +3,33 @@
     android:color="?attr/colorControlHighlight">
     <item android:id="@android:id/mask">
         <shape>
-            <corners android:radius="24dp" />
+            <corners android:radius="@dimen/roundedImageRadius" />
             <solid android:color="@android:color/white" />
         </shape>
     </item>
     <item>
         <layer-list>
-            <!-- Contrast Overlay to enhance backdrop readability -->
+            <!-- Contrast Overlay: Darker in light modes, subtle in dark modes -->
             <item>
                 <shape>
-                    <solid android:color="#0D000000" />
-                    <corners android:radius="24dp" />
+                    <solid android:color="#1A000000" />
+                    <corners android:radius="@dimen/roundedImageRadius" />
                 </shape>
             </item>
             
             <!-- Glass Translucency Panel -->
             <item>
                 <shape>
-                    <solid android:color="?attr/floatingNavBackground" />
-                    <corners android:radius="24dp" />
+                    <solid android:color="?attr/floatingNavBackground" /> 
+                    <corners android:radius="@dimen/roundedImageRadius" />
                 </shape>
             </item>
             
-            <!-- Border Edge Highlight for Glass panel reflection -->
+            <!-- Premium Frosted Border Stroke: High contrast for Amoled -->
             <item>
                 <shape>
-                    <stroke android:width="1.2dp" android:color="?attr/floatingNavStroke" />
-                    <corners android:radius="24dp" />
+                    <stroke android:width="1.2dp" android:color="?attr/floatingNavStroke" /> 
+                    <corners android:radius="@dimen/roundedImageRadius" />
                 </shape>
             </item>
         </layer-list>

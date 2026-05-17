@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Flattened structure to eliminate category-induced vertical gaps -->
+    <Preference
+        android:icon="@drawable/netflix_download"
+        android:key="@string/download_path_key"
+        android:title="@string/download_path_pref"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:icon="@drawable/baseline_save_as_24"
+        android:key="@string/backup_key"
+        android:title="@string/backup_settings"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:icon="@drawable/baseline_restore_page_24"
+        android:key="@string/restore_key"
+        android:title="@string/restore_settings"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:icon="@drawable/ic_baseline_collections_bookmark_24"
+        android:key="@string/manage_data_key"
+        android:title="@string/manage_data"
+        android:summary="@string/manage_data_desc"
+        app:layout="@layout/setting_tile" />
+
+</PreferenceScreen>

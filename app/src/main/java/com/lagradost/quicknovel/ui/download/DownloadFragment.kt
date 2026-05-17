@@ -1,6 +1,5 @@
 package com.lagradost.quicknovel.ui.download
 
-import android.R.attr.fragment
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.os.Bundle
@@ -10,20 +9,16 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.EditText
 import android.widget.TextView
-import androidx.activity.result.launch
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.doOnAttach
-import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -44,6 +39,7 @@ import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.databinding.FragmentDownloadsBinding
 import com.lagradost.quicknovel.databinding.SortBottomSheetBinding
 import com.lagradost.quicknovel.util.SettingsHelper.getDownloadIsCompact
+import com.lagradost.quicknovel.util.SettingsHelper.getLibraryNavStyle
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.ui.SortingMethodAdapter
 import com.lagradost.quicknovel.ui.UiImage
@@ -51,20 +47,61 @@ import com.lagradost.quicknovel.ui.img
 import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import com.lagradost.quicknovel.util.toPx
-import android.graphics.Rect
-import android.widget.FrameLayout
+import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.KineticTiltHelper
+import kotlinx.coroutines.launch
+import android.content.SharedPreferences
+import androidx.preference.PreferenceManager
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.HapticFeedbackConstants
 
 class DownloadFragment : Fragment() {
     private lateinit var viewModel: DownloadViewModel
     lateinit var binding: FragmentDownloadsBinding
     private var tabsMediator: TabLayoutMediator? = null
 
+    private val navStyleListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        val navStyleKey = context?.getString(R.string.library_nav_style_key)
+        val bentoKey = context?.getString(R.string.library_pinterest_bento_key)
+        val downloadFormatKey = context?.getString(R.string.download_format_key)
 
+        if (key == navStyleKey) {
+            updateNavStyleUI()
+        }
+        if (key == "library_bento_3x3" || key == bentoKey || key == downloadFormatKey) {
+            setupGridView()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        context?.let { ctx ->
+            PreferenceManager.getDefaultSharedPreferences(ctx)
+                .registerOnSharedPreferenceChangeListener(navStyleListener)
+        }
+        updateNavStyleUI()
+        setupGridView()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        context?.let { ctx ->
+            PreferenceManager.getDefaultSharedPreferences(ctx)
+                .unregisterOnSharedPreferenceChangeListener(navStyleListener)
+        }
+    }
+
+    private fun updateNavStyleUI() {
+        if (!::binding.isInitialized) return
+        val isSwipeMode = context?.getLibraryNavStyle() == "1"
+        binding.libraryPillMenu.isVisible = !isSwipeMode
+        binding.tabGestureZone.isVisible = isSwipeMode
+        
+        // Ensure swiping is only enabled during "Swipe View" mode
+        binding.viewpager.isUserInputEnabled = isSwipeMode
+    }
 
     data class DownloadData(
         @JsonProperty("source")
@@ -94,6 +131,15 @@ class DownloadFragment : Fragment() {
         /** Unix time ms */
         @JsonProperty("lastDownloaded")
         val lastDownloaded: Long?,
+        // Import extensions
+        @JsonProperty("filePath")
+        val filePath: String? = null,
+        @JsonProperty("formatType")
+        val formatType: String? = null,
+        @JsonProperty("hash")
+        val hash: String? = null,
+        @JsonProperty("bookmarkType")
+        val bookmarkType: Int? = null,
     )
 
     data class DownloadDataLoaded(
@@ -108,6 +154,7 @@ class DownloadFragment : Fragment() {
         val synopsis: String?,
         val tags: List<String>?,
         val apiName: String,
+        val readCount: Int,
         val downloadedCount: Long,
         val downloadedTotal: Long,
         val ETA: String,
@@ -116,6 +163,10 @@ class DownloadFragment : Fragment() {
         val generating: Boolean,
         val lastUpdated: Long?,
         val lastDownloaded: Long?,
+        val filePath: String? = null,
+        val formatType: String? = null,
+        val hash: String? = null,
+        val bookmarkType: Int? = null,
     ) {
         val image by lazy {
             if(isImported) {
@@ -125,10 +176,6 @@ class DownloadFragment : Fragment() {
                 }
             }
             img(posterUrl)
-        }
-
-        override fun hashCode(): Int {
-            return id
         }
 
         val isImported: Boolean get() = (apiName == IMPORT_SOURCE || apiName ==IMPORT_SOURCE_PDF)
@@ -142,31 +189,81 @@ class DownloadFragment : Fragment() {
         viewModel = ViewModelProvider(activity ?: this)[DownloadViewModel::class.java]
         binding = FragmentDownloadsBinding.inflate(inflater)
         return binding.root
-        //return inflater.inflate(R.layout.fragment_downloads, container, false)
     }
 
-    override fun onResume() {
-        super.onResume()
-        setupGridView()
-    }
 
-    @SuppressLint("NotifyDataSetChanged")
     private fun setupGridView() {
         val adapter = (binding.viewpager.adapter as? ViewpagerAdapter) ?: return
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context ?: return)
+        val usePinterest = prefs.getBoolean("library_pinterest_bento", false)
+        val use3x3Bento = usePinterest && prefs.getBoolean("library_bento_3x3", false)
+        
         for ((_, ref) in adapter.collectionsOfRecyclerView) {
             val rv = ref.get() ?: continue
             val compactView = rv.context.getDownloadIsCompact()
 
-            val spanCountLandscape = if (compactView) 2 else 6
-            val spanCountPortrait = if (compactView) 1 else 3
-            val orientation = rv.resources.configuration.orientation
-            rv.spanCount = if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                spanCountLandscape
-            } else {
-                spanCountPortrait
+            // QN-Enhanced: Instead of destructive recreation, we update the existing manager if possible
+            // to preserve scroll position and minimize layout thrashing.
+            val currentManager = rv.layoutManager
+            
+            val targetManager = when {
+                use3x3Bento && !compactView -> {
+                    if (currentManager is androidx.recyclerview.widget.GridLayoutManager && currentManager.spanCount == 3 && currentManager.spanSizeLookup !is androidx.recyclerview.widget.GridLayoutManager.DefaultSpanSizeLookup) {
+                        null // Keep existing
+                    } else {
+                        androidx.recyclerview.widget.GridLayoutManager(rv.context, 3).apply {
+                            spanSizeLookup = object : androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup() {
+                                override fun getSpanSize(position: Int): Int {
+                                    val rvAdapter = rv.adapter
+                                    if (rvAdapter != null && position >= rvAdapter.itemCount - 1) return 3
+                                    return when (position % 7) {
+                                        0, 5 -> 2
+                                        else -> 1
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                usePinterest && !compactView -> {
+                    if (currentManager is StaggeredGridLayoutManager) null
+                    else StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL).apply {
+                        gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
+                    }
+                }
+                else -> {
+                    if (compactView) {
+                        // Use GridLayoutManager with span 1 instead of LinearLayoutManager for consistency
+                        if (currentManager is androidx.recyclerview.widget.GridLayoutManager && currentManager.spanCount == 1) null
+                        else androidx.recyclerview.widget.GridLayoutManager(rv.context, 1)
+                    } else {
+                        if (currentManager is androidx.recyclerview.widget.GridLayoutManager && currentManager.spanCount == 3 && currentManager.spanSizeLookup is androidx.recyclerview.widget.GridLayoutManager.DefaultSpanSizeLookup) null
+                        else androidx.recyclerview.widget.GridLayoutManager(rv.context, 3)
+                    }
+                }
             }
 
-            (rv.adapter as? AnyAdapter)?.notifyDataSetChanged()
+            // Standardized Performance Tuning for Thousands of Items
+            rv.apply {
+                setHasFixedSize(true)
+                setItemViewCacheSize(40) // Increased for better pre-fetching on high-refresh-rate screens
+                
+                // Clear and re-add listener to avoid duplicates while ensuring kinetic tilt logic
+                clearOnScrollListeners()
+                addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+                    override fun onScrollStateChanged(recyclerView: androidx.recyclerview.widget.RecyclerView, newState: Int) {
+                        KineticTiltHelper.isLocked = newState != androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE
+                    }
+                })
+            }
+            
+            // Aggressive layout refresh to prevent "pollution" (mismatching view types in grid/list)
+            if (targetManager != null) {
+                rv.recycledViewPool.clear()
+                rv.layoutManager = targetManager
+                // Optional: rv.invalidateItemDecorations() if decorations are used
+            }
+            rv.adapter?.notifyDataSetChanged()
         }
     }
 
@@ -189,7 +286,7 @@ class DownloadFragment : Fragment() {
         val touchSlopField = RecyclerView::class.java.getDeclaredField("mTouchSlop")
         touchSlopField.isAccessible = true
         val touchSlop = touchSlopField.get(recyclerView) as Int
-        touchSlopField.set(recyclerView, touchSlop * f)       // "8" was obtained experimentally
+        touchSlopField.set(recyclerView, touchSlop * f) 
     }
 
     val isOnDownloads get() = viewModel.currentTab.value == 0
@@ -200,10 +297,9 @@ class DownloadFragment : Fragment() {
     @SuppressLint("ClickableViewAccessibility")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.viewpager.reduceDragSensitivity(2) // Requires longer horizontal swipe to switch tabs, prevents accidental swipe while vertical scrolling
         viewModel.loadAllData(true)
-        // activity?.fixPaddingStatusbar(binding.downloadToolbar)
         activity?.fixPaddingStatusbar(binding.downloadRoot)
-        //viewModel = ViewModelProviders.of(activity!!).get(DownloadViewModel::class.java)
 
         var initialPillMargin = -1
         var initialFabMargin = -1
@@ -232,9 +328,7 @@ class DownloadFragment : Fragment() {
             windowInsets
         }
 
-
-        searchExitIcon =
-            binding.downloadSearch.findViewById(androidx.appcompat.R.id.search_close_btn)
+        searchExitIcon = binding.downloadSearch.findViewById(androidx.appcompat.R.id.search_close_btn)
         searchMagIcon = binding.downloadSearch.findViewById(androidx.appcompat.R.id.search_mag_icon)
         searchMagIcon.scaleX = 0.65f
         searchMagIcon.scaleY = 0.65f
@@ -252,16 +346,15 @@ class DownloadFragment : Fragment() {
         })
 
         binding.updatesButton.setOnClickListener {
-            it.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             val navHostFragment = activity?.supportFragmentManager?.findFragmentById(R.id.nav_host_fragment) as? androidx.navigation.fragment.NavHostFragment
             navHostFragment?.navController?.navigate(R.id.navigation_updates)
         }
 
         binding.editCategories.setOnClickListener {
-            it.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             showCategoriesManager()
         }
-
 
         val adapter = ViewpagerAdapter(viewModel, this) { isScrollingDown ->
             binding.downloadFabText.isVisible = !isScrollingDown
@@ -284,7 +377,6 @@ class DownloadFragment : Fragment() {
             }
             tabsMediator?.attach()
 
-            // Dynamic Dots Generation
             val dotsHolder = binding.pillDotsHolder
             dotsHolder.removeAllViews()
             val density = context?.resources?.displayMetrics?.density ?: 1f
@@ -305,7 +397,7 @@ class DownloadFragment : Fragment() {
                  frame.addView(dot)
                  frame.setOnClickListener {
                      binding.viewpager.currentItem = i
-                     it.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                     it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                  }
                  dotsHolder.addView(frame)
             }
@@ -318,55 +410,80 @@ class DownloadFragment : Fragment() {
         }
 
         binding.viewpager.adapter = adapter
-        binding.viewpager.isUserInputEnabled = true // Enable smooth swiping
-        binding.viewpager.offscreenPageLimit = 1 // Smooth load adjacent sections
+        updateNavStyleUI()
+        binding.viewpager.offscreenPageLimit = 2
         
+        // Premium horizontal swipe transition
+        binding.viewpager.setPageTransformer { page, position ->
+            val absPos = Math.abs(position)
+            // Premium parallax & fade effect
+            page.alpha = 1f - (absPos * 0.4f)
+            val scale = 1f - (absPos * 0.10f)
+            page.scaleY = scale
+            page.scaleX = scale
+            // Removed translationX to prevent adjacent tab "leakage"
+            // Add slight rotation for premium feel
+            page.rotationY = position * 5f
+        }
+
+        binding.viewpager.post {
         val dotsHolder = binding.pillDotsHolder
         var initialTouchX = 0f
         var initialPillX = 0f
         var currentSelectedIndex = 0
         var isDragging = false
+        var lastPillX = 0f
 
         binding.travelerIcon.setOnTouchListener { view, event ->
             val maxOffset = binding.libraryPillMenu.width - view.width
             val totalCats = viewModel.readList.size
-            val stepSize = if (maxOffset > 0 && totalCats > 0) maxOffset.toFloat() / totalCats.toFloat() else 0f
+            if (maxOffset <= 0 || totalCats <= 0) return@setOnTouchListener false
+            
+            val stepSize = maxOffset.toFloat() / totalCats.toFloat()
+            val vpWidth = binding.viewpager.width.toFloat()
 
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     view.parent.requestDisallowInterceptTouchEvent(true)
+                    binding.viewpager.beginFakeDrag()
                     initialTouchX = event.rawX
                     initialPillX = view.translationX
+                    lastPillX = initialPillX
                     isDragging = true
                     true
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - initialTouchX
-                    var newX = initialPillX + dx
-                    newX = newX.coerceIn(0f, maxOffset.toFloat())
+                    var newX = (initialPillX + dx).coerceIn(0f, maxOffset.toFloat())
+                    
+                    // Calculate relative movement in ViewPager pixels
+                    val pillDelta = newX - lastPillX
+                    val dragAmount = - (pillDelta / stepSize) * vpWidth
+                    
+                    if (kotlin.math.abs(dragAmount) > 0.1f) {
+                        try {
+                            binding.viewpager.fakeDragBy(dragAmount)
+                            lastPillX = newX
+                        } catch (e: Exception) {
+                            // If fake drag fails/end was called prematurely
+                        }
+                    }
+
                     view.translationX = newX
 
-                    if (stepSize > 0) {
-                        val index = (newX / stepSize).coerceIn(0f, totalCats.toFloat()).toInt()
-                        if (index != currentSelectedIndex) {
-                            currentSelectedIndex = index
-                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                            binding.viewpager.setCurrentItem(index, true) 
-                            
-                            // Highlight dot
-                            for (i in 0 until dotsHolder.childCount) {
-                                val dot = (dotsHolder.getChildAt(i) as? android.view.ViewGroup)?.getChildAt(0)
-                                if (dot != null) {
-                                    if (i == index) {
-                                        dot.alpha = 1.0f
-                                        dot.scaleX = 1.25f
-                                        dot.scaleY = 1.25f
-                                    } else {
-                                        dot.alpha = 0.4f
-                                        dot.scaleX = 1.0f
-                                        dot.scaleY = 1.0f
-                                    }
-                                }
+                    val index = (newX / stepSize).coerceIn(0f, totalCats.toFloat()).toInt()
+                    if (index != currentSelectedIndex) {
+                        currentSelectedIndex = index
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                        
+                        // Update dots only on index change
+                        for (i in 0 until dotsHolder.childCount) {
+                            val dot = (dotsHolder.getChildAt(i) as? android.view.ViewGroup)?.getChildAt(0)
+                            if (dot != null) {
+                                val selected = i == index
+                                dot.alpha = if (selected) 1.0f else 0.4f
+                                dot.scaleX = if (selected) 1.25f else 1.0f
+                                dot.scaleY = if (selected) 1.25f else 1.0f
                             }
                         }
                     }
@@ -375,15 +492,17 @@ class DownloadFragment : Fragment() {
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                     view.parent.requestDisallowInterceptTouchEvent(false)
                     isDragging = false
-                    if (stepSize > 0) {
-                        val targetX = currentSelectedIndex * stepSize
-                        android.animation.ObjectAnimator.ofFloat(view, "translationX", targetX).apply {
-                            duration = 200
-                            interpolator = android.view.animation.DecelerateInterpolator()
-                            start()
-                        }
-                        binding.viewpager.setCurrentItem(currentSelectedIndex, true) // Smooth switch
+                    try {
+                        binding.viewpager.endFakeDrag()
+                    } catch (e: Exception) {}
+                    
+                    val targetX = currentSelectedIndex * stepSize
+                    android.animation.ObjectAnimator.ofFloat(view, "translationX", targetX).apply {
+                        duration = 200
+                        interpolator = android.view.animation.DecelerateInterpolator()
+                        start()
                     }
+                    binding.viewpager.setCurrentItem(currentSelectedIndex, true)
                     true
                 }
                 else -> false
@@ -392,7 +511,7 @@ class DownloadFragment : Fragment() {
 
         binding.viewpager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
             override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
-                if (isDragging) return // Don't override user drag offset
+                if (isDragging) return
                 val maxOffset = binding.libraryPillMenu.width - binding.travelerIcon.width
                 val totalCats = viewModel.readList.size
                 if (maxOffset > 0 && totalCats > 0) {
@@ -403,11 +522,14 @@ class DownloadFragment : Fragment() {
             }
 
             override fun onPageSelected(position: Int) {
-                if (isDragging) return // Don't override user drag offset
+                val navStyle = context?.getLibraryNavStyle() ?: "0"
+                if (navStyle == "1") {
+                    view?.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                }
+
+                if (isDragging) return
                 
                 currentSelectedIndex = position
-                // Highlight dots updated continuously in continuous callback if desired, or here!
-                // But dot updates are fast and simple!
 
                 for (i in 0 until dotsHolder.childCount) {
                     val dot = (dotsHolder.getChildAt(i) as? android.view.ViewGroup)?.getChildAt(0)
@@ -429,30 +551,24 @@ class DownloadFragment : Fragment() {
         binding.bookmarkTabs.apply {
             addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
                 override fun onTabSelected(tab: TabLayout.Tab?) {
-                    //binding.swipeContainer.isEnabled = binding.bookmarkTabs.selectedTabPosition == 0
                     viewModel.switchPage(binding.bookmarkTabs.selectedTabPosition)
                 }
-
-                override fun onTabUnselected(tab: TabLayout.Tab?) {
-                }
-
-                override fun onTabReselected(tab: TabLayout.Tab?) {
-                }
-
+                override fun onTabUnselected(tab: TabLayout.Tab?) {}
+                override fun onTabReselected(tab: TabLayout.Tab?) {}
             })
         }
 
         binding.downloadFab.setOnClickListener { view ->
-            val binding = SortBottomSheetBinding.inflate(layoutInflater, null, false)
-            val bottomSheetDialog = BottomSheetDialog(view.context)
-            bottomSheetDialog.setContentView(binding.root)
+            val sortBinding = SortBottomSheetBinding.inflate(layoutInflater, null, false)
+            val bottomSheetDialog = BottomSheetDialog(view.context, R.style.BottomSheetDrawerTheme)
+            bottomSheetDialog.setContentView(sortBinding.root)
 
             val (sorting, key) = if (isOnDownloads) {
                 DownloadViewModel.sortingMethods to DOWNLOAD_SORTING_METHOD
             } else {
                 DownloadViewModel.normalSortingMethods to DOWNLOAD_NORMAL_SORTING_METHOD
             }
-            val current = (getKey<Int>(DOWNLOAD_SETTINGS, key) ?: DEFAULT_SORT)
+            val current = (getKey<Int>(DOWNLOAD_SETTINGS, key) ?: 0)
 
             val adapter = SortingMethodAdapter(current) { item, position, newId ->
                 setKey(DOWNLOAD_SETTINGS, key, newId)
@@ -461,42 +577,36 @@ class DownloadFragment : Fragment() {
             }.apply {
                 submitList(sorting.toList())
             }
-            binding.sortClick.adapter = adapter
+            sortBinding.sortClick.adapter = adapter
+            
+            // Background scaling animation
+            val backgroundView = binding.downloadRoot
+            val behavior = bottomSheetDialog.behavior
+            behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                override fun onStateChanged(bottomSheet: View, newState: Int) {
+                    if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
+                        newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
+                        DrawerHelper.resetScaling(backgroundView)
+                    }
+                }
+                override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                    DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                }
+            })
+
             bottomSheetDialog.show()
         }
-        /*
-        download_filter.setOnClickListener {
-            val builder: AlertDialog.Builder = AlertDialog.Builder(this.context!!)
-            lateinit var dialog: AlertDialog
-            builder.setSingleChoiceItems(sotringMethods.map { t -> t.name }.toTypedArray(),
-                sotringMethods.indexOfFirst { t -> t.id ==  viewModel.currentSortingMethod.value }
-            ) { _, which ->
-                val id = sotringMethods[which].id
-                viewModel.currentSortingMethod.postValue(id)
-                DataStore.setKey(DOWNLOAD_SETTINGS, DOWNLOAD_SORTING_METHOD, id)
-
-                dialog.dismiss()
-            }
-            builder.setTitle("Sorting order")
-            builder.setNegativeButton("Cancel") { _, _ -> }
-
-            dialog = builder.create()
-            dialog.show()
-        }*/
-
-        //swipe_container.setProgressBackgroundColorSchemeColor(requireContext().colorFromAttribute(R.attr.darkBackground))
-
 
         binding.swipeContainer.apply {
             setColorSchemeColors(context.colorFromAttribute(R.attr.colorPrimary))
             setProgressBackgroundColorSchemeColor(context.colorFromAttribute(R.attr.primaryGrayBackground))
+            // Increase distance to trigger to prevent accidental refreshes during fast scrolling
+            setDistanceToTriggerSync(300.toPx) 
             setOnRefreshListener {
                 if(isOnDownloads){
                     viewModel.refresh()
                     isRefreshing = false
-
-                }
-                else{
+                } else {
                     viewModel.refreshReadingProgress()
                 }
             }
@@ -507,7 +617,6 @@ class DownloadFragment : Fragment() {
                 binding.swipeContainer.isRefreshing = refreshing
             }
         }
-
 
         lifecycleScope.launch{
             viewModel.refresh.collect { tab ->
@@ -520,7 +629,7 @@ class DownloadFragment : Fragment() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
                 val currentTab = getKey(DOWNLOAD_SETTINGS, CURRENT_TAB, null)?:1
-                binding.swipeContainer.isRefreshing =  viewModel.activeRefreshTabs.contains(currentTab)
+                binding.swipeContainer.isRefreshing = viewModel.activeRefreshTabs.contains(currentTab)
             }
 
             override fun onPageScrollStateChanged(state: Int) {
@@ -529,34 +638,46 @@ class DownloadFragment : Fragment() {
             }
         })
         binding.swipeContainer.setOnChildScrollUpCallback { parent, child ->
-            return@setOnChildScrollUpCallback  !canSwip// true = can't Swip, false = can swip
+            return@setOnChildScrollUpCallback !canSwip
         }
 
         setupGridView()
-
-        /*binding.downloadCardSpace.apply {
-            itemAnimator?.changeDuration = 0
-            val downloadAdapter = DownloadAdapter2(viewModel, this)
-            downloadAdapter.setHasStableIds(true)
-            adapter = downloadAdapter
-            observe(viewModel.downloadCards) { cards ->
-                // we need to copy here because otherwise diff wont work
-                downloadAdapter.submitList(cards.map { it.copy() })
+        
+        // --- Split-Zone Sliding Feature Logic (v2 refined) ---
+        updateNavStyleUI()
+        
+        val gestureDetector = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                // Only trigger if horizontal movement is dominant
+                if (kotlin.math.abs(velocityX) < kotlin.math.abs(velocityY)) return false
+                
+                val direction = if (velocityX > 0) -1 else 1 // -1: Swipe Right, 1: Swipe Left
+                
+                if (direction == 1) { // Swipe Left -> Next Tab (Search)
+                    (activity as? com.lagradost.quicknovel.ui.TabNavigator)?.moveToTab(1)
+                    binding.tabGestureZone.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    return true
+                } else if (direction == -1) { // Swipe Right -> Previous (Overscroll on Library)
+                    binding.tabGestureZone.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    return true
+                }
+                return false
             }
+        })
+
+        binding.tabGestureZone.setOnTouchListener { _, event ->
+            val handled = gestureDetector.onTouchEvent(event)
+            // If the gesture detector handled a fling, we consume the event.
+            // Otherwise, we return false to potentially allow touches to pass through,
+            // although ACTION_DOWN must be consumed to receive subsequent events.
+            if (event.action == android.view.MotionEvent.ACTION_DOWN) return@setOnTouchListener true
+            handled
         }
-
-        binding.bookmarkCardSpace.apply {
-            val bookmarkAdapter = CachedAdapter2(viewModel, this)
-            adapter = bookmarkAdapter
-            observe(viewModel.normalCards) { cards ->
-                bookmarkAdapter.submitList(cards.map { it.copy() })
-            }
-        }*/
-
     }
+}
 
     private fun showCategoriesManager() {
-        val dialog = BottomSheetDialog(requireContext())
+        val dialog = BottomSheetDialog(requireContext(), R.style.BottomSheetDrawerTheme)
         val view = layoutInflater.inflate(R.layout.dialog_categories_manager, null)
         dialog.setContentView(view)
 
@@ -577,30 +698,23 @@ class DownloadFragment : Fragment() {
             }
         ) {
             inner class VH(val view: View) : RecyclerView.ViewHolder(view)
-
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
                 val v = LayoutInflater.from(parent.context).inflate(R.layout.item_category_manager, parent, false)
                 return VH(v)
             }
-
             override fun onBindViewHolder(holder: VH, @SuppressLint("RecyclerView") position: Int) {
                 val item = getItem(position)
                 val name = holder.view.findViewById<TextView>(R.id.category_name)
                 val drag = holder.view.findViewById<ImageView>(R.id.category_drag_handle)
                 val rename = holder.view.findViewById<ImageView>(R.id.category_rename)
                 val delete = holder.view.findViewById<ImageView>(R.id.category_delete)
-
                 name.text = if (item.isSystem && item.stringRes != null) holder.view.context.getString(item.stringRes) else item.name
                 delete.isVisible = !item.isSystem
                 rename.isVisible = !item.isSystem
-
                 drag.setOnTouchListener { _, event ->
-                    if (event.action == android.view.MotionEvent.ACTION_DOWN) {
-                        onStartDrag(holder)
-                    }
+                    if (event.action == android.view.MotionEvent.ACTION_DOWN) onStartDrag(holder)
                     false
                 }
-
                 rename.setOnClickListener {
                     val builder = android.app.AlertDialog.Builder(holder.view.context)
                     val input = EditText(holder.view.context)
@@ -609,31 +723,21 @@ class DownloadFragment : Fragment() {
                         .setView(input)
                         .setPositiveButton("OK") { _: android.content.DialogInterface, _: Int ->
                             val n = input.text.toString().trim()
-                            if (n.isNotEmpty()) {
-                                onRename(item, n)
-                            }
+                            if (n.isNotEmpty()) onRename(item, n)
                         }
                         .setNegativeButton("Cancel", null)
                         .show()
                 }
-
-                delete.setOnClickListener {
-                    onDelete(item)
-                }
+                delete.setOnClickListener { onDelete(item) }
             }
         }
 
         val adapter = CategoryAdapter(
-            onStartDrag = { holder ->
-                // Handled implicitly by ItemTouchHelper simple drag setup below!
-            },
+            onStartDrag = {},
             onDelete = { item ->
                 viewModel.deleteCategory(item.id)
                 items = viewModel.readList.toMutableList()
                 (list.adapter as? CategoryAdapter)?.submitList(items)
-                
-                // Refresh tabs titles manually
-                val adapterVp = binding.viewpager.adapter as? ViewpagerAdapter
                 viewModel.loadAllData(false)
             },
             onRename = { item, newName ->
@@ -642,7 +746,6 @@ class DownloadFragment : Fragment() {
                 (list.adapter as? CategoryAdapter)?.submitList(items)
             }
         )
-
         list.adapter = adapter
         adapter.submitList(items)
 
@@ -658,16 +761,13 @@ class DownloadFragment : Fragment() {
                 }
                 return true
             }
-
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
-
             override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
                 super.clearView(recyclerView, viewHolder)
-                viewModel.updateCategories(items) // Save on let go
+                viewModel.updateCategories(items)
             }
         }
-        val touchHelper = androidx.recyclerview.widget.ItemTouchHelper(callback)
-        touchHelper.attachToRecyclerView(list)
+        androidx.recyclerview.widget.ItemTouchHelper(callback).attachToRecyclerView(list)
 
         addBtn.setOnClickListener {
             val name = addInput.text.toString().trim()
@@ -685,6 +785,20 @@ class DownloadFragment : Fragment() {
                 }
             }
         }
+        
+        // Background scaling animation
+        val backgroundView = binding.downloadRoot
+        val behavior = dialog.behavior
+        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
+                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
+                }
+            }
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+            }
+        })
 
         dialog.show()
     }

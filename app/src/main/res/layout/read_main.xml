@@ -7,31 +7,176 @@
         android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
         android:paddingTop="0dp"
         android:id="@+id/reader_container"
-        android:background="@color/readerBackground">
+        android:background="@android:color/transparent">
+
+    <ImageView
+        android:id="@+id/reader_background_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <View
+        android:id="@+id/reader_background_dim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:alpha="0"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <View
+        android:id="@+id/reader_background_grain"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <View
+        android:id="@+id/reader_background_vignette"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_vignette"
+        android:alpha="0"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <View
+        android:id="@+id/reader_background_light_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"
+        android:alpha="0"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <com.lagradost.quicknovel.ui.custom.LivingGlassView
+        android:id="@+id/reader_living_glass"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <View
+        android:id="@+id/reader_halo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/reader_halo_gradient"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <FrameLayout
-            tools:visibility="visible"
             android:id="@+id/read_loading"
             android:visibility="gone"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="match_parent"
+            android:background="#99000000"
+            android:clickable="true"
+            android:focusable="true"
+            tools:visibility="visible">
 
-        <ProgressBar
-                android:id="@+id/read_loading_bar"
-                android:layout_gravity="center"
-                android:progressTint="@color/colorPrimary"
-                android:layout_width="50dp"
-                android:layout_height="50dp" />
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginHorizontal="32dp"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="12dp"
+            app:cardBackgroundColor="@color/grayBackground"
+            app:strokeWidth="0dp">
 
-        <TextView
-                android:id="@+id/loading_text"
-                android:layout_marginTop="50dp"
-                android:gravity="center"
-                android:layout_gravity="center"
-                android:textColor="@color/colorPrimary"
-                tools:text="@string/delete"
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="wrap_content"
+                android:padding="24dp">
+
+                <ImageView
+                    android:id="@+id/read_loading_icon"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/ic_google_translate"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:tint="@color/colorPrimary"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/read_loading_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="8dp"
+                    android:text="Translating... This may take a moment."
+                    android:textColor="?attr/textColor"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    app:layout_constraintEnd_toStartOf="@+id/read_stop_translation_btn"
+                    app:layout_constraintStart_toEndOf="@id/read_loading_icon"
+                    app:layout_constraintTop_toTopOf="@id/read_loading_icon" />
+
+                <TextView
+                    android:id="@+id/loading_text"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="?attr/grayTextColor"
+                    android:textSize="14sp"
+                    app:layout_constraintEnd_toEndOf="@id/read_loading_title"
+                    app:layout_constraintStart_toStartOf="@id/read_loading_title"
+                    app:layout_constraintTop_toBottomOf="@id/read_loading_title"
+                    tools:text="Google Translate (Free)" />
+
+                <ImageButton
+                    android:id="@+id/read_stop_translation_btn"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:padding="8dp"
+                    android:scaleType="centerInside"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/a11y_stop_translation"
+                    android:src="@drawable/ic_sharp_clear_24"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:tint="?attr/textColor" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/read_loading_progress_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:progress="30"
+                    app:indicatorColor="@color/colorPrimary"
+                    app:layout_constraintTop_toBottomOf="@id/loading_text"
+                    app:trackColor="#26FFFFFF"
+                    app:trackCornerRadius="4dp"
+                    app:trackThickness="8dp" />
+
+                <TextView
+                    android:id="@+id/read_loading_percentage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/read_loading_progress_bar"
+                    tools:text="30%" />
+
+                <TextView
+                    android:id="@+id/read_loading_fraction"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/grayTextColor"
+                    android:textSize="14sp"
+                    app:layout_constraintBottom_toBottomOf="@id/read_loading_percentage"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="@id/read_loading_percentage"
+                    tools:text="30 / 100" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </com.google.android.material.card.MaterialCardView>
     </FrameLayout>
 
     <FrameLayout
@@ -86,6 +231,8 @@
             android:id="@+id/read_normal_layout"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
+
+        <include android:id="@+id/read_skeleton_shimmer" layout="@layout/read_skeleton_layout" />
 
         <LinearLayout
                 android:id="@+id/reader_lin_container"
@@ -365,16 +512,17 @@
                     android:visibility="gone">
 
                 <ImageButton
-                        android:id="@+id/read_action_rotate"
+                        android:id="@+id/read_action_color_palette"
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_screen_rotation"
+                        android:contentDescription="@string/read_color"
                         android:padding="@dimen/screenEdgeMargin"
+                        app:layout_constraintHorizontal_chainStyle="spread"
                         app:layout_constraintEnd_toStartOf="@id/read_action_tts"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
-                        app:srcCompat="@drawable/ic_baseline_screen_rotation_24"
+                        app:srcCompat="@drawable/ic_baseline_color_lens_24"
                         app:tint="?attr/white" />
 
                 <ImageButton
@@ -385,7 +533,7 @@
                         android:contentDescription="@string/read_action_tts"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toStartOf="@id/read_action_chapters"
-                        app:layout_constraintStart_toEndOf="@+id/read_action_rotate"
+                        app:layout_constraintStart_toEndOf="@+id/read_action_color_palette"
                         app:layout_constraintTop_toTopOf="parent"
                         app:srcCompat="@drawable/ic_baseline_volume_up_24"
                         app:tint="?attr/white" />
@@ -432,7 +580,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_screen_rotation"
+                        android:contentDescription="@string/a11y_rewind"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toStartOf="@id/tts_action_stop"
                         app:layout_constraintStart_toStartOf="parent"
@@ -445,7 +593,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_tts"
+                        android:contentDescription="@string/a11y_stop"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toStartOf="@id/tts_action_pause_play"
                         app:layout_constraintStart_toEndOf="@+id/tts_action_back"
@@ -458,7 +606,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_chapters"
+                        android:contentDescription="@string/a11y_pause"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toStartOf="@id/tts_action_forward"
                         app:layout_constraintStart_toEndOf="@+id/tts_action_stop"
@@ -472,7 +620,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
                         android:background="@drawable/ripple_regular"
-                        android:contentDescription="@string/read_action_settings"
+                        android:contentDescription="@string/a11y_fast_forward"
                         android:padding="@dimen/screenEdgeMargin"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toEndOf="@id/tts_action_pause_play"
@@ -485,27 +633,66 @@
 
 
         <com.google.android.material.appbar.AppBarLayout
-                tools:visibility="visible"
-                android:minHeight="?attr/actionBarSize"
-                android:layout_width="match_parent"
                 android:id="@+id/read_toolbar_holder"
-                android:background="?attr/primaryGrayBackground"
-                android:layout_height="wrap_content">
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/spatial_glass_card"
+                android:elevation="10dp"
+                android:outlineProvider="background"
+                app:elevation="0dp"
+                tools:visibility="visible">
 
             <com.google.android.material.appbar.MaterialToolbar
                     android:id="@+id/read_toolbar"
-
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
                     android:layout_gravity="center"
                     android:gravity="center"
-
                     app:navigationIconTint="?attr/iconColor"
                     app:titleTextColor="?attr/textColor"
                     app:subtitleTextColor="?attr/grayTextColor"
                     tools:title="TEST"
-                    tools:subtitle="TEST"
+                    tools:subtitle="TEST">
 
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+                <!-- Toggle Original/Translated -->
+                <ImageButton
+                    android:id="@+id/read_translate_toggle"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="end|center_vertical"
+                    android:layout_marginEnd="12dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/a11y_translate_toggle"
+                    android:src="@drawable/translate_24px"
+                    android:visibility="gone"
+                    app:tint="?attr/textColor"
+                    tools:visibility="visible" />
+
+            </com.google.android.material.appbar.MaterialToolbar>
         </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- ── Reading Progress Indicator ──────────────────────────────────────
+             A 4dp strip at the bottom of the reader that fills left→right
+             as you scroll. Updated via scaleX (GPU-accelerated, zero GC). -->
+        <FrameLayout
+            android:id="@+id/reader_progress_container"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_gravity="bottom"
+            android:layout_marginBottom="24dp"
+            android:background="@android:color/transparent">
+
+            <View
+                android:id="@+id/reader_reading_progress_fill"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="?attr/colorAccent"
+                android:scaleX="0"
+                android:alpha="0.9"
+                android:transformPivotX="0dp" />
+        </FrameLayout>
+
     </FrameLayout>
 </FrameLayout>

@@ -2,9 +2,18 @@
 
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto">
-    <Preference
-        android:key="by_shady_header"
-        app:layout="@layout/settings_header" />
+    <com.lagradost.quicknovel.ui.custom.HeroPreference
+        android:key="hero_card"
+        app:layout="@layout/setting_hero_card" />
+
+    <com.lagradost.quicknovel.ui.custom.BentoPreference
+        android:key="bento_grid"
+        app:layout="@layout/setting_bento_grid" />
+
+    <com.lagradost.quicknovel.ui.custom.SocialChipsPreference
+        android:key="social_chips"
+        app:layout="@layout/setting_social_chips" />
+
     <PreferenceCategory
         android:key="appearance"
         android:title="@string/appearance_background"
@@ -25,21 +34,21 @@
             android:icon="@drawable/baseline_restore_page_24"
             app:layout="@layout/setting_tile" />
 
-        <SeekBarPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
             android:key="@string/background_blur_key"
             android:title="@string/background_blur"
-            android:max="100"
+            app:valueTo="100"
+            app:valueFrom="0"
             app:defaultValue="0"
-            app:showSeekBarValue="true"
             android:icon="@drawable/ic_baseline_color_lens_24"
             app:layout="@layout/setting_seekbar_tile" />
 
-        <SeekBarPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
             android:key="@string/background_dim_key"
             android:title="@string/background_dim"
-            android:max="100"
+            app:valueTo="100"
+            app:valueFrom="0"
             app:defaultValue="0"
-            app:showSeekBarValue="true"
             android:icon="@drawable/ic_baseline_color_lens_24"
             app:layout="@layout/setting_seekbar_tile" />
 
@@ -56,41 +65,38 @@
             android:icon="@drawable/ic_baseline_color_lens_24"
             app:useSimpleSummaryProvider="true"
             app:layout="@layout/setting_tile" />
-    </PreferenceCategory>
 
-    <PreferenceCategory
-        android:key="search"
-        android:title="@string/search"
-        app:layout="@layout/setting_category_title">
-        <SwitchPreference
-                android:icon="@drawable/search_icon_white"
-                app:key="advanced_search"
-                android:title="@string/advanced_search"
-                android:summary="@string/advanced_search_desc"
-                app:defaultValue="true"
-                app:layout="@layout/setting_tile" />
-        <Preference
-                app:icon="@drawable/ic_baseline_cloud_24"
-                android:key="@string/search_providers_list_key"
-                android:title="@string/search_providers"
-                app:useSimpleSummaryProvider="true"
-                app:layout="@layout/setting_tile" />
-        <Preference
-                android:key="@string/download_path_key"
-                android:title="@string/download_path_pref"
-                android:icon="@drawable/netflix_download"
-                app:layout="@layout/setting_tile" />
-        <Preference
-                android:icon="@drawable/ic_baseline_language_24"
-                android:key="@string/provider_lang_key"
-                android:title="@string/provider_lang_settings"
-                app:layout="@layout/setting_tile" />
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:key="@string/reader_background_key"
+            android:title="@string/reader_background"
+            android:summary="@string/reader_background_summary"
+            app:defaultValue="false"
+            android:icon="@drawable/ic_baseline_color_lens_24"
+            app:layout="@layout/setting_tile" />
 
-        <Preference
-                android:icon="@drawable/ic_baseline_language_24"
-                android:key="@string/locale_key"
-                android:title="@string/locale_settings"
-                app:layout="@layout/setting_tile" />
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:key="@string/library_pinterest_bento_key"
+            android:title="@string/library_pinterest_bento_title"
+            android:summary="@string/library_pinterest_bento_desc"
+            app:defaultValue="false"
+            android:icon="@drawable/ic_baseline_color_lens_24"
+            app:layout="@layout/setting_tile" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:key="library_bento_3x3"
+            android:title="3×3 Bento Grid"
+            android:summary="Display library as a 3-column grid with fixed-height bento cards"
+            app:defaultValue="false"
+            android:icon="@drawable/ic_baseline_grid_view_24"
+            app:layout="@layout/setting_tile" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+            android:key="@string/library_tactile_response_key"
+            android:title="@string/library_tactile_response_title"
+            android:summary="@string/library_tactile_response_desc"
+            app:defaultValue="true"
+            android:icon="@drawable/ic_baseline_color_lens_24"
+            app:layout="@layout/setting_tile" />
     </PreferenceCategory>
 
 
@@ -114,7 +120,24 @@
                 android:entries="@array/DownloadGridFormat"
                 android:entryValues="@array/DownloadGridFormatData"
                 app:layout="@layout/setting_tile" />
-        <SwitchPreference
+
+        <Preference
+                app:icon="@drawable/ic_baseline_edit_24"
+                android:key="@string/manage_data_key"
+                android:title="@string/manage_data"
+                android:summary="@string/manage_data_desc"
+                app:layout="@layout/setting_tile" />
+
+        <ListPreference
+                android:key="@string/library_nav_style_key"
+                android:title="@string/library_nav_style"
+                android:summary="@string/library_nav_style_desc"
+                app:defaultValue="0"
+                android:entries="@array/library_nav_style_entries"
+                android:entryValues="@array/library_nav_style_values"
+                android:icon="@drawable/ic_baseline_edit_24"
+                app:layout="@layout/setting_tile" />
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
                 app:key="@string/auto_update_key"
                 android:title="@string/show_app_updates"
                 android:summary="@string/show_app_updates_desc"
@@ -132,7 +155,7 @@
                 android:icon="@drawable/ic_baseline_notifications_active_24"
                 app:layout="@layout/setting_tile" />
 
-        <SwitchPreference
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
                 app:key="@string/remove_external_key"
                 android:title="@string/remove_bloat"
                 android:summary="@string/remove_bloat_desc"
@@ -145,23 +168,58 @@
                 app:key="@string/manual_check_update_key"
                 app:icon="@drawable/ic_baseline_system_update_24"
                 app:layout="@layout/setting_tile" />
-        <Preference
-                android:icon="@drawable/baseline_save_as_24"
-                android:key="@string/backup_key"
-                android:title="@string/backup_settings"
-                app:layout="@layout/setting_tile" />
+    </PreferenceCategory>
 
-        <Preference
-                android:icon="@drawable/baseline_restore_page_24"
-                android:key="@string/restore_key"
-                android:title="@string/restore_settings"
-                app:layout="@layout/setting_tile" />
+    <PreferenceCategory
+            android:key="dev_only"
+            android:title="@string/dev_only"
+            android:summary="@string/dev_only_desc"
+            app:layout="@layout/setting_category_title">
+
         <Preference
                 android:icon="@drawable/baseline_description_24"
                 android:key="@string/show_logcat_key"
                 android:title="@string/show_log_cat"
                 app:layout="@layout/setting_tile" />
+
+        <Preference
+                android:title="@string/check_for_plugin_update"
+                app:key="@string/plugin_sync_key"
+                android:summary="@string/plugin_sync_desc"
+                android:icon="@drawable/ic_baseline_autorenew_24"
+                app:layout="@layout/setting_tile" />
+
+        <Preference
+                android:title="@string/import_plugin"
+                app:key="@string/plugin_import_key"
+                android:summary="@string/import_plugin_desc"
+                android:icon="@drawable/ic_baseline_add_24"
+                app:layout="@layout/setting_tile" />
+
+        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
+                android:title="@string/cloudflare_auto_solve_title"
+                app:key="@string/cloudflare_auto_solve_key"
+                android:summary="@string/cloudflare_auto_solve_summary"
+                app:defaultValue="false"
+                android:icon="@drawable/ic_baseline_autorenew_24"
+                app:layout="@layout/setting_tile" />
+
+        <Preference
+                android:title="@string/cloudflare_resolve_manual_title"
+                app:key="@string/cloudflare_resolve_manual_key"
+                android:summary="@string/cloudflare_resolve_manual_summary"
+                android:icon="@drawable/ic_baseline_autorenew_24"
+                app:layout="@layout/setting_tile" />
+
+        <Preference
+                android:title="@string/clear_cookies"
+                app:key="@string/clear_cookies_key"
+                android:summary="@string/clear_cookies_desc"
+                android:icon="@drawable/ic_baseline_autorenew_24"
+                app:layout="@layout/setting_tile" />
     </PreferenceCategory>
+
+
 
     <PreferenceCategory
             android:key="extra"
@@ -180,13 +238,32 @@
 
         <Preference
                 android:title="Join Telegram Group"
-                android:icon="@drawable/ic_baseline_discord_24"
+                android:icon="@drawable/ic_baseline_language_24"
                 app:summary="https://t.me/+i9MSwgeoXzU0NTE1"
                 app:layout="@layout/setting_tile">
             <intent
                     android:action="android.intent.action.VIEW"
                     android:data="https://t.me/+i9MSwgeoXzU0NTE1" />
+        </Preference>
 
+        <Preference
+                android:title="Join Discord Server"
+                android:icon="@drawable/ic_baseline_discord_24"
+                app:summary="https://discord.gg/njMumTKvVw"
+                app:layout="@layout/setting_tile">
+            <intent
+                    android:action="android.intent.action.VIEW"
+                    android:data="https://discord.gg/njMumTKvVw" />
+        </Preference>
+
+        <Preference
+                android:title="QuickNovel Dev (LagradOst)"
+                android:icon="@drawable/ic_github_logo"
+                app:summary="https://github.com/LagradOst"
+                app:layout="@layout/setting_tile">
+            <intent
+                    android:action="android.intent.action.VIEW"
+                    android:data="https://github.com/LagradOst" />
         </Preference>
     </PreferenceCategory>
 </PreferenceScreen>

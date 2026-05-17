@@ -17,6 +17,7 @@ import com.lagradost.quicknovel.util.UIHelper.hideKeyboard
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.util.toPx
 import com.lagradost.quicknovel.widget.AutofitRecyclerView
+import com.lagradost.quicknovel.util.KineticTiltHelper
 import kotlin.math.roundToInt
 
 class MainAdapter(
@@ -83,17 +84,23 @@ class MainAdapter(
             val compactView = false//resView.context?.getGridIsCompact() ?: return
 
             val coverHeight: Int =
-                if (compactView) 80.toPx else (resView.itemWidth / 0.68).roundToInt()
+                if (compactView) 80.toPx else (resView.itemWidth / 0.64).roundToInt()
 
             imageView.apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    coverHeight
-                )
                 setImage(item.image)
+                
+                // QN-Enhanced: Apply premium tactile response
+                KineticTiltHelper.applyKineticTilt(this)
 
                 setOnClickListener {
-                    loadResult(item.url, item.apiName)
+                    transitionName = item.url
+                    val extras = androidx.navigation.fragment.FragmentNavigatorExtras(this to item.url)
+                    val act = com.lagradost.quicknovel.CommonActivity.activity
+                    if (act is androidx.fragment.app.FragmentActivity) {
+                        act.loadResult(item.url, item.apiName, 0, null, extras)
+                    } else {
+                        loadResult(item.url, item.apiName)
+                    }
                 }
 
                 setOnLongClickListener { view ->

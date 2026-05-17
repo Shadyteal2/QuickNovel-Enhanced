@@ -45,7 +45,7 @@ object ImageLoader {
 
     internal fun buildImageLoader(context: PlatformContext): ImageLoader = ImageLoader.Builder(context)
             .crossfade(200)
-            .allowHardware(false) // SDK_INT >= 28, cant use hardware bitmaps for Palette Builder
+            .allowHardware(true) // Offload bitmap storage to GPU memory for faster scrolling
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
             .memoryCache {
@@ -59,14 +59,16 @@ object ImageLoader {
                     .maxSizePercent(0.04) // Use 4 % of the device's storage space for disk caching
                     .build()
             }
-            /** Pass interceptors with care, unnecessary passing tokens to servers
-            or image hosting services causes unauthorized exceptions **/
-            .components { add(OkHttpNetworkFetcherFactory(callFactory = { OkHttpClient()
-                .newBuilder()
-                .ignoreAllSSLErrors()
-                .build() })) }
-            .also {
-                it.setupCoilLogger()
+            .components {
+                add(OkHttpNetworkFetcherFactory(callFactory = {
+                    OkHttpClient()
+                        .newBuilder()
+                        .ignoreAllSSLErrors()
+                        .build()
+                }))
+            }
+            .also { loaderBuilder ->
+                loaderBuilder.setupCoilLogger()
                 Log.d(TAG, "buildImageLoader: Setting COIL Image Loader.")
             }
             .build()

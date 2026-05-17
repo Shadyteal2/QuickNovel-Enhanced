@@ -22,9 +22,6 @@ data class ResultCached(
 ) {
     val image : UiImage? get() = img(poster)
 
-    override fun hashCode(): Int {
-        return id
-    }
     val currentTotalChapters:Int get() = (
             getKey(RESULT_BOOKMARK, this.id.toString()) as? ResultCached
             )?.totalChapters ?: totalChapters

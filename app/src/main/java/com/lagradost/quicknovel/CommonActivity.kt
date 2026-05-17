@@ -14,6 +14,8 @@ import android.widget.Toast
 import androidx.annotation.MainThread
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.preference.PreferenceManager
 import com.lagradost.quicknovel.ui.UiText
 import com.lagradost.quicknovel.mvvm.logError
@@ -23,7 +25,34 @@ import java.lang.ref.WeakReference
 import java.util.Locale
 
 object CommonActivity {
+    var pendingThemeChangeScreenshot: Bitmap? = null
+    var themeCenterX: Float? = null
+    var themeCenterY: Float? = null
+
+    @JvmStatic
+    fun recreateWithSmoothTransition(act: Activity?, x: Float? = null, y: Float? = null) {
+        if (act == null) return
+        themeCenterX = x
+        themeCenterY = y
+        try {
+            val rootView = act.window?.decorView?.rootView
+            if (rootView != null && rootView.width > 0 && rootView.height > 0) {
+                val bitmap = Bitmap.createBitmap(
+                    rootView.width,
+                    rootView.height,
+                    Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(bitmap)
+                rootView.draw(canvas)
+                pendingThemeChangeScreenshot = bitmap
+            }
+        } catch (e: Exception) {
+            logError(e)
+        }
+        act.recreate()
+    }
     private var _activity: WeakReference<Activity>? = null
+    @JvmStatic
     var activity
         get() = _activity?.get()
         set(value) {
@@ -33,14 +62,17 @@ object CommonActivity {
     const val TAG = "COMPACT"
     var currentToast: Toast? = null
 
+    @JvmStatic
     fun showToast(@StringRes message: Int, duration: Int? = null) {
         activity?.runOnUiThread { showToast(activity, message, duration) }
     }
 
+    @JvmStatic
     fun showToast(message: String?, duration: Int? = null) {
         activity?.runOnUiThread { showToast(activity, message, duration) }
     }
 
+    @JvmStatic
     fun showToast(message: UiText?, duration: Int? = null) {
         val act = activity ?: return
         if (message == null) return

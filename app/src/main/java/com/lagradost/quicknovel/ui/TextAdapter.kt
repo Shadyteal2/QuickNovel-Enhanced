@@ -43,6 +43,11 @@ import com.lagradost.quicknovel.util.UIHelper.systemFonts
 import com.lagradost.quicknovel.util.toPx
 import io.noties.markwon.image.AsyncDrawable
 import io.noties.markwon.image.AsyncDrawableSpan
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
+import com.lagradost.quicknovel.ReadActivity2
+import com.lagradost.quicknovel.ui.TranslationBottomSheet
 import java.io.File
 
 
@@ -184,7 +189,16 @@ data class TextConfig(
     val verticalPadding: Float,
 ) {
     private val fontFile: File? by lazy {
-        if (textFont == "") null else systemFonts.firstOrNull { it.name == textFont }
+        if (textFont == "") null else {
+            val found = systemFonts.firstOrNull { it.name == textFont }
+            if (found != null) found else {
+                val ctx = com.lagradost.quicknovel.BaseApplication.context
+                if (ctx != null) {
+                    val file = File(File(ctx.filesDir, "fonts"), textFont)
+                    if (file.exists()) file else null
+                } else null
+            }
+        }
     }
 
     private val cachedFont: Typeface by lazy {
@@ -513,7 +527,7 @@ class TextAdapter(
     // a full line of these characters is often used as a SEPARATOR
     val separatorRegex = Regex("[=\\-_\\s━*]*")
 
-    override fun customContentViewType(item: SpanDisplay): Int {
+    override fun customContentViewType(item: SpanDisplay, position: Int): Int {
         return when (item) {
             is TextSpan -> {
                 if (item.text.matches(separatorRegex)) {
@@ -554,6 +568,10 @@ class TextAdapter(
     override fun getItemId(position: Int): Long {
         return getItem(position).id
     }
+
+
+
+
 
     private fun bindLoading(binding: ViewBinding, obj: LoadingSpanned) {
         if (binding !is SingleLoadingBinding) return
@@ -645,6 +663,41 @@ class TextAdapter(
                     if (config.isTextSelectable) {
                         post {
                             setTextIsSelectable(true)
+                            customSelectionActionModeCallback = object : ActionMode.Callback {
+                                override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+                                    if (ReadActivity2.readActivity?.viewModel?.isDictionaryEnabled != false) {
+                                        menu?.add(0, 101, 0, "Dictionary")?.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                                    }
+                                    // Add Translate option
+                                    menu?.add(0, 102, 0, "Translate")?.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                                    return true
+                                }
+
+                                override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean = false
+
+                                override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
+                                    val start = selectionStart
+                                    val end = selectionEnd
+                                    val selectedText = text.substring(start, end).trim()
+                                    if (selectedText.isBlank()) return false
+
+                                    when (item?.itemId) {
+                                        101 -> {
+                                            ReadActivity2.readActivity?.showDictionary(selectedText)
+                                            mode?.finish()
+                                            return true
+                                        }
+                                        102 -> {
+                                            ReadActivity2.readActivity?.showTranslation(selectedText)
+                                            mode?.finish()
+                                            return true
+                                        }
+                                    }
+                                    return false
+                                }
+
+                                override fun onDestroyActionMode(mode: ActionMode?) {}
+                            }
                             movementMethod = LinkMovementMethod.getInstance()
                             setOnClickListener {
                                 viewModel.switchVisibility()
@@ -788,9 +841,12 @@ class TextAdapter(
             return when (oldItem) {
                 is TextSpan -> {
                     if (newItem !is TextSpan) return false
-                    // don't check the span content as that does not change
-                    return newItem.end == oldItem.end && newItem.start == oldItem.start && newItem.index != oldItem.index
+                    // Check text content to ensure UI updates during live translation
+                    return oldItem.index == newItem.index && 
+                           oldItem.innerIndex == newItem.innerIndex &&
+                           oldItem.text.toString() == newItem.text.toString()
                 }
+
 
                 is LoadingSpanned -> {
                     if (newItem !is LoadingSpanned) return false

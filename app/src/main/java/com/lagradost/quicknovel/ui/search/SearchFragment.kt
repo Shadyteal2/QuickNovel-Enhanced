@@ -11,6 +11,7 @@ import android.widget.ImageView
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.preference.PreferenceManager
@@ -26,9 +27,10 @@ import com.lagradost.quicknovel.mvvm.observeNullable
 import com.lagradost.quicknovel.ui.home.BrowseAdapter
 import com.lagradost.quicknovel.ui.home.HomeViewModel
 import com.lagradost.quicknovel.ui.setRecycledViewPool
-import com.lagradost.quicknovel.ui.settings.SettingsFragment
+import com.lagradost.quicknovel.ui.settings.showSearchProviders
 import com.lagradost.quicknovel.util.Event
 import com.lagradost.quicknovel.util.UIHelper.fixPaddingStatusbar
+import com.lagradost.quicknovel.util.UIHelper.hideKeyboard
 
 class SearchFragment : Fragment() {
     lateinit var binding: FragmentSearchBinding
@@ -121,6 +123,24 @@ class SearchFragment : Fragment() {
 
         val settingsManager = context?.let { PreferenceManager.getDefaultSharedPreferences(it) }
         val isAdvancedSearch = settingsManager?.getBoolean("advanced_search", true) == true
+
+        val backCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                val hasResponse = viewModel.searchResponse.value != null || viewModel.currentSearch.value != null
+                if (hasResponse) {
+                    viewModel.clearSearch()
+                    binding.mainSearch.setQuery("", false)
+                    binding.mainSearch.clearFocus()
+                    hideKeyboard(view)
+                } else {
+                    isEnabled = false
+                    activity?.onBackPressedDispatcher?.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        }
+        activity?.onBackPressedDispatcher?.addCallback(viewLifecycleOwner, backCallback)
+
         binding.searchMasterRecycler.isVisible = false
         binding.searchAllRecycler.isGone = false
 
@@ -136,6 +156,8 @@ class SearchFragment : Fragment() {
 
         observeNullable(viewModel.searchResponse) { response ->
             binding.homeBrowselist.isVisible = response == null
+            // Check both standard and advanced search state for back button intercept
+            backCallback.isEnabled = response != null || viewModel.currentSearch.value != null
             if (response == null) {
                 binding.searchAllRecycler.isVisible = false
                 allAdapter.submitIncomparableList(emptyList())
@@ -148,6 +170,9 @@ class SearchFragment : Fragment() {
                 is Resource.Success -> {
                     response.value.let { data ->
                         allAdapter.submitList(data)
+                        if (data.isNotEmpty()) {
+                            com.lagradost.quicknovel.util.MagicAnimator.runGridReveal(binding.searchAllRecycler)
+                        }
                     }
                     searchExitIcon.alpha = 1f
                     binding.searchLoadingBar.alpha = 0f
@@ -178,10 +203,19 @@ class SearchFragment : Fragment() {
                         if (it.data is Resource.Success) it.data.value else emptyList()
                     )
                 })
+                if (list.isNotEmpty()) {
+                    com.lagradost.quicknovel.util.MagicAnimator.runGridReveal(binding.searchMasterRecycler)
+                }
             }
+            // Update back callback when advanced search results update
+            backCallback.isEnabled = list != null || viewModel.searchResponse.value != null
         }
 
-        activity?.fixPaddingStatusbar(binding.searchToolbar)
+        activity?.fixPaddingStatusbar(binding.searchHeaderHolder)
+        
+        com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(binding.searchToolbar, binding.searchAllRecycler)
+        com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(binding.searchToolbar, binding.homeBrowselist)
+        com.lagradost.quicknovel.util.GlassHeaderHelper.applyGlassHeader(binding.searchToolbar, binding.searchMasterRecycler)
 
         fixGrid()
         binding.searchLoadingBar.alpha = 0f
@@ -191,7 +225,7 @@ class SearchFragment : Fragment() {
         searchMagIcon.scaleY = 0.65f
 
         binding.searchFilter.setOnClickListener {
-            SettingsFragment.showSearchProviders(it.context)
+            com.lagradost.quicknovel.ui.settings.showSearchProviders(it.context)
         }
 
         binding.mainSearch.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
@@ -203,7 +237,8 @@ class SearchFragment : Fragment() {
             }
 
             override fun onQueryTextChange(newText: String): Boolean {
-                if (newText.isEmpty()) {
+                // Kinetic Fix: Only clear search if the query was manually emptied and we are not restoring state
+                if (newText.isEmpty() && isResumed) {
                     viewModel.clearSearch()
                 }
                 return true
@@ -233,6 +268,9 @@ class SearchFragment : Fragment() {
 
         observe(homeViewModel.homeApis) { list ->
             browseAdapter.submitList(list)
+            if (list.isNotEmpty()) {
+                com.lagradost.quicknovel.util.MagicAnimator.runGridReveal(binding.homeBrowselist)
+            }
         }
 
         /*

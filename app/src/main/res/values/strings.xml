@@ -1,10 +1,15 @@
 <resources>
+    <string name="back_btn">Back</string>
+    <string name="appearance">Appearance</string>
+    <string name="storage">Storage</string>
     <string name="app_name">NeoQN</string>
     <string name="title_search">Search</string>
     <string name="title_history">History</string>
     <string name="title_settings">Settings</string>
     <string name="title_home">Explore</string>
     <string name="title_download">Library</string>
+    <string name="title_foryou_short">For You</string>
+
 
     <string name="locale_key" translatable="false">locale_key</string>
     <string name="provider_lang_key" translatable="false">provider_lang_key</string>
@@ -25,6 +30,7 @@
     <string name="download_from_chapter">Partial download</string>
     <string name="download_ml">Download translation model</string>
     <string name="download_ml_long">To translate locally the app needs to download the translation model (~30MB)</string>
+    <string name="approx_30mb">~30MB</string>
     <string name="novel_imagecover_descript">Novel Imagecover</string>
     <string name="background_image_descript">Background Image</string>
     <string name="back_to_search">Back to search</string>
@@ -36,6 +42,9 @@
     <string name="auto_update_key">auto_update</string>
     <string name="external_reader_key">external_reader</string>
     <string name="remove_external_key">remove_external</string>
+    <string name="remove_bloat_key" translatable="false">remove_bloat_key</string>
+    <string name="library_bento_3x3_key" translatable="false">library_bento_3x3</string>
+    <string name="updates_sync_interval_key" translatable="false">updates_sync_interval</string>
     <string name="manual_check_update_key">manual_check_update</string>
     <string name="backup_key">backup_key</string>
     <string name="rating_format_key">rating_format</string>
@@ -53,6 +62,8 @@
     <string name="search">Search</string>
     <string name="general">General</string>
     <string name="info">Info</string>
+    <string name="reader">Reader</string>
+    <string name="advanced">Advanced</string>
 
     <string name="advanced_search">Advanced Search</string>
     <string name="advanced_search_desc">Gives you the search results separated by provider</string>
@@ -158,13 +169,12 @@
     <string name="home_more_info">More info</string>
     <string name="home_expanded_hide">Hide</string>
     <string name="reload_chapter">Reload Chapter</string>
-    <string name="provider_lang_settings">Provider Languages</string>
-    <string name="locale_settings">App Languages</string>
+    <string name="provider_lang_settings">Provider Language Filter</string>
+    <string name="locale_settings">App Display Language</string>
     <string name="sort_apply">Apply</string>
     <string name="sort_cancel">Cancel</string>
     <string name="keep_screen_active">Keep screen active</string>
     <string name="twelve_hour_time">12 Hour time</string>
-
 
     <string name="backup_settings">Backup data</string>
     <string name="restore_success">Loaded backup file</string>
@@ -175,12 +185,12 @@
     <string name="tts_locale">Language</string>
     <string name="tts_voice">Voice</string>
     <string name="tts_voice_title">TTS Voice</string>
-    <string name="theme_key">theme_key</string>
-    <string name="theme">Theme</string>
-    <string name="primary_color_key">primary_color_key</string>
-    <string name="primary_color_settings">Main Color</string>
+    <string name="theme_key" translatable="false">theme_key</string>
+    <string name="theme">App Theme</string>
+    <string name="primary_color_key" translatable="false">primary_color_key</string>
+    <string name="primary_color_settings">Accent Color</string>
     <string name="library_display_mode">Library Display Mode</string>
-    <string name="rating_format">Rating Format</string>
+    <string name="rating_format">Book Rating Format</string>
     <string name="cancel">Cancel</string>
     <string name="remove">Remove</string>
     <string name="remove_from_history_format">This remove %s from your history.\nAre you sure?</string>
@@ -220,6 +230,7 @@
     <string name="loading">Loading…</string>
     <string name="loading_format" formatted="true">Loading %s…</string>
     <string name="chapter_format" formatted="true">Chapter %s</string>
+    <string name="last_read_sort">Last read</string>
 
     <string name="default_sort">Default</string>
     <string name="recently_sort">Recently opened</string>
@@ -242,11 +253,14 @@
     <string name="download_path_key">download_path_key</string>
     <string name="download_path_pref">Download path</string>
     <string name="bionic_reading">Bionic Reading</string>
-    <string name="selectable_text">Selectable text</string>
+    <string name="selectable_text">Selectable text (to use inbuilt dictionary)</string>
     <string name="sleep_timer">Sleep</string>
     <string name="sleep_format">%d min</string>
     <string name="sleep_format_stop">TTS will stop in %d min</string>
-    <string name="google_translate">Google translate</string>
+    <string name="google_translate">Google Translate</string>
+    <string name="google_ml">Google ML</string>
+    <string name="ml_info_title">Google ML Kit</string>
+    <string name="ml_info_text">Fast, private, and offline translation. To translate, select your target language and tap \'Apply\'. Each language requires a one-time (~30MB) download. Downloading can take up to 10 mins depending on Google server. Once applied, use the translate icon in the reader toolbar to toggle between original and translated text.\n\nTip: If translation doesn\'t start immediately after a download, try restarting the app or re-applying the target language.</string>
     <string name="online_translate">Online translation</string>
     <string name="start_chapter">Skipped chapters</string>
     <string name="tts_speed">TTS Speed</string>
@@ -266,6 +280,9 @@
     <string name="clipboard_permission_error">Error accessing Clipboard, Please try again.</string>
     <string name="clipboard_unknown_error">Error copying, Please copy logcat and contact app support.</string>
     <string name="show_log_cat">Show Logcat 🐈</string>
+    <string name="show_read">Show Read</string>
+    <string name="show_unread">Show Unread</string>
+    <string name="show_downloaded">Show Downloaded</string>
     <string name="unread">Unread</string>
     <string name="bookmarks">Bookmarks</string>
     <string name="bookmark">Bookmark</string>
@@ -297,17 +314,168 @@
     <string name="appearance_background">Appearance &amp; Background</string>
     <string name="background_image">Custom Background Image</string>
     <string name="background_image_summary">Pick a custom image for the app background</string>
+    <string name="background_effect_mode">Background Effect Preset</string>
+    <string name="background_effect_mode_summary">Choose a stylized treatment for the background image</string>
+    <string name="background_effect_none">None</string>
     <string name="background_blur">Background Blur</string>
     <string name="background_dim">Background Dim</string>
+    <string name="background_grain">Background Grain</string>
+    <string name="background_grain_summary">Add visible monochrome film grain to the background</string>
+    <string name="background_vignette">Background Vignette</string>
+    <string name="background_vignette_summary">Darken the edges more aggressively for focus</string>
     <string name="background_image_key" translatable="false">background_image</string>
+    <string name="background_effect_mode_key" translatable="false">background_effect_mode</string>
     <string name="background_blur_key" translatable="false">background_blur</string>
     <string name="background_dim_key" translatable="false">background_dim</string>
+    <string name="background_grain_key" translatable="false">background_grain</string>
+    <string name="background_vignette_key" translatable="false">background_vignette</string>
+    <string name="reader_background">Custom Background in Reader</string>
+    <string name="reader_background_summary">Apply global background image and effect presets to the reader</string>
+    <string name="reader_background_key" translatable="false">reader_background</string>
     <string name="reset_background">Reset Background</string>
     <string name="reset_background_summary">Remove custom background and return to default</string>
     <string name="reset_background_key" translatable="false">reset_background</string>
     <string name="background_reset_confirmed">Background has been reset to default</string>
     <string name="by_shady">By Shady</string>
+    <string name="library_nav_style_key" translatable="false">library_nav_style</string>
+    <string name="library_nav_style">Library Navigation Style</string>
+    <string name="library_nav_style_pill">Pill Drawer</string>
+    <string name="library_nav_style_swipe">Swipe View</string>
+    <string name="library_nav_style_desc">Choose how you navigate categories in the Library</string>
     <string name="notes">Notes</string>
     <string name="dropped_reason">Why did you drop this novel?</string>
     <string name="title_updates">Updates</string>
+    <string name="plugin_sync_key" translatable="false">plugin_sync_key</string>
+    <string name="check_for_plugin_update">Check for Plugin Updates</string>
+    <string name="plugin_sync_desc">Download and update novel providers from GitHub</string>
+    <string name="plugin_import_key" translatable="false">plugin_import_key</string>
+    <string name="import_plugin">Import Plugin from Storage</string>
+    <string name="import_plugin_desc">Pick an APK and JSON to manually install a plugin</string>
+    <string name="dev_only">Dev Only</string>
+    <string name="dev_only_desc">For dev and beta testers only</string>
+    <string name="plugin_import_invalid_apk">Invalid APK or DEX file selected</string>
+    <string name="plugin_import_signature_error">Plugin rejected: Signature mismatch! Internal developer only.</string>
+    <string name="provider_apk_import_key" translatable="false">provider_apk_import_key</string>
+    <string name="import_provider_apk">Import Provider APK</string>
+    <string name="import_provider_apk_desc">Pick a provider APK file directly — bypass GitHub sync (same providers, different method)</string>
+    <string name="import_provider_apk_success_format" formatted="true">✓ Loaded %d provider(s) from APK</string>
+    <string name="import_provider_apk_none_found">No providers found in this APK. Is it the correct file?</string>
+    <string name="import_provider_apk_bad_sig">APK rejected — signature does not match trusted key</string>
+    <string name="import_provider_apk_duplicate_format" formatted="true">Provider already installed (v%d). Import will update it.</string>
+    <string name="clear_cookies">Clear Network Cookies</string>
+    <string name="clear_cookies_desc">Removes all stored Cloudflare and site cookies. Use if verification is stuck.</string>
+    <string name="clear_cookies_key" translatable="false">clear_cookies_key</string>
+    <string name="cloudflare_auto_solve_title">Automatic Cloudflare Solving</string>
+    <string name="cloudflare_auto_solve_summary">Automatically attempt to solve Cloudflare challenges using WebView</string>
+    <string name="cloudflare_resolve_manual_title">Resolve Cloudflare Challenge</string>
+    <string name="cloudflare_resolve_manual_summary">Manually open a WebView to solve a challenge for a specific site</string>
+    <string name="cloudflare_auto_solve_key" translatable="false">cloudflare_auto_solve</string>
+    <string name="cloudflare_resolve_manual_key" translatable="false">cloudflare_resolve_manual</string>
+
+    <string name="library_pinterest_bento_key" translatable="false">library_pinterest_bento</string>
+    <string name="library_pinterest_bento_title">Pinterest Bento Grid</string>
+    <string name="library_pinterest_bento_desc">Transforms Library &amp; Home into a gapless 2rd col masonry grid. Only works in Grid View.</string>
+
+    <string name="library_tactile_response_key" translatable="false">library_tactile_response</string>
+    <string name="library_tactile_response_title">Tactile Cover Response</string>
+    <string name="library_tactile_response_desc">Enable premium 3D physical tilt effect when touching book covers.</string>
+    <string name="dictionary">Dictionary</string>
+    <string name="dictionary_not_found">Definition not found</string>
+    <string name="dictionary_error">Error fetching definition</string>
+    <string name="inbuilt_dictionary">Inbuilt Dictionary</string>
+
+    <!-- Translation Settings -->
+    <string name="translation_settings">Translation Settings</string>
+    <string name="advanced_settings">Advanced Settings</string>
+    <string name="translation_engine">Translation Engine</string>
+    <string name="translation_engine_key" translatable="false">translation_engine_key</string>
+    <string name="translation_target_lang">Target Language</string>
+    <string name="translation_target_lang_key" translatable="false">translation_target_lang_key</string>
+    
+    <string name="translate">Translate</string>
+    <string name="translation">Translation</string>
+
+    <string name="translating_p">Translating</string>
+    <string name="translation_source_lang">Source Language</string>
+    <string name="translation_source_lang_key" translatable="false">translation_source_lang_key</string>
+    <string name="content_type">Content Type</string>
+    <string name="tone">Translation Tone</string>
+    <string name="already_in_library">This novel is already in your library</string>
+    <string name="character_aliases">Character Aliases</string>
+    <string name="add_alias">Add Alias</string>
+    <string name="original_name">Original Name</string>
+    <string name="new_name">New Name</string>
+    <string name="no_aliases">No aliases for this novel</string>
+    <string name="edit_alias">Edit Alias</string>
+    <string name="delete_alias">Delete Alias</string>
+    <string name="manage_data">Manage Notes &amp; Aliases</string>
+    <string name="manage_data_desc">View and delete saved notes and character renames</string>
+    <string name="manage_data_key" translatable="false">manage_data_key</string>
+    <string name="clear_all">Clear All</string>
+    <string name="clear_all_confirmation">Are you sure you want to delete ALL notes and character aliases? This cannot be undone.</string>
+    
+    <string name="restart_required">Restart Required</string>
+    <string name="backup_restored_message">Backup restored successfully. Please close and reopen the app from your recent apps to apply the changes and see your bookmarks.</string>
+    <string name="got_it">Got It</string>
+    <string name="restart_ml_message">Google ML model installed. Please restart the app for it to initialize correctly.</string>
+    <string name="restart">Restart</string>
+    <string name="later">Later</string>
+    <string name="backup_restored_title">Backup Restored</string>
+    
+    <string name="vibe_aura">Vibe &amp; Aura</string>
+    <string name="vibe_aura_desc">Experimental algorithmic art &amp; sensory enhancements</string>
+    <string name="premium_animations">Premium Animations</string>
+    <string name="premium_animations_desc">Enables staggered transitions, glowing progress bars, and reactive physics</string>
+    <string name="premium_animations_key" translatable="false">premium_animations_key</string>
+    <string name="experimental_visuals">Experimental Visuals</string>
+    <string name="living_glass">Living Glass Background</string>
+    <string name="living_glass_desc">Fluid organic gradients that morph with your interactions</string>
+    
+    <string name="vibe_aura_key" translatable="false">vibe_aura_key</string>
+    <string name="experimental_visuals_key" translatable="false">experimental_visuals_key</string>
+    <string name="living_glass_key" translatable="false">living_glass_key</string>
+    <string name="aura_intensity">Aura Visibility Intensity</string>
+    <string name="aura_palette">Aura Color Palette</string>
+    <string name="aura_speed">Animation Velocity</string>
+
+    <string name="aura_intensity_key" translatable="false">aura_intensity_key</string>
+    <string name="aura_palette_key" translatable="false">aura_palette_key</string>
+    <string name="aura_speed_key" translatable="false">aura_speed_key</string>
+
+    <string name="background_effect_noir">Noir</string>
+    <string name="background_effect_sepia">Sepia</string>
+    <string name="background_effect_blockify">Blockify</string>
+    <string name="background_effect_threshold">Threshold</string>
+    <string name="background_effect_edge_detection">Edge Detection</string>
+    <string name="background_effect_dots">Dots</string>
+    <string name="background_effect_dithering">Dithering</string>
+    <string name="background_effect_voronoi">Voronoi</string>
+    <string name="palette_nebula">Deep Nebula (Original)</string>
+    <string name="palette_garden">Zen Garden (Relaxing)</string>
+    <string name="palette_minimal">Minimalist Earth</string>
+    <string name="palette_shady">Shady</string>
+    <string name="palette_browny">Browny</string>
+
+    <string name="luminescent_reader">Luminescent Reader</string>
+    <string name="luminescent_reader_desc">Adds a soft atmospheric glow to text and screen edges</string>
+    <string name="luminescent_reader_key" translatable="false">luminescent_reader</string>
+    <string name="luminescent_intensity">Glow Intensity</string>
+    <string name="luminescent_intensity_key" translatable="false">luminescent_intensity</string>
+
+    <string name="navbar_width_key" translatable="false">navbar_width</string>
+    <string name="navbar_width_title">Navigation Bar Width</string>
+    <string name="navbar_width_summary">Adjust the width of the bottom navigation cluster</string>
+
+    <!-- Accessibility Labels -->
+    <string name="a11y_rewind">Rewind</string>
+    <string name="a11y_stop">Stop</string>
+    <string name="a11y_pause">Pause</string>
+    <string name="a11y_play">Play</string>
+    <string name="a11y_fast_forward">Fast Forward</string>
+    <string name="a11y_translate_toggle">Toggle Translation</string>
+    <string name="a11y_stop_translation">Stop Translation</string>
+    <string name="a11y_drag_handle">Drag Handle</string>
+    <string name="a11y_info">Information</string>
+    <string name="a11y_theme_format">Select %s Theme</string>
+    <string name="show_reading_progress">Show Reading Progress</string>
 </resources>

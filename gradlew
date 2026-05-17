@@ -69,6 +69,10 @@
 # Resolve links: $0 may be a link
 app_path=$0
 
+# FIX: Force JAVA_HOME to Android Studio's JDK to fix jlink errors
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+export GRADLE_USER_HOME="$PWD/.gradle-home"
+
 # Need this for daisy-chained symlinks.
 while
     APP_HOME=${app_path%"${app_path##*/}"}  # leaves a trailing /; empty if no leading path

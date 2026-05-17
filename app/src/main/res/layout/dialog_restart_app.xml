@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="24dp"
+    android:background="@drawable/dialog_glass_background">
+
+    <ImageView
+        android:id="@+id/restart_icon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        app:srcCompat="@drawable/ic_baseline_autorenew_24"
+        app:tint="?attr/colorPrimary"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/restart_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Restart Required"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="?attr/textColor"
+        android:layout_marginTop="16dp"
+        app:layout_constraintTop_toBottomOf="@id/restart_icon"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/restart_description"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="To apply these layout changes perfectly, the app needs to refresh.\n\nCaution: This may affect any download in progress."
+        android:textAlignment="center"
+        android:textColor="?attr/grayTextColor"
+        android:layout_marginTop="8dp"
+        app:layout_constraintTop_toBottomOf="@id/restart_title"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/restart_button"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Restart Now"
+        android:layout_marginTop="24dp"
+        app:cornerRadius="12dp"
+        app:layout_constraintTop_toBottomOf="@id/restart_description"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/later_button"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Later"
+        android:textColor="?attr/grayTextColor"
+        android:layout_marginTop="4dp"
+        app:layout_constraintTop_toBottomOf="@id/restart_button"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
