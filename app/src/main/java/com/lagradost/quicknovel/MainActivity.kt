@@ -697,7 +697,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         loadResultFromUrl(data)
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         handleIntent(intent)
         super.onNewIntent(intent)
     }

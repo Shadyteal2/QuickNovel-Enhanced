@@ -36,6 +36,9 @@ import com.lagradost.quicknovel.databinding.*
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.mainpage.MainAdapter
 import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
@@ -109,19 +112,11 @@ class ResultFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        if(viewModel.isResume){
+        if (viewModel.isResume) {
             chapterAdapter?.notifyDataSetChanged()
             viewModel.isResume = false
         }
         viewModel.reorderChapters()
-
-
-        val savedNote = viewModel.getNote() ?: ""
-        novelTabBinding?.resultNotesEdittext?.let { et ->
-            if (et.text?.toString() != savedNote) {
-                et.setText(savedNote)
-            }
-        }
     }
 
     private fun updateScrollHeight() {
@@ -134,86 +129,7 @@ class ResultFragment : Fragment() {
     }
 
     private fun updateTabData() {
-        val loadResponse = viewModel.loadResponse.value
-        if (loadResponse !is Resource.Success) return
-        val res = loadResponse.value
-
-        novelTabBinding?.apply {
-            val state = viewModel.readState.value ?: ReadType.NONE
-            resultUpdatesToggle.isVisible = state != ReadType.NONE
-            val isEnabled = viewModel.isSyncEnabledDisplay.value ?: true
-            resultUpdatesToggle.alpha = if (isEnabled) 1.0f else 0.4f
-
-            downloadWarning.isVisible = (repo?.rateLimitTime ?: 0) > 2000
-
-            resultRatingVotedCount.text = getString(R.string.no_data)
-            res.rating?.let { rating ->
-                resultRating.text = context?.getRating(rating)
-                val votes = res.peopleVoted
-                if (votes != null) {
-                    resultRatingVotedCount.text = getString(R.string.votes_format).format(votes)
-                }
-            }
-            resultViews.text = res.views?.let { views -> humanReadableByteCountSI(views) }
-                ?: getString(R.string.no_data)
-
-            resultTag.removeAllViews()
-            res.tags?.forEach { tag ->
-                val chip = Chip(requireContext())
-                val chipDrawable = ChipDrawable.createFromAttributes(requireContext(), null, 0, R.style.ChipFilled)
-                chip.setChipDrawable(chipDrawable)
-                chip.text = tag
-                chip.isClickable = false
-                
-                val tagIndex = repo?.tags?.indexOfFirst { it.first == tag }?.takeIf { it != -1 }
-                if (tagIndex != null) {
-                    chip.isClickable = true
-                    chip.setOnClickListener {
-                        val currentApi = repo ?: return@setOnClickListener
-                        activity?.navigate(
-                            R.id.global_to_navigation_mainpage,
-                            MainPageFragment.newInstance(currentApi.name, tag = tagIndex),
-                            options = com.lagradost.quicknovel.MainActivity.navOptions
-                        )
-                    }
-                }
-                chip.setTextColor(requireContext().colorFromAttribute(R.attr.textColor))
-                resultTag.addView(chip)
-            }
-
-            res.synopsis?.let { synopsis ->
-                resultSynopsisText.text = synopsis.html()
-                
-                var isExpanded = false
-                val toggleExpand = {
-                    isExpanded = !isExpanded
-                    resultSynopsisText.maxLines = if (isExpanded) Integer.MAX_VALUE else 4
-                    resultSynopsisTapMore.isVisible = !isExpanded
-                    resultSynopsisCollapseArrow.rotation = if (isExpanded) 180f else 0f
-                    root.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                }
-                synopsisCard.setOnClickListener { toggleExpand() }
-                resultSynopsisCollapseArrow.setOnClickListener { toggleExpand() }
-            } ?: run {
-                resultSynopsisText.text = "..."
-                resultSynopsisTapMore.isVisible = false
-                resultSynopsisCollapseArrow.isVisible = false
-            }
-
-            if (res is StreamResponse) {
-                resultChaptersInfoHolder.isVisible = true
-                resultChapters.text = res.data.size.toString()
-                resultChaptersInfo.text = if (res.data.size == 1) getString(R.string.chapter) else getString(R.string.chapters)
-            } else {
-                resultChaptersInfoHolder.isVisible = false
-            }
-            // Notes text restoration managed by onResume and LiveData observer
-        }
-        
-        // Populate chapter count in its tab if available
-        chaptersTabBinding?.apply {
-           // If we need extra population logic here
-        }
+        // Compose automatically reacts to LiveData changes inside the ComposeView.
     }
 
     private fun newState(loadResponse: Resource<LoadResponse>?) {
@@ -529,6 +445,10 @@ class ResultFragment : Fragment() {
             resultContinueReading.setCardBackgroundColor(android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF")))
             resultContinueReading.strokeColor = android.graphics.Color.parseColor(if (isLightTheme) "#E0E0E0" else "#11FFFFFF")
             
+            resultBookmark.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF"))
+            resultBookmark.strokeColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#E0E0E0" else "#11FFFFFF"))
+            resultBookmark.strokeWidth = (1 * (context?.resources?.displayMetrics?.density ?: 1f)).toInt()
+            
             resultProviderChip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF"))
             resultProviderChip.setTextColor(if (isLightTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
 
@@ -813,30 +733,12 @@ class ResultFragment : Fragment() {
                 if (!hasBookmark) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
             binding.resultBookmark.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_START
-            novelTabBinding?.resultUpdatesToggle?.isVisible = (currentStateId != -1) // Sync only for current provider
-
-            // Update notes UI when read status changes
-            novelTabBinding?.apply {
-                val isDropped = state == ReadType.DROPPED
-                resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
-                val primaryColor = requireContext().colorFromAttribute(R.attr.colorPrimary)
-                resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else primaryColor
-                resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else primaryColor))
-            }
         }
 
         observe(viewModel.isSyncEnabledDisplay) { isEnabled ->
-            novelTabBinding?.resultUpdatesToggle?.alpha = if (isEnabled) 1.0f else 0.4f
         }
 
         observeNullable(viewModel.userNote) { note ->
-            novelTabBinding?.apply {
-                val current = resultNotesEdittext.text?.toString() ?: ""
-                val saved = note ?: ""
-                if (current != saved) {
-                    resultNotesEdittext.setText(saved)
-                }
-            }
         }
 
         observeNullable(viewModel.duplicateBookmarkState) {
@@ -844,9 +746,10 @@ class ResultFragment : Fragment() {
             viewModel.readState.postValue(viewModel.readState.value)
         }
 
-        observeNullable(viewModel.chapters) { chapters ->
+        observeNullable(viewModel.chapters) { chaptersList ->
+            val chapters = chaptersList ?: emptyList()
             chapterAdapter?.let { adapter ->
-                if (chapters == null || chapters.size > 300) {
+                if (chapters.size > 300) {
                     adapter.submitIncomparableList(chapters)
                 } else {
                     adapter.submitList(chapters)
@@ -854,11 +757,9 @@ class ResultFragment : Fragment() {
             }
 
             val streamResponse = (viewModel.loadResponse.value as? Resource.Success)?.value as? StreamResponse
-            if (streamResponse != null && !chapters.isNullOrEmpty()) {
+            if (streamResponse != null && chapters.isNotEmpty()) {
                 val total = chapters.size
                 val readCount = chapters.count { viewModel.hasReadChapter(it) }
-                
-                // Update Continue text with guaranteed loaded data
                 val name = streamResponse.name
                 val lastReadIndex = chapters.indexOfLast { ch ->
                     val idx = viewModel.chapterIndex(ch) ?: -1
@@ -867,22 +768,10 @@ class ResultFragment : Fragment() {
                     com.lagradost.quicknovel.BaseApplication.getKey<Long>(com.lagradost.quicknovel.EPUB_CURRENT_POSITION_READ_AT, key) != null
                 }
                 binding.resultContinueText.text = if (lastReadIndex != -1) "Continue Chapter ${lastReadIndex + 1}" else "Start Reading"
-
-                novelTabBinding?.apply {
-                    if (readCount > 0) {
-                        resultProgressLayout.isVisible = true
-                        val progress = (readCount * 100) / total
-                        resultProgressBar.progress = progress
-                        resultProgressText.text = getString(R.string.latest_format).format("$progress% Read ($readCount/$total)")
-                    } else {
-                        resultProgressLayout.isVisible = false
-                    }
-                }
             }
         }
 
         observe(viewModel.downloadState) { progressState ->
-            updateDownloadInfo(progressState)
         }
 
         binding.resultMainscroll.setOnScrollChangeListener { v: NestedScrollView, _, scrollY, _, oldScrollY ->
@@ -1037,84 +926,17 @@ class ResultFragment : Fragment() {
     private fun onBindingCreated(tabView: View) {
         val binding = ResultNovelTabBinding.bind(tabView)
         novelTabBinding = binding
-        updateDownloadInfo(viewModel.downloadState.value)
         
-        binding.apply {
-            resultUpdatesToggle.setOnClickListener { 
-                viewModel.toggleSyncEnabled() 
-                val isCurrentlyEnabled = viewModel.isSyncEnabledDisplay.value ?: false
-                com.lagradost.quicknovel.CommonActivity.showToast(if (!isCurrentlyEnabled) "Updates Enabled" else "Updates Disabled")
-            }
-            resultSynopsisText.setOnClickListener {
-                val res = (viewModel.loadResponse.value as? Resource.Success)?.value ?: return@setOnClickListener
-                val syno = if (res.synopsis?.length ?: 0 > MAX_SYNO_LENGH) {
-                    res.synopsis?.substring(0, MAX_SYNO_LENGH) + "..."
-                } else {
-                    res.synopsis
-                }
-                val isExpanded = resultSynopsisText.text.length > (syno?.length ?: 0)
-                resultSynopsisText.text = if (!isExpanded) res.synopsis?.html() else syno?.html()
-            }
-            resultDownloadGenerateEpub.setOnClickListener { viewModel.readEpub() }
-            resultDownloadBtt.setOnClickListener { v ->
-                val apiName = arguments?.getString("apiName") ?: ""
-                if (apiName == "OceanOfPDF") {
-                    val res = (viewModel.loadResponse.value as? Resource.Success)?.value as? com.lagradost.quicknovel.EpubResponse
-                    val link = res?.downloadLinks?.firstOrNull()
-                    if (link != null) {
-                        showOceanOfPDFDownloadDialog(link)
-                    } else {
-                        com.lagradost.quicknovel.CommonActivity.showToast("No download links found")
-                    }
-                    return@setOnClickListener
-                }
-                val actions = getActions()
-                if (actions == null) {
-                    viewModel.downloadOrPause()
-                } else if (actions.size == 1) {
-                    doAction(actions[0])
-                } else if (actions.contains(R.string.download) || actions.contains(R.string.pause)) {
-                    viewModel.downloadOrPause()
-                } else {
-                    v.popupMenu(actions.map { it to it }, null) { doAction(itemId) }
+        binding.novelTabComposeView.apply {
+            setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                val loadResponse by viewModel.loadResponse.observeAsState()
+                val res = (loadResponse as? Resource.Success<LoadResponse>)?.value ?: return@setContent
+                
+                QuickNovelTheme {
+                    NovelTabScreen(viewModel, res, requireActivity())
                 }
             }
-            resultDownloadBtt.setOnLongClickListener { v ->
-                val items = getActions() ?: return@setOnLongClickListener true
-                v.popupMenu(items.map { it to it }, null) { doAction(itemId) }
-                true
-            }
-
-            // Initial Notes Population
-            val currentNote = resultNotesEdittext.text?.toString() ?: ""
-            val savedNote = viewModel.getNote() ?: ""
-            if (currentNote != savedNote) {
-                resultNotesEdittext.setText(savedNote)
-            }
-
-            // Setup Notes Update Trigger
-            resultNotesEdittext.doOnTextChanged { text, _, _, _ ->
-                if (viewModel.hasLoaded) {
-                    viewModel.updateNote(text?.toString())
-                }
-            }
-
-            // Keyboard Scrolling Focus Listener
-            resultNotesEdittext.setOnFocusChangeListener { view, hasFocus ->
-                if (hasFocus) {
-                    val scrollHandler = android.os.Handler(android.os.Looper.getMainLooper())
-                    scrollHandler.postDelayed({
-                        val scrollPos =
-                            this@ResultFragment.binding.resultViewpager.top + resultNotesLayout.top - 100.toPx
-                        this@ResultFragment.binding.resultMainscroll.smoothScrollTo(
-                            0,
-                            Math.max(0, scrollPos)
-                        )
-                    }, 400)
-                }
-            }
-
-            // --- End of binding.apply block ---
         }
     }
     private fun showFilterBottomSheet(act: android.app.Activity) {
@@ -1276,74 +1098,7 @@ class ResultFragment : Fragment() {
     }
 
     private fun updateDownloadInfo(progressState: DownloadProgressState?) {
-        val binding = novelTabBinding ?: return
-        if (progressState == null) return
-
-        binding.apply {
-            resultDownloadProgressText.text = "${progressState.progress}/${progressState.total}"
-
-            resultDownloadProgressBarNotDownloaded.apply {
-                max = progressState.total.toInt() * 100
-                val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                    this, "progress", this.progress,
-                    (progressState.progress - progressState.downloaded).toInt() * 100
-                )
-                animation.duration = 500
-                animation.setAutoCancel(true)
-                animation.interpolator = DecelerateInterpolator()
-                animation.start()
-            }
-
-            resultDownloadProgressBar.apply {
-                max = progressState.total.toInt() * 100
-                val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                    this, "progress", this.progress,
-                    progressState.progress.toInt() * 100
-                )
-                animation.duration = 500
-                animation.setAutoCancel(true)
-                animation.interpolator = DecelerateInterpolator()
-                animation.start()
-            }
-
-            val ePubGeneration = progressState.progress > 0
-            resultDownloadGenerateEpub.apply {
-                isClickable = ePubGeneration
-                alpha = if (ePubGeneration) 1f else 0.5f
-                isVisible = true
-            }
-
-            val canDownload = progressState.progress < progressState.total
-            val canClick = progressState.total > 0
-            resultDownloadBtt.apply {
-                isClickable = canClick
-                alpha = if (canClick) 1f else 0.5f
-                isVisible = true
-
-                setText(
-                    when (progressState.state) {
-                        DownloadState.IsDone -> R.string.manage
-                        DownloadState.IsDownloading -> R.string.pause
-                        DownloadState.IsPaused -> R.string.resume
-                        DownloadState.IsFailed -> R.string.re_downloaded
-                        DownloadState.IsStopped -> R.string.downloaded
-                        DownloadState.Nothing -> if (canDownload) R.string.download else R.string.manage
-                        DownloadState.IsPending -> R.string.loading
-                        else -> if (canDownload) R.string.download else R.string.manage
-                    }
-                )
-                setIconResource(
-                    when (progressState.state) {
-                        DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
-                        DownloadState.IsPaused -> R.drawable.netflix_play
-                        DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
-                        DownloadState.IsDone -> R.drawable.ic_outline_settings_24
-                        DownloadState.Nothing -> if (canDownload) R.drawable.netflix_download else R.drawable.ic_outline_settings_24
-                        else -> R.drawable.netflix_download
-                    }
-                )
-            }
-        }
+        // Obsolete function, download info is observed directly in Compose
     }
 
     inner class SortAdapter(val sortMethods: Array<SortingMethod>, val onClick: (Int) -> Unit) :

@@ -110,21 +110,31 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Continue Reading Bar -->
-            <View
+            <!-- Horizontal Action Dock Skeleton -->
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
                 android:layout_marginHorizontal="24dp"
-                android:layout_marginBottom="12dp"
-                android:background="@drawable/skeleton_bg_rounded" />
+                android:layout_marginBottom="16dp"
+                android:weightSum="2">
 
-            <!-- Bookmark Button -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginHorizontal="24dp"
-                android:layout_marginBottom="24dp"
-                android:background="@drawable/skeleton_bg_rounded" />
+                <!-- Continue Reading Pill Skeleton -->
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/skeleton_bg_pill" />
+
+                <!-- Bookmark Pill Skeleton -->
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/skeleton_bg_pill" />
+            </LinearLayout>
 
             <!-- Tab Layout simulation -->
             <LinearLayout
