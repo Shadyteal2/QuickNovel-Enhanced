@@ -825,6 +825,16 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     var binding: ActivityMainBinding? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (CommonActivity.pendingThemeChangeScreenshot != null) {
+            if (Build.VERSION.SDK_INT >= 34) {
+                overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+                overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
+            } else {
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            }
+        }
+
         mainActivity = this
 
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -884,7 +894,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                             CommonActivity.pendingThemeChangeScreenshot = null
                         }.start()
                     }
-                }, 10)
+                }, 200)
             }
         }
 

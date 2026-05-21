@@ -8,6 +8,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
+import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.lagradost.quicknovel.APIRepository
@@ -133,13 +134,6 @@ class DownloadViewModel : ViewModel() {
         val bookmarkChanged = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 0)
     }
 
-    var activeQuery: String = ""
-    val _pages: androidx.lifecycle.MutableLiveData<List<Page>> = androidx.lifecycle.MutableLiveData(null)
-    val pages: androidx.lifecycle.LiveData<List<Page>> = _pages
-    private val cardsDataMutex = kotlinx.coroutines.sync.Mutex()
-    private val cardsData: java.util.HashMap<Int, com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded> = hashMapOf()
-    private val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: com.lagradost.quicknovel.BaseApplication.context!!).novelDao()
-
     private fun getSavedCategories(): List<CategoryItem> {
         val json = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
         return try {
@@ -163,6 +157,24 @@ class DownloadViewModel : ViewModel() {
 
     private val _readList = MutableStateFlow<List<CategoryItem>>(getSavedCategories())
     val readList: List<CategoryItem> get() = _readList.value
+
+    var activeQuery: String = ""
+    val _pages: androidx.lifecycle.MutableLiveData<List<Page>?> = androidx.lifecycle.MutableLiveData(null)
+    val pages: androidx.lifecycle.LiveData<List<Page>?> = _pages
+    val categories: LiveData<List<CategoryItem>> = _readList.asLiveData()
+    val searchQuery: MutableLiveData<String> = MutableLiveData("")
+    val cards: LiveData<List<Any>> = pages.map { pageList ->
+        pageList?.flatMap { it.items }?.distinctBy { card ->
+            when (card) {
+                is ResultCached -> card.id
+                is DownloadFragment.DownloadDataLoaded -> card.id
+                else -> card.hashCode()
+            }
+        } ?: emptyList()
+    }
+    private val cardsDataMutex = kotlinx.coroutines.sync.Mutex()
+    private val cardsData: java.util.HashMap<Int, com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded> = hashMapOf()
+    private val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: com.lagradost.quicknovel.BaseApplication.context!!).novelDao()
 
     fun updateCategories(newList: List<CategoryItem>) {
         _readList.value = newList
@@ -267,6 +279,7 @@ class DownloadViewModel : ViewModel() {
     }
 
     fun search(query: String) {
+        searchQuery.postValue(query)
         activeQuery = query.lowercase()
         resortAllData()
     }
@@ -304,19 +317,6 @@ class DownloadViewModel : ViewModel() {
         val allValues = cardsDataMutex.withLock {
             cardsData.values
         }
-
-        val values = currentDownloadsMutex.withLock {
-            allValues.filter { card ->
-                val notImported = !card.isImported && card.apiName != IMPORT_SOURCE_PDF
-                val canDownload =
-                    card.downloadedTotal <= 0 || (card.downloadedCount * 100 / card.downloadedTotal) > 90
-                val notDownloading = !currentDownloads.contains(
-                    card.id
-                )
-                notImported && canDownload && notDownloading
-            }
-        }
-
         // Disable automatic downloading of updates to prevent unintentional background activity.
         // Users should manually start downloads for specific novels.
         /*for (card in values) {
@@ -408,8 +408,45 @@ class DownloadViewModel : ViewModel() {
         }
     }
 
+    private fun getRelevanceScore(title: String): Int {
+        if (activeQuery.isBlank()) return 0
+        val titleLower = title.lowercase()
+        val queryLower = activeQuery
+        
+        // 1. Exact case-insensitive match
+        if (titleLower == queryLower) return 1000
+        
+        // 2. Starts with query
+        if (titleLower.startsWith(queryLower)) return 800
+        
+        // 3. Starts with query after stripping "the ", "a ", "an "
+        val cleanTitle = titleLower.replaceFirst(Regex("^(the|a|an)\\s+"), "")
+        if (cleanTitle.startsWith(queryLower)) return 700
+        
+        // 4. Contains query as a whole word
+        val wordRegex = Regex("\\b${Regex.escape(queryLower)}\\b")
+        if (wordRegex.containsMatchIn(titleLower)) return 600
+        
+        // 5. Substring match
+        if (titleLower.contains(queryLower)) return 400
+        
+        // 6. All query words exist in the title
+        val queryWords = queryLower.split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        if (queryWords.isNotEmpty()) {
+            val allWordsMatch = queryWords.all { word -> titleLower.contains(word) }
+            if (allWordsMatch) return 300
+        }
+        
+        // 7. Fallback to fuzzy search only if partial ratio is high (>= 75)
+        val fuzzy = FuzzySearch.partialRatio(titleLower, queryLower)
+        if (fuzzy >= 75) return 100 + fuzzy
+        
+        return 0
+    }
+
     private fun matchesQuery(x: String): Boolean {
-        return activeQuery.isBlank() || FuzzySearch.partialRatio(x.lowercase(), activeQuery) > 50
+        if (activeQuery.isBlank()) return true
+        return getRelevanceScore(x) > 0
     }
 
     private fun sortArray(
@@ -418,51 +455,46 @@ class DownloadViewModel : ViewModel() {
         val newSortingMethod = getKey(DOWNLOAD_SETTINGS, DOWNLOAD_SORTING_METHOD) ?: DEFAULT_SORT
         setKey(DOWNLOAD_SETTINGS, DOWNLOAD_SORTING_METHOD, newSortingMethod)
 
-        return when (newSortingMethod) {
+        val filtered = currentArray.filter { matchesQuery(it.name) }.toMutableList()
+
+        when (newSortingMethod) {
             ALPHA_SORT -> {
-                currentArray.sortBy { t -> t.name }
-                currentArray
+                filtered.sortBy { t -> t.name }
             }
 
             REVERSE_ALPHA_SORT -> {
-                currentArray.sortByDescending { t -> t.name }
-                currentArray
+                filtered.sortByDescending { t -> t.name }
             }
 
             DOWNLOADSIZE_SORT -> {
-                currentArray.sortByDescending { t -> t.downloadedCount }
-                currentArray
+                filtered.sortByDescending { t -> t.downloadedCount }
             }
 
             REVERSE_DOWNLOADSIZE_SORT -> {
-                currentArray.sortBy { t -> t.downloadedCount }
-                currentArray
+                filtered.sortBy { t -> t.downloadedCount }
             }
 
             DOWNLOADPRECENTAGE_SORT -> {
-                currentArray.sortByDescending { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
-                currentArray
+                filtered.sortByDescending { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
             }
 
             REVERSE_DOWNLOADPRECENTAGE_SORT -> {
-                currentArray.sortBy { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
-                currentArray
+                filtered.sortBy { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
             }
 
             REVERSE_LAST_ACCES_SORT -> {
-                currentArray.sortBy { t ->
+                filtered.sortBy { t ->
                     (getKey<Long>(
                         DOWNLOAD_EPUB_LAST_ACCESS,
                         t.id.toString(),
                         0
                     )!!)
                 }
-                currentArray
             }
 
             LAST_UPDATED_SORT -> {
-                if (currentArray.any { it.lastDownloaded == null }) {
-                    currentArray.sortByDescending { t ->
+                if (filtered.any { it.lastDownloaded == null }) {
+                    filtered.sortByDescending { t ->
                         (getKey<Long>(
                             DOWNLOAD_EPUB_LAST_ACCESS,
                             t.id.toString(),
@@ -470,13 +502,12 @@ class DownloadViewModel : ViewModel() {
                         )!!)
                     }
                 }
-                currentArray.sortByDescending { it.lastDownloaded ?: 0L }
-                currentArray
+                filtered.sortByDescending { it.lastDownloaded ?: 0L }
             }
 
             REVERSE_LAST_UPDATED_SORT -> {
-                if (currentArray.any { it.lastDownloaded == null }) {
-                    currentArray.sortByDescending { t ->
+                if (filtered.any { it.lastDownloaded == null }) {
+                    filtered.sortByDescending { t ->
                         (getKey<Long>(
                             DOWNLOAD_EPUB_LAST_ACCESS,
                             t.id.toString(),
@@ -484,21 +515,25 @@ class DownloadViewModel : ViewModel() {
                         )!!)
                     }
                 }
-                currentArray.sortBy { it.lastDownloaded ?: 0L }
-                currentArray
+                filtered.sortBy { it.lastDownloaded ?: 0L }
             }
             //DEFAULT_SORT, LAST_ACCES_SORT
             else -> {
-                currentArray.sortByDescending { t ->
+                filtered.sortByDescending { t ->
                     (getKey<Long>(
                         DOWNLOAD_EPUB_LAST_ACCESS,
                         t.id.toString(),
                         0
                     )!!)
                 }
-                currentArray
             }
-        }.filter { matchesQuery(it.name) }
+        }
+
+        return if (activeQuery.isNotBlank()) {
+            filtered.sortedByDescending { getRelevanceScore(it.name) }
+        } else {
+            filtered
+        }
     }
 
     private fun sortNormalArray(
@@ -508,39 +543,43 @@ class DownloadViewModel : ViewModel() {
             getKey(DOWNLOAD_SETTINGS, DOWNLOAD_NORMAL_SORTING_METHOD) ?: DEFAULT_SORT
         setKey(DOWNLOAD_SETTINGS, DOWNLOAD_NORMAL_SORTING_METHOD, newSortingMethod)
 
-        return when (newSortingMethod) {
+        val filtered = currentArray.filter { matchesQuery(it.name) }.toMutableList()
+
+        when (newSortingMethod) {
             ALPHA_SORT -> {
-                currentArray.sortBy { t -> t.name }
-                currentArray
+                filtered.sortBy { t -> t.name }
             }
 
             REVERSE_ALPHA_SORT -> {
-                currentArray.sortByDescending { t -> t.name }
-                currentArray
+                filtered.sortByDescending { t -> t.name }
             }
 
             REVERSE_LAST_ACCES_SORT -> {
-                currentArray.sortBy { t ->
+                filtered.sortBy { t ->
                     (getKey<Long>(
                         DOWNLOAD_EPUB_LAST_ACCESS,
                         t.id.toString(),
                         0
                     )!!)
                 }
-                currentArray
             }
             // DEFAULT_SORT, LAST_ACCES_SORT
             else -> {
-                currentArray.sortByDescending { t ->
+                filtered.sortByDescending { t ->
                     (getKey<Long>(
                         DOWNLOAD_EPUB_LAST_ACCESS,
                         t.id.toString(),
                         0
                     )!!)
                 }
-                currentArray
             }
-        }.filter { matchesQuery(it.name) }
+        }
+
+        return if (activeQuery.isNotBlank()) {
+            filtered.sortedByDescending { getRelevanceScore(it.name) }
+        } else {
+            filtered
+        }
     }
 
     // QN-Enhanced: Optimized background sorting to prevent UI lag with 10k items

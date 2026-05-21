@@ -49,7 +49,16 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun QuickNovelTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = run {
+        val context = LocalContext.current
+        val settingsManager = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
+        val themeKey = remember(settingsManager) { settingsManager.getString(context.getString(R.string.theme_key), "Amoled") }
+        when (themeKey) {
+            "Light", "AmoledLight" -> false
+            "Black", "Amoled" -> true
+            else -> isSystemInDarkTheme()
+        }
+    },
     // Dynamic color is available on Android 12+ (will be true if user theme is Monet)
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
@@ -155,7 +164,7 @@ fun QuickNovelTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }

@@ -21,6 +21,7 @@ class ForYouFragment : Fragment() {
     ): View {
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            background = null
             setContent {
                 QuickNovelTheme {
                     ForYouScreen(

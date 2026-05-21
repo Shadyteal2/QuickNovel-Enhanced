@@ -4,11 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -27,11 +29,9 @@ fun Modifier.glassCard(
     strokeWidth: Dp = 1.dp
 ): Modifier = composed {
     val context = LocalContext.current
+    val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
     
     val resolvedBg = backgroundColor ?: run {
-        val textColorInt = context.colorFromAttribute(R.attr.textColor)
-        val isLightTheme = (android.graphics.Color.red(textColorInt) + android.graphics.Color.green(textColorInt) + android.graphics.Color.blue(textColorInt)) < 400
-
         if (isLightTheme) {
             // Gorgeous high-contrast translucent white card for Light/Flashbang mode
             Color(0xEEFFFFFF)
@@ -56,9 +56,6 @@ fun Modifier.glassCard(
     }
 
     val resolvedStroke = strokeColor ?: run {
-        val textColorInt = context.colorFromAttribute(R.attr.textColor)
-        val isLightTheme = (android.graphics.Color.red(textColorInt) + android.graphics.Color.green(textColorInt) + android.graphics.Color.blue(textColorInt)) < 400
-
         if (isLightTheme) {
             // Soft slate stroke for light theme
             Color(0x1F000000)

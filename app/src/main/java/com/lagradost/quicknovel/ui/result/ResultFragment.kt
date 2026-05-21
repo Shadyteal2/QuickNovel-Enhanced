@@ -438,6 +438,7 @@ class ResultFragment : Fragment() {
             
             val tintList = android.content.res.ColorStateList.valueOf(iconTint)
             resultBack.imageTintList = tintList
+            resultBell.imageTintList = tintList
             resultOpeninbrower.imageTintList = tintList
             resultShare.imageTintList = tintList
 
@@ -456,11 +457,13 @@ class ResultFragment : Fragment() {
             MagicAnimator.applyIconPress(resultBack)
             MagicAnimator.applyIconPress(resultShare)
             MagicAnimator.applyIconPress(resultOpeninbrower)
+            MagicAnimator.applyIconPress(resultBell)
             MagicAnimator.applyCardPress(resultContinueReading)
             // ────────────────────────────────────────────────────────────────
 
             resultReloadConnectionerror.setOnClickListener { viewModel.initState(apiName, url) }
             resultOpeninbrower.setOnClickListener { viewModel.openInBrowser() }
+            resultBell.setOnClickListener { viewModel.toggleSyncEnabled() }
             resultReloadConnectionOpenInBrowser.setOnClickListener { viewModel.openInBrowser() }
 
 
@@ -736,6 +739,9 @@ class ResultFragment : Fragment() {
         }
 
         observe(viewModel.isSyncEnabledDisplay) { isEnabled ->
+            binding.resultBell.setImageResource(
+                if (isEnabled) R.drawable.ic_baseline_notifications_active_24 else R.drawable.ic_baseline_notifications_none_24
+            )
         }
 
         observeNullable(viewModel.userNote) { note ->

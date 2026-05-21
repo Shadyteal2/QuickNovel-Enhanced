@@ -32,13 +32,19 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
+import androidx.preference.PreferenceManager
+import androidx.compose.ui.graphics.luminance
+import com.lagradost.quicknovel.R
 import coil3.compose.AsyncImage
+import coil3.SingletonImageLoader
 import com.lagradost.quicknovel.ui.foryou.recommendation.Recommendation
 import com.lagradost.quicknovel.ui.foryou.recommendation.RecommendationGroup
 import com.lagradost.quicknovel.ui.foryou.recommendation.TagAffinity
 import com.lagradost.quicknovel.ui.foryou.recommendation.TagCategory
 import com.lagradost.quicknovel.ui.foryou.recommendation.UserTasteProfile
 import com.lagradost.quicknovel.ui.theme.glassCard
+import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,16 +53,21 @@ fun ForYouScreen(
     onBookClick: (url: String, apiName: String) -> Unit,
     onRefresh: () -> Unit
 ) {
+    val context = LocalContext.current
     val profile by viewModel.profile.observeAsState(UserTasteProfile.EMPTY)
     val recommendations by viewModel.recommendations.observeAsState(emptyList())
     val isLoading by viewModel.isLoading.observeAsState(false)
     val stats by viewModel.stats.observeAsState(Pair(0, 0))
 
+    val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
+    val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
+    val hasBackground = !imageUri.isNullOrBlank()
+    val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
+
     Surface(
         modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding(),
-        color = Color.Transparent
+            .fillMaxSize(),
+        color = containerColor
     ) {
         if (!profile.isWizardComplete) {
             WizardScreen(
@@ -96,6 +107,7 @@ fun WizardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.Center
     ) {
@@ -191,6 +203,7 @@ fun RecommendationsContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -254,10 +267,8 @@ fun RecommendationGroupSection(
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.changes.any { it.changedToDown() }) {
-                                view.parent?.requestDisallowInterceptTouchEvent(true)
-                            }
+                            awaitPointerEvent(PointerEventPass.Initial)
+                            view.parent?.requestDisallowInterceptTouchEvent(true)
                         }
                     }
                 },
@@ -289,8 +300,9 @@ fun NovelCard(
                 .glassCard(shape = RoundedCornerShape(8.dp))
         ) {
             AsyncImage(
-                model = novel.posterUrl,
+                model = rememberImageRequest(data = novel),
                 contentDescription = novel.name,
+                imageLoader = SingletonImageLoader.get(LocalContext.current),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
             )

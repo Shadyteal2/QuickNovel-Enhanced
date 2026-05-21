@@ -49,6 +49,15 @@ object CommonActivity {
         } catch (e: Exception) {
             logError(e)
         }
+        // Override transition BEFORE recreate() so the system transition animation
+        // is suppressed from the moment the activity recreates — eliminates the blink.
+        if (Build.VERSION.SDK_INT >= 34) {
+            act.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+            act.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            act.overridePendingTransition(0, 0)
+        }
         act.recreate()
     }
     private var _activity: WeakReference<Activity>? = null
@@ -204,6 +213,8 @@ object CommonActivity {
 
 
         act.window?.navigationBarColor =
+            android.graphics.Color.TRANSPARENT
+        act.window?.statusBarColor =
             android.graphics.Color.TRANSPARENT
     }
 }
