@@ -463,17 +463,7 @@ fun DownloadScreen(
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
                             modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) {
-                                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                                            if (event.changes.any { it.changedToDown() }) {
-                                                view.parent?.requestDisallowInterceptTouchEvent(true)
-                                            }
-                                        }
-                                    }
-                                },
+                                .fillMaxSize(),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -551,7 +541,7 @@ fun DownloadScreen(
                                         val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
                                         if (pagerState.currentPage != targetPage) {
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                            scope.launch { pagerState.scrollToPage(targetPage) }
+                                            scope.launch { pagerState.animateScrollToPage(targetPage) }
                                         }
                                     },
                                     onHorizontalDrag = { change, _ ->
@@ -560,7 +550,7 @@ fun DownloadScreen(
                                         val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
                                         if (pagerState.currentPage != targetPage) {
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                            scope.launch { pagerState.scrollToPage(targetPage) }
+                                            scope.launch { pagerState.animateScrollToPage(targetPage) }
                                         }
                                     }
                                 )
@@ -615,10 +605,18 @@ fun DownloadScreen(
                         }
 
                         // Traveling capsule — driven purely by pagerState offset fraction
-                        val pagerPos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                        val targetPagerPos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                        val animatedPagerPos by animateFloatAsState(
+                            targetValue = targetPagerPos,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "capsulePos"
+                        )
                         val segmentWidth = 200.dp / numTabs
                         val capsuleWidth = 24.dp
-                        val capsuleOffset = (segmentWidth * (pagerPos + 0.5f)) - (capsuleWidth / 2)
+                        val capsuleOffset = (segmentWidth * (animatedPagerPos + 0.5f)) - (capsuleWidth / 2)
 
                         Box(
                             modifier = Modifier

@@ -33,7 +33,8 @@ class DetailScreenStylePreference(
             .getString(prefKey(), "0") ?: "0"
         summary = when (current) {
             "1" -> context.getString(R.string.detail_screen_style_modern)
-            else -> context.getString(R.string.detail_screen_style_classic)
+            "2" -> context.getString(R.string.detail_screen_style_classic)
+            else -> context.getString(R.string.detail_screen_style_default)
         }
     }
 
@@ -48,10 +49,11 @@ class DetailScreenStylePreference(
         val host = (context as? Activity) ?: CommonActivity.activity ?: return
         val settings = PreferenceManager.getDefaultSharedPreferences(context)
         val names = listOf(
+            context.getString(R.string.detail_screen_style_default),
             context.getString(R.string.detail_screen_style_classic),
             context.getString(R.string.detail_screen_style_modern),
         )
-        val values = listOf("0", "1")
+        val values = listOf("0", "2", "1")
         val current = settings.getString(prefKey(), "0") ?: "0"
         val index = values.indexOf(current).coerceAtLeast(0)
 

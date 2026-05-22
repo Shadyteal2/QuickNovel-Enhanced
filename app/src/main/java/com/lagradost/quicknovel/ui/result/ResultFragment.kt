@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.util.SettingsHelper.isModernDetailScreen
+import com.lagradost.quicknovel.util.SettingsHelper.isDefaultDetailScreen
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.mainpage.MainAdapter
 import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
@@ -76,7 +77,9 @@ class ResultFragment : Fragment() {
 
     private var chapterAdapter: ChapterAdapter? = null
     private var modernChapterList: RecyclerView? = null
-    private var usesModernStyle = false
+    private var defaultChapterList: RecyclerView? = null
+    private var usesModernStyle  = false
+    private var usesDefaultStyle = false
 
     companion object {
         fun newInstance(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null): Bundle =
@@ -99,13 +102,16 @@ class ResultFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-        usesModernStyle = requireContext().isModernDetailScreen()
-        if (!usesModernStyle) {
+        usesModernStyle  = requireContext().isModernDetailScreen()
+        usesDefaultStyle = requireContext().isDefaultDetailScreen()
+        if (!usesModernStyle && !usesDefaultStyle) {
+            // Classic ("2") — XML layout
             sharedElementEnterTransition = android.transition.TransitionInflater.from(requireContext())
                 .inflateTransition(android.R.transition.move)
             binding = FragmentResultBinding.inflate(inflater, container, false)
             return binding.root
         }
+        // Modern ("1") or Default ("0") — Compose
         sharedElementEnterTransition = null
         sharedElementReturnTransition = null
         return ComposeView(requireContext()).apply {
@@ -124,7 +130,7 @@ class ResultFragment : Fragment() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (!usesModernStyle) {
+        if (!usesModernStyle && !usesDefaultStyle) {
             binding.resultHolder.post {
                 updateScrollHeight()
             }
@@ -133,9 +139,12 @@ class ResultFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        val nowModern = requireContext().isModernDetailScreen()
-        if (nowModern != usesModernStyle && isAdded) {
-            usesModernStyle = nowModern
+        val nowModern  = requireContext().isModernDetailScreen()
+        val nowDefault = requireContext().isDefaultDetailScreen()
+        // Reload the fragment if the user changed the detail screen style in Settings
+        if ((nowModern != usesModernStyle || nowDefault != usesDefaultStyle) && isAdded) {
+            usesModernStyle  = nowModern
+            usesDefaultStyle = nowDefault
             parentFragmentManager.beginTransaction()
                 .detach(this)
                 .attach(this)
@@ -400,6 +409,10 @@ class ResultFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         if (usesModernStyle) {
             setupModernResultScreen(view as ComposeView, savedInstanceState)
+            return
+        }
+        if (usesDefaultStyle) {
+            setupDefaultResultScreen(view as ComposeView, savedInstanceState)
             return
         }
 
@@ -760,7 +773,16 @@ class ResultFragment : Fragment() {
                 title = if (systemCat != null) {
                     "In Library (${getString(systemCat.stringRes ?: R.string.bookmark)})"
                 } else {
-                    "In Library"
+                    val json = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+                    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                    val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList() }
+                    val customCat = customCats.find { it.id == duplicateState }
+                    if (customCat != null) {
+                        "In Library (${customCat.name})"
+                    } else {
+                        "In Library"
+                    }
                 }
                 hasBookmark = true // Fill icon
             }
@@ -1035,6 +1057,106 @@ class ResultFragment : Fragment() {
                     onChapterRecyclerReady = { modernChapterList = it },
                 )
             }
+        }
+    }
+
+    private fun setupDefaultResultScreen(composeView: ComposeView, savedInstanceState: Bundle?) {
+        val url = savedInstanceState?.getString("url") ?: arguments?.getString("url") ?: throw NotImplementedError()
+        val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
+        val startAction = savedInstanceState?.getInt("startAction") ?: arguments?.getInt("startAction") ?: 0
+        val startChapterUrl = savedInstanceState?.getString("startChapterUrl") ?: arguments?.getString("startChapterUrl")
+
+        if (viewModel.loadResponse.value == null) {
+            viewModel.initState(apiName, url)
+        }
+
+        if (chapterAdapter == null) {
+            chapterAdapter = ChapterAdapter(viewModel)
+        }
+
+        var hasTriggeredStart = false
+        observe(viewModel.loadResponse) { res ->
+            if (res is Resource.Success && !hasTriggeredStart && startAction == 2 && startChapterUrl != null) {
+                hasTriggeredStart = true
+                val stream = res.value as? StreamResponse
+                val chapter = stream?.data?.find { it.url == startChapterUrl }
+                if (chapter != null) {
+                    viewModel.streamRead(chapter)
+                }
+            }
+        }
+
+        observeNullable(viewModel.chapters) { chaptersList ->
+            val chapters = chaptersList ?: emptyList()
+            chapterAdapter?.let { adapter ->
+                if (chapters.size > 300) {
+                    adapter.submitIncomparableList(chapters)
+                } else {
+                    adapter.submitList(chapters)
+                }
+            }
+        }
+
+        observeNullable(viewModel.duplicateBookmarkState) {
+            viewModel.readState.postValue(viewModel.readState.value)
+        }
+
+        val backCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                viewModel.setSelectionMode(false)
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
+        observe(viewModel.isInSelectionMode) { enabled ->
+            backCallback.isEnabled = enabled
+        }
+
+        val act = requireActivity()
+        composeView.setContent {
+            QuickNovelTheme {
+                ResultDetailDefaultScreen(
+                    viewModel    = viewModel,
+                    apiName      = apiName,
+                    url          = url,
+                    activity     = act,
+                    chapterAdapter = chapterAdapter!!,
+                    onBack               = { act.onBackPressedDispatcher.onBackPressed() },
+                    onReload             = { viewModel.initState(apiName, url) },
+                    onOpenInBrowser      = { viewModel.openInBrowser() },
+                    onShare              = { viewModel.share() },
+                    onToggleSync         = { viewModel.toggleSyncEnabled() },
+                    onContinueReading    = { handleContinueReading() },
+                    onShowFilterSort     = { showFilterBottomSheet(act, null) },
+                    onScrollToLatestChapter = { scrollDefaultChaptersToLatest() },
+                    onScrollToLastRead      = { scrollDefaultChaptersToLastRead() },
+                    onChapterRecyclerReady  = { defaultChapterList = it },
+                )
+            }
+        }
+    }
+
+    private fun scrollDefaultChaptersToLatest() {
+        val list     = defaultChapterList ?: return
+        val chapters = viewModel.chapters.value ?: return
+        if (chapters.isEmpty()) return
+        val sortType = ResultViewModel.sortChapterBy
+        val index = if (sortType == com.lagradost.quicknovel.ui.download.REVERSE_CHAPTER_SORT ||
+                        sortType == REVERSE_LAST_ACCES_SORT) 0 else chapters.lastIndex
+        list.scrollToPosition(index)
+    }
+
+    private fun scrollDefaultChaptersToLastRead() {
+        val list     = defaultChapterList ?: return
+        val chapters = viewModel.chapters.value ?: return
+        val name     = (viewModel.loadResponse.value as? Resource.Success)?.value?.name ?: return
+        val index    = chapters.indexOfLast { ch ->
+            val key = "$name/${chapters.indexOf(ch)}"
+            BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, key) != null
+        }
+        if (index != -1) {
+            list.scrollToPosition(index)
+        } else {
+            CommonActivity.showToast(activity, "No last read position found")
         }
     }
 

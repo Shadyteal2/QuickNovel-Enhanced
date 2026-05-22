@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,8 +21,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -55,12 +58,13 @@ import com.lagradost.quicknovel.ui.download.CategoryItem
 import com.lagradost.quicknovel.ui.download.DownloadViewModel
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
+import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
 
 // ─── Hero dimensions ──────────────────────────────────────────────────────────
 private val HERO_HEIGHT  = 380.dp
 private val CARD_OVERLAP = 0.dp
-private val HERO_CORNER  = 32.dp
+private val HERO_CORNER  = 48.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +92,7 @@ fun ResultDetailModernScreen(
     val readState        by viewModel.readState.observeAsState()
     val duplicateBookmark by viewModel.duplicateBookmarkState.observeAsState()
     val chapters         by viewModel.chapters.observeAsState(emptyList())
+    val currentId        by viewModel.id.observeAsState(-1)
 
     var selectedTab          by remember { mutableIntStateOf(0) }
 
@@ -102,8 +107,8 @@ fun ResultDetailModernScreen(
     val context = LocalContext.current
 
     val defaultBookmarkLabel = stringResource(R.string.bookmark)
-    val bookmarkTitle = remember(readState, duplicateBookmark) {
-        resolveBookmarkTitle(context, viewModel)
+    val bookmarkTitle = remember(readState, duplicateBookmark, currentId) {
+        resolveBookmarkTitle(context, viewModel, currentId, readState)
     }
     val hasBookmark = bookmarkTitle != defaultBookmarkLabel
 
@@ -114,9 +119,7 @@ fun ResultDetailModernScreen(
 
             // ── Loading ───────────────────────────────────────────────────────
             null, is Resource.Loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                ShimmerSkeletonScreen()
             }
 
             // ── Error ─────────────────────────────────────────────────────────
@@ -145,19 +148,71 @@ fun ResultDetailModernScreen(
                 val ratingText = res.rating?.let { context.getRating(it) }
                 val chapterCount = (res as? StreamResponse)?.data?.size
 
-                // ── Fixed-layout: hero on top, content fills remaining ─────────
-                // This avoids any nested-scroll issues — chapters RecyclerView gets
-                // its own full height and scrolls independently.
-                Column(modifier = Modifier.fillMaxSize()) {
+                var showPosterViewer by remember { mutableStateOf(false) }
 
-                    // ── Hero (fixed height) ───────────────────────────────────
+                // Full-screen dialog viewer for the cover poster
+                if (showPosterViewer) {
+                    androidx.compose.ui.window.Dialog(
+                        onDismissRequest = { showPosterViewer = false },
+                        properties = androidx.compose.ui.window.DialogProperties(
+                            usePlatformDefaultWidth = false
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable { showPosterViewer = false },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Blurred Background Cover Image
+                            AsyncImage(
+                                model = rememberHighQualityRequest(res.image, context),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .blur(24.dp)
+                            )
+                            // Semi-transparent overlay to ensure good contrast and focus
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.55f))
+                            )
+                            // Sharp cover image in foreground
+                            AsyncImage(
+                                model = rememberHighQualityRequest(res.image, context),
+                                contentDescription = "Full Cover Poster",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp)
+                            )
+                            IconButton(
+                                onClick = { showPosterViewer = false },
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(16.dp)
+                                    .align(Alignment.TopEnd)
+                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Close Viewer",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // The static poster image background layer
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(HERO_HEIGHT)
                     ) {
-                        // Full-bleed cover – FillWidth preserves aspect ratio,
-                        // no artificial upscale blurring
                         AsyncImage(
                             model = rememberHighQualityRequest(res.image, context),
                             contentDescription = null,
@@ -170,9 +225,18 @@ fun ResultDetailModernScreen(
                                         bottomEnd   = HERO_CORNER
                                     )
                                 )
+                                .clickable {
+                                    showPosterViewer = true
+                                }
                         )
 
-                        // Gradient scrim for text readability
+                        // Gradient scrim / Full bg dim for text readability
+                        val scrimBrush = Brush.verticalGradient(
+                            0.0f  to Color.Transparent,
+                            0.40f to Color.Transparent,
+                            1.0f  to Color(0xD5000000)
+                        )
+
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -182,74 +246,78 @@ fun ResultDetailModernScreen(
                                         bottomEnd   = HERO_CORNER
                                     )
                                 )
-                                .background(
-                                    Brush.verticalGradient(
-                                        0.0f  to Color.Transparent,
-                                        0.40f to Color.Transparent,
-                                        1.0f  to Color(0xD5000000)
-                                    )
-                                )
+                                .background(scrimBrush)
                         )
+                    }
 
-                        // ── Back pill (top-left) ──────────────────────────────
+                    // Foreground layout containing the overlays and detail content card
+                    Column(modifier = Modifier.fillMaxSize()) {
+
+                        // ── Hero overlay region (fixed height, matches background poster size when not slid down) ──────
                         Box(
                             modifier = Modifier
-                                .statusBarsPadding()
-                                .padding(start = 16.dp, top = 12.dp)
-                                .align(Alignment.TopStart)
-                                .size(42.dp)
-                                .shadow(8.dp, CircleShape)
-                                .background(Color(0xBB000000), CircleShape)
-                                .clickable { onBack() },
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .height(HERO_HEIGHT)
                         ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // ── Action pills (top-right): Share, Browser, Bell ────
-                        Row(
-                            modifier = Modifier
-                                .statusBarsPadding()
-                                .padding(end = 16.dp, top = 12.dp)
-                                .align(Alignment.TopEnd),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            HeroPill(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onShare()
-                            }) {
-                                Icon(Icons.Default.Share, null, tint = Color.White,
-                                    modifier = Modifier.size(18.dp))
-                            }
-                            HeroPill(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onOpenInBrowser()
-                            }) {
-                                Icon(Icons.Default.Public, null, tint = Color.White,
-                                    modifier = Modifier.size(18.dp))
-                            }
-                            HeroPill(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onToggleSync()
-                            }) {
+                            // ── Back pill (top-left) ──────────────────────────────
+                            Box(
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(start = 16.dp, top = 12.dp)
+                                    .align(Alignment.TopStart)
+                                    .size(42.dp)
+                                    .shadow(8.dp, CircleShape)
+                                    .background(Color(0xBB000000), CircleShape)
+                                    .clickable { onBack() },
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Icon(
-                                    if (isSyncEnabled) Icons.Default.Notifications
-                                    else Icons.Default.NotificationsNone,
+                                    Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = null,
-                                    tint = if (isSyncEnabled)
-                                        MaterialTheme.colorScheme.primary else Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
-                        }
 
-                        // ── Title + author overlay (bottom of hero) ───────────
-                        // Tap title → copy, tap author → copy
+                            // ── Action pills (top-right): Share, Browser, Bell ──────────────────
+                            Row(
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(end = 16.dp, top = 12.dp)
+                                    .align(Alignment.TopEnd),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                HeroPill(onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onShare()
+                                }) {
+                                    Icon(Icons.Default.Share, null, tint = Color.White,
+                                        modifier = Modifier.size(18.dp))
+                                }
+                                HeroPill(onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onOpenInBrowser()
+                                }) {
+                                    Icon(Icons.Default.Public, null, tint = Color.White,
+                                        modifier = Modifier.size(18.dp))
+                                }
+                                HeroPill(onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onToggleSync()
+                                }) {
+                                    Icon(
+                                        if (isSyncEnabled) Icons.Default.Notifications
+                                        else Icons.Default.NotificationsNone,
+                                        contentDescription = null,
+                                        tint = if (isSyncEnabled)
+                                            MaterialTheme.colorScheme.primary else Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            // ── Title + author overlay (bottom of hero) ───────────
+                            // Tap title → copy, tap author → copy
                         Column(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
@@ -358,6 +426,7 @@ fun ResultDetailModernScreen(
                         Box(modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
+                            .imePadding()
                         ) {
                             when (selectedTab) {
                                 0 -> {
@@ -494,10 +563,11 @@ fun ResultDetailModernScreen(
                         }
                     }
                 }
-            } // end Resource.Success
-        }
-    } // end root Box
-}
+            } // end Box
+        } // end Resource.Success
+    } // end when state
+} // end root Box
+} // end fun ResultDetailModernScreen
 
 // ─── High-quality image request — no size constraint so Coil loads
 // at the server's full resolution without artificial downscale ─────────────────
@@ -506,7 +576,8 @@ private fun rememberHighQualityRequest(data: Any?, context: Context): ImageReque
     val baseRequest = rememberImageRequest(data)
     return remember(data) {
         baseRequest.newBuilder(context)
-            .allowHardware(false)   // allows software rendering for crisper upscale
+            .allowHardware(true)   // Using hardware bitmap allows GPU-optimized high quality filtering and smoother display
+            .size(coil3.size.Size.ORIGINAL) // Load the original full quality and high resolution of the image
             .crossfade(300)
             .build()
     }
@@ -613,9 +684,9 @@ private fun PremiumActionBar(
 ) {
     val context = LocalContext.current
     val categories    = remember { loadBookmarkCategories(context) }
-    val currentStateId = remember(viewModel.loadId) {
-        BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, viewModel.loadId.toString()) ?: -1
-    }
+    val currentId by viewModel.id.observeAsState(-1)
+    val readState by viewModel.readState.observeAsState()
+    val currentStateId = if (readState == null || readState == ReadType.NONE) -1 else readState!!.prefValue
 
     Surface(
         modifier      = Modifier.fillMaxWidth(),
@@ -784,9 +855,10 @@ private fun continueReadingLabel(
 private fun resolveBookmarkTitle(
     context: Context,
     viewModel: ResultViewModel,
+    currentId: Int,
+    readState: ReadType?,
 ): String {
-    val currentStateId =
-        BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, viewModel.loadId.toString()) ?: -1
+    val currentStateId = if (readState == null || readState == ReadType.NONE) -1 else readState.prefValue
     if (currentStateId != -1) {
         DownloadViewModel.systemCategories
             .find { it.id == currentStateId }?.stringRes
@@ -803,10 +875,21 @@ private fun resolveBookmarkTitle(
     }
     viewModel.duplicateBookmarkState.value?.let { duplicateState ->
         val systemCat = DownloadViewModel.systemCategories.find { it.id == duplicateState }
-        return if (systemCat != null) {
-            "In Library (${context.getString(systemCat.stringRes ?: R.string.bookmark)})"
+        if (systemCat != null) {
+            return "In Library (${context.getString(systemCat.stringRes ?: R.string.bookmark)})"
         } else {
-            "In Library"
+            val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+            val customCats = try {
+                mapper.readValue(
+                    json,
+                    object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
+                )
+            } catch (_: Throwable) { emptyList() }
+            val customCat = customCats.find { it.id == duplicateState }
+            if (customCat != null) {
+                return "In Library (${customCat.name})"
+            }
         }
     }
     return context.getString(R.string.bookmark)
@@ -834,5 +917,120 @@ private fun loadBookmarkCategories(context: Context): List<Pair<Int, String>> {
     } else allCats
     return sorted.map { cat ->
         cat.id to (cat.stringRes?.let { context.getString(it) } ?: cat.name)
+    }
+}
+
+// ─── Shimmer / Skeleton Loading Component ─────────────────────────────────────
+@Composable
+private fun shimmerBrush(
+    showShimmer: Boolean = true,
+    targetValue: Float = 1000f
+): Brush {
+    return if (showShimmer) {
+        val shimmerColors = listOf(
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        )
+
+        val transition = rememberInfiniteTransition(label = "shimmer")
+        val translateAnimation = transition.animateFloat(
+            initialValue = 0f,
+            targetValue = targetValue,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "shimmerTranslate"
+        )
+
+        Brush.linearGradient(
+            colors = shimmerColors,
+            start = Offset.Zero,
+            end = Offset(x = translateAnimation.value, y = translateAnimation.value)
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(Color.Transparent, Color.Transparent),
+            start = Offset.Zero,
+            end = Offset.Zero
+        )
+    }
+}
+
+@Composable
+private fun ShimmerSkeletonScreen() {
+    val brush = shimmerBrush()
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Hero skeleton matching exactly the novel cover rounded corners
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(HERO_HEIGHT)
+                .clip(
+                    RoundedCornerShape(
+                        bottomStart = HERO_CORNER,
+                        bottomEnd = HERO_CORNER
+                    )
+                )
+                .background(brush)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Content skeleton details card
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(horizontal = 24.dp)
+        ) {
+            // Stat chips placeholders matching PillChip layouts
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 90.dp, height = 28.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(brush)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(width = 65.dp, height = 28.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(brush)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(width = 80.dp, height = 28.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(brush)
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Premium Tab Row placeholder
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(brush)
+            )
+            Spacer(modifier = Modifier.height(28.dp))
+            
+            // Description paragraph lines matching typography layout
+            repeat(4) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(if (it == 3) 0.65f else 1f)
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(brush)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+        }
     }
 }

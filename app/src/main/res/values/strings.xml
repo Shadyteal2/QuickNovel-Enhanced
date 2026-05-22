@@ -345,6 +345,7 @@
     <string name="detail_screen_style_key" translatable="false">detail_screen_style</string>
     <string name="detail_screen_style">Novel Detail Layout</string>
     <string name="detail_screen_style_desc">Choose how the novel detail screen is displayed</string>
+    <string name="detail_screen_style_default">Default</string>
     <string name="detail_screen_style_classic">Classic</string>
     <string name="detail_screen_style_modern">Modern</string>
     <string name="notes">Notes</string>

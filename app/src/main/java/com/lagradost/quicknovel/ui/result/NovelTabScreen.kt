@@ -18,6 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import kotlinx.coroutines.launch
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +37,9 @@ import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.theme.glassCard
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+import androidx.compose.foundation.ExperimentalFoundationApi
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun NovelTabScreen(
     viewModel: ResultViewModel,
@@ -153,12 +161,49 @@ fun NovelTabScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            val view = androidx.compose.ui.platform.LocalView.current
+            val coroutineScope = rememberCoroutineScope()
+            val bringIntoViewRequester = remember { BringIntoViewRequester() }
+            var textFieldY by remember { mutableFloatStateOf(0f) }
+
             // Notes Field
             OutlinedTextField(
                 value = userNote ?: "",
                 onValueChange = { viewModel.updateNote(it) },
                 label = { Text(if (readState == ReadType.DROPPED) stringResource(R.string.dropped_reason) else stringResource(R.string.notes)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(bringIntoViewRequester)
+                    .onGloballyPositioned { coordinates ->
+                        textFieldY = coordinates.positionInRoot().y
+                    }
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            coroutineScope.launch {
+                                bringIntoViewRequester.bringIntoView()
+                            }
+                            view.post {
+                                var parent = view.parent
+                                var accumY = textFieldY.toInt()
+                                while (parent != null) {
+                                    if (parent is android.view.View) {
+                                        if (parent is androidx.core.widget.NestedScrollView) {
+                                            val scrollY = (accumY - 100).coerceAtLeast(0)
+                                            parent.smoothScrollTo(0, scrollY)
+                                        } else if (parent is android.widget.ScrollView) {
+                                            val scrollY = (accumY - 100).coerceAtLeast(0)
+                                            parent.smoothScrollTo(0, scrollY)
+                                        }
+                                        val nextParent = (parent as? android.view.ViewParent)?.parent
+                                        if (nextParent is android.view.View) {
+                                            accumY += parent.top
+                                        }
+                                    }
+                                    parent = (parent as? android.view.ViewParent)?.parent
+                                }
+                            }
+                        }
+                    },
                 shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,

@@ -60,6 +60,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += [
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" + project.rootDir.absolutePath + "/compose_compiler_config.conf"
+        ]
     }
     namespace 'com.lagradost.quicknovel'
 

@@ -728,7 +728,7 @@ class ResultViewModel : ViewModel() {
     }
 
     private fun checkDuplicates() {
-        val novel = (loadResponse.value as? Resource.Success)?.value ?: return
+        val novel = if (::load.isInitialized) load else ((loadResponse.value as? Resource.Success)?.value ?: return)
         duplicateBookmarkState.postValue(findDuplicateState(novel.name, novel.author))
     }
 
@@ -745,7 +745,23 @@ class ResultViewModel : ViewModel() {
             if (novel != null) {
                 val duplicate = findDuplicateState(novel.name, novel.author)
                 if (duplicate != null && currentState == -1) {
-                    showToast(R.string.already_in_library)
+                    val context = context
+                    val catName = if (context != null) {
+                        val systemCat = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories.find { it.id == duplicate }
+                        if (systemCat != null) {
+                            context.getString(systemCat.stringRes ?: R.string.bookmark)
+                        } else {
+                            val json = getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+                            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                            val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList() }
+                            val customCat = customCats.find { it.id == duplicate }
+                            customCat?.name ?: "Library"
+                        }
+                    } else "Library"
+                    
+                    showToast(if (context != null) context.getString(R.string.already_in_library) + " ($catName)" else "Already in Library ($catName)")
+                    
                     // Trigger UI to show where it is
                     duplicateBookmarkState.postValue(duplicate)
                     return@launch
