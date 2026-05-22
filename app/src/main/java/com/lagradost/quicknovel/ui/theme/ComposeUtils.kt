@@ -23,58 +23,101 @@ fun rememberImageRequest(data: Any?): ImageRequest {
         val builder = ImageRequest.Builder(context)
             .crossfade(200)
 
-        val uiImage = when (data) {
-            is UiImage -> data
+        val resolvedData = when (data) {
             is ResultCached -> {
                 val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
-                val bitmap = BookDownloader2Helper.getCachedBitmap(act, data.apiName, data.author, data.name)
-                if (bitmap != null) {
-                    UiImage.Bitmap(bitmap)
-                } else {
-                    img(data.poster)
+                val filesDir = act?.filesDir?.toString()
+                var file: java.io.File? = null
+                if (filesDir != null) {
+                    val filePath = BookDownloader2Helper.getFilenameIMG(
+                        BookDownloader2Helper.sanitizeFilename(data.apiName),
+                        BookDownloader2Helper.sanitizeFilename(data.author ?: ""),
+                        BookDownloader2Helper.sanitizeFilename(data.name)
+                    )
+                    val f = java.io.File(filesDir + filePath)
+                    if (f.exists() && f.length() > 0L) {
+                        file = f
+                    }
                 }
+                file ?: data.poster
             }
             is DownloadFragment.DownloadDataLoaded -> {
                 val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
-                val bitmap = BookDownloader2Helper.getCachedBitmap(act, data.apiName, data.author, data.name)
-                if (bitmap != null) {
-                    UiImage.Bitmap(bitmap)
-                } else {
-                    img(data.posterUrl)
+                val filesDir = act?.filesDir?.toString()
+                var file: java.io.File? = null
+                if (filesDir != null) {
+                    val filePath = BookDownloader2Helper.getFilenameIMG(
+                        BookDownloader2Helper.sanitizeFilename(data.apiName),
+                        BookDownloader2Helper.sanitizeFilename(data.author ?: ""),
+                        BookDownloader2Helper.sanitizeFilename(data.name)
+                    )
+                    val f = java.io.File(filesDir + filePath)
+                    if (f.exists() && f.length() > 0L) {
+                        file = f
+                    }
                 }
+                file ?: data.posterUrl
             }
             is com.lagradost.quicknovel.ui.foryou.recommendation.NovelVector -> {
                 val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
-                val bitmap = BookDownloader2Helper.getCachedBitmap(act, data.apiName, null, data.name)
-                if (bitmap != null) {
-                    UiImage.Bitmap(bitmap)
-                } else {
-                    img(data.posterUrl)
+                val filesDir = act?.filesDir?.toString()
+                var file: java.io.File? = null
+                if (filesDir != null) {
+                    val filePath = BookDownloader2Helper.getFilenameIMG(
+                        BookDownloader2Helper.sanitizeFilename(data.apiName),
+                        "",
+                        BookDownloader2Helper.sanitizeFilename(data.name)
+                    )
+                    val f = java.io.File(filesDir + filePath)
+                    if (f.exists() && f.length() > 0L) {
+                        file = f
+                    }
                 }
+                file ?: data.posterUrl
             }
-            is String -> img(data)
-            else -> null
+            else -> data
         }
 
-        when (uiImage) {
-            is UiImage.Bitmap -> {
-                builder.data(uiImage.bitmap)
+        when (resolvedData) {
+            is java.io.File -> {
+                builder.data(resolvedData)
             }
-            is UiImage.Drawable -> {
-                builder.data(uiImage.resId)
-            }
-            is UiImage.Image -> {
-                builder.data(uiImage.url)
-                if (!uiImage.headers.isNullOrEmpty()) {
-                    builder.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
-                        uiImage.headers.forEach { (key, value) ->
-                            headerBuilder[key] = value
+            is UiImage -> {
+                when (resolvedData) {
+                    is UiImage.Bitmap -> builder.data(resolvedData.bitmap)
+                    is UiImage.Drawable -> builder.data(resolvedData.resId)
+                    is UiImage.Image -> {
+                        builder.data(resolvedData.url)
+                        if (!resolvedData.headers.isNullOrEmpty()) {
+                            builder.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
+                                resolvedData.headers.forEach { (key, value) ->
+                                    headerBuilder[key] = value
+                                }
+                            }.build())
                         }
-                    }.build())
+                    }
+                }
+            }
+            is String -> {
+                val uiImage = img(resolvedData)
+                when (uiImage) {
+                    is UiImage.Bitmap -> builder.data(uiImage.bitmap)
+                    is UiImage.Drawable -> builder.data(uiImage.resId)
+                    is UiImage.Image -> {
+                        builder.data(uiImage.url)
+                        if (!uiImage.headers.isNullOrEmpty()) {
+                            builder.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
+                                uiImage.headers.forEach { (key, value) ->
+                                    headerBuilder[key] = value
+                                }
+                            }.build())
+                        }
+                    }
+                    else -> builder.data(resolvedData)
                 }
             }
             else -> {
-                builder.data("")
+                builder.data(resolvedData ?: "")
             }
         }
         builder.build()

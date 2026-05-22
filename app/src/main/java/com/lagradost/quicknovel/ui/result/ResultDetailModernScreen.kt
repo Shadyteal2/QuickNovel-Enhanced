@@ -53,6 +53,7 @@ import com.lagradost.quicknovel.StreamResponse
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.ui.download.CategoryItem
 import com.lagradost.quicknovel.ui.download.DownloadViewModel
+import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
 
@@ -89,7 +90,13 @@ fun ResultDetailModernScreen(
     val chapters         by viewModel.chapters.observeAsState(emptyList())
 
     var selectedTab          by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(selectedTab) {
+        viewModel.switchTab(selectedTab, if (selectedTab == 0) 0 else 3)
+    }
+
     var bookmarkMenuExpanded by remember { mutableStateOf(false) }
+
     var chaptersMenuExpanded by remember { mutableStateOf(false) }
     val haptic  = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -101,11 +108,7 @@ fun ResultDetailModernScreen(
     val hasBookmark = bookmarkTitle != defaultBookmarkLabel
 
     // ── Root box fills entire screen ──────────────────────────────────────────
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
 
         when (val state = loadResponse) {
 
@@ -290,9 +293,9 @@ fun ResultDetailModernScreen(
                             .fillMaxWidth()
                             .weight(1f)
                             .offset(y = -CARD_OVERLAP)
-                            .background(
-                                MaterialTheme.colorScheme.surface,
-                                RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                            .glassCard(
+                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                                strokeWidth = 0.dp
                             )
                     ) {
                         // ── Pill stat chips ───────────────────────────────────
@@ -428,21 +431,24 @@ fun ResultDetailModernScreen(
                                                 .weight(1f),
                                             factory = { ctx ->
                                                 RecyclerView(ctx).apply {
+                                                    layoutParams = android.view.ViewGroup.LayoutParams(
+                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                                    )
                                                     layoutManager = LinearLayoutManager(ctx)
                                                     adapter = chapterAdapter
                                                     setHasFixedSize(true)
-                                                    // Don't disable nested scrolling here —
-                                                    // there's no outer scroll on this path so
-                                                    // RecyclerView handles everything natively
                                                     onChapterRecyclerReady(this)
                                                 }
                                             },
-                                            update = {
-                                                val items = chapters.orEmpty()
-                                                if (items.size > 300) {
-                                                    chapterAdapter.submitIncomparableList(items)
-                                                } else {
-                                                    chapterAdapter.submitList(items)
+                                            update = { rv ->
+                                                val list = chapters
+                                                if (list != null && list.isNotEmpty()) {
+                                                    if (list.size > 300) {
+                                                        chapterAdapter.submitIncomparableList(list)
+                                                    } else {
+                                                        chapterAdapter.submitList(list)
+                                                    }
                                                 }
                                             }
                                         )

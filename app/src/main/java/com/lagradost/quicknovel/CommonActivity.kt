@@ -211,6 +211,14 @@ object CommonActivity {
             true
         ) // THEME IS SET BEFORE VIEW IS CREATED TO APPLY THE THEME TO THE MAIN VIEW
 
+        val themeString = settingsManager.getString(act.getString(R.string.theme_key), "Amoled")
+        val backgroundRes = when (themeString) {
+            "Black", "Amoled" -> android.R.color.black
+            "Light" -> R.color.lightPrimaryGrayBackground
+            "AmoledLight" -> R.color.amoledModeLight
+            else -> android.R.color.black
+        }
+        act.window?.setBackgroundDrawableResource(backgroundRes)
 
         act.window?.navigationBarColor =
             android.graphics.Color.TRANSPARENT

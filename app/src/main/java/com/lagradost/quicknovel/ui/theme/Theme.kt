@@ -82,27 +82,48 @@ fun QuickNovelTheme(
         }
     }
 
-    val backgroundColor = remember(context, darkTheme) {
+    val themeKey = remember(context) {
         try {
-            if (darkTheme) {
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+            settingsManager.getString(context.getString(R.string.theme_key), "Amoled") ?: "Amoled"
+        } catch (e: Exception) {
+            "Amoled"
+        }
+    }
+
+    val backgroundColor = remember(context, darkTheme, themeKey) {
+        try {
+            if (themeKey == "Amoled" || themeKey == "Black") {
+                Color.Black
+            } else if (darkTheme) {
                 Color(context.colorFromAttribute(R.attr.primaryBlackBackground))
             } else {
                 Color(ContextCompat.getColor(context, R.color.lightPrimaryGrayBackground))
             }
         } catch (e: Exception) {
-            if (darkTheme) DarkPrimaryBlackBackground else LightPrimaryGrayBackground
+            if (darkTheme) {
+                if (themeKey == "Amoled" || themeKey == "Black") Color.Black else DarkPrimaryBlackBackground
+            } else {
+                LightPrimaryGrayBackground
+            }
         }
     }
 
-    val surfaceColor = remember(context, darkTheme) {
+    val surfaceColor = remember(context, darkTheme, themeKey) {
         try {
-            if (darkTheme) {
+            if (themeKey == "Amoled" || themeKey == "Black") {
+                Color.Black
+            } else if (darkTheme) {
                 Color(context.colorFromAttribute(R.attr.iconGrayBackground))
             } else {
                 Color(ContextCompat.getColor(context, R.color.lightBitDarkerGrayBackground))
             }
         } catch (e: Exception) {
-            if (darkTheme) DarkIconGrayBackground else LightBitDarkerGrayBackground
+            if (darkTheme) {
+                if (themeKey == "Amoled" || themeKey == "Black") Color.Black else DarkIconGrayBackground
+            } else {
+                LightBitDarkerGrayBackground
+            }
         }
     }
 
@@ -119,10 +140,9 @@ fun QuickNovelTheme(
     }
 
     // Check if the current theme is Monet (which allows dynamic wallpaper-based colors)
-    val isMonet = remember(context) {
+    val isMonet = remember(context, themeKey) {
         try {
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
-            val themeKey = settingsManager.getString(context.getString(R.string.theme_key), "Amoled")
             val primaryColorKey = settingsManager.getString(context.getString(R.string.primary_color_key), "Banana")
             (themeKey == "Monet" || primaryColorKey == "Monet" || primaryColorKey == "Monet2")
         } catch (e: Exception) {

@@ -134,7 +134,10 @@ fun WizardScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            items(TagCategory.entries.toList()) { tag ->
+            items(
+                items = TagCategory.entries.toList(),
+                key = { tag -> tag.name }
+            ) { tag ->
                 val isSelected = selectedTags.contains(tag)
                 val primaryColor = MaterialTheme.colorScheme.primary
                 
@@ -236,7 +239,10 @@ fun RecommendationsContent(
                 }
             }
         } else {
-            items(groups) { group ->
+            items(
+                items = groups,
+                key = { group -> group.title }
+            ) { group ->
                 RecommendationGroupSection(group = group, onBookClick = onBookClick)
             }
         }
@@ -275,7 +281,10 @@ fun RecommendationGroupSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(group.recommendations) { rec ->
+            items(
+                items = group.recommendations,
+                key = { rec -> rec.novel.url }
+            ) { rec ->
                 NovelCard(recommendation = rec, onBookClick = onBookClick)
             }
         }

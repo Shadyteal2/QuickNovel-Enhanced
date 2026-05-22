@@ -38,6 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -96,7 +99,8 @@ fun DownloadScreen(
     val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     var isCompact by remember { mutableStateOf(settings.getBoolean("download_compact", false)) }
     var isBento3x3 by remember { mutableStateOf(settings.getBoolean("download_bento", false)) }
-    val isSwipeMode = remember { settings.getString(context.getString(R.string.library_nav_style_key), "0") == "1" }
+    val navStyleState = rememberPreferenceString(context.getString(R.string.library_nav_style_key), "0")
+    val isSwipeMode = navStyleState.value == "1"
 
     // Dialog & Bottom Sheet triggers
     var showCategorySheet by remember { mutableStateOf(false) }
@@ -295,8 +299,8 @@ fun DownloadScreen(
                     }
                 }
 
-                // If swipe layout mode: Show custom sliding pill tabs in header
-                if (isSwipeMode) {
+                // Show custom sliding pill tabs in header
+                if (allTabs.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
                     ScrollableTabRow(
                         selectedTabIndex = pagerState.currentPage,
@@ -367,7 +371,7 @@ fun DownloadScreen(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = isSwipeMode // Only allow swiping in swipe layout mode
+                userScrollEnabled = isSwipeMode // Only swipeable in Swipe View mode
             ) { page ->
                 val list = cardsByPage[page] ?: emptyList()
                 val isDownloadsPage = page == 0
@@ -416,23 +420,38 @@ fun DownloadScreen(
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(list) { card ->
-                                CompactCardItem(
-                                    card = card,
-                                    viewModel = viewModel,
-                                    onClick = {
+                            items(
+                                items = list,
+                                key = { card ->
+                                    when (card) {
+                                        is ResultCached -> "cached_${card.id}"
+                                        is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
+                                        else -> card.hashCode()
+                                    }
+                                }
+                            ) { card ->
+                                val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
+                                    {
                                         if (card is ResultCached) onBookClick(card)
                                         else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
-                                    },
-                                    onLongClick = {
+                                    }
+                                }
+                                val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
+                                    {
                                         if (card is ResultCached) onBookLongClick(card)
                                         else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
                                     }
+                                }
+                                CompactCardItem(
+                                    card = card,
+                                    viewModel = viewModel,
+                                    onClick = currentOnClick,
+                                    onLongClick = currentOnLongClick
                                 )
                             }
                             // Bottom Import item inside downloads page
                             if (isDownloadsPage) {
-                                item {
+                                item(key = "import_item_column") {
                                     ImportCardItem(onClick = onImportEpubClick)
                                 }
                             }
@@ -448,8 +467,10 @@ fun DownloadScreen(
                                 .pointerInput(Unit) {
                                     awaitPointerEventScope {
                                         while (true) {
-                                            awaitPointerEvent(PointerEventPass.Initial)
-                                            view.parent?.requestDisallowInterceptTouchEvent(true)
+                                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                                            if (event.changes.any { it.changedToDown() }) {
+                                                view.parent?.requestDisallowInterceptTouchEvent(true)
+                                            }
                                         }
                                     }
                                 },
@@ -459,6 +480,13 @@ fun DownloadScreen(
                         ) {
                             itemsIndexed(
                                 items = list,
+                                key = { _, card ->
+                                    when (card) {
+                                        is ResultCached -> "cached_${card.id}"
+                                        is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
+                                        else -> card.hashCode()
+                                    }
+                                },
                                 span = { index, _ ->
                                     val spanSize = if (isBento3x3) {
                                         when (index % 7) {
@@ -475,22 +503,28 @@ fun DownloadScreen(
                                         else -> 1
                                     }
                                 } else 1
+                                val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
+                                    {
+                                        if (card is ResultCached) onBookClick(card)
+                                        else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                    }
+                                }
+                                val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
+                                    {
+                                        if (card is ResultCached) onBookLongClick(card)
+                                        else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                    }
+                                }
                                 GridCardItem(
                                     card = card,
                                     isBento = isBento3x3,
                                     span = spanSize,
-                                    onClick = {
-                                        if (card is ResultCached) onBookClick(card)
-                                        else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
-                                    },
-                                    onLongClick = {
-                                        if (card is ResultCached) onBookLongClick(card)
-                                        else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
-                                    }
+                                    onClick = currentOnClick,
+                                    onLongClick = currentOnLongClick
                                 )
                             }
                             if (isDownloadsPage) {
-                                item(span = { GridItemSpan(3) }) {
+                                item(key = "import_item_grid", span = { GridItemSpan(3) }) {
                                     ImportCardItem(onClick = onImportEpubClick)
                                 }
                             }
@@ -499,51 +533,108 @@ fun DownloadScreen(
                 }
             }
 
-            // Elegant, high-premium floating Bottom Nav overlay when swipe mode is FALSE
+            // Clean, non-glitchy Pill Slider — only shown in Pill Drawer mode
             if (!isSwipeMode) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 104.dp)
-                        .glassCard(shape = RoundedCornerShape(28.dp))
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        allTabs.forEachIndexed { index, tabName ->
-                            val isSelected = pagerState.currentPage == index
-                            
-                            val backgroundColor by animateColorAsState(
-                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                label = "navBg"
-                            )
-                            val textColor by animateColorAsState(
-                                if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                                label = "navText"
-                            )
-                            
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(backgroundColor)
-                                    .clickable {
-                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                        scope.launch { pagerState.animateScrollToPage(index) }
+                val numTabs = allTabs.size
+                if (numTabs > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(bottom = 96.dp)
+                            .width(200.dp) // Sleek, compact size
+                            .height(48.dp)
+                            .pointerInput(numTabs, "drag") {
+                                detectHorizontalDragGestures(
+                                    onDragStart = { offset ->
+                                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                        val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
+                                        if (pagerState.currentPage != targetPage) {
+                                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                            scope.launch { pagerState.scrollToPage(targetPage) }
+                                        }
+                                    },
+                                    onHorizontalDrag = { change, _ ->
+                                        change.consume()
+                                        val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                        val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
+                                        if (pagerState.currentPage != targetPage) {
+                                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                            scope.launch { pagerState.scrollToPage(targetPage) }
+                                        }
                                     }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = tabName,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = textColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            .pointerInput(numTabs, "tap") {
+                                detectTapGestures { offset ->
+                                    val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                    val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
+                                    if (pagerState.currentPage != targetPage) {
+                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                        scope.launch { pagerState.animateScrollToPage(targetPage) }
+                                    }
+                                }
+                            },
+                        // Crucial: CenterStart alignment so X offset starts from the left edge instead of the middle
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        // Track line
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .align(Alignment.Center) // Keep the track line centered
+                                .background(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(1.dp)
+                                )
+                        )
+
+                        // Dots row
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            allTabs.forEachIndexed { _, _ ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(5.dp)
+                                            .background(
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
+                            }
+                        }
+
+                        // Traveling capsule — driven purely by pagerState offset fraction
+                        val pagerPos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                        val segmentWidth = 200.dp / numTabs
+                        val capsuleWidth = 24.dp
+                        val capsuleOffset = (segmentWidth * (pagerPos + 0.5f)) - (capsuleWidth / 2)
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(capsuleWidth)
+                                .offset(x = capsuleOffset), // Now accurately placed relative to CenterStart
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(width = capsuleWidth, height = 8.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = RoundedCornerShape(4.dp)
+                                    )
+                            )
                         }
                     }
                 }
@@ -695,7 +786,10 @@ fun DownloadScreen(
                         .fillMaxWidth()
                         .weight(1f, fill = false)
                 ) {
-                    itemsIndexed(categories) { index, categoryItem ->
+                    itemsIndexed(
+                        items = categories,
+                        key = { _, categoryItem -> categoryItem.id }
+                    ) { index, categoryItem ->
                         val isEditing = index == isEditingCategoryIdx
                         val isSystem = categoryItem.isSystem
                         val categoryName = if (categoryItem.isSystem && categoryItem.stringRes != null) context.getString(categoryItem.stringRes) else categoryItem.name
@@ -812,6 +906,25 @@ fun rememberPreferenceBoolean(key: String, defaultValue: Boolean): State<Boolean
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, k ->
             if (k == key) {
                 state.value = prefs.getBoolean(key, defaultValue)
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+    return state
+}
+
+@Composable
+fun rememberPreferenceString(key: String, defaultValue: String): State<String> {
+    val context = LocalContext.current
+    val prefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
+    val state = remember { mutableStateOf(prefs.getString(key, defaultValue) ?: defaultValue) }
+    DisposableEffect(prefs, key) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, k ->
+            if (k == key) {
+                state.value = prefs.getString(key, defaultValue) ?: defaultValue
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)

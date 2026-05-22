@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -62,9 +63,11 @@ fun HistoryScreen(
     val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
     val hasBackground = !imageUri.isNullOrBlank()
-    val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
 
     QuickNovelTheme {
+        val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
+        val onDeleteAllClick = remember(viewModel) { { viewModel.deleteAllAlert() } }
+        
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -79,7 +82,7 @@ fun HistoryScreen(
                     actions = {
                         if (cards.isNotEmpty()) {
                             IconButton(
-                                onClick = { viewModel.deleteAllAlert() }
+                                onClick = onDeleteAllClick
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
@@ -178,17 +181,22 @@ fun HistoryItemCard(
 ) {
     val haptic = LocalHapticFeedback.current
 
+    val currentOnClick = remember(item, viewModel) { { viewModel.open(item) } }
+    val currentOnLongClick = remember(item, viewModel, haptic) {
+        {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            viewModel.showMetadata(item)
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(115.dp)
             .glassCard(RoundedCornerShape(20.dp))
             .combinedClickable(
-                onClick = { viewModel.open(item) },
-                onLongClick = {
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    viewModel.showMetadata(item)
-                }
+                onClick = currentOnClick,
+                onLongClick = currentOnLongClick
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -249,12 +257,16 @@ fun HistoryItemCard(
             val playInteractionSource = remember { MutableInteractionSource() }
             val playPressed by playInteractionSource.collectIsPressedAsState()
             val playScale by animateFloatAsState(if (playPressed) 0.88f else 1.0f, label = "play")
+            val onStreamClick = remember(item, viewModel) { { viewModel.stream(item) } }
 
             IconButton(
-                onClick = { viewModel.stream(item) },
+                onClick = onStreamClick,
                 interactionSource = playInteractionSource,
                 modifier = Modifier
-                    .scale(playScale)
+                    .graphicsLayer {
+                        scaleX = playScale
+                        scaleY = playScale
+                    }
                     .size(42.dp)
             ) {
                 Icon(
@@ -269,12 +281,16 @@ fun HistoryItemCard(
             val deleteInteractionSource = remember { MutableInteractionSource() }
             val deletePressed by deleteInteractionSource.collectIsPressedAsState()
             val deleteScale by animateFloatAsState(if (deletePressed) 0.88f else 1.0f, label = "del")
+            val onDeleteClick = remember(item, viewModel) { { viewModel.deleteAlert(item) } }
 
             IconButton(
-                onClick = { viewModel.deleteAlert(item) },
+                onClick = onDeleteClick,
                 interactionSource = deleteInteractionSource,
                 modifier = Modifier
-                    .scale(deleteScale)
+                    .graphicsLayer {
+                        scaleX = deleteScale
+                        scaleY = deleteScale
+                    }
                     .size(42.dp)
             ) {
                 Icon(
