@@ -38,7 +38,10 @@ import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
+import com.lagradost.quicknovel.util.SettingsHelper.isModernDetailScreen
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.mainpage.MainAdapter
 import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
@@ -65,13 +68,15 @@ import com.lagradost.quicknovel.util.MagicAnimator
 const val MAX_SYNO_LENGH = 300
 
 class ResultFragment : Fragment() {
-    lateinit var binding: FragmentResultBinding
+    private lateinit var binding: FragmentResultBinding
     private val viewModel: ResultViewModel by viewModels()
 
     private var novelTabBinding: ResultNovelTabBinding? = null
     private var chaptersTabBinding: ResultChaptersTabBinding? = null
 
     private var chapterAdapter: ChapterAdapter? = null
+    private var modernChapterList: RecyclerView? = null
+    private var usesModernStyle = false
 
     companion object {
         fun newInstance(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null): Bundle =
@@ -87,7 +92,6 @@ class ResultFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        sharedElementEnterTransition = android.transition.TransitionInflater.from(requireContext()).inflateTransition(android.R.transition.move)
     }
 
     override fun onCreateView(
@@ -95,8 +99,23 @@ class ResultFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-        binding = FragmentResultBinding.inflate(inflater)
-        return binding.root
+        usesModernStyle = requireContext().isModernDetailScreen()
+        if (!usesModernStyle) {
+            sharedElementEnterTransition = android.transition.TransitionInflater.from(requireContext())
+                .inflateTransition(android.R.transition.move)
+            binding = FragmentResultBinding.inflate(inflater, container, false)
+            return binding.root
+        }
+        sharedElementEnterTransition = null
+        sharedElementReturnTransition = null
+        return ComposeView(requireContext()).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setBackgroundColor(Color.TRANSPARENT)
+        }
     }
 
     private fun setupGridView() {
@@ -105,13 +124,24 @@ class ResultFragment : Fragment() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        binding.resultHolder.post {
-            updateScrollHeight()
+        if (!usesModernStyle) {
+            binding.resultHolder.post {
+                updateScrollHeight()
+            }
         }
     }
 
     override fun onResume() {
         super.onResume()
+        val nowModern = requireContext().isModernDetailScreen()
+        if (nowModern != usesModernStyle && isAdded) {
+            usesModernStyle = nowModern
+            parentFragmentManager.beginTransaction()
+                .detach(this)
+                .attach(this)
+                .commit()
+            return
+        }
         if (viewModel.isResume) {
             chapterAdapter?.notifyDataSetChanged()
             viewModel.isResume = false
@@ -368,6 +398,10 @@ class ResultFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        if (usesModernStyle) {
+            setupModernResultScreen(view as ComposeView, savedInstanceState)
+            return
+        }
 
         // Expand backdrop to 1.5x screen height so parallax never exposes a gap at the bottom.
         // At 0.25x parallax factor, max upward shift ≈ (contentHeight - screenHeight) * 0.25.
@@ -512,7 +546,7 @@ class ResultFragment : Fragment() {
                 
                 popup.setOnItemClickListener { _, _, position, _ ->
                     when (items[position]) {
-                        "Filter & Sort" -> showFilterBottomSheet(act)
+                        "Filter & Sort" -> showFilterBottomSheet(act, binding.resultMainscroll)
                         "Go to Latest Chapter" -> chaptersTabBinding?.chapterList?.let { list ->
                              val chapters = viewModel.chapters.value ?: return@setOnItemClickListener
                              if (chapters.isNotEmpty()) {
@@ -929,6 +963,120 @@ class ResultFragment : Fragment() {
         }
     }
 
+    private fun setupModernResultScreen(composeView: ComposeView, savedInstanceState: Bundle?) {
+        val url = savedInstanceState?.getString("url") ?: arguments?.getString("url") ?: throw NotImplementedError()
+        val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
+        val startAction = savedInstanceState?.getInt("startAction") ?: arguments?.getInt("startAction") ?: 0
+        val startChapterUrl = savedInstanceState?.getString("startChapterUrl") ?: arguments?.getString("startChapterUrl")
+
+        if (viewModel.loadResponse.value == null) {
+            viewModel.initState(apiName, url)
+        }
+
+        if (chapterAdapter == null) {
+            chapterAdapter = ChapterAdapter(viewModel)
+        }
+
+        var hasTriggeredStart = false
+        observe(viewModel.loadResponse) { res ->
+            if (res is Resource.Success && !hasTriggeredStart && startAction == 2 && startChapterUrl != null) {
+                hasTriggeredStart = true
+                val stream = res.value as? StreamResponse
+                val chapter = stream?.data?.find { it.url == startChapterUrl }
+                if (chapter != null) {
+                    viewModel.streamRead(chapter)
+                }
+            }
+        }
+
+        observeNullable(viewModel.chapters) { chaptersList ->
+            val chapters = chaptersList ?: emptyList()
+            chapterAdapter?.let { adapter ->
+                if (chapters.size > 300) {
+                    adapter.submitIncomparableList(chapters)
+                } else {
+                    adapter.submitList(chapters)
+                }
+            }
+        }
+
+        observeNullable(viewModel.duplicateBookmarkState) {
+            viewModel.readState.postValue(viewModel.readState.value)
+        }
+
+        val backCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                viewModel.setSelectionMode(false)
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
+        observe(viewModel.isInSelectionMode) { enabled ->
+            backCallback.isEnabled = enabled
+        }
+
+        val act = requireActivity()
+        composeView.setContent {
+            QuickNovelTheme {
+                ResultDetailModernScreen(
+                    viewModel = viewModel,
+                    apiName = apiName,
+                    url = url,
+                    activity = act,
+                    chapterAdapter = chapterAdapter!!,
+                    onBack = { act.onBackPressedDispatcher.onBackPressed() },
+                    onReload = { viewModel.initState(apiName, url) },
+                    onOpenInBrowser = { viewModel.openInBrowser() },
+                    onShare = { viewModel.share() },
+                    onToggleSync = { viewModel.toggleSyncEnabled() },
+                    onContinueReading = { handleContinueReading() },
+                    onShowFilterSort = { showFilterBottomSheet(act, null) },
+                    onScrollToLatestChapter = { scrollModernChaptersToLatest() },
+                    onScrollToLastRead = { scrollModernChaptersToLastRead() },
+                    onChapterRecyclerReady = { modernChapterList = it },
+                )
+            }
+        }
+    }
+
+    private fun handleContinueReading() {
+        val streamResponse = (viewModel.loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        val name = streamResponse.name
+        val index = streamResponse.data.indexOfLast { ch ->
+            val idx = streamResponse.data.indexOf(ch)
+            val key = "$name/$idx"
+            BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, key) != null
+        }
+        if (index != -1 && index < streamResponse.data.size) {
+            viewModel.streamRead(streamResponse.data[index])
+        } else {
+            viewModel.streamRead()
+        }
+    }
+
+    private fun scrollModernChaptersToLatest() {
+        val list = modernChapterList ?: return
+        val chapters = viewModel.chapters.value ?: return
+        if (chapters.isEmpty()) return
+        val sortType = ResultViewModel.sortChapterBy
+        val target = if (sortType == REVERSE_CHAPTER_SORT || sortType == REVERSE_LAST_ACCES_SORT) 0 else chapters.size - 1
+        list.scrollToPosition(target)
+    }
+
+    private fun scrollModernChaptersToLastRead() {
+        val list = modernChapterList ?: return
+        val chapters = viewModel.chapters.value ?: return
+        val name = (viewModel.loadResponse.value as? Resource.Success)?.value.let { it as? StreamResponse }?.name ?: ""
+        val index = chapters.indexOfLast { ch ->
+            val key = "$name/${chapters.indexOf(ch)}"
+            BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, key) != null
+        }
+        if (index != -1) {
+            list.scrollToPosition(index)
+        } else {
+            CommonActivity.showToast(activity, "No last read position found")
+        }
+    }
+
     private fun onBindingCreated(tabView: View) {
         val binding = ResultNovelTabBinding.bind(tabView)
         novelTabBinding = binding
@@ -945,7 +1093,7 @@ class ResultFragment : Fragment() {
             }
         }
     }
-    private fun showFilterBottomSheet(act: android.app.Activity) {
+    private fun showFilterBottomSheet(act: android.app.Activity, backgroundView: View?) {
          val bottomSheetDialog = BottomSheetDialog(act, R.style.BottomSheetDrawerTheme)
          val filterBinding = com.lagradost.quicknovel.databinding.ChapterFilterPopupBinding.inflate(act.layoutInflater, null, false)
          bottomSheetDialog.setContentView(filterBinding.root)
@@ -993,19 +1141,19 @@ class ResultFragment : Fragment() {
          }
          filterBinding.sortContent.layoutManager = LinearLayoutManager(act)
 
-         // Background scaling animation
-         val backgroundView = binding.resultMainscroll
-         val behavior = bottomSheetDialog.behavior
-         behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
-             override fun onStateChanged(bottomSheet: View, newState: Int) {
-                 if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
-                     DrawerHelper.resetScaling(backgroundView)
+         if (backgroundView != null) {
+             val behavior = bottomSheetDialog.behavior
+             behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                 override fun onStateChanged(bottomSheet: View, newState: Int) {
+                     if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
+                         DrawerHelper.resetScaling(backgroundView)
+                     }
                  }
-             }
-             override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                 com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
-             }
-         })
+                 override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                     DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                 }
+             })
+         }
 
          bottomSheetDialog.show()
     }
@@ -1153,4 +1301,4 @@ class ResultFragment : Fragment() {
         inner class SortViewHolder(val binding: SortByItemBinding) :
             RecyclerView.ViewHolder(binding.root)
     }
-}
+}

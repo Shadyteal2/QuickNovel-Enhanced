@@ -342,6 +342,11 @@
     <string name="library_nav_style_pill">Pill Drawer</string>
     <string name="library_nav_style_swipe">Swipe View</string>
     <string name="library_nav_style_desc">Choose how you navigate categories in the Library</string>
+    <string name="detail_screen_style_key" translatable="false">detail_screen_style</string>
+    <string name="detail_screen_style">Novel Detail Layout</string>
+    <string name="detail_screen_style_desc">Choose how the novel detail screen is displayed</string>
+    <string name="detail_screen_style_classic">Classic</string>
+    <string name="detail_screen_style_modern">Modern</string>
     <string name="notes">Notes</string>
     <string name="dropped_reason">Why did you drop this novel?</string>
     <string name="title_updates">Updates</string>

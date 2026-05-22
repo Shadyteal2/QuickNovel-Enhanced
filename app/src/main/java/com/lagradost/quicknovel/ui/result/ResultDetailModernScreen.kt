@@ -58,7 +58,7 @@ import com.lagradost.quicknovel.util.SettingsHelper.getRating
 
 // ─── Hero dimensions ──────────────────────────────────────────────────────────
 private val HERO_HEIGHT  = 380.dp
-private val CARD_OVERLAP = 28.dp
+private val CARD_OVERLAP = 0.dp
 private val HERO_CORNER  = 32.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,7 +101,11 @@ fun ResultDetailModernScreen(
     val hasBookmark = bookmarkTitle != defaultBookmarkLabel
 
     // ── Root box fills entire screen ──────────────────────────────────────────
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
 
         when (val state = loadResponse) {
 
@@ -247,8 +251,7 @@ fun ResultDetailModernScreen(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .fillMaxWidth()
-                                .padding(start = 20.dp, end = 20.dp,
-                                    bottom = CARD_OVERLAP + 16.dp)
+                                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
                         ) {
                             Text(
                                 text = res.name,
@@ -263,16 +266,17 @@ fun ResultDetailModernScreen(
                                 }
                             )
                             Spacer(Modifier.height(4.dp))
-                            val author = res.author ?: stringResource(R.string.no_author)
+                            val authorVal = res.author
+                            val authorText = authorVal ?: stringResource(R.string.no_author)
                             Text(
-                                text = author,
+                                text = authorText,
                                 color = Color.White.copy(alpha = 0.78f),
                                 fontSize = 13.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.clickable {
-                                    if (res.author != null) {
-                                        copyToClipboard(context, "Author", res.author)
+                                    if (authorVal != null) {
+                                        copyToClipboard(context, "Author", authorVal)
                                     }
                                 }
                             )

@@ -46,4 +46,11 @@ object SettingsHelper {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         return settingsManager.getString(getString(R.string.library_nav_style_key), "0") ?: "0"
     }
+
+    fun Context.getDetailScreenStyle(): String {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+        return settingsManager.getString(getString(R.string.detail_screen_style_key), "0") ?: "0"
+    }
+
+    fun Context.isModernDetailScreen(): Boolean = getDetailScreenStyle() == "1"
 }
