@@ -29,6 +29,8 @@ class SearchViewModel : ViewModel() {
     @Volatile
     var searchCounter = 0
 
+    var lastSearchQuery = ""
+
     fun clearSearch() {
         searchCounter++
         ongoingSearchJob?.cancel()
@@ -53,6 +55,7 @@ class SearchViewModel : ViewModel() {
             return
         }
         ongoingSearchJob?.cancel()
+        lastSearchQuery = query
         ongoingSearchJob = ioSafe {
             searchCounter++
             val localSearchCounter = searchCounter

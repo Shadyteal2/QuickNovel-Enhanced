@@ -75,6 +75,30 @@ fun rememberImageRequest(data: Any?): ImageRequest {
                 }
                 file ?: data.posterUrl
             }
+            is com.lagradost.quicknovel.SearchResponse -> {
+                val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
+                val filesDir = act?.filesDir?.toString()
+                var file: java.io.File? = null
+                if (filesDir != null) {
+                    val filePath = BookDownloader2Helper.getFilenameIMG(
+                        BookDownloader2Helper.sanitizeFilename(data.apiName),
+                        "",
+                        BookDownloader2Helper.sanitizeFilename(data.name)
+                    )
+                    val f = java.io.File(filesDir + filePath)
+                    if (f.exists() && f.length() > 0L) {
+                        file = f
+                    }
+                }
+                
+                if (file != null) file else {
+                    if (data.posterHeaders != null) {
+                        UiImage.Image(data.posterUrl ?: "", data.posterHeaders)
+                    } else {
+                        data.posterUrl
+                    }
+                }
+            }
             else -> data
         }
 
