@@ -62,6 +62,13 @@
         android:icon="@drawable/ic_baseline_tune_24"
         app:layout="@layout/setting_seekbar_tile" />
 
+    <com.lagradost.quicknovel.ui.custom.DetailScreenStylePreference
+        android:key="@string/detail_screen_style_key"
+        android:title="@string/detail_screen_style"
+        android:summary="@string/detail_screen_style_desc"
+        android:icon="@drawable/ic_baseline_menu_book_24"
+        app:layout="@layout/setting_tile" />
+
     <Preference
         android:key="@string/theme_key"
         android:title="@string/theme"
