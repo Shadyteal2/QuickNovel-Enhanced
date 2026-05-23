@@ -53,16 +53,20 @@ object DrawerHelper {
     fun resetScaling(backgroundView: View?) {
         if (backgroundView == null) return
         
+        // Cancel any ongoing animations to prevent race conditions or overridden states
+        backgroundView.animate().cancel()
+        
+        // Instantly clear the blur effect to guarantee the background doesn't stay blurred/locked
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            backgroundView.setRenderEffect(null)
+        }
+        
+        // Smoothly animate scale and alpha back to original values
         backgroundView.animate()
             .scaleX(1.0f)
             .scaleY(1.0f)
             .alpha(1.0f)
             .setDuration(250)
-            .withEndAction {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                    backgroundView.setRenderEffect(null)
-                }
-            }
             .start()
     }
 }

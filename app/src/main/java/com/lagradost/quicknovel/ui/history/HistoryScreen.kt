@@ -64,6 +64,10 @@ fun HistoryScreen(
     val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
     val hasBackground = !imageUri.isNullOrBlank()
 
+    // Read the active density preference (history_compact_view)
+    val isCompactState = remember { mutableStateOf(settings.getBoolean("history_compact_view", false)) }
+    var isCompact by isCompactState
+
     QuickNovelTheme {
         val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
         val onDeleteAllClick = remember(viewModel) { { viewModel.deleteAllAlert() } }
@@ -80,6 +84,20 @@ fun HistoryScreen(
                         )
                     },
                     actions = {
+                        // Premium layout density toggle button
+                        IconButton(
+                            onClick = {
+                                isCompact = !isCompact
+                                settings.edit().putBoolean("history_compact_view", isCompact).apply()
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = if (isCompact) R.drawable.density_small_24px else R.drawable.density_medium_24px),
+                                contentDescription = stringResource(if (isCompact) R.string.history_density_compact else R.string.history_density_comfortable),
+                                tint = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                         if (cards.isNotEmpty()) {
                             IconButton(
                                 onClick = onDeleteAllClick
@@ -150,20 +168,44 @@ fun HistoryScreen(
                         }
                     }
                 } else {
+                    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+                    
+                    // Prefetch cover images of the upcoming 12 novels as the user scrolls
+                    LaunchedEffect(gridState.firstVisibleItemIndex, cards) {
+                        val totalItems = cards.size
+                        val startIndex = (gridState.firstVisibleItemIndex + 10).coerceAtMost(totalItems)
+                        val endIndex = (startIndex + 12).coerceAtMost(totalItems)
+                        for (i in startIndex until endIndex) {
+                            val card = cards.getOrNull(i) ?: continue
+                            val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
+                            coil3.SingletonImageLoader.get(context).enqueue(req)
+                        }
+                    }
+
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(if (isLandscape) 2 else 1),
+                        state = gridState,
+                        columns = GridCells.Fixed(if (isLandscape) { if (isCompact) 4 else 2 } else { if (isCompact) 2 else 1 }),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isCompact) 10.dp else 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isCompact) 10.dp else 14.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         itemsIndexed(
                             items = cards,
                             key = { _, item -> item.id }
                         ) { _, item ->
+                            val currentOnClick = remember(item, viewModel) { { viewModel.open(item) } }
+                            val currentOnLongClick = remember(item, viewModel) { { viewModel.showMetadata(item) } }
+                            val onStreamClick = remember(item, viewModel) { { viewModel.stream(item) } }
+                            val onDeleteClick = remember(item, viewModel) { { viewModel.deleteAlert(item) } }
+
                             HistoryItemCard(
                                 item = item,
-                                viewModel = viewModel
+                                isCompact = isCompact,
+                                onClick = currentOnClick,
+                                onLongClick = currentOnLongClick,
+                                onStreamClick = onStreamClick,
+                                onDeleteClick = onDeleteClick
                             )
                         }
                     }
@@ -177,26 +219,29 @@ fun HistoryScreen(
 @Composable
 fun HistoryItemCard(
     item: ResultCached,
-    viewModel: HistoryViewModel
+    isCompact: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onStreamClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
 
-    val currentOnClick = remember(item, viewModel) { { viewModel.open(item) } }
-    val currentOnLongClick = remember(item, viewModel, haptic) {
+    val currentOnLongClickWithHaptic = remember(onLongClick, haptic) {
         {
             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-            viewModel.showMetadata(item)
+            onLongClick()
         }
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(115.dp)
-            .glassCard(RoundedCornerShape(20.dp))
+            .height(if (isCompact) 80.dp else 115.dp)
+            .glassCard(RoundedCornerShape(if (isCompact) 12.dp else 20.dp))
             .combinedClickable(
-                onClick = currentOnClick,
-                onLongClick = currentOnLongClick
+                onClick = onClick,
+                onLongClick = currentOnLongClickWithHaptic
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -204,8 +249,8 @@ fun HistoryItemCard(
         Box(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(82.dp)
-                .clip(RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp))
+                .width(if (isCompact) 56.dp else 82.dp)
+                .clip(RoundedCornerShape(topStart = if (isCompact) 12.dp else 20.dp, bottomStart = if (isCompact) 12.dp else 20.dp))
         ) {
             AsyncImage(
                 model = rememberImageRequest(data = item),
@@ -216,48 +261,62 @@ fun HistoryItemCard(
             )
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(if (isCompact) 10.dp else 12.dp))
 
         // Metadata Column
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(vertical = 12.dp),
+                .padding(vertical = if (isCompact) 6.dp else 12.dp),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = item.name,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 19.sp
-                ),
+                style = if (isCompact) {
+                    MaterialTheme.typography.titleSmall.copy(
+                        fontSize = 13.sp,
+                        lineHeight = 16.sp
+                    )
+                } else {
+                    MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 19.sp
+                    )
+                },
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(if (isCompact) 2.dp else 6.dp))
             Text(
                 text = "${item.totalChapters} ${stringResource(R.string.read_action_chapters)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
-                fontWeight = FontWeight.Medium
+                style = if (isCompact) {
+                    MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium
+                    )
+                },
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
             )
         }
 
         // Controls Column
         Row(
             modifier = Modifier
-                .padding(end = 12.dp)
+                .padding(end = if (isCompact) 6.dp else 12.dp)
                 .fillMaxHeight(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(if (isCompact) 2.dp else 4.dp)
         ) {
             // Play Button
             val playInteractionSource = remember { MutableInteractionSource() }
             val playPressed by playInteractionSource.collectIsPressedAsState()
             val playScale by animateFloatAsState(if (playPressed) 0.88f else 1.0f, label = "play")
-            val onStreamClick = remember(item, viewModel) { { viewModel.stream(item) } }
 
             IconButton(
                 onClick = onStreamClick,
@@ -267,13 +326,13 @@ fun HistoryItemCard(
                         scaleX = playScale
                         scaleY = playScale
                     }
-                    .size(42.dp)
+                    .size(if (isCompact) 34.dp else 42.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = stringResource(R.string.stream_read),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(if (isCompact) 22.dp else 28.dp)
                 )
             }
 
@@ -281,7 +340,6 @@ fun HistoryItemCard(
             val deleteInteractionSource = remember { MutableInteractionSource() }
             val deletePressed by deleteInteractionSource.collectIsPressedAsState()
             val deleteScale by animateFloatAsState(if (deletePressed) 0.88f else 1.0f, label = "del")
-            val onDeleteClick = remember(item, viewModel) { { viewModel.deleteAlert(item) } }
 
             IconButton(
                 onClick = onDeleteClick,
@@ -291,13 +349,13 @@ fun HistoryItemCard(
                         scaleX = deleteScale
                         scaleY = deleteScale
                     }
-                    .size(42.dp)
+                    .size(if (isCompact) 34.dp else 42.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Delete,
                     contentDescription = stringResource(R.string.delete),
                     tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(if (isCompact) 18.dp else 24.dp)
                 )
             }
         }

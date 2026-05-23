@@ -189,13 +189,13 @@ class TactileRulerSlider @JvmOverloads constructor(
                 scroller.forceFinished(true)
                 lastX = event.x
                 isDragging = false
-                parent?.requestDisallowInterceptTouchEvent(true)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.x - lastX
                 if (!isDragging && abs(dx) > touchSlop) {
                     isDragging = true
+                    parent?.requestDisallowInterceptTouchEvent(true)
                 }
                 
                 if (isDragging) {

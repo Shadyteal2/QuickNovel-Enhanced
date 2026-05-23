@@ -189,6 +189,9 @@
     <string name="theme">App Theme</string>
     <string name="primary_color_key" translatable="false">primary_color_key</string>
     <string name="primary_color_settings">Accent Color</string>
+    <string name="app_font_key" translatable="false">app_font_key</string>
+    <string name="app_font">App Font Style</string>
+    <string name="app_font_desc">Choose a custom font style for the entire app UI</string>
     <string name="library_display_mode">Library Display Mode</string>
     <string name="rating_format">Book Rating Format</string>
     <string name="cancel">Cancel</string>
@@ -483,5 +486,10 @@
     <string name="a11y_drag_handle">Drag Handle</string>
     <string name="a11y_info">Information</string>
     <string name="a11y_theme_format">Select %s Theme</string>
+    <string name="history_density_comfortable">Comfortable Layout</string>
+    <string name="history_density_compact">Compact Layout</string>
+    <string name="app_font_scale_key" translatable="false">app_font_scale</string>
+    <string name="app_font_scale">Global Font Size Scale</string>
+    <string name="app_font_scale_desc">Adjust the visual size of all UI fonts in Compose</string>
     <string name="show_reading_progress">Show Reading Progress</string>
 </resources>

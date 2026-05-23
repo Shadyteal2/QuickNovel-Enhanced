@@ -8,9 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -189,9 +187,73 @@ fun QuickNovelTheme(
         }
     }
 
+    val settingsManager = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
+    
+    var fontKey by remember { 
+        mutableStateOf(
+            try {
+                settingsManager.getString(context.getString(R.string.app_font_key), "default") ?: "default"
+            } catch (e: Exception) {
+                "default"
+            }
+        )
+    }
+    
+    var fontScaleInt by remember { 
+        mutableStateOf(
+            try {
+                settingsManager.getInt("app_font_scale", 100)
+            } catch (e: Exception) {
+                100
+            }
+        )
+    }
+    
+    DisposableEffect(settingsManager) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == context.getString(R.string.app_font_key)) {
+                fontKey = settingsManager.getString(key, "default") ?: "default"
+            } else if (key == "app_font_scale") {
+                fontScaleInt = settingsManager.getInt(key, 100)
+            }
+        }
+        settingsManager.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            settingsManager.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
+    val resolvedFontFamily = remember(fontKey) {
+        when (fontKey) {
+            "productsans" -> ProductSansFontFamily
+            "comico" -> ComicoFontFamily
+            "instrument_serif" -> InstrumentSerifFontFamily
+            "manosque" -> ManosqueFontFamily
+            "orbitron" -> OrbitronFontFamily
+            "skyscapers" -> SkyscapersFontFamily
+            "struggle" -> StruggleFontFamily
+            "typefesse_claire_obscure" -> TypefesseClaireObscureFontFamily
+            "typefesse_pleine" -> TypefessePleineFontFamily
+            "unique" -> UniqueFontFamily
+            "nevis" -> NevisFontFamily
+            "nightydemo" -> NightyDemoFontFamily
+            "ostrich_sans_bold" -> OstrichSansBoldFontFamily
+            "ostrich_sans_inline" -> OstrichSansInlineFontFamily
+            "rude" -> RudeFontFamily
+            "shadowhand" -> ShadowHandFontFamily
+            else -> androidx.compose.ui.text.font.FontFamily.Default
+        }
+    }
+    
+    val fontScale = fontScaleInt / 100f
+    
+    val dynamicTypography = remember(resolvedFontFamily, fontScale) {
+        getTypography(resolvedFontFamily, fontScale)
+    }
+
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = dynamicTypography,
         content = content
     )
 }

@@ -4,40 +4,40 @@
     <font
             app:fontStyle="normal"
             app:fontWeight="100"
-            app:font="@font/productsans_thin" />
+            app:font="@font/productsans_bold" />
     <font
             app:fontStyle="italic"
             app:fontWeight="100"
-            app:font="@font/productsans_thinitalic" />
+            app:font="@font/productsans_bold" />
 
     <font
             app:fontStyle="normal"
             app:fontWeight="300"
-            app:font="@font/productsans_light" />
+            app:font="@font/productsans_bold" />
 
     <font
             app:fontStyle="italic"
             app:fontWeight="300"
-            app:font="@font/productsans_lightitalic" />
+            app:font="@font/productsans_bold" />
 
     <font
             app:fontStyle="normal"
             app:fontWeight="400"
-            app:font="@font/productsans_regular" />
+            app:font="@font/productsans_bold" />
 
     <font
             app:fontStyle="italic"
             app:fontWeight="400"
-            app:font="@font/productsans_italic" />
+            app:font="@font/productsans_bold" />
 
     <font
             app:fontStyle="normal"
             app:fontWeight="500"
-            app:font="@font/productsans_medium" />
+            app:font="@font/productsans_bold" />
     <font
             app:fontStyle="italic"
             app:fontWeight="500"
-            app:font="@font/productsans_mediumitalic" />
+            app:font="@font/productsans_bold" />
 
     <font
             app:fontStyle="normal"
@@ -46,7 +46,7 @@
     <font
             app:fontStyle="italic"
             app:fontWeight="700"
-            app:font="@font/productsans_bolditalic" />
+            app:font="@font/productsans_bold" />
 
     <font
             app:fontStyle="normal"
@@ -55,5 +55,5 @@
     <font
             app:fontStyle="italic"
             app:fontWeight="900"
-            app:font="@font/productsans_blackitalic" />
+            app:font="@font/productsans_black" />
 </font-family>

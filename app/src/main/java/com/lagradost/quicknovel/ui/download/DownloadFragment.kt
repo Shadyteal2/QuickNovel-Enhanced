@@ -22,6 +22,7 @@ import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 class DownloadFragment : Fragment() {
     private lateinit var viewModel: DownloadViewModel
 
+    @androidx.compose.runtime.Immutable
     data class DownloadData(
         @JsonProperty("source")
         val source: String,
@@ -61,6 +62,7 @@ class DownloadFragment : Fragment() {
         val bookmarkType: Int? = null,
     )
 
+    @androidx.compose.runtime.Immutable
     data class DownloadDataLoaded(
         val source: String,
         val name: String,

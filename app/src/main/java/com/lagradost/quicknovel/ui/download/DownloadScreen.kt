@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -128,6 +129,11 @@ fun DownloadScreen(
 
     // ViewPager / HorizontalPager state
     val pagerState = rememberPagerState(pageCount = { allTabs.size })
+
+    var activeTargetPage by remember { mutableStateOf(pagerState.currentPage) }
+    LaunchedEffect(pagerState.currentPage) {
+        activeTargetPage = pagerState.currentPage
+    }
 
     val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
     val hasBackground = !imageUri.isNullOrBlank()
@@ -324,8 +330,11 @@ fun DownloadScreen(
                                         strokeColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else null
                                     )
                                     .clickable {
-                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                        scope.launch { pagerState.animateScrollToPage(index) }
+                                        if (activeTargetPage != index) {
+                                            activeTargetPage = index
+                                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                            scope.launch { pagerState.animateScrollToPage(index) }
+                                        }
                                     }
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
                                 contentAlignment = Alignment.Center
@@ -415,7 +424,22 @@ fun DownloadScreen(
                     }
                 } else {
                     if (isCompact) {
+                        val listState = rememberLazyListState()
+                        
+                        // Prefetch cover images of the upcoming 8 novels as the user scrolls
+                        LaunchedEffect(listState.firstVisibleItemIndex, list) {
+                            val totalItems = list.size
+                            val startIndex = (listState.firstVisibleItemIndex + 10).coerceAtMost(totalItems)
+                            val endIndex = (startIndex + 8).coerceAtMost(totalItems)
+                            for (i in startIndex until endIndex) {
+                                val card = list.getOrNull(i) ?: continue
+                                val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
+                                coil3.SingletonImageLoader.get(context).enqueue(req)
+                            }
+                        }
+
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -442,11 +466,35 @@ fun DownloadScreen(
                                         else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
                                     }
                                 }
+                                val onPauseClick = remember(card, viewModel) {
+                                    {
+                                        if (card is DownloadFragment.DownloadDataLoaded) viewModel.pause(card)
+                                    }
+                                }
+                                val onResumeClick = remember(card, viewModel) {
+                                    {
+                                        if (card is DownloadFragment.DownloadDataLoaded) viewModel.resume(card)
+                                    }
+                                }
+                                val onRefreshClick = remember(card, viewModel) {
+                                    {
+                                        if (card is DownloadFragment.DownloadDataLoaded) viewModel.refreshCard(card)
+                                    }
+                                }
+                                val onDeleteClick = remember(card, viewModel) {
+                                    {
+                                        if (card is DownloadFragment.DownloadDataLoaded) viewModel.deleteAlert(card)
+                                    }
+                                }
+
                                 CompactCardItem(
                                     card = card,
-                                    viewModel = viewModel,
                                     onClick = currentOnClick,
-                                    onLongClick = currentOnLongClick
+                                    onLongClick = currentOnLongClick,
+                                    onPauseClick = onPauseClick,
+                                    onResumeClick = onResumeClick,
+                                    onRefreshClick = onRefreshClick,
+                                    onDeleteClick = onDeleteClick
                                 )
                             }
                             // Bottom Import item inside downloads page
@@ -459,8 +507,22 @@ fun DownloadScreen(
                     } else {
                         // Grid layout (Pinterest/Bento style)
                         val totalCount = list.size + (if (isDownloadsPage) 1 else 0)
+                        val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+
+                        // Prefetch cover images of the upcoming 12 novels (4 rows of 3 columns) as the user scrolls
+                        LaunchedEffect(gridState.firstVisibleItemIndex, list) {
+                            val totalItems = list.size
+                            val startIndex = (gridState.firstVisibleItemIndex + 15).coerceAtMost(totalItems)
+                            val endIndex = (startIndex + 12).coerceAtMost(totalItems)
+                            for (i in startIndex until endIndex) {
+                                val card = list.getOrNull(i) ?: continue
+                                val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
+                                coil3.SingletonImageLoader.get(context).enqueue(req)
+                            }
+                        }
                         
                         LazyVerticalGrid(
+                            state = gridState,
                             columns = GridCells.Fixed(3),
                             modifier = Modifier
                                 .fillMaxSize(),
@@ -539,7 +601,8 @@ fun DownloadScreen(
                                     onDragStart = { offset ->
                                         val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
                                         val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
-                                        if (pagerState.currentPage != targetPage) {
+                                        if (activeTargetPage != targetPage) {
+                                            activeTargetPage = targetPage
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                                             scope.launch { pagerState.animateScrollToPage(targetPage) }
                                         }
@@ -548,7 +611,8 @@ fun DownloadScreen(
                                         change.consume()
                                         val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
                                         val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
-                                        if (pagerState.currentPage != targetPage) {
+                                        if (activeTargetPage != targetPage) {
+                                            activeTargetPage = targetPage
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                                             scope.launch { pagerState.animateScrollToPage(targetPage) }
                                         }
@@ -559,7 +623,8 @@ fun DownloadScreen(
                                 detectTapGestures { offset ->
                                     val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
                                     val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
-                                    if (pagerState.currentPage != targetPage) {
+                                    if (activeTargetPage != targetPage) {
+                                        activeTargetPage = targetPage
                                         view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                                         scope.launch { pagerState.animateScrollToPage(targetPage) }
                                     }
@@ -1177,9 +1242,12 @@ fun GridCardItem(
 @Composable
 fun CompactCardItem(
     card: Any,
-    viewModel: DownloadViewModel,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    onPauseClick: () -> Unit,
+    onResumeClick: () -> Unit,
+    onRefreshClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -1371,11 +1439,11 @@ fun CompactCardItem(
                 IconButton(onClick = {
                     view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                     when (realState) {
-                        DownloadState.IsDownloading -> viewModel.pause(card)
-                        DownloadState.IsPaused -> viewModel.resume(card)
+                        DownloadState.IsDownloading -> onPauseClick()
+                        DownloadState.IsPaused -> onResumeClick()
                         DownloadState.IsPending -> {}
-                        DownloadState.IsDone -> viewModel.refreshCard(card)
-                        else -> viewModel.refreshCard(card)
+                        DownloadState.IsDone -> onRefreshClick()
+                        else -> onRefreshClick()
                     }
                 }) {
                     Icon(
@@ -1388,7 +1456,7 @@ fun CompactCardItem(
                 // Delete Trash Alert
                 IconButton(onClick = {
                     view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                    viewModel.deleteAlert(card)
+                    onDeleteClick()
                 }) {
                     Icon(
                         imageVector = Icons.Default.Delete,

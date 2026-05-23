@@ -92,6 +92,7 @@ const val REVERSE_CHAPTER_SORT = 12
 
 data class SortingMethod(@StringRes val name: Int, val id: Int, val inverse: Int = id)
 
+@androidx.compose.runtime.Immutable
 data class CategoryItem(
     val id: Int,
     @StringRes val stringRes: Int? = null,
@@ -599,7 +600,7 @@ class DownloadViewModel : ViewModel() {
         _pages.postValue(list)
     }
 
-    // QN-Enhanced: Background data loading from Room SSOT
+    // QN-Enhanced: Background data loading from Room SSOT with native SQLite sorting/filtering
     fun loadAllData(refreshAll: Boolean) = viewModelScope.launch(Dispatchers.Default) {
         if (refreshAll) fetchAllData(false)
         val mapping: HashMap<Int, ArrayList<ResultCached>> = hashMapOf()
@@ -608,8 +609,22 @@ class DownloadViewModel : ViewModel() {
             mapping[cat.id] = arrayListOf()
         }
 
-        // Fetch from Room
-        val bookmarks = dao.getAllBookmarksAsFlow().first()
+        val newSortingMethod = getKey(DOWNLOAD_SETTINGS, DOWNLOAD_NORMAL_SORTING_METHOD) ?: DEFAULT_SORT
+
+        // Fetch sorted/filtered subset natively from Room to support 10k+ books efficiently
+        val bookmarks = if (activeQuery.isNotBlank()) {
+            val queryPattern = "%${activeQuery}%"
+            dao.getBookmarksFiltered(queryPattern)
+        } else {
+            when (newSortingMethod) {
+                ALPHA_SORT -> dao.getBookmarksSortedAlphabetical()
+                REVERSE_ALPHA_SORT -> dao.getBookmarksSortedAlphabeticalDesc()
+                LAST_UPDATED_SORT -> dao.getBookmarksSortedLastDownloaded()
+                REVERSE_LAST_UPDATED_SORT -> dao.getBookmarksSortedLastDownloadedAsc()
+                else -> dao.getAllBookmarksAsFlow().first()
+            }
+        }
+
         for (novel in bookmarks) {
             val type = novel.bookmarkType ?: continue
             val cached = ResultCached(
@@ -638,7 +653,13 @@ class DownloadViewModel : ViewModel() {
 
         for (read in currentCategories) {
             val unsorted = mapping[read.id] ?: arrayListOf()
-            val sorted = sortNormalArray(ArrayList(unsorted))
+            // If activeQuery is not blank, we rank by relevance score in memory since the filtered list is small!
+            // If activeQuery is blank, the list is already sorted natively by Room, so we skip sortNormalArray!
+            val sorted = if (activeQuery.isNotBlank()) {
+                sortNormalArray(ArrayList(unsorted))
+            } else {
+                unsorted
+            }
             
             pages.add(
                 Page(

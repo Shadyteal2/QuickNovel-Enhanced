@@ -255,7 +255,20 @@ fun RecommendationGroupSection(
     onBookClick: (String, String) -> Unit
 ) {
     val view = LocalView.current
+    val context = LocalContext.current
     val lazyListState = rememberLazyListState()
+
+    // Prefetch cover images of the upcoming 8 novels as the user scrolls
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, group.recommendations) {
+        val totalItems = group.recommendations.size
+        val startIndex = (lazyListState.firstVisibleItemIndex + 6).coerceAtMost(totalItems)
+        val endIndex = (startIndex + 8).coerceAtMost(totalItems)
+        for (i in startIndex until endIndex) {
+            val card = group.recommendations.getOrNull(i)?.novel ?: continue
+            val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
+            coil3.SingletonImageLoader.get(context).enqueue(req)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(

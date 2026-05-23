@@ -157,7 +157,6 @@ fun ResultDetailDefaultScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
                 ) {
                     AsyncImage(
                         model = rememberDefaultImageRequest(res.image, context),

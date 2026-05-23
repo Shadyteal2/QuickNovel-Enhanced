@@ -309,23 +309,16 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             return
         }
 
-        val builder = AlertDialog.Builder(this, R.style.AlertDialogCustom)
-        builder.setTitle("Import Provider")
-        builder.setMessage("Join the NeoQN telegram/discord to get the latest providers apk, you can find the social links in settings and import it")
-        
-        val checkBoxView = android.view.LayoutInflater.from(this).inflate(R.layout.dialog_checkbox, null)
-        val checkBox = checkBoxView.findViewById<android.widget.CheckBox>(R.id.dialog_checkbox)
-        checkBox.text = "Do not show again"
-        builder.setView(checkBoxView)
-
-        builder.setPositiveButton("OK") { _, _ ->
-            if (checkBox.isChecked) {
-                settingsManager.edit().putBoolean("SKIP_PROVIDER_IMPORT_WARNING", true).apply()
-            }
-            providerApkPicker.launch(arrayOf("application/vnd.android.package-archive", "*/*"))
-        }
-        builder.setNegativeButton(R.string.cancel, null)
-        builder.show()
+        com.lagradost.quicknovel.util.ComposeDialogHelper.showImportProviderDialog(
+            context = this,
+            onConfirm = { doNotShowAgain ->
+                if (doNotShowAgain) {
+                    settingsManager.edit().putBoolean("SKIP_PROVIDER_IMPORT_WARNING", true).apply()
+                }
+                providerApkPicker.launch(arrayOf("application/vnd.android.package-archive", "*/*"))
+            },
+            onCancel = {}
+        )
     }
 
     private fun android.view.View.applySpringTouch() {
@@ -1309,6 +1302,11 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 enabled = true,
                 state = settingsManager.getBackgroundEffectState(this@MainActivity),
             )
+
+            // Force transparency on structural view wrappers so the custom background image shows through in fragment tabs
+            val helper = com.lagradost.quicknovel.util.AuraTransparencyHelper
+            helper.forceTransparent(mainContentWrapper)
+            helper.forceTransparent(homeRoot)
         }
     }
     fun updateGlobalAura() {

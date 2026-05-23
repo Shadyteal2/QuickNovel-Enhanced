@@ -28,7 +28,8 @@ class UpdatesFragment : Fragment() {
                     UpdatesScreen(
                         viewModel = viewModel,
                         onCleanupClick = { showCleanupDialog() },
-                        onSelectClick = { showSelectDialog() }
+                        onSelectClick = { showSelectDialog() },
+                        onBack = { activity?.onBackPressedDispatcher?.onBackPressed() }
                     )
                 }
             }

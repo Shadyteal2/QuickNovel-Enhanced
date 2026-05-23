@@ -27,6 +27,21 @@ interface NovelDao {
     @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0")
     fun getAllBookmarksAsFlow(): Flow<List<NovelEntity>>
 
+    @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0 ORDER BY name COLLATE NOCASE ASC")
+    fun getBookmarksSortedAlphabetical(): List<NovelEntity>
+
+    @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0 ORDER BY name COLLATE NOCASE DESC")
+    fun getBookmarksSortedAlphabeticalDesc(): List<NovelEntity>
+
+    @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0 ORDER BY COALESCE(lastDownloaded, 0) DESC")
+    fun getBookmarksSortedLastDownloaded(): List<NovelEntity>
+
+    @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0 ORDER BY COALESCE(lastDownloaded, 0) ASC")
+    fun getBookmarksSortedLastDownloadedAsc(): List<NovelEntity>
+
+    @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0 AND name LIKE :queryPattern")
+    fun getBookmarksFiltered(queryPattern: String): List<NovelEntity>
+
     @Query("UPDATE novel SET bookmarkType = :type WHERE id = :id")
     fun updateBookmarkType(id: Int, type: Int?)
 

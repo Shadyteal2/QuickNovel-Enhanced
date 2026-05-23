@@ -370,7 +370,23 @@ fun StandardSearchLayout(
     onBookClick: (SearchResponse) -> Unit,
     onBookLongClick: (SearchResponse) -> Unit
 ) {
+    val context = LocalContext.current
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+
+    // Prefetch cover images of the upcoming 12 novels as the user scrolls
+    LaunchedEffect(gridState.firstVisibleItemIndex, results) {
+        val totalItems = results.size
+        val startIndex = (gridState.firstVisibleItemIndex + 15).coerceAtMost(totalItems)
+        val endIndex = (startIndex + 12).coerceAtMost(totalItems)
+        for (i in startIndex until endIndex) {
+            val card = results.getOrNull(i) ?: continue
+            val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
+            coil3.SingletonImageLoader.get(context).enqueue(req)
+        }
+    }
+
     LazyVerticalGrid(
+        state = gridState,
         columns = GridCells.Adaptive(110.dp),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 120.dp),
@@ -419,6 +435,21 @@ fun ProviderSearchResultsRow(
     onMoreClick: () -> Unit
 ) {
     val view = LocalView.current
+    val context = LocalContext.current
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    // Prefetch cover images of the upcoming 8 novels as the user scrolls
+    LaunchedEffect(listState.firstVisibleItemIndex, provider.list) {
+        val totalItems = provider.list.size
+        val startIndex = (listState.firstVisibleItemIndex + 6).coerceAtMost(totalItems)
+        val endIndex = (startIndex + 8).coerceAtMost(totalItems)
+        for (i in startIndex until endIndex) {
+            val card = provider.list.getOrNull(i) ?: continue
+            val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
+            coil3.SingletonImageLoader.get(context).enqueue(req)
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         Row(
             modifier = Modifier
@@ -442,6 +473,7 @@ fun ProviderSearchResultsRow(
         }
 
         LazyRow(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
                 .pointerInput(Unit) {

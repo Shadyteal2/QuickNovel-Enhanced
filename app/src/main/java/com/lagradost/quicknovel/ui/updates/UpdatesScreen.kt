@@ -32,14 +32,25 @@ import coil3.SingletonImageLoader
 import com.lagradost.quicknovel.db.UpdateItem
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 import com.lagradost.quicknovel.MainActivity
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.graphics.Color
+import androidx.preference.PreferenceManager
+import com.lagradost.quicknovel.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun UpdatesScreen(
     viewModel: UpdatesViewModel,
     onCleanupClick: () -> Unit,
-    onSelectClick: () -> Unit
+    onSelectClick: () -> Unit,
+    onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
+    val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
+    val hasBackground = !imageUri.isNullOrBlank()
+    val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
+
     val groupedUpdates by viewModel.groupedUpdates.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
@@ -60,6 +71,33 @@ fun UpdatesScreen(
     }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Updates",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+            )
+        },
         floatingActionButton = {
             Column(
                 horizontalAlignment = Alignment.End,
@@ -82,7 +120,7 @@ fun UpdatesScreen(
                 }
             }
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = containerColor
     ) { paddingValues ->
         Box(
             modifier = Modifier
