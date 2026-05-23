@@ -130,9 +130,10 @@ class WebViewResolver(
                         return@main
                     }
                     
-                    val builder = androidx.appcompat.app.AlertDialog.Builder(activity)
+                    val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity, com.lagradost.quicknovel.R.style.AlertDialogCustom)
                         .setView(webView)
                         .setTitle("Cloudflare Verification")
+                        .setMessage("Please complete the verification challenge below to safely access the provider.")
                         .setNegativeButton("Cancel") { _, _ -> destroyWebView() }
                         .setOnCancelListener { destroyWebView() }
                     
@@ -142,7 +143,7 @@ class WebViewResolver(
                     // Resize to be useful but not full screen
                     dialog?.window?.setLayout(
                         (activity.resources.displayMetrics.widthPixels * 0.9).toInt(),
-                        (activity.resources.displayMetrics.heightPixels * 0.8).toInt()
+                        (activity.resources.displayMetrics.heightPixels * 0.85).toInt()
                     )
                 }
 
@@ -194,7 +195,7 @@ class WebViewResolver(
                             ".woff2",
                             ".woff",
                             ".ttf",
-                            ".css",
+                            // ".css", removed to allow Cloudflare's own layout/dark mode to render
                             ".vtt",
                             ".srt",
                             ".ts",

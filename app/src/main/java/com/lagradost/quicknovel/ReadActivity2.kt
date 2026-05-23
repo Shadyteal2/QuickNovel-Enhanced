@@ -1656,6 +1656,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             
             val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
             bottomSheetDialog.behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            bottomSheetDialog.behavior.isDraggable = false
             val composeView = androidx.compose.ui.platform.ComposeView(this).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,

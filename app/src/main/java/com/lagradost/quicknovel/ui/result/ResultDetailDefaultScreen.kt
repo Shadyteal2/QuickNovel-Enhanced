@@ -111,11 +111,12 @@ fun ResultDetailDefaultScreen(
     val duplicateBookmark    by viewModel.duplicateBookmarkState.observeAsState()
     val readState            by viewModel.readState.observeAsState()
     val currentId            by viewModel.id.observeAsState(-1)
+    val bookmarkState        by viewModel.bookmarkState.observeAsState(-1)
 
-    val bookmarkTitle = remember(readState, duplicateBookmark, currentId) {
+    val bookmarkLabel = remember(readState, duplicateBookmark, currentId, bookmarkState) {
         resolveBookmarkTitle(context, viewModel, currentId, readState)
     }
-    val hasBookmark = bookmarkTitle != defaultBookmarkLabel
+    val hasBookmark = bookmarkLabel != defaultBookmarkLabel
 
     // ── Root Box fills entire screen ──────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
@@ -378,7 +379,7 @@ fun ResultDetailDefaultScreen(
                                                 )
                                                 Spacer(Modifier.width(8.dp))
                                                 Text(
-                                                    text = bookmarkTitle,
+                                                    text = if (hasBookmark) bookmarkLabel else "Add to Library",
                                                     fontSize = 14.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     maxLines = 1,
@@ -390,7 +391,9 @@ fun ResultDetailDefaultScreen(
                                                 onDismissRequest = { bookmarkMenuExpanded = false }
                                             ) {
                                                 val categories = remember { loadDefaultBookmarkCategories(context) }
-                                                val currentStateId = if (readState == null || readState == ReadType.NONE) -1 else readState!!.prefValue
+                                                val currentStateId = remember(readState, currentId, bookmarkState) {
+                                                    BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
+                                                }
                                                 categories.forEach { (id, label) ->
                                                     DropdownMenuItem(
                                                         text = {
@@ -753,7 +756,7 @@ private fun defaultContinueReadingLabel(
 // ─── Bookmark categories loader ───────────────────────────────────────────────
 private fun loadDefaultBookmarkCategories(context: Context): List<Pair<Int, String>> {
     val json   = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+    val mapper = com.lagradost.quicknovel.DataStore.mapper
     val customCats = try {
         mapper.readValue(
             json,
@@ -782,13 +785,13 @@ private fun resolveBookmarkTitle(
     currentId: Int,
     readState: ReadType?,
 ): String {
-    val currentStateId = if (readState == null || readState == ReadType.NONE) -1 else readState.prefValue
+    val currentStateId = BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
     if (currentStateId != -1) {
         DownloadViewModel.systemCategories
             .find { it.id == currentStateId }?.stringRes
             ?.let { return context.getString(it) }
         val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = com.lagradost.quicknovel.DataStore.mapper
         val customCats = try {
             mapper.readValue(
                 json,
@@ -803,7 +806,7 @@ private fun resolveBookmarkTitle(
             return "In Library (${context.getString(systemCat.stringRes ?: R.string.bookmark)})"
         } else {
             val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+            val mapper = com.lagradost.quicknovel.DataStore.mapper
             val customCats = try {
                 mapper.readValue(
                     json,

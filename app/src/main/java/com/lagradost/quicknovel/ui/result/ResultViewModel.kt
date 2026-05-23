@@ -302,6 +302,7 @@ class ResultViewModel : ViewModel() {
 
     var id: MutableLiveData<Int> = MutableLiveData<Int>(-1)
     var readState: MutableLiveData<ReadType> = MutableLiveData<ReadType>(ReadType.NONE)
+    var bookmarkState: MutableLiveData<Int> = MutableLiveData<Int>(-1)
     val duplicateBookmarkState = MutableLiveData<Int?>(null)
 
     var apiName : String = ""
@@ -752,8 +753,7 @@ class ResultViewModel : ViewModel() {
                             context.getString(systemCat.stringRes ?: R.string.bookmark)
                         } else {
                             val json = getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-                            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
-                                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                            val mapper = com.lagradost.quicknovel.DataStore.mapper
                             val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList() }
                             val customCat = customCats.find { it.id == duplicate }
                             customCat?.name ?: "Library"
@@ -780,6 +780,7 @@ class ResultViewModel : ViewModel() {
                 )
                 updateBookmarkData()
             }
+            bookmarkState.postValue(state)
             readState.postValue(ReadType.fromSpinner(state))
 
             // SSOT: Sync with Room Database
@@ -969,13 +970,9 @@ class ResultViewModel : ViewModel() {
         loadId = tid
         id.postValue(tid)
 
-        readState.postValue(
-            ReadType.fromSpinner(
-                getKey(
-                    RESULT_BOOKMARK_STATE, tid.toString()
-                )
-            )
-        )
+        val state = getKey<Int>(RESULT_BOOKMARK_STATE, tid.toString()) ?: -1
+        bookmarkState.postValue(state)
+        readState.postValue(ReadType.fromSpinner(state))
 
         setKey(
             DOWNLOAD_EPUB_LAST_ACCESS, tid.toString(), System.currentTimeMillis()

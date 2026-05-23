@@ -91,6 +91,9 @@ object BackupUtils {
     private fun isDownloadKey(key: String): Boolean {
         // QN-Enhanced: Strictly ignore all download-related meta/content to reduce backup size
         // and prevent ghost downloads from appearing post-restore.
+        // QN-Enhanced: Allow custom category definitions to be backed up and restored.
+        if (key == "download_settings/CUSTOM_CATEGORIES" || key == "download_settings/CATEGORIES_ORDER") return false
+
         return key.startsWith("downloads_data/") ||
                key.startsWith("downloads_data") || // Catch folder itself
                key.startsWith("download_settings") ||

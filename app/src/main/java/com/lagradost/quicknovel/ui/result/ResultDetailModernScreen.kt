@@ -93,6 +93,7 @@ fun ResultDetailModernScreen(
     val duplicateBookmark by viewModel.duplicateBookmarkState.observeAsState()
     val chapters         by viewModel.chapters.observeAsState(emptyList())
     val currentId        by viewModel.id.observeAsState(-1)
+    val bookmarkState    by viewModel.bookmarkState.observeAsState(-1)
 
     var selectedTab          by remember { mutableIntStateOf(0) }
 
@@ -107,10 +108,10 @@ fun ResultDetailModernScreen(
     val context = LocalContext.current
 
     val defaultBookmarkLabel = stringResource(R.string.bookmark)
-    val bookmarkTitle = remember(readState, duplicateBookmark, currentId) {
+    val bookmarkLabel = remember(currentId, readState, duplicateBookmark, bookmarkState) {
         resolveBookmarkTitle(context, viewModel, currentId, readState)
     }
-    val hasBookmark = bookmarkTitle != defaultBookmarkLabel
+    val hasBookmark = bookmarkLabel != defaultBookmarkLabel
 
     // ── Root box fills entire screen ──────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
@@ -149,6 +150,17 @@ fun ResultDetailModernScreen(
                 val chapterCount = (res as? StreamResponse)?.data?.size
 
                 var showPosterViewer by remember { mutableStateOf(false) }
+
+                // Responsive hero height calculation based on available screen space to prevent clipping on small/folded screens
+                val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                val screenHeight = configuration.screenHeightDp.dp
+                val dynamicHeroHeight = remember(screenHeight) {
+                    if (screenHeight < 720.dp) {
+                        screenHeight * 0.42f
+                    } else {
+                        380.dp
+                    }
+                }
 
                 // Full-screen dialog viewer for the cover poster
                 if (showPosterViewer) {
@@ -211,7 +223,7 @@ fun ResultDetailModernScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(HERO_HEIGHT)
+                            .height(dynamicHeroHeight)
                     ) {
                         AsyncImage(
                             model = rememberHighQualityRequest(res.image, context),
@@ -257,12 +269,13 @@ fun ResultDetailModernScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(HERO_HEIGHT)
+                                .height(dynamicHeroHeight)
                         ) {
-                            // ── Back pill (top-left) ──────────────────────────────
+                            // ── Back pill (top-left) — notch & cutout safe ──────────────────────────────
                             Box(
                                 modifier = Modifier
                                     .statusBarsPadding()
+                                    .displayCutoutPadding()
                                     .padding(start = 16.dp, top = 12.dp)
                                     .align(Alignment.TopStart)
                                     .size(42.dp)
@@ -279,10 +292,11 @@ fun ResultDetailModernScreen(
                                 )
                             }
 
-                            // ── Action pills (top-right): Share, Browser, Bell ──────────────────
+                            // ── Action pills (top-right): Share, Browser, Bell — notch & cutout safe ──────────────────
                             Row(
                                 modifier = Modifier
                                     .statusBarsPadding()
+                                    .displayCutoutPadding()
                                     .padding(end = 16.dp, top = 12.dp)
                                     .align(Alignment.TopEnd),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -504,6 +518,12 @@ fun ResultDetailModernScreen(
                                                         android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                                         android.view.ViewGroup.LayoutParams.MATCH_PARENT
                                                     )
+                                                    
+                                                    // Add bottom padding to allow scrolling past the floating action bar
+                                                    val padBottom = (96 * ctx.resources.displayMetrics.density).toInt()
+                                                    setPadding(paddingLeft, paddingTop, paddingRight, padBottom)
+                                                    clipToPadding = false
+                                                    
                                                     layoutManager = LinearLayoutManager(ctx)
                                                     adapter = chapterAdapter
                                                     setHasFixedSize(true)
@@ -549,7 +569,7 @@ fun ResultDetailModernScreen(
                         apiName != "OceanOfPDF" -> {
                             PremiumActionBar(
                                 continueLabel        = continueReadingLabel(res, chapters.orEmpty(), viewModel),
-                                bookmarkLabel        = bookmarkTitle,
+                                bookmarkLabel        = bookmarkLabel,
                                 hasBookmark          = hasBookmark,
                                 bookmarkMenuExpanded = bookmarkMenuExpanded,
                                 onBookmarkMenuChange = { bookmarkMenuExpanded = it },
@@ -686,7 +706,10 @@ private fun PremiumActionBar(
     val categories    = remember { loadBookmarkCategories(context) }
     val currentId by viewModel.id.observeAsState(-1)
     val readState by viewModel.readState.observeAsState()
-    val currentStateId = if (readState == null || readState == ReadType.NONE) -1 else readState!!.prefValue
+    val bookmarkState by viewModel.bookmarkState.observeAsState(-1)
+    val currentStateId = remember(readState, currentId, bookmarkState) {
+        BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
+    }
 
     Surface(
         modifier      = Modifier.fillMaxWidth(),
@@ -858,13 +881,13 @@ private fun resolveBookmarkTitle(
     currentId: Int,
     readState: ReadType?,
 ): String {
-    val currentStateId = if (readState == null || readState == ReadType.NONE) -1 else readState.prefValue
+    val currentStateId = BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
     if (currentStateId != -1) {
         DownloadViewModel.systemCategories
             .find { it.id == currentStateId }?.stringRes
             ?.let { return context.getString(it) }
         val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = com.lagradost.quicknovel.DataStore.mapper
         val customCats = try {
             mapper.readValue(
                 json,
@@ -879,7 +902,7 @@ private fun resolveBookmarkTitle(
             return "In Library (${context.getString(systemCat.stringRes ?: R.string.bookmark)})"
         } else {
             val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+            val mapper = com.lagradost.quicknovel.DataStore.mapper
             val customCats = try {
                 mapper.readValue(
                     json,
@@ -897,7 +920,7 @@ private fun resolveBookmarkTitle(
 
 private fun loadBookmarkCategories(context: Context): List<Pair<Int, String>> {
     val json   = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+    val mapper = com.lagradost.quicknovel.DataStore.mapper
     val customCats = try {
         mapper.readValue(
             json,

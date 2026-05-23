@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -184,10 +185,10 @@ fun HistoryScreen(
 
                     LazyVerticalGrid(
                         state = gridState,
-                        columns = GridCells.Fixed(if (isLandscape) { if (isCompact) 4 else 2 } else { if (isCompact) 2 else 1 }),
+                        columns = GridCells.Fixed(if (isLandscape) 2 else 1),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(if (isCompact) 10.dp else 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(if (isCompact) 10.dp else 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isCompact) 8.dp else 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isCompact) 8.dp else 14.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         itemsIndexed(
@@ -234,11 +235,27 @@ fun HistoryItemCard(
         }
     }
 
+    val cardShape = remember(isCompact) { RoundedCornerShape(if (isCompact) 12.dp else 20.dp) }
+    val posterShape = remember(isCompact) {
+        RoundedCornerShape(
+            topStart = if (isCompact) 12.dp else 20.dp,
+            bottomStart = if (isCompact) 12.dp else 20.dp
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(if (isCompact) 80.dp else 115.dp)
-            .glassCard(RoundedCornerShape(if (isCompact) 12.dp else 20.dp))
+            .let { modifier ->
+                if (isCompact) {
+                    modifier
+                        .clip(cardShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                } else {
+                    modifier.glassCard(cardShape)
+                }
+            }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = currentOnLongClickWithHaptic
@@ -250,7 +267,7 @@ fun HistoryItemCard(
             modifier = Modifier
                 .fillMaxHeight()
                 .width(if (isCompact) 56.dp else 82.dp)
-                .clip(RoundedCornerShape(topStart = if (isCompact) 12.dp else 20.dp, bottomStart = if (isCompact) 12.dp else 20.dp))
+                .clip(posterShape)
         ) {
             AsyncImage(
                 model = rememberImageRequest(data = item),

@@ -1502,8 +1502,24 @@ object BookDownloader2 {
                     downloadData[id] = res
 
                     val state = novel.downloadStatus?.let { DownloadState.values().getOrNull(it) } ?: DownloadState.Nothing
+                    
+                    // Cleanup orphaned active states when the app starts up/reopens
+                    val cleanedState = if (state == DownloadState.IsDownloading || state == DownloadState.IsPending || state == DownloadState.IsPaused) {
+                        DownloadState.IsStopped
+                    } else {
+                        state
+                    }
+
+                    // Update the database to reflect the stopped state so both DB and memory are synchronized
+                    if (cleanedState != state) {
+                        ioSafe {
+                            val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@ioSafe).novelDao()
+                            dao.updateDownloadProgress(id, cleanedState.ordinal, novel.downloadProgress ?: info.progress, novel.downloadTotal ?: info.total)
+                        }
+                    }
+
                     downloadProgress[id] = DownloadProgressState(
-                        state = state,
+                        state = cleanedState,
                         progress = novel.downloadProgress ?: info.progress,
                         total = novel.downloadTotal ?: info.total,
                         downloaded = novel.downloadProgress ?: info.downloaded,
@@ -1512,45 +1528,6 @@ object BookDownloader2 {
                         lastDbUpdateMs = System.currentTimeMillis(),
                         lastDbProgress = novel.downloadProgress ?: info.progress
                     )
-                    
-                    // We do NOT add it to currentDownloads here.
-                    // The background thread (triggered below) will add itself when it starts.
-                    // This prevents the thread from exiting early due to a 'duplicate' check.
-                    if (state == DownloadState.IsDownloading || state == DownloadState.IsPending) {
-                        // Explicitly resume the download task
-                        val card = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded(
-                            source = novel.source,
-                            name = novel.name,
-                            author = novel.author,
-                            posterUrl = novel.posterUrl,
-                            rating = novel.rating,
-                            peopleVoted = novel.peopleVoted,
-                            views = novel.views,
-                            synopsis = novel.synopsis,
-                            tags = novel.tags,
-                            apiName = novel.apiName,
-                            readCount = 0,
-                            downloadedCount = novel.downloadProgress ?: 0L,
-                            downloadedTotal = novel.downloadTotal ?: 0L,
-                            ETA = "",
-                            state = state,
-                            id = novel.id,
-                            generating = false,
-                            lastUpdated = novel.lastUpdated,
-                            lastDownloaded = novel.lastDownloaded,
-                            filePath = novel.filePath,
-                            formatType = novel.formatType,
-                            hash = novel.hash,
-                            bookmarkType = novel.bookmarkType
-                        )
-                        DownloadFileWorkManager.download(card, context!!)
-                    } else if (state == DownloadState.IsPaused || state == DownloadState.IsDownloading || state == DownloadState.IsPending) {
-                        // Orphaned active state: The app was closed or crashed while this was active.
-                        // We reset the in-memory state to IsStopped so that:
-                        //  - The UI shows the correct 'resume/restart' controls (not dead buttons)
-                        //  - addPendingActionAsync will properly restart the job if Resume is called.
-                        downloadProgress[id]?.state = DownloadState.IsStopped
-                    }
                 }
             }
         }
@@ -2816,6 +2793,7 @@ object BookDownloader2 {
 
         val downloadedTotal = java.util.concurrent.atomic.AtomicLong(0L) // how many successful get requests
         val failedChapters = java.util.concurrent.atomic.AtomicLong(0L)  // chapters that failed all retries — tracked but do NOT abort the loop
+        val consecutiveFailures = java.util.concurrent.atomic.AtomicInteger(0)
 
         try {
             // 1. download the image
@@ -2885,6 +2863,7 @@ object BookDownloader2 {
 
                             if (hasDownloadedChapter) {
                                 downloadedTotal.incrementAndGet()
+                                consecutiveFailures.set(0) // Reset on success!
                                 // Fix: Polite inter-chapter delay when the provider has no rate limit configured.
                                 // Avoids hammering the server and triggering anti-bot protection.
                                 if (api.rateLimitTime <= 0) {
@@ -2894,6 +2873,14 @@ object BookDownloader2 {
                                 // Fix: Skip the failed chapter and continue — one bad chapter should
                                 // not abort the entire download of a 2000-chapter novel.
                                 failedChapters.incrementAndGet()
+                                val currentFails = consecutiveFailures.incrementAndGet()
+                                if (currentFails >= 10) {
+                                    // Persistent failures: auto-pause to prevent heavy loops and notify the user
+                                    addPendingActionAsync(id, DownloadActionType.Pause)
+                                    main {
+                                        showToast("Download paused: Server is rate-limiting or blocking requests. Please try again later.", Toast.LENGTH_LONG)
+                                    }
+                                }
                             }
 
                             val processedItems = index - range.start +
@@ -2951,7 +2938,9 @@ object BookDownloader2 {
             if (downloadedTotal.get() > 0) {
                 setSuffixData(load, api.name)
             }
-
+            changeDownload(id) {
+                state = DownloadState.IsFailed
+            }
             logError(t)
         } finally {
             currentDownloadsMutex.withLock {
@@ -2971,12 +2960,12 @@ object BookDownloader2 {
         val sAuthor = BookDownloader2Helper.sanitizeFilename(load.author ?: "")
         val sName = BookDownloader2Helper.sanitizeFilename(load.name)
         val id = generateId(load, api.name)
-
         val totalItems = indices.size.toLong()
         setPrefixData(load, api.name, totalItems, 0L)
 
         val downloadedTotal = java.util.concurrent.atomic.AtomicLong(0L)
         val failedChapters = java.util.concurrent.atomic.AtomicLong(0L)  // chapters that failed all retries — tracked but do NOT break the loop
+        val consecutiveFailures = java.util.concurrent.atomic.AtomicInteger(0)
 
         try {
             downloadImage(load, sApiName, sAuthor, sName, filesDir)
@@ -3021,11 +3010,19 @@ object BookDownloader2 {
                             val hasDownloadedChapter = BookDownloader2Helper.downloadIndividualChapter(filepath, api, data)
                             if (hasDownloadedChapter) {
                                 downloadedTotal.incrementAndGet()
+                                consecutiveFailures.set(0) // Reset on success!
                                 // Polite inter-chapter delay when no provider rate limit is configured.
                                 if (api.rateLimitTime <= 0) delay(300L)
                             } else {
                                 // Skip the failed chapter; do not abort the batch download.
                                 failedChapters.incrementAndGet()
+                                val currentFails = consecutiveFailures.incrementAndGet()
+                                if (currentFails >= 10) {
+                                    addPendingActionAsync(id, DownloadActionType.Pause)
+                                    main {
+                                        showToast("Download paused: Server is rate-limiting or blocking requests. Please try again later.", Toast.LENGTH_LONG)
+                                    }
+                                }
                             }
 
                             changeDownload(id) {
@@ -3052,12 +3049,15 @@ object BookDownloader2 {
             changeDownload(id) {
                 this.progress = totalItems
                 this.downloaded = downloadedTotal.get()
-                state = finalState
+                this.state = finalState
             }?.let { progressState ->
                 if (downloadedTotal.get() > 0 || failedChapters.get() > 0) createNotification(id, load, progressState)
             }
         } catch (t: Throwable) {
             if (downloadedTotal.get() > 0) setSuffixData(load, api.name)
+            changeDownload(id) {
+                state = DownloadState.IsFailed
+            }
             logError(t)
         } finally {
             currentDownloadsMutex.withLock { currentDownloads -= id }

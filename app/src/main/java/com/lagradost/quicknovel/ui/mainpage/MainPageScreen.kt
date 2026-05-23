@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -52,6 +53,14 @@ import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
 
 // Spring scaling press effect for high-fidelity micro-animations
 fun Modifier.springScalePress(): Modifier = composed {
@@ -95,11 +104,6 @@ fun MainPageScreen(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     // Observe settings and backgrounds
-    val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
-    val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
-    val hasBackground = !imageUri.isNullOrBlank()
-    val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
-
     // Observe ViewModel LiveData
     val currentCardsState = viewModel.currentCards.observeAsState(initial = Resource.Loading())
     val currentMainCategory by viewModel.currentMainCategory.observeAsState(initial = null)
@@ -111,6 +115,11 @@ fun MainPageScreen(
     var searchQuery by remember { mutableStateOf("") }
 
     QuickNovelTheme {
+        val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
+        val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
+        val hasBackground = !imageUri.isNullOrBlank()
+        val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
+
         Scaffold(
             topBar = {
                 // Header with fully custom Search Input & navigation actions
@@ -309,12 +318,7 @@ fun MainPageScreen(
                 // Render list contents depending on active Resource State
                 when (val data = currentCardsState.value) {
                     is Resource.Loading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                        }
+                        MainPageShimmerSkeleton(isLandscape = isLandscape)
                     }
 
                     is Resource.Failure -> {
@@ -327,24 +331,85 @@ fun MainPageScreen(
                                     .padding(24.dp)
                                     .glassCard(RoundedCornerShape(24.dp))
                                     .padding(32.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_baseline_warning_24),
                                     contentDescription = "Error Icon",
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(48.dp)
+                                    modifier = Modifier.size(56.dp)
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(20.dp))
                                 Text(
-                                    text = data.errorString,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    text = "Provider Connection Failed",
+                                    style = MaterialTheme.typography.titleLarge,
                                     color = MaterialTheme.colorScheme.onBackground,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Bold
                                 )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                
+                                val friendlyMessage = remember(data.errorString) {
+                                    if (data.errorString.contains("NullPointerException") || data.errorString.contains("IndexOutOfBoundsException")) {
+                                        "The provider's website layout might have changed, or a parser update is required."
+                                    } else if (data.errorString.contains("Timeout") || data.errorString.contains("SocketTimeoutException")) {
+                                        "The request timed out. The provider's server might be under heavy load or blocked by Cloudflare."
+                                    } else if (data.errorString.contains("connect") || data.errorString.contains("Host")) {
+                                        "Cannot connect to the server. Please check your internet connection or try again later."
+                                    } else {
+                                        "An unexpected error occurred while parsing the provider content."
+                                    }
+                                }
+                                
+                                Text(
+                                    text = friendlyMessage,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                var showDetails by remember { mutableStateOf(false) }
+                                Text(
+                                    text = if (showDetails) "Hide technical details" else "Show technical details",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .clickable { showDetails = !showDetails }
+                                        .padding(8.dp)
+                                )
+                                
+                                if (showDetails) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 120.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(12.dp)
+                                    ) {
+                                        androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                                            item {
+                                                Text(
+                                                    text = data.errorString,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Button(
-                                    onClick = { viewModel.load(0, currentMainCategory, currentOrderBy, currentTag) }
+                                    onClick = { viewModel.load(0, currentMainCategory, currentOrderBy, currentTag) },
+                                    shape = RoundedCornerShape(50)
                                 ) {
                                     Text(stringResource(id = R.string.reload_error))
                                 }
@@ -494,5 +559,66 @@ fun ProviderNovelGridCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 4.dp)
         )
+    }
+}
+
+@Composable
+fun MainPageShimmerSkeleton(isLandscape: Boolean) {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val anim = transition.animateFloat(
+        initialValue = 0f,
+        targetValue  = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerTranslate"
+    )
+    val shimmerColors = listOf(
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+    )
+    val brush = Brush.linearGradient(
+        colors = shimmerColors,
+        start  = Offset.Zero,
+        end    = Offset(anim.value, anim.value)
+    )
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(if (isLandscape) 6 else 3),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        userScrollEnabled = false,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(if (isLandscape) 12 else 9) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.66f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(brush)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(brush)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(brush)
+                )
+            }
+        }
     }
 }

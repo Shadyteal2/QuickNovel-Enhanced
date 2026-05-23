@@ -19,6 +19,7 @@ class MainPageFragment : Fragment() {
         savedInstanceState: Bundle?,
     ): View {
         return ComposeView(requireContext()).apply {
+            background = null
             setContent {
                 val apiName = requireArguments().getString("apiName")!!
                 MainPageScreen(

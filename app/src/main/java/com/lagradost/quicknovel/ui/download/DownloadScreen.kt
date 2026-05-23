@@ -669,25 +669,20 @@ fun DownloadScreen(
                             }
                         }
 
-                        // Traveling capsule — driven purely by pagerState offset fraction
-                        val targetPagerPos = pagerState.currentPage + pagerState.currentPageOffsetFraction
-                        val animatedPagerPos by animateFloatAsState(
-                            targetValue = targetPagerPos,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            ),
-                            label = "capsulePos"
-                        )
+                        // Traveling capsule — driven purely by pagerState offset fraction with GPU-accelerated graphicsLayer
+                        val targetPagerPos = remember { derivedStateOf { pagerState.currentPage + pagerState.currentPageOffsetFraction } }
                         val segmentWidth = 200.dp / numTabs
                         val capsuleWidth = 24.dp
-                        val capsuleOffset = (segmentWidth * (animatedPagerPos + 0.5f)) - (capsuleWidth / 2)
 
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .width(capsuleWidth)
-                                .offset(x = capsuleOffset), // Now accurately placed relative to CenterStart
+                                .graphicsLayer {
+                                    val segmentWidthPx = segmentWidth.toPx()
+                                    val capsuleWidthPx = capsuleWidth.toPx()
+                                    translationX = (segmentWidthPx * (targetPagerPos.value + 0.5f)) - (capsuleWidthPx / 2)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Box(
@@ -1117,6 +1112,10 @@ fun GridCardItem(
                 .fillMaxWidth()
                 .aspectRatio(cardAspectRatio)
                 .glassCard(shape = RoundedCornerShape(12.dp), strokeWidth = 0.5.dp)
+                .clickable {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    onLongClick()
+                }
         ) {
             // Premium typographic placeholder for missing/loading covers
             Box(
@@ -1315,6 +1314,10 @@ fun CompactCardItem(
             modifier = Modifier
                 .size(width = 54.dp, height = 76.dp)
                 .clip(RoundedCornerShape(8.dp))
+                .clickable {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    onLongClick()
+                }
         ) {
             Box(
                 modifier = Modifier
@@ -1366,7 +1369,7 @@ fun CompactCardItem(
 
         Spacer(modifier = Modifier.width(14.dp))
 
-        // Titles and downloading status
+        // Titles and reading progress status
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
@@ -1380,15 +1383,73 @@ fun CompactCardItem(
                 overflow = TextOverflow.Ellipsis
             )
 
-            if (card is DownloadFragment.DownloadDataLoaded) {
-                Spacer(modifier = Modifier.height(4.dp))
+            val (readCount, totalCount) = remember(card) {
+                when (card) {
+                    is ResultCached -> {
+                        card.lastChapterRead to card.currentTotalChapters
+                    }
+                    is DownloadFragment.DownloadDataLoaded -> {
+                        card.readCount to card.downloadedTotal.toInt()
+                    }
+                    else -> 0 to 0
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val progressTextToShow = remember(readCount, totalCount) {
+                if (totalCount > 0) {
+                    "$readCount / $totalCount chapters read"
+                } else if (readCount > 0) {
+                    "$readCount chapters read"
+                } else {
+                    "Not started reading"
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Text(
-                    text = progressText,
+                    text = progressTextToShow,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
 
-                // Loading bar
+                if (card is DownloadFragment.DownloadDataLoaded && progressText.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .size(3.dp)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), CircleShape)
+                    )
+                    Text(
+                        text = progressText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            // Reading progress indicator
+            val progressFraction = remember(readCount, totalCount) {
+                if (totalCount > 0) readCount.toFloat() / totalCount.toFloat() else 0.0f
+            }
+            if (progressFraction > 0f) {
+                Spacer(modifier = Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { progressFraction.coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .height(3.dp)
+                        .clip(CircleShape),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                )
+            }
+
+            // Downloading status progress bar (secondary color)
+            if (card is DownloadFragment.DownloadDataLoaded) {
                 val showProgressbar = card.generating || (card.downloadedCount < card.downloadedTotal)
                 if (showProgressbar) {
                     Spacer(modifier = Modifier.height(6.dp))
@@ -1398,18 +1459,18 @@ fun CompactCardItem(
                                 .fillMaxWidth()
                                 .height(4.dp)
                                 .clip(CircleShape),
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.secondary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     } else {
-                        val progress = if (card.downloadedTotal > 0) card.downloadedCount.toFloat() / card.downloadedTotal.toFloat() else 0.0f
+                        val dlProgress = if (card.downloadedTotal > 0) card.downloadedCount.toFloat() / card.downloadedTotal.toFloat() else 0.0f
                         LinearProgressIndicator(
-                            progress = { progress },
+                            progress = { dlProgress },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(4.dp)
                                 .clip(CircleShape),
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.secondary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }

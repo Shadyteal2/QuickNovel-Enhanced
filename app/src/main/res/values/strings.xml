@@ -492,4 +492,5 @@
     <string name="app_font_scale">Global Font Size Scale</string>
     <string name="app_font_scale_desc">Adjust the visual size of all UI fonts in Compose</string>
     <string name="show_reading_progress">Show Reading Progress</string>
+    <string name="reading_status_title">Reading Status</string>
 </resources>

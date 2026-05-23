@@ -28,6 +28,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -179,13 +180,15 @@ fun SubSettingsScreen(
                         }
 
                         item {
-                            ExpressiveSliderPreferenceCard(
+                            StepSelectorPreferenceCard(
                                 title = "Background Blur",
                                 value = getInt("background_blur", 0),
                                 min = 0,
                                 max = 100,
+                                step = 5,
                                 valueSuffix = "%",
                                 iconRes = R.drawable.ic_baseline_tune_24,
+                                presets = listOf(0, 10, 25, 50, 80),
                                 onValueChange = { value ->
                                     sharedPrefs.edit().putInt("background_blur", value).apply()
                                     onPreferenceChange("background_blur", value)
@@ -248,7 +251,7 @@ fun SubSettingsScreen(
                         item {
                             ActionPreferenceCard(
                                 title = "Novel Detail Layout",
-                                summary = getDetailScreenStyleLabel(getString("detail_screen_style", "default")),
+                                summary = getDetailScreenStyleLabel(getString("detail_screen_style", "0")),
                                 iconRes = R.drawable.ic_baseline_menu_book_24,
                                 onClick = { onPreferenceClick("detail_screen_style") }
                             )
@@ -281,17 +284,16 @@ fun SubSettingsScreen(
                             )
                         }
 
-                        // ─── Our NEW Dynamic Font Size Slider! ───
+                        // ─── Our NEW Premium Dynamic Font Size Step Selector! ───
                         item {
-                            ExpressiveSliderPreferenceCard(
+                            StepSelectorPreferenceCard(
                                 title = "Global Font Size Scale",
                                 value = getInt("app_font_scale", 100),
                                 min = 80,
                                 max = 130,
-                                valueSuffix = "%",
                                 step = 5,
+                                valueSuffix = "%",
                                 iconRes = R.drawable.ic_baseline_font_download_24,
-                                useRuler = true,
                                 onValueChange = { value ->
                                     sharedPrefs.edit().putInt("app_font_scale", value).apply()
                                     onPreferenceChange("app_font_scale", value)
@@ -730,6 +732,162 @@ fun SwitchPreferenceCard(
 }
 
 @Composable
+fun StepSelectorPreferenceCard(
+    title: String,
+    value: Int,
+    min: Int,
+    max: Int,
+    step: Int = 5,
+    valueSuffix: String,
+    iconRes: Int,
+    presets: List<Int> = listOf(80, 100, 115, 130),
+    onValueChange: (Int) -> Unit
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(RoundedCornerShape(20.dp))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = title,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                
+                // Glowing value indicator
+                Box(
+                    modifier = Modifier
+                        .glassCard(
+                            shape = RoundedCornerShape(8.dp),
+                            backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            strokeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            strokeWidth = 0.5.dp
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "$value$valueSuffix",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Step Selector Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Decrement Button
+                OutlinedIconButton(
+                    onClick = {
+                        if (value > min) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            onValueChange(value - step)
+                        }
+                    },
+                    enabled = value > min,
+                    modifier = Modifier.size(44.dp),
+                    colors = IconButtonDefaults.outlinedIconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = "-",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                // Preset Pills
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    presets.forEach { preset ->
+                        val isSelected = value == preset
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                    else Color.Transparent
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    onValueChange(preset)
+                                }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "$preset$valueSuffix",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
+                // Increment Button
+                OutlinedIconButton(
+                    onClick = {
+                        if (value < max) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            onValueChange(value + step)
+                        }
+                    },
+                    enabled = value < max,
+                    modifier = Modifier.size(44.dp),
+                    colors = IconButtonDefaults.outlinedIconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = "+",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ExpressiveSliderPreferenceCard(
     title: String,
     value: Int,
@@ -1083,8 +1241,8 @@ fun getBackgroundEffectLabel(context: Context, mode: String): String {
 
 fun getDetailScreenStyleLabel(style: String): String {
     return when (style) {
-        "classic" -> "Classic Layout"
-        "modern" -> "Modern Layout"
+        "classic", "2" -> "Classic Layout"
+        "modern", "1" -> "Modern Layout"
         else -> "Default Layout"
     }
 }

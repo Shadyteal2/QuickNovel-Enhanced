@@ -22,6 +22,7 @@ import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
 import com.lagradost.quicknovel.ui.settings.showSearchProviders
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.util.UIHelper.hideKeyboard
+import com.lagradost.quicknovel.util.applyGlassStyle
 
 class SearchFragment : Fragment() {
     private val viewModel: SearchViewModel by activityViewModels()
@@ -34,7 +35,7 @@ class SearchFragment : Fragment() {
             if (currentDialog != null) return
             val act = activity ?: return
 
-            val bottomSheetDialog = BottomSheetDialog(act)
+            val bottomSheetDialog = BottomSheetDialog(act, R.style.BottomSheetDrawerTheme)
             val binding = HomeEpisodesExpandedBinding.inflate(act.layoutInflater, null, false)
             bottomSheetDialog.setContentView(binding.root)
 
@@ -56,6 +57,7 @@ class SearchFragment : Fragment() {
                 currentDialog = null
             }
             currentDialog = bottomSheetDialog
+            bottomSheetDialog.applyGlassStyle()
             bottomSheetDialog.show()
         }
     }
@@ -70,6 +72,7 @@ class SearchFragment : Fragment() {
         )
 
         return ComposeView(requireContext()).apply {
+            background = null
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 QuickNovelTheme {

@@ -297,9 +297,16 @@ class SubSettingsFragment : Fragment() {
 
             "detail_screen_style" -> {
                 val names = listOf("Default", "Classic", "Modern")
-                val values = listOf("default", "classic", "modern")
-                val current = sharedPrefs.getString("detail_screen_style", "default")
-                activity?.showBottomDialog(names, values.indexOf(current), "Novel Detail Layout", false, {}) {
+                val values = listOf("0", "2", "1")
+                val currentRaw = sharedPrefs.getString("detail_screen_style", "0")
+                val current = when (currentRaw) {
+                    "default" -> "0"
+                    "classic" -> "2"
+                    "modern" -> "1"
+                    else -> currentRaw ?: "0"
+                }
+                val index = values.indexOf(current).coerceAtLeast(0)
+                activity?.showBottomDialog(names, index, "Novel Detail Layout", false, {}) {
                     sharedPrefs.edit().putString("detail_screen_style", values[it]).apply()
                 }
             }

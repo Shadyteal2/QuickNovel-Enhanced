@@ -258,6 +258,16 @@ fun RecommendationGroupSection(
     val context = LocalContext.current
     val lazyListState = rememberLazyListState()
 
+    // Tactile haptic tick feedback as new cards snap or scroll into focus horizontally
+    LaunchedEffect(lazyListState) {
+        snapshotFlow { lazyListState.firstVisibleItemIndex }
+            .collect { index ->
+                if (index > 0) {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                }
+            }
+    }
+
     // Prefetch cover images of the upcoming 8 novels as the user scrolls
     LaunchedEffect(lazyListState.firstVisibleItemIndex, group.recommendations) {
         val totalItems = group.recommendations.size
