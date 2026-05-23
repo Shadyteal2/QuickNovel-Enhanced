@@ -26,5 +26,18 @@ todoprovide/
 .gemini/
 build_*.txt
 git_status.tmp
-visualizer preset/
-scratch/
+
+# Local manuals and drafting files (Agent notes)
+AGENTS.md
+temp_readme.md
+
+# Android Keystores & Signing Secrets
+*.jks
+*.keystore
+*.pepk
+*.p12
+signing.properties
+
+# OS & IDE Caches
+Thumbs.db
+desktop.ini
