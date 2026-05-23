@@ -5,8 +5,6 @@
 # ─── Build Outputs & Gradle Caches ───────────────────────────
 .gradle/
 .gradle-home/
-.gradle
-/build
 build/
 .externalNativeBuild
 .cxx
@@ -36,13 +34,6 @@ gradle.properties
 .gemini/
 AGENTS.md
 temp_readme.md
-
-# ─── Cleaned & Deprecated Components (Ignored) ───────────────
-recommendation/
-/recommendation
-todoprovide/
-scripts/
-stitch_screens/
 
 # ─── Android Keystores & Signing Secrets ─────────────────────
 *.jks
