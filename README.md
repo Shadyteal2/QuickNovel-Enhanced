@@ -31,45 +31,16 @@ This project is an enhanced fork of the original QuickNovel app, introducing a f
 
 **Download Releases:** [Get the latest APK](https://github.com/Shadyteal2/QuickNovel-Enhanced/releases)
 
-**Providers used:** (Some of the providers listed below are currently non-functional. I’ve removed them for now and will reintroduce them once a reliable solution is found.)
+## Extensible Extension Ecosystem
+NeoQN does not bundle, host, or pre-configure any copyrighted novel streams or scraping sources. Instead, it provides a powerful, sandboxed **External Plugin System** allowing users to create, import, and load their own self-hosted text scrapers, personal web archives, or custom third-party extensions. 
 
-- https://allnovel.org
-- https://annas-archive.org
-- https://bestlightnovel.com
-- https://freewebnovel.com
-- https://www.fanmtl.com
-- https://graycity.net
-- https://hiraethtranslation.com
-- https://indowebnovel.id
-- https://kolnovel.com
-- https://libread.com
-- https://lightnovelstranslations.com/Li
-- https://meionovels.com
-- https://risenovel.com
-- https://www.mtlnovels.com
-- https://novelbin.com
-- https://novelfull.com
-- https://novelsonline.org
-- https://novlove.com/
-- https://novelfire.net/
-- https://pawread.com
-- https://readfrom.net
-- https://readnovelfull.com
-- https://www.royalroad.com
-- https://sakuranovel.id
-- https://www.scribblehub.com
-- https://wtr-lab.com
-- https://www.wuxiabox.com/
+To learn more about developing or installing custom extensions, please refer to the plugin template guidelines.
 
-**Legal notice:**
+## Legal Disclaimer & Notice
+NeoQN is a generic, open-source e-book client, browser utility, and offline EPUB reader. 
+- **No Content Hosting**: NeoQN does not host, stream, pre-package, or manage any digital files, media, or books. All content accessed through the app is sourced dynamically from external locations provided directly by the end-user.
+- **User Responsibility**: The user is solely responsible for ensuring that any extensions, plugins, or sources they install are accessed in compliance with local copyright laws, intellectual property rights, and terms of service.
+- **Copyright Inquiries**: Any copyright concerns or takedown requests regarding content accessed through user-defined extensions should be directed to the third-party hosts or site operators where the content is hosted. NeoQN has no affiliation with, control over, or responsibility for user-loaded URLs or files.
 
-Any legal issues regarding the content on this application should be taken up with the actual file hosts and providers themselves as we are not affiliated with them.
-
-In case of copyright infringement, please directly contact the responsible parties or the streaming websites.
-
-The app is purely for educational and personal use.
-
-NeoQN does not host any content on the app, and has no control over what media is put up or taken down. NeoQN functions like any other search engine, such as Google. NeoQN does not host, upload or manage any videos, films or content. It simply crawls, aggregates and displayes links in a convenient, user-friendly interface.
-
-It merely scrapes 3rd-party websites that are publicly accessable via any regular web browser. It is the responsibility of user to avoid any actions that might violate the laws governing his/her locality. Use NeoQN at your own risk.
+Use NeoQN at your own discretion and risk.
 
