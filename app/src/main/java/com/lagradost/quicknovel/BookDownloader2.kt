@@ -1180,19 +1180,11 @@ object BookDownloader2 {
         try {
             turnToEpub(author, name, apiName, synopsis)
         } catch (e: ErrorLoadingException) {
-            if (e.message != null) {
-                showToast(e.message)
-            } else {
-                throw e
-            }
+            showToast("File not found or can't create file. Please setup a custom folder path in storage settings of our app.")
         } catch (e: IOException) {
-            if (e.message != null) {
-                showToast(e.message)
-            } else {
-                throw e
-            }
+            showToast("File not found or can't create file. Please setup a custom folder path in storage settings of our app.")
         } catch (t: Throwable) {
-            showToast(R.string.error_loading_novel)
+            showToast("File not found or can't create file. Please setup a custom folder path in storage settings of our app.")
         }
         openEpub(name, openInApp)
     }
@@ -1442,19 +1434,11 @@ object BookDownloader2 {
         try {
             BookDownloader2Helper.openEpub(activity, name, openInApp)
         } catch (e: ErrorLoadingException) {
-            if (e.message != null) {
-                showToast(e.message)
-            } else {
-                throw e
-            }
+            showToast("File not found or can't create file. Please setup a custom folder path in storage settings of our app.")
         } catch (e: IOException) {
-            if (e.message != null) {
-                showToast(e.message)
-            } else {
-                throw e
-            }
+            showToast("File not found or can't create file. Please setup a custom folder path in storage settings of our app.")
         } catch (t: Throwable) {
-            showToast(R.string.error_loading_novel)
+            showToast("File not found or can't create file. Please setup a custom folder path in storage settings of our app.")
         }
     }
 
@@ -1572,12 +1556,24 @@ object BookDownloader2 {
         // If the coroutine is dead (crash/kill/stopped), a Resume action should restart the download
         // from where it left off, rather than writing to pendingAction that nobody is reading.
         if (action == DownloadActionType.Resume && !hasLiveCoroutine) {
+            android.util.Log.d("DownloadRetry", "Resuming novel $id from force-close")
             val data = downloadInfoMutex.withLock { downloadData[id] } ?: return
-            val progressState = downloadInfoMutex.withLock { downloadProgress[id] } ?: return
-            
-            // Re-emit progress to ensure UI is ready
-            downloadProgressChanged.invoke(Pair(id, progressState))
-            
+            val progressState = downloadInfoMutex.withLock {
+                downloadProgress[id]?.apply {
+                    state = DownloadState.IsDownloading
+                    downloadProgressChanged.invoke(Pair(id, this))
+                }
+            } ?: return
+
+            // Update database state as well to maintain SSOT synchronization
+            ioSafe {
+                val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context ?: return@ioSafe).novelDao()
+                dao.updateDownloadProgress(id, DownloadState.IsDownloading.ordinal, progressState.progress, progressState.total)
+            }
+
+            // Small delay to let the UI settle
+            delay(300)
+
             val card = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded(
                 source = data.source,
                 name = data.name,
@@ -1603,10 +1599,6 @@ object BookDownloader2 {
                 hash = data.hash,
                 bookmarkType = data.bookmarkType
             )
-            // Update in-memory state to IsDownloading before kicking off the task
-            downloadInfoMutex.withLock {
-                downloadProgress[id]?.state = DownloadState.IsDownloading
-            }
             DownloadFileWorkManager.download(card, context ?: return)
             return
         }

@@ -87,6 +87,10 @@ fun DownloadScreen(
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val pagerScrollJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+
+    val isTactileEnabledState = rememberPreferenceBoolean("library_tactile_response", true)
+    val isTactileEnabled = isTactileEnabledState.value
 
     // Observe sorting, query, lists, categories
     // Observe sorting, query, lists, categories
@@ -323,7 +327,10 @@ fun DownloadScreen(
                             Box(
                                 modifier = Modifier
                                     .padding(end = 8.dp, bottom = 4.dp)
-                                    .scale(scale)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
                                     .glassCard(
                                         shape = RoundedCornerShape(16.dp),
                                         backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -333,7 +340,16 @@ fun DownloadScreen(
                                         if (activeTargetPage != index) {
                                             activeTargetPage = index
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                            scope.launch { pagerState.animateScrollToPage(index) }
+                                            pagerScrollJob[0]?.cancel()
+                                            pagerScrollJob[0] = scope.launch {
+                                                pagerState.animateScrollToPage(
+                                                    page = index,
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                                        stiffness = Spring.StiffnessMedium
+                                                    )
+                                                )
+                                            }
                                         }
                                     }
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -426,17 +442,7 @@ fun DownloadScreen(
                     if (isCompact) {
                         val listState = rememberLazyListState()
                         
-                        // Prefetch cover images of the upcoming 8 novels as the user scrolls
-                        LaunchedEffect(listState.firstVisibleItemIndex, list) {
-                            val totalItems = list.size
-                            val startIndex = (listState.firstVisibleItemIndex + 10).coerceAtMost(totalItems)
-                            val endIndex = (startIndex + 8).coerceAtMost(totalItems)
-                            for (i in startIndex until endIndex) {
-                                val card = list.getOrNull(i) ?: continue
-                                val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
-                                coil3.SingletonImageLoader.get(context).enqueue(req)
-                            }
-                        }
+
 
                         LazyColumn(
                             state = listState,
@@ -489,6 +495,7 @@ fun DownloadScreen(
 
                                 CompactCardItem(
                                     card = card,
+                                    isTactileEnabled = isTactileEnabled,
                                     onClick = currentOnClick,
                                     onLongClick = currentOnLongClick,
                                     onPauseClick = onPauseClick,
@@ -509,17 +516,7 @@ fun DownloadScreen(
                         val totalCount = list.size + (if (isDownloadsPage) 1 else 0)
                         val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
-                        // Prefetch cover images of the upcoming 12 novels (4 rows of 3 columns) as the user scrolls
-                        LaunchedEffect(gridState.firstVisibleItemIndex, list) {
-                            val totalItems = list.size
-                            val startIndex = (gridState.firstVisibleItemIndex + 15).coerceAtMost(totalItems)
-                            val endIndex = (startIndex + 12).coerceAtMost(totalItems)
-                            for (i in startIndex until endIndex) {
-                                val card = list.getOrNull(i) ?: continue
-                                val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
-                                coil3.SingletonImageLoader.get(context).enqueue(req)
-                            }
-                        }
+
                         
                         LazyVerticalGrid(
                             state = gridState,
@@ -571,6 +568,7 @@ fun DownloadScreen(
                                     card = card,
                                     isBento = isBento3x3,
                                     span = spanSize,
+                                    isTactileEnabled = isTactileEnabled,
                                     onClick = currentOnClick,
                                     onLongClick = currentOnLongClick
                                 )
@@ -604,7 +602,16 @@ fun DownloadScreen(
                                         if (activeTargetPage != targetPage) {
                                             activeTargetPage = targetPage
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                            scope.launch { pagerState.animateScrollToPage(targetPage) }
+                                            pagerScrollJob[0]?.cancel()
+                                            pagerScrollJob[0] = scope.launch {
+                                                pagerState.animateScrollToPage(
+                                                    page = targetPage,
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                                        stiffness = Spring.StiffnessMedium
+                                                    )
+                                                )
+                                            }
                                         }
                                     },
                                     onHorizontalDrag = { change, _ ->
@@ -614,7 +621,16 @@ fun DownloadScreen(
                                         if (activeTargetPage != targetPage) {
                                             activeTargetPage = targetPage
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                            scope.launch { pagerState.animateScrollToPage(targetPage) }
+                                            pagerScrollJob[0]?.cancel()
+                                            pagerScrollJob[0] = scope.launch {
+                                                pagerState.animateScrollToPage(
+                                                    page = targetPage,
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                                        stiffness = Spring.StiffnessMedium
+                                                    )
+                                                )
+                                            }
                                         }
                                     }
                                 )
@@ -626,7 +642,16 @@ fun DownloadScreen(
                                     if (activeTargetPage != targetPage) {
                                         activeTargetPage = targetPage
                                         view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                        scope.launch { pagerState.animateScrollToPage(targetPage) }
+                                        pagerScrollJob[0]?.cancel()
+                                        pagerScrollJob[0] = scope.launch {
+                                            pagerState.animateScrollToPage(
+                                                page = targetPage,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMedium
+                                                )
+                                            )
+                                        }
                                     }
                                 }
                             },
@@ -1002,29 +1027,29 @@ fun Modifier.tactileResponse(
 
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val scale by animateFloatAsState(
+    val scaleState = animateFloatAsState(
         targetValue = if (isPressed) 0.96f else 1.0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "tactileScale"
     )
 
-    val rotateX by animateFloatAsState(
+    val rotateXState = animateFloatAsState(
         targetValue = if (isPressed) -3f else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "tactileRotateX"
     )
 
-    val rotateY by animateFloatAsState(
+    val rotateYState = animateFloatAsState(
         targetValue = if (isPressed) 3f else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "tactileRotateY"
     )
 
     return this.graphicsLayer {
-        this.scaleX = scale
-        this.scaleY = scale
-        this.rotationX = rotateX
-        this.rotationY = rotateY
+        this.scaleX = scaleState.value
+        this.scaleY = scaleState.value
+        this.rotationX = rotateXState.value
+        this.rotationY = rotateYState.value
         this.cameraDistance = 12f * density
     }
 }
@@ -1035,12 +1060,12 @@ fun GridCardItem(
     card: Any,
     isBento: Boolean,
     span: Int = 1,
+    isTactileEnabled: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     val view = LocalView.current
     val context = LocalContext.current
-    val isTactileEnabled by rememberPreferenceBoolean("library_tactile_response", true)
     val interactionSource = remember { MutableInteractionSource() }
     
     val posterUrl = remember(card) {
@@ -1066,7 +1091,11 @@ fun GridCardItem(
                 0
             }
             is DownloadFragment.DownloadDataLoaded -> {
-                card.downloadedCount - card.readCount
+                val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
+                    com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
+                    card.name
+                )?.let { it + 1 } ?: 0
+                (card.downloadedCount - realReadCount).coerceAtLeast(0).toInt()
             }
             else -> 0
         }
@@ -1241,6 +1270,7 @@ fun GridCardItem(
 @Composable
 fun CompactCardItem(
     card: Any,
+    isTactileEnabled: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onPauseClick: () -> Unit,
@@ -1250,7 +1280,6 @@ fun CompactCardItem(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
-    val isTactileEnabled by rememberPreferenceBoolean("library_tactile_response", true)
     val interactionSource = remember { MutableInteractionSource() }
 
     val title = remember(card) {
@@ -1284,7 +1313,13 @@ fun CompactCardItem(
     val diffCount = remember(card) {
         when (card) {
             is ResultCached -> 0
-            is DownloadFragment.DownloadDataLoaded -> card.downloadedCount - card.readCount
+            is DownloadFragment.DownloadDataLoaded -> {
+                val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
+                    com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
+                    card.name
+                )?.let { it + 1 } ?: 0
+                (card.downloadedCount - realReadCount).coerceAtLeast(0).toInt()
+            }
             else -> 0
         }
     }
@@ -1389,7 +1424,11 @@ fun CompactCardItem(
                         card.lastChapterRead to card.currentTotalChapters
                     }
                     is DownloadFragment.DownloadDataLoaded -> {
-                        card.readCount to card.downloadedTotal.toInt()
+                        val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
+                            com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
+                            card.name
+                        )?.let { it + 1 } ?: 0
+                        realReadCount to card.downloadedTotal.toInt()
                     }
                     else -> 0 to 0
                 }
@@ -1407,26 +1446,38 @@ fun CompactCardItem(
                 }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = progressTextToShow,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+            Text(
+                text = progressTextToShow,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
 
-                if (card is DownloadFragment.DownloadDataLoaded && progressText.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .size(3.dp)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), CircleShape)
-                    )
+            if (card is DownloadFragment.DownloadDataLoaded && progressText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                val badgeColor = when (card.state) {
+                    DownloadState.IsDownloading -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    DownloadState.IsPaused, DownloadState.IsStopped -> Color(0xFFFFB300).copy(alpha = 0.12f)
+                    DownloadState.IsDone -> Color(0xFF4CAF50).copy(alpha = 0.12f)
+                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                }
+
+                val textTint = when (card.state) {
+                    DownloadState.IsDownloading -> MaterialTheme.colorScheme.primary
+                    DownloadState.IsPaused, DownloadState.IsStopped -> Color(0xFFFFB300)
+                    DownloadState.IsDone -> Color(0xFF4CAF50)
+                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .background(badgeColor, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
                     Text(
-                        text = progressText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        text = "Downloaded: $progressText",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = textTint,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -1502,6 +1553,8 @@ fun CompactCardItem(
                     when (realState) {
                         DownloadState.IsDownloading -> onPauseClick()
                         DownloadState.IsPaused -> onResumeClick()
+                        DownloadState.IsStopped -> onResumeClick()
+                        DownloadState.IsFailed -> onResumeClick()
                         DownloadState.IsPending -> {}
                         DownloadState.IsDone -> onRefreshClick()
                         else -> onRefreshClick()

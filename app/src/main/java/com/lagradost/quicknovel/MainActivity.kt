@@ -819,6 +819,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (CommonActivity.pendingThemeChangeScreenshot != null) {
+            window?.setWindowAnimations(0)
             if (Build.VERSION.SDK_INT >= 34) {
                 overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
                 overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
@@ -834,6 +835,23 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+
+        // Upgrade & Clean Install Safety: Initialize clean defaults ONLY on a fresh install
+        if (settingsManager.all.isEmpty() && !settingsManager.contains("app_initialized_defaults")) {
+            settingsManager.edit()
+                .putString(getString(R.string.theme_key), "Amoled")
+                .putString(getString(R.string.primary_color_key), "Monet")
+                .putString(getString(R.string.app_font_key), "default")
+                .putString("detail_screen_style", "0")
+                .putString("library_nav_style", "1") // Swipe view
+                .putString(getString(R.string.locale_key), "en")
+                .putBoolean("app_initialized_defaults", true)
+                .apply()
+        } else if (!settingsManager.contains("app_initialized_defaults")) {
+            // Upgrading user: Fully preserve all existing settings, simply mark as initialized
+            settingsManager.edit().putBoolean("app_initialized_defaults", true).apply()
+        }
+
         CommonActivity.loadThemes(this)
         CommonActivity.init(this)
 
@@ -870,11 +888,16 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         anim.duration = 800 
                         anim.interpolator = FastOutSlowInInterpolator()
                         anim.addListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationStart(animation: Animator) {
+                                @Suppress("DEPRECATION")
+                                window?.setWindowAnimations(android.R.style.Animation_Activity)
+                            }
+
                             override fun onAnimationEnd(animation: Animator) {
+                                overlay.visibility = android.view.View.GONE
                                 overlay.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                                 decorView.removeView(overlay)
                                 overlay.setImageDrawable(null)
-                                screenshot?.recycle()
                                 CommonActivity.pendingThemeChangeScreenshot = null
                                 CommonActivity.themeCenterX = null
                                 CommonActivity.themeCenterY = null
@@ -883,11 +906,12 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         anim.start()
                     } catch (e: Exception) {
                         overlay.animate().alpha(0f).setDuration(250).withEndAction {
+                            overlay.visibility = android.view.View.GONE
                             decorView.removeView(overlay)
                             CommonActivity.pendingThemeChangeScreenshot = null
                         }.start()
                     }
-                }, 200)
+                }, 50)
             }
         }
 

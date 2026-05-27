@@ -280,6 +280,8 @@ fun RecommendationGroupSection(
         }
     }
 
+    val uniqueRecommendations = remember(group.recommendations) { group.recommendations.distinctBy { it.novel.url } }
+
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(
             text = group.title,
@@ -305,7 +307,7 @@ fun RecommendationGroupSection(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(
-                items = group.recommendations,
+                items = uniqueRecommendations,
                 key = { rec -> rec.novel.url }
             ) { rec ->
                 NovelCard(recommendation = rec, onBookClick = onBookClick)

@@ -280,7 +280,11 @@ class DownloadViewModel : ViewModel() {
     }
 
     fun search(query: String) {
-        searchQuery.postValue(query)
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            searchQuery.value = query
+        } else {
+            searchQuery.postValue(query)
+        }
         activeQuery = query.lowercase()
         resortAllData()
     }

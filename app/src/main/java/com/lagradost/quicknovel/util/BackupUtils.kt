@@ -306,27 +306,5 @@ object BackupUtils {
                 this.setKey(MIGRATION_KEY, false)
             }
         }
-
-        // QN-Enhanced: Trigger immediate, high-priority plugin synchronization post-restore.
-        // This ensures providers are available instantly so restored novels can be opened without delay.
-        try {
-            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.lagradost.quicknovel.sync.PluginSyncWorker>()
-                .setInputData(androidx.work.workDataOf("force" to true))
-                .setBackoffCriteria(
-                    androidx.work.BackoffPolicy.LINEAR,
-                    androidx.work.WorkRequest.MIN_BACKOFF_MILLIS,
-                    java.util.concurrent.TimeUnit.MILLISECONDS
-                )
-                .build()
-            
-            androidx.work.WorkManager.getInstance(this).enqueueUniqueWork(
-                "plugin_sync_restore",
-                androidx.work.ExistingWorkPolicy.REPLACE,
-                syncRequest
-            )
-            android.util.Log.i("BackupUtils", "Enqueued high-priority plugin sync post-restore")
-        } catch (e: Exception) {
-            com.lagradost.quicknovel.mvvm.logError(e)
-        }
     }
 }

@@ -349,7 +349,7 @@ fun NovelTabScreen(
                     DownloadState.IsDownloading -> stringResource(R.string.pause)
                     DownloadState.IsPaused -> stringResource(R.string.resume)
                     DownloadState.IsFailed -> stringResource(R.string.re_downloaded)
-                    DownloadState.IsStopped -> stringResource(R.string.downloaded)
+                    DownloadState.IsStopped -> stringResource(R.string.resume)
                     DownloadState.IsPending -> stringResource(R.string.loading)
                     else -> if (canDownload) stringResource(R.string.download) else stringResource(R.string.manage)
                 }

@@ -42,88 +42,104 @@ fun checkFileExistsCached(file: java.io.File): Boolean {
 @Composable
 fun rememberImageRequest(data: Any?): ImageRequest {
     val context = LocalContext.current
-    return remember(data) {
-        val builder = ImageRequest.Builder(context)
-            .crossfade(200)
+    
+    val stableKey = remember(data) {
+        when (data) {
+            is ResultCached -> data.poster to (data.apiName + data.name)
+            is DownloadFragment.DownloadDataLoaded -> data.posterUrl to (data.apiName + data.name)
+            is com.lagradost.quicknovel.ui.foryou.recommendation.NovelVector -> data.posterUrl to (data.apiName + data.name)
+            is com.lagradost.quicknovel.SearchResponse -> data.posterUrl to (data.apiName + data.name)
+            else -> data
+        }
+    }
 
-        val resolvedData = when (data) {
-            is ResultCached -> {
-                val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
-                val filesDir = act?.filesDir?.toString()
-                var file: java.io.File? = null
-                if (filesDir != null) {
-                    val filePath = BookDownloader2Helper.getFilenameIMG(
-                        BookDownloader2Helper.sanitizeFilename(data.apiName),
-                        BookDownloader2Helper.sanitizeFilename(data.author ?: ""),
-                        BookDownloader2Helper.sanitizeFilename(data.name)
-                    )
-                    val f = java.io.File(filesDir + filePath)
-                    if (checkFileExistsCached(f)) {
-                        file = f
+    // Asynchronously resolve file existence checks on Dispatchers.IO to prevent main-thread lag
+    val resolvedDataState = androidx.compose.runtime.produceState<Any?>(initialValue = null as Any?, key1 = stableKey) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val resolved = when (data) {
+                is ResultCached -> {
+                    val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
+                    val filesDir = act?.filesDir?.toString()
+                    var file: java.io.File? = null
+                    if (filesDir != null) {
+                        val filePath = BookDownloader2Helper.getFilenameIMG(
+                            BookDownloader2Helper.sanitizeFilename(data.apiName),
+                            BookDownloader2Helper.sanitizeFilename(data.author ?: ""),
+                            BookDownloader2Helper.sanitizeFilename(data.name)
+                        )
+                        val f = java.io.File(filesDir + filePath)
+                        if (f.exists() && f.length() > 0L) {
+                            file = f
+                        }
                     }
+                    file ?: data.poster
                 }
-                file ?: data.poster
-            }
-            is DownloadFragment.DownloadDataLoaded -> {
-                val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
-                val filesDir = act?.filesDir?.toString()
-                var file: java.io.File? = null
-                if (filesDir != null) {
-                    val filePath = BookDownloader2Helper.getFilenameIMG(
-                        BookDownloader2Helper.sanitizeFilename(data.apiName),
-                        BookDownloader2Helper.sanitizeFilename(data.author ?: ""),
-                        BookDownloader2Helper.sanitizeFilename(data.name)
-                    )
-                    val f = java.io.File(filesDir + filePath)
-                    if (checkFileExistsCached(f)) {
-                        file = f
+                is DownloadFragment.DownloadDataLoaded -> {
+                    val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
+                    val filesDir = act?.filesDir?.toString()
+                    var file: java.io.File? = null
+                    if (filesDir != null) {
+                        val filePath = BookDownloader2Helper.getFilenameIMG(
+                            BookDownloader2Helper.sanitizeFilename(data.apiName),
+                            BookDownloader2Helper.sanitizeFilename(data.author ?: ""),
+                            BookDownloader2Helper.sanitizeFilename(data.name)
+                        )
+                        val f = java.io.File(filesDir + filePath)
+                        if (f.exists() && f.length() > 0L) {
+                            file = f
+                        }
                     }
+                    file ?: data.posterUrl
                 }
-                file ?: data.posterUrl
-            }
-            is com.lagradost.quicknovel.ui.foryou.recommendation.NovelVector -> {
-                val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
-                val filesDir = act?.filesDir?.toString()
-                var file: java.io.File? = null
-                if (filesDir != null) {
-                    val filePath = BookDownloader2Helper.getFilenameIMG(
-                        BookDownloader2Helper.sanitizeFilename(data.apiName),
-                        "",
-                        BookDownloader2Helper.sanitizeFilename(data.name)
-                    )
-                    val f = java.io.File(filesDir + filePath)
-                    if (checkFileExistsCached(f)) {
-                        file = f
+                is com.lagradost.quicknovel.ui.foryou.recommendation.NovelVector -> {
+                    val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
+                    val filesDir = act?.filesDir?.toString()
+                    var file: java.io.File? = null
+                    if (filesDir != null) {
+                        val filePath = BookDownloader2Helper.getFilenameIMG(
+                            BookDownloader2Helper.sanitizeFilename(data.apiName),
+                            "",
+                            BookDownloader2Helper.sanitizeFilename(data.name)
+                        )
+                        val f = java.io.File(filesDir + filePath)
+                        if (f.exists() && f.length() > 0L) {
+                            file = f
+                        }
                     }
+                    file ?: data.posterUrl
                 }
-                file ?: data.posterUrl
-            }
-            is com.lagradost.quicknovel.SearchResponse -> {
-                val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
-                val filesDir = act?.filesDir?.toString()
-                var file: java.io.File? = null
-                if (filesDir != null) {
-                    val filePath = BookDownloader2Helper.getFilenameIMG(
-                        BookDownloader2Helper.sanitizeFilename(data.apiName),
-                        "",
-                        BookDownloader2Helper.sanitizeFilename(data.name)
-                    )
-                    val f = java.io.File(filesDir + filePath)
-                    if (checkFileExistsCached(f)) {
-                        file = f
+                is com.lagradost.quicknovel.SearchResponse -> {
+                    val act = context.getActivity() ?: com.lagradost.quicknovel.CommonActivity.activity
+                    val filesDir = act?.filesDir?.toString()
+                    var file: java.io.File? = null
+                    if (filesDir != null) {
+                        val filePath = BookDownloader2Helper.getFilenameIMG(
+                            BookDownloader2Helper.sanitizeFilename(data.apiName),
+                            "",
+                            BookDownloader2Helper.sanitizeFilename(data.name)
+                        )
+                        val f = java.io.File(filesDir + filePath)
+                        if (f.exists() && f.length() > 0L) {
+                            file = f
+                        }
                     }
-                }
-                
-                if (file != null) file else {
-                    if (data.posterHeaders != null) {
+                    file ?: if (data.posterHeaders != null) {
                         UiImage.Image(data.posterUrl ?: "", data.posterHeaders)
                     } else {
                         data.posterUrl
                     }
                 }
+                else -> data
             }
-            else -> data
+            value = resolved
         }
+    }
+
+    val resolvedData = resolvedDataState.value
+
+    return remember(resolvedData) {
+        val builder = ImageRequest.Builder(context)
+            .crossfade(200)
 
         when (resolvedData) {
             is java.io.File -> {
@@ -135,10 +151,11 @@ fun rememberImageRequest(data: Any?): ImageRequest {
                     is UiImage.Drawable -> builder.data(resolvedData.resId)
                     is UiImage.Image -> {
                         builder.data(resolvedData.url)
-                        if (!resolvedData.headers.isNullOrEmpty()) {
-                            builder.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
-                                resolvedData.headers.forEach { (key, value) ->
-                                    headerBuilder[key] = value
+                        val headersMap = resolvedData.headers
+                        if (!headersMap.isNullOrEmpty()) {
+                            builder.httpHeaders(coil3.network.NetworkHeaders.Builder().also { headerBuilder ->
+                                for (entry in headersMap.entries) {
+                                    headerBuilder.set(entry.key, entry.value)
                                 }
                             }.build())
                         }
@@ -146,16 +163,17 @@ fun rememberImageRequest(data: Any?): ImageRequest {
                 }
             }
             is String -> {
-                val uiImage = img(resolvedData)
+                val uiImage = img(resolvedData as String)
                 when (uiImage) {
                     is UiImage.Bitmap -> builder.data(uiImage.bitmap)
                     is UiImage.Drawable -> builder.data(uiImage.resId)
                     is UiImage.Image -> {
                         builder.data(uiImage.url)
-                        if (!uiImage.headers.isNullOrEmpty()) {
-                            builder.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
-                                uiImage.headers.forEach { (key, value) ->
-                                    headerBuilder[key] = value
+                        val headersMap = uiImage.headers
+                        if (!headersMap.isNullOrEmpty()) {
+                            builder.httpHeaders(coil3.network.NetworkHeaders.Builder().also { headerBuilder ->
+                                for (entry in headersMap.entries) {
+                                    headerBuilder.set(entry.key, entry.value)
                                 }
                             }.build())
                         }
@@ -264,10 +282,11 @@ fun buildImageRequest(context: android.content.Context, data: Any?): ImageReques
                 is UiImage.Drawable -> builder.data(resolvedData.resId)
                 is UiImage.Image -> {
                     builder.data(resolvedData.url)
-                    if (!resolvedData.headers.isNullOrEmpty()) {
-                        builder.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
-                            resolvedData.headers.forEach { (key, value) ->
-                                headerBuilder[key] = value
+                    val headersMap = resolvedData.headers
+                    if (!headersMap.isNullOrEmpty()) {
+                        builder.httpHeaders(coil3.network.NetworkHeaders.Builder().also { headerBuilder ->
+                            for (entry in headersMap.entries) {
+                                headerBuilder.set(entry.key, entry.value)
                             }
                         }.build())
                     }
@@ -275,16 +294,17 @@ fun buildImageRequest(context: android.content.Context, data: Any?): ImageReques
             }
         }
         is String -> {
-            val uiImage = img(resolvedData)
+            val uiImage = img(resolvedData as String)
             when (uiImage) {
                 is UiImage.Bitmap -> builder.data(uiImage.bitmap)
                 is UiImage.Drawable -> builder.data(uiImage.resId)
                 is UiImage.Image -> {
                     builder.data(uiImage.url)
-                    if (!uiImage.headers.isNullOrEmpty()) {
-                        builder.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
-                            uiImage.headers.forEach { (key, value) ->
-                                headerBuilder[key] = value
+                    val headersMap = uiImage.headers
+                    if (!headersMap.isNullOrEmpty()) {
+                        builder.httpHeaders(coil3.network.NetworkHeaders.Builder().also { headerBuilder ->
+                            for (entry in headersMap.entries) {
+                                headerBuilder.set(entry.key, entry.value)
                             }
                         }.build())
                     }

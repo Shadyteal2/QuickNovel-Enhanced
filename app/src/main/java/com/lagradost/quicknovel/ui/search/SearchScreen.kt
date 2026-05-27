@@ -385,6 +385,8 @@ fun StandardSearchLayout(
         }
     }
 
+    val uniqueResults = remember(results) { results.distinctBy { it.url } }
+
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Adaptive(110.dp),
@@ -393,7 +395,7 @@ fun StandardSearchLayout(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(results, key = { it.url }) { novel ->
+        items(uniqueResults, key = { it.url }) { novel ->
             SearchNovelCard(
                 novel = novel,
                 onClick = { onBookClick(novel) },
@@ -450,6 +452,8 @@ fun ProviderSearchResultsRow(
         }
     }
 
+    val uniqueProviderList = remember(provider.list) { provider.list.distinctBy { it.url } }
+
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         Row(
             modifier = Modifier
@@ -487,7 +491,7 @@ fun ProviderSearchResultsRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(provider.list, key = { it.url }) { novel ->
+            items(uniqueProviderList, key = { it.url }) { novel ->
                 SearchNovelCard(
                     novel = novel,
                     onClick = { onBookClick(novel) },

@@ -55,6 +55,7 @@ import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.layout
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
@@ -65,7 +66,7 @@ import androidx.compose.animation.core.animateFloat
 // Spring scaling press effect for high-fidelity micro-animations
 fun Modifier.springScalePress(): Modifier = composed {
     var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
+    val scaleState = animateFloatAsState(
         targetValue = if (isPressed) 0.95f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
@@ -75,8 +76,8 @@ fun Modifier.springScalePress(): Modifier = composed {
     )
     this
         .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            scaleX = scaleState.value
+            scaleY = scaleState.value
         }
         .pointerInput(Unit) {
             detectTapGestures(
@@ -103,6 +104,22 @@ fun MainPageScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // Hoist LazyGridState to monitor scroll offsets for the collapsing header
+    val gridState = rememberLazyGridState()
+
+    // Collapse fraction computed completely outside layout/draw loops to maximize rendering performance on 1GB RAM
+    val maxCollapseOffset = 140f // Collapse over 140 pixels of scrolling
+    val collapseFractionState = remember {
+        derivedStateOf {
+            if (gridState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val scrollOffset = gridState.firstVisibleItemScrollOffset
+                (scrollOffset.toFloat() / maxCollapseOffset).coerceIn(0f, 1f)
+            }
+        }
+    }
+
     // Observe settings and backgrounds
     // Observe ViewModel LiveData
     val currentCardsState = viewModel.currentCards.observeAsState(initial = Resource.Loading())
@@ -121,199 +138,14 @@ fun MainPageScreen(
         val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
 
         Scaffold(
-            topBar = {
-                // Header with fully custom Search Input & navigation actions
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = {
-                                if (isInSearch) {
-                                    searchQuery = ""
-                                    viewModel.switchToMain()
-                                } else {
-                                    onBack()
-                                }
-                            },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_baseline_arrow_back_24),
-                                contentDescription = "Back",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // Rich Glassmorphism search input
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            placeholder = {
-                                Text(
-                                    text = "Search $apiName…",
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(
-                                onSearch = {
-                                    if (searchQuery.isNotBlank()) {
-                                        focusManager.clearFocus()
-                                        viewModel.search(searchQuery)
-                                    }
-                                }
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                                focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.05f),
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.02f)
-                            ),
-                            shape = RoundedCornerShape(24.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp),
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = {
-                                            searchQuery = ""
-                                            viewModel.switchToMain()
-                                        }
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.ic_sharp_clear_24),
-                                            contentDescription = "Clear Search",
-                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                        )
-                                    }
-                                } else {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_baseline_search_24),
-                                        contentDescription = "Search icon",
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // Open in browser button
-                        IconButton(
-                            onClick = { viewModel.openInBrowser() },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_baseline_open_in_new_24),
-                                contentDescription = "Open in Browser",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    // Filters Chips (Invisible in search mode)
-                    if (!isInSearch) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Category Filter
-                            if (viewModel.api.mainCategories.isNotEmpty()) {
-                                val currentCategoryLabel = currentMainCategory?.let {
-                                    viewModel.api.mainCategories.getOrNull(it)?.first
-                                } ?: "All Categories"
-                                
-                                FilterChip(
-                                    selected = currentMainCategory != null,
-                                    onClick = {
-                                        context.showDialog(
-                                            viewModel.api.mainCategories.map { it.first },
-                                            viewModel.currentMainCategory.value ?: -1,
-                                            context.getString(R.string.filter_dialog_general),
-                                            true,
-                                            {}
-                                        ) { selection ->
-                                            viewModel.setMainCategory(selection)
-                                        }
-                                    },
-                                    label = { Text(currentCategoryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                            }
-
-                            // Genre Filter
-                            if (viewModel.api.tags.isNotEmpty()) {
-                                val currentTagLabel = currentTag?.let {
-                                    viewModel.api.tags.getOrNull(it)?.first
-                                } ?: "All Genres"
-
-                                FilterChip(
-                                    selected = currentTag != null,
-                                    onClick = {
-                                        context.showDialog(
-                                            viewModel.api.tags.map { it.first },
-                                            viewModel.currentTag.value ?: -1,
-                                            context.getString(R.string.filter_dialog_genre),
-                                            true,
-                                            {}
-                                        ) { selection ->
-                                            viewModel.setTag(selection)
-                                        }
-                                    },
-                                    label = { Text(currentTagLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                            }
-
-                            // Order By Filter
-                            if (viewModel.api.orderBys.isNotEmpty()) {
-                                val currentOrderLabel = currentOrderBy?.let {
-                                    viewModel.api.orderBys.getOrNull(it)?.first
-                                } ?: "Order By"
-
-                                FilterChip(
-                                    selected = currentOrderBy != null,
-                                    onClick = {
-                                        context.showDialog(
-                                            viewModel.api.orderBys.map { it.first },
-                                            viewModel.currentOrderBy.value ?: -1,
-                                            context.getString(R.string.filter_dialog_order_by),
-                                            true,
-                                            {}
-                                        ) { selection ->
-                                            viewModel.setOrderBy(selection)
-                                        }
-                                    },
-                                    label = { Text(currentOrderLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            },
             containerColor = containerColor,
             modifier = Modifier.fillMaxSize()
         ) { paddingValues ->
+            // Use an overlap Box where the scrolling library novels list slides seamlessly beneath the floating collapsing header
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(bottom = paddingValues.calculateBottomPadding()) // Only pad bottom (for navigation bar if any)
             ) {
                 // Render list contents depending on active Resource State
                 when (val data = currentCardsState.value) {
@@ -323,7 +155,9 @@ fun MainPageScreen(
 
                     is Resource.Failure -> {
                         Box(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 140.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(
@@ -420,10 +254,13 @@ fun MainPageScreen(
                     is Resource.Success -> {
                         val response = data.value
                         val items = response.items
+                        val uniqueItems = remember(response.id) { items.distinctBy { it.url } }
 
                         if (items.isEmpty()) {
                             Box(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = 140.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -433,8 +270,6 @@ fun MainPageScreen(
                                 )
                             }
                         } else {
-                            val gridState = rememberLazyGridState()
-                            
                             // Scroll listener for Infinite Pagination
                             val shouldLoadMore = remember {
                                 derivedStateOf {
@@ -452,7 +287,7 @@ fun MainPageScreen(
                             }
 
                             // Dynamic cover prefetching during scrolls
-                            LaunchedEffect(gridState.firstVisibleItemIndex, items) {
+                            LaunchedEffect(gridState.firstVisibleItemIndex, response.id) {
                                 val totalItems = items.size
                                 val startIndex = (gridState.firstVisibleItemIndex + 12).coerceAtMost(totalItems)
                                 val endIndex = (startIndex + 15).coerceAtMost(totalItems)
@@ -466,13 +301,13 @@ fun MainPageScreen(
                             LazyVerticalGrid(
                                 state = gridState,
                                 columns = GridCells.Fixed(if (isLandscape) 6 else 3),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                contentPadding = PaddingValues(top = 140.dp, bottom = 16.dp, start = 16.dp, end = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 items(
-                                    items = items,
+                                    items = uniqueItems,
                                     key = { item -> item.url }
                                 ) { item ->
                                     ProviderNovelGridCard(
@@ -497,6 +332,259 @@ fun MainPageScreen(
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ─── Floating Collapsing Header (Overlay on Top) ──────────────────
+                val collapseFraction = collapseFractionState.value
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.background.copy(alpha = if (hasBackground) 0.8f else 1f)
+                        )
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Back Button
+                            IconButton(
+                                onClick = {
+                                    if (isInSearch) {
+                                        searchQuery = ""
+                                        viewModel.switchToMain()
+                                    } else {
+                                        onBack()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .size(48.dp)
+                                    .graphicsLayer {
+                                        alpha = 1f - collapseFraction
+                                        translationX = -56.dp.toPx() * collapseFraction
+                                    }
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_baseline_arrow_back_24),
+                                    contentDescription = "Back",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // Expanding Search Bar
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer {
+                                        // Shift up slightly during collapse for a tight sticky header feel
+                                        translationY = -4.dp.toPx() * collapseFraction
+                                    }
+                                    .layout { measurable, constraints ->
+                                        // Animate padding from 56.dp (when expanded) to 0.dp (when collapsed) completely off the main thread
+                                        val paddingPx = (56.dp.toPx() * (1f - collapseFraction)).toInt()
+                                        val targetMinWidth = (constraints.minWidth - paddingPx * 2).coerceAtLeast(0)
+                                        val targetMaxWidth = (constraints.maxWidth - paddingPx * 2).coerceAtLeast(targetMinWidth)
+                                        val childConstraints = constraints.copy(
+                                            minWidth = targetMinWidth,
+                                            maxWidth = targetMaxWidth
+                                        )
+                                        val placeable = measurable.measure(childConstraints)
+                                        layout(constraints.maxWidth, constraints.maxHeight) {
+                                            placeable.place(paddingPx, 0)
+                                        }
+                                    }
+                            ) {
+                                OutlinedTextField(
+                                    value = searchQuery,
+                                    onValueChange = { searchQuery = it },
+                                    placeholder = {
+                                        Text(
+                                            text = "Search $apiName…",
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                    keyboardActions = KeyboardActions(
+                                        onSearch = {
+                                            if (searchQuery.isNotBlank()) {
+                                                focusManager.clearFocus()
+                                                viewModel.search(searchQuery)
+                                            }
+                                        }
+                                    ),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.05f),
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.02f)
+                                    ),
+                                    shape = RoundedCornerShape(24.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp),
+                                    trailingIcon = {
+                                        if (searchQuery.isNotEmpty()) {
+                                            IconButton(
+                                                onClick = {
+                                                    searchQuery = ""
+                                                    viewModel.switchToMain()
+                                                }
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(id = R.drawable.ic_sharp_clear_24),
+                                                    contentDescription = "Clear Search",
+                                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                        } else {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.ic_baseline_search_24),
+                                                contentDescription = "Search icon",
+                                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+
+                            // Open in Browser Button
+                            IconButton(
+                                onClick = { viewModel.openInBrowser() },
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .size(48.dp)
+                                    .graphicsLayer {
+                                        alpha = 1f - collapseFraction
+                                        translationX = 56.dp.toPx() * collapseFraction
+                                    }
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_baseline_open_in_new_24),
+                                    contentDescription = "Open in Browser",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        // Collapsing Genre Filter Chips
+                        if (!isInSearch) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer {
+                                        alpha = 1f - collapseFraction
+                                        translationY = -20.dp.toPx() * collapseFraction
+                                    }
+                                    .layout { measurable, constraints ->
+                                        // Animate height to 0 during collapse to seamlessly shift grid items upwards
+                                        val height = (measurable.minIntrinsicHeight(constraints.maxWidth) * (1f - collapseFraction)).toInt()
+                                        val targetMinHeight = constraints.minHeight.coerceAtMost(height)
+                                        val placeable = measurable.measure(
+                                            constraints.copy(
+                                                minHeight = targetMinHeight,
+                                                maxHeight = height
+                                            )
+                                        )
+                                        layout(constraints.maxWidth, height) {
+                                            placeable.place(0, 0)
+                                        }
+                                    },
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Category Filter
+                                if (viewModel.api.mainCategories.isNotEmpty()) {
+                                    val currentCategoryLabel = currentMainCategory?.let {
+                                        viewModel.api.mainCategories.getOrNull(it)?.first
+                                    } ?: "All Categories"
+                                    
+                                    FilterChip(
+                                        selected = currentMainCategory != null,
+                                        onClick = {
+                                            if (collapseFraction < 0.5f) { // Disable clicks when collapsed/invisible
+                                                context.showDialog(
+                                                    viewModel.api.mainCategories.map { it.first },
+                                                    viewModel.currentMainCategory.value ?: -1,
+                                                    context.getString(R.string.filter_dialog_general),
+                                                    true,
+                                                    {}
+                                                ) { selection ->
+                                                    viewModel.setMainCategory(selection)
+                                                }
+                                            }
+                                        },
+                                        label = { Text(currentCategoryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                }
+
+                                // Genre Filter
+                                if (viewModel.api.tags.isNotEmpty()) {
+                                    val currentTagLabel = currentTag?.let {
+                                        viewModel.api.tags.getOrNull(it)?.first
+                                    } ?: "All Genres"
+
+                                    FilterChip(
+                                        selected = currentTag != null,
+                                        onClick = {
+                                            if (collapseFraction < 0.5f) {
+                                                context.showDialog(
+                                                    viewModel.api.tags.map { it.first },
+                                                    viewModel.currentTag.value ?: -1,
+                                                    context.getString(R.string.filter_dialog_genre),
+                                                    true,
+                                                    {}
+                                                ) { selection ->
+                                                    viewModel.setTag(selection)
+                                                }
+                                            }
+                                        },
+                                        label = { Text(currentTagLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                }
+
+                                // Order By Filter
+                                if (viewModel.api.orderBys.isNotEmpty()) {
+                                    val currentOrderLabel = currentOrderBy?.let {
+                                        viewModel.api.orderBys.getOrNull(it)?.first
+                                    } ?: "Order By"
+
+                                    FilterChip(
+                                        selected = currentOrderBy != null,
+                                        onClick = {
+                                            if (collapseFraction < 0.5f) {
+                                                context.showDialog(
+                                                    viewModel.api.orderBys.map { it.first },
+                                                    viewModel.currentOrderBy.value ?: -1,
+                                                    context.getString(R.string.filter_dialog_order_by),
+                                                    true,
+                                                    {}
+                                                ) { selection ->
+                                                    viewModel.setOrderBy(selection)
+                                                }
+                                            }
+                                        },
+                                        label = { Text(currentOrderLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
                                 }
                             }
                         }
@@ -587,7 +675,7 @@ fun MainPageShimmerSkeleton(isLandscape: Boolean) {
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(if (isLandscape) 6 else 3),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(top = 140.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         userScrollEnabled = false,

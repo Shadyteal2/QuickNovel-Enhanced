@@ -524,11 +524,18 @@ fun ResultDetailDefaultScreen(
                                             },
                                             update = { rv ->
                                                 val list = chapters
+                                                // Reference selection states to force recomposing update block on selection change
+                                                val selMode = isSelectionMode
+                                                val selChapters = selectedChapters
                                                 if (list != null && list.isNotEmpty()) {
-                                                    if (list.size > 300) {
-                                                        chapterAdapter.submitIncomparableList(list)
+                                                    if (chapterAdapter.immutableCurrentList != list) {
+                                                        if (chapterAdapter.immutableCurrentList.isEmpty()) {
+                                                            chapterAdapter.submitIncomparableList(list)
+                                                        } else {
+                                                            chapterAdapter.submitList(list)
+                                                        }
                                                     } else {
-                                                        chapterAdapter.submitList(list)
+                                                        chapterAdapter.notifyDataSetChanged()
                                                     }
                                                 }
                                             }
@@ -720,7 +727,7 @@ private fun DefaultShimmerSkeletonScreen() {
 @Composable
 private fun rememberDefaultImageRequest(data: Any?, context: Context): ImageRequest {
     val base = rememberImageRequest(data)
-    return remember(data) {
+    return remember(data, base) {
         base.newBuilder(context)
             .allowHardware(true)
             .size(coil3.size.Size.ORIGINAL)

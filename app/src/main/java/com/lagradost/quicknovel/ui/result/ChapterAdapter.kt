@@ -49,6 +49,9 @@ class ChapterAdapter(val viewModel: ResultViewModel) :
         binding.releaseDate.alpha = alpha
 
         val isInSelectionMode = viewModel.isInSelectionMode.value ?: false
+        if (!isInSelectionMode) {
+            lastSelectedPosition = -1
+        }
         val isSelected = viewModel.selectedChapters.value?.contains(card.url) ?: false
         val isBookmarked = viewModel.isChapterBookmarked(card)
 
@@ -93,6 +96,8 @@ class ChapterAdapter(val viewModel: ResultViewModel) :
                         val chapters = viewModel.chapters.value ?: emptyList()
                         val rangeUrls = chapters.subList(start, end + 1).map { it.url }
                         viewModel.selectRange(rangeUrls)
+                        val count = end - start + 1
+                        com.lagradost.quicknovel.CommonActivity.showToast("Selected $count chapters")
                     }
                 }
                 notifyDataSetChanged() // Full refresh to show checkboxes
@@ -103,6 +108,10 @@ class ChapterAdapter(val viewModel: ResultViewModel) :
                 viewModel.toggleSelection(item.url)
                 lastSelectedPosition = position
                 refresh(binding, item, viewModel)
+            }
+            
+            chapterCheckbox.setOnLongClickListener {
+                root.performLongClick()
             }
             
             chapterBookmarkIcon.setOnClickListener {

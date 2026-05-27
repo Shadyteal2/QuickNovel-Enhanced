@@ -101,14 +101,14 @@ class WebViewResolver(
         var fixedRequest: Request? = null
         val extraRequestList = mutableListOf<Request>()
 
-        main {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
             // Useful for debugging
             WebView.setWebContentsDebuggingEnabled(true)
             try {
                 // IMPORTANT: For AlertDialog we MUST use an Activity context.
                 // We try to get the current activity from CommonActivity.
                 val activity = com.lagradost.quicknovel.CommonActivity.activity
-                val ctx = activity ?: context ?: return@main
+                val ctx = activity ?: context ?: return@withContext
                 
                 println("Creating WebView with context: $ctx (isActivity: ${ctx is android.app.Activity})")
                 
@@ -127,7 +127,7 @@ class WebViewResolver(
                 if (showDialog) {
                     if (activity == null) {
                         println("Cannot show dialog: No Activity context available!")
-                        return@main
+                        return@withContext
                     }
                     
                     val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity, com.lagradost.quicknovel.R.style.AlertDialogCustom)

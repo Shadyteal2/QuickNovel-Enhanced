@@ -49,6 +49,9 @@ object CommonActivity {
         } catch (e: Exception) {
             logError(e)
         }
+        // Suppress window animations completely during the transition/recreation phase
+        act.window?.setWindowAnimations(0)
+
         // Override transition BEFORE recreate() so the system transition animation
         // is suppressed from the moment the activity recreates — eliminates the blink.
         if (Build.VERSION.SDK_INT >= 34) {

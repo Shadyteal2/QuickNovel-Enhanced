@@ -198,13 +198,15 @@ fun SubSettingsScreen(
                         }
 
                         item {
-                            ExpressiveSliderPreferenceCard(
+                            StepSelectorPreferenceCard(
                                 title = "Background Dim",
                                 value = getInt("background_dim", 0),
                                 min = 0,
                                 max = 100,
+                                step = 5,
                                 valueSuffix = "%",
                                 iconRes = R.drawable.ic_baseline_tune_24,
+                                presets = listOf(0, 10, 25, 50, 80),
                                 onValueChange = { value ->
                                     sharedPrefs.edit().putInt("background_dim", value).apply()
                                     onPreferenceChange("background_dim", value)
@@ -214,13 +216,15 @@ fun SubSettingsScreen(
                         }
 
                         item {
-                            ExpressiveSliderPreferenceCard(
+                            StepSelectorPreferenceCard(
                                 title = "Background Grain",
                                 value = getInt("background_grain", 0),
                                 min = 0,
                                 max = 100,
+                                step = 5,
                                 valueSuffix = "%",
                                 iconRes = R.drawable.ic_baseline_tune_24,
+                                presets = listOf(0, 10, 25, 50, 80),
                                 onValueChange = { value ->
                                     sharedPrefs.edit().putInt("background_grain", value).apply()
                                     onPreferenceChange("background_grain", value)
@@ -230,13 +234,15 @@ fun SubSettingsScreen(
                         }
 
                         item {
-                            ExpressiveSliderPreferenceCard(
+                            StepSelectorPreferenceCard(
                                 title = "Background Vignette",
                                 value = getInt("background_vignette", 0),
                                 min = 0,
                                 max = 100,
+                                step = 5,
                                 valueSuffix = "%",
                                 iconRes = R.drawable.ic_baseline_tune_24,
+                                presets = listOf(0, 10, 25, 50, 80),
                                 onValueChange = { value ->
                                     sharedPrefs.edit().putInt("background_vignette", value).apply()
                                     onPreferenceChange("background_vignette", value)

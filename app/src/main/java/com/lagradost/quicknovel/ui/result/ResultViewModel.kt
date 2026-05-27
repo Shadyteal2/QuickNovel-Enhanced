@@ -468,7 +468,7 @@ class ResultViewModel : ViewModel() {
             BookDownloader2.downloadInfoMutex.withLock {
                 downloadProgress[loadId]?.let { downloadState ->
                     when (downloadState.state) {
-                        DownloadState.IsPaused -> BookDownloader2.addPendingAction(
+                        DownloadState.IsPaused, DownloadState.IsStopped, DownloadState.IsFailed -> BookDownloader2.addPendingAction(
                             loadId,
                             DownloadActionType.Resume
                         )
@@ -904,37 +904,65 @@ class ResultViewModel : ViewModel() {
         loadMutex.withLock {
             if (!hasLoaded) return@launch
 
+            val dbState = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val ctx = context ?: return@withContext null
+                    com.lagradost.quicknovel.db.AppDatabase.getDatabase(ctx).novelDao().getById(loadId)
+                } catch (t: Throwable) {
+                    com.lagradost.quicknovel.mvvm.logError(t)
+                    null
+                }
+            }
+
             BookDownloader2.downloadInfoMutex.withLock {
-                val current = downloadProgress[loadId]
-                if (current != null) {
-                    setDownloadState(current)
+                if (dbState != null && dbState.downloadStatus != null) {
+                    val stateEnum = dbState.downloadStatus.let { statusInt ->
+                        DownloadState.values().getOrNull(statusInt)
+                    } ?: DownloadState.Nothing
+
+                    val inMemory = downloadProgress[loadId]
+                    val new = DownloadProgressState(
+                        state = stateEnum,
+                        progress = dbState.downloadProgress ?: inMemory?.progress ?: 0L,
+                        total = dbState.downloadTotal ?: inMemory?.total ?: (load as? StreamResponse)?.data?.size?.toLong() ?: 1L,
+                        downloaded = dbState.downloadProgress ?: inMemory?.downloaded ?: 0L,
+                        lastUpdatedMs = System.currentTimeMillis(),
+                        etaMs = null
+                    )
+                    downloadProgress[loadId] = new
+                    setDownloadState(new)
                 } else {
-                    BookDownloader2Helper.downloadInfo(
-                        context,
-                        load.author,
-                        load.name,
-                        load.apiName
-                    )?.let { info ->
-                        val new = DownloadProgressState(
-                            state = DownloadState.Nothing,
-                            progress = info.progress,
-                            total = info.total,
-                            downloaded = info.downloaded,
-                            lastUpdatedMs = System.currentTimeMillis(),
-                            etaMs = null
-                        )
-                        downloadProgress[loadId] = new
-                        setDownloadState(new)
-                    } ?: run {
-                        val new = DownloadProgressState(
-                            state = DownloadState.Nothing,
-                            progress = 0,
-                            total = (load as? StreamResponse)?.data?.size?.toLong() ?: 1,
-                            downloaded = 0,
-                            lastUpdatedMs = System.currentTimeMillis(),
-                            etaMs = null
-                        )
-                        setDownloadState(new)
+                    val current = downloadProgress[loadId]
+                    if (current != null) {
+                        setDownloadState(current)
+                    } else {
+                        BookDownloader2Helper.downloadInfo(
+                            context,
+                            load.author,
+                            load.name,
+                            load.apiName
+                        )?.let { info ->
+                            val new = DownloadProgressState(
+                                state = DownloadState.Nothing,
+                                progress = info.progress,
+                                total = info.total,
+                                downloaded = info.downloaded,
+                                lastUpdatedMs = System.currentTimeMillis(),
+                                etaMs = null
+                            )
+                            downloadProgress[loadId] = new
+                            setDownloadState(new)
+                        } ?: run {
+                            val new = DownloadProgressState(
+                                state = DownloadState.Nothing,
+                                progress = 0,
+                                total = (load as? StreamResponse)?.data?.size?.toLong() ?: 1,
+                                downloaded = 0,
+                                lastUpdatedMs = System.currentTimeMillis(),
+                                etaMs = null
+                            )
+                            setDownloadState(new)
+                        }
                     }
                 }
             }
@@ -990,6 +1018,10 @@ class ResultViewModel : ViewModel() {
 
         // insert a download progress if not found
         insertZeroData()
+
+        if (::load.isInitialized) {
+            reorderChapters(load)
+        }
     }
 
     fun initState(card: DownloadFragment.DownloadDataLoaded) = viewModelScope.launch {

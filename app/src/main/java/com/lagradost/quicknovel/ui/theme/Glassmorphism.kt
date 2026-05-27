@@ -22,6 +22,26 @@ import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
  * Applies the QuickNovel "Spatial Glass" aesthetic to any composable.
  * This dynamically adapts based on the active theme (AMOLED, Light, or standard Dark).
  */
+private val amoledCache = java.util.concurrent.atomic.AtomicBoolean(true)
+private val lastThemeCheck = java.util.concurrent.atomic.AtomicLong(0L)
+
+private fun checkIsAmoledCached(context: android.content.Context): Boolean {
+    val now = System.currentTimeMillis()
+    if (now - lastThemeCheck.get() < 2500L) {
+        return amoledCache.get()
+    }
+    try {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        val themeKey = prefs.getString(context.getString(R.string.theme_key), "Amoled") ?: "Amoled"
+        val isAmoled = (themeKey == "Amoled" || themeKey == "Black")
+        amoledCache.set(isAmoled)
+        lastThemeCheck.set(now)
+    } catch (e: Exception) {
+        // Fallback silently to cache
+    }
+    return amoledCache.get()
+}
+
 fun Modifier.glassCard(
     shape: Shape = RoundedCornerShape(16.dp),
     backgroundColor: Color? = null,
@@ -36,14 +56,8 @@ fun Modifier.glassCard(
             // Gorgeous high-contrast translucent white card for Light/Flashbang mode
             Color(0xEEFFFFFF)
         } else {
-            // Check for AMOLED theme
-            val isAmoled = try {
-                val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
-                val themeKey = settingsManager.getString(context.getString(R.string.theme_key), "Amoled")
-                themeKey == "Amoled" || themeKey == "Black"
-            } catch (e: Exception) {
-                true
-            }
+            // Check for AMOLED theme using our high-performance cache
+            val isAmoled = checkIsAmoledCached(context)
             
             if (isAmoled) {
                 // Pure AMOLED translucent black for rich deep blacks

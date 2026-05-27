@@ -532,11 +532,18 @@ fun ResultDetailModernScreen(
                                             },
                                             update = { rv ->
                                                 val list = chapters
+                                                // Reference selection states to force recomposing update block on selection change
+                                                val selMode = isSelectionMode
+                                                val selChapters = selectedChapters
                                                 if (list != null && list.isNotEmpty()) {
-                                                    if (list.size > 300) {
-                                                        chapterAdapter.submitIncomparableList(list)
+                                                    if (chapterAdapter.immutableCurrentList != list) {
+                                                        if (chapterAdapter.immutableCurrentList.isEmpty()) {
+                                                            chapterAdapter.submitIncomparableList(list)
+                                                        } else {
+                                                            chapterAdapter.submitList(list)
+                                                        }
                                                     } else {
-                                                        chapterAdapter.submitList(list)
+                                                        chapterAdapter.notifyDataSetChanged()
                                                     }
                                                 }
                                             }
@@ -594,7 +601,7 @@ fun ResultDetailModernScreen(
 @Composable
 private fun rememberHighQualityRequest(data: Any?, context: Context): ImageRequest {
     val baseRequest = rememberImageRequest(data)
-    return remember(data) {
+    return remember(data, baseRequest) {
         baseRequest.newBuilder(context)
             .allowHardware(true)   // Using hardware bitmap allows GPU-optimized high quality filtering and smoother display
             .size(coil3.size.Size.ORIGINAL) // Load the original full quality and high resolution of the image

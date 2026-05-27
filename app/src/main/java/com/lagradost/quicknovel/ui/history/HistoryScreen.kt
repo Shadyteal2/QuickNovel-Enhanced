@@ -171,18 +171,6 @@ fun HistoryScreen(
                 } else {
                     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
                     
-                    // Prefetch cover images of the upcoming 12 novels as the user scrolls
-                    LaunchedEffect(gridState.firstVisibleItemIndex, cards) {
-                        val totalItems = cards.size
-                        val startIndex = (gridState.firstVisibleItemIndex + 10).coerceAtMost(totalItems)
-                        val endIndex = (startIndex + 12).coerceAtMost(totalItems)
-                        for (i in startIndex until endIndex) {
-                            val card = cards.getOrNull(i) ?: continue
-                            val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
-                            coil3.SingletonImageLoader.get(context).enqueue(req)
-                        }
-                    }
-
                     LazyVerticalGrid(
                         state = gridState,
                         columns = GridCells.Fixed(if (isLandscape) 2 else 1),
@@ -216,6 +204,18 @@ fun HistoryScreen(
     }
 }
 
+private val compactCardShape = RoundedCornerShape(12.dp)
+private val looseCardShape = RoundedCornerShape(20.dp)
+
+private val compactPosterShape = RoundedCornerShape(
+    topStart = 12.dp,
+    bottomStart = 12.dp
+)
+private val loosePosterShape = RoundedCornerShape(
+    topStart = 20.dp,
+    bottomStart = 20.dp
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HistoryItemCard(
@@ -235,13 +235,8 @@ fun HistoryItemCard(
         }
     }
 
-    val cardShape = remember(isCompact) { RoundedCornerShape(if (isCompact) 12.dp else 20.dp) }
-    val posterShape = remember(isCompact) {
-        RoundedCornerShape(
-            topStart = if (isCompact) 12.dp else 20.dp,
-            bottomStart = if (isCompact) 12.dp else 20.dp
-        )
-    }
+    val cardShape = if (isCompact) compactCardShape else looseCardShape
+    val posterShape = if (isCompact) compactPosterShape else loosePosterShape
 
     Row(
         modifier = Modifier

@@ -811,10 +811,16 @@ class ResultFragment : Fragment() {
         observeNullable(viewModel.chapters) { chaptersList ->
             val chapters = chaptersList ?: emptyList()
             chapterAdapter?.let { adapter ->
-                if (chapters.size > 300) {
-                    adapter.submitIncomparableList(chapters)
-                } else {
-                    adapter.submitList(chapters)
+                if (chapters.isNotEmpty()) {
+                    if (adapter.immutableCurrentList != chapters) {
+                        if (adapter.immutableCurrentList.isEmpty()) {
+                            adapter.submitIncomparableList(chapters)
+                        } else {
+                            adapter.submitList(chapters)
+                        }
+                    } else {
+                        adapter.notifyDataSetChanged()
+                    }
                 }
             }
 
@@ -910,6 +916,7 @@ class ResultFragment : Fragment() {
         observe(viewModel.selectedChapters) { selected ->
             val count = selected.size
             binding.resultSelectionCount.text = if (count == 0) getString(R.string.no_data) else "$count Selected"
+            chapterAdapter?.notifyDataSetChanged()
         }
 
 
@@ -1014,10 +1021,16 @@ class ResultFragment : Fragment() {
         observeNullable(viewModel.chapters) { chaptersList ->
             val chapters = chaptersList ?: emptyList()
             chapterAdapter?.let { adapter ->
-                if (chapters.size > 300) {
-                    adapter.submitIncomparableList(chapters)
-                } else {
-                    adapter.submitList(chapters)
+                if (chapters.isNotEmpty()) {
+                    if (adapter.immutableCurrentList != chapters) {
+                        if (adapter.immutableCurrentList.isEmpty()) {
+                            adapter.submitIncomparableList(chapters)
+                        } else {
+                            adapter.submitList(chapters)
+                        }
+                    } else {
+                        adapter.notifyDataSetChanged()
+                    }
                 }
             }
         }
@@ -1089,10 +1102,16 @@ class ResultFragment : Fragment() {
         observeNullable(viewModel.chapters) { chaptersList ->
             val chapters = chaptersList ?: emptyList()
             chapterAdapter?.let { adapter ->
-                if (chapters.size > 300) {
-                    adapter.submitIncomparableList(chapters)
-                } else {
-                    adapter.submitList(chapters)
+                if (chapters.isNotEmpty()) {
+                    if (adapter.immutableCurrentList != chapters) {
+                        if (adapter.immutableCurrentList.isEmpty()) {
+                            adapter.submitIncomparableList(chapters)
+                        } else {
+                            adapter.submitList(chapters)
+                        }
+                    } else {
+                        adapter.notifyDataSetChanged()
+                    }
                 }
             }
         }

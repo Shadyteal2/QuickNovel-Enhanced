@@ -38,6 +38,13 @@ class CloudflareKiller : Interceptor {
 
         // Check if we are being blocked by Cloudflare (403/503) or generic challenge (200)
         val isChallengeCode = response.code == 403 || response.code == 503 || response.code == 429
+        val contentType = response.header("Content-Type", "") ?: ""
+
+        // Fast-path: if not a challenge status code and not an HTML content type, skip body analysis entirely.
+        if (!isChallengeCode && !contentType.contains("text/html", ignoreCase = true)) {
+            return@runBlocking response
+        }
+
         val bodySnippet = try {
             response.peekBody(1024 * 10).string()
         } catch (e: Exception) {
@@ -46,11 +53,13 @@ class CloudflareKiller : Interceptor {
         
         // Refined markers: for 200 OK, we want to be more certain it's a challenge, not just a site mention
         val hasChallengeMarkers = response.header("cf-mitigated") == "challenge" ||
-                                 bodySnippet.contains("cf-challenge", ignoreCase = true) ||
-                                 bodySnippet.contains("Turnstile", ignoreCase = true) ||
-                                 bodySnippet.contains("ctp-button", ignoreCase = true) ||
-                                 (bodySnippet.contains("cloudflare", ignoreCase = true) && 
-                                  bodySnippet.contains("challenges.cloudflare.com", ignoreCase = true))
+                                 bodySnippet.contains("class=\"cf-turnstile\"", ignoreCase = true) ||
+                                 bodySnippet.contains("class='cf-turnstile'", ignoreCase = true) ||
+                                 bodySnippet.contains("cf-challenge-response", ignoreCase = true) ||
+                                 bodySnippet.contains("/cdn-cgi/challenge-platform/", ignoreCase = true) ||
+                                 bodySnippet.contains("id=\"cf-bubble\"", ignoreCase = true) ||
+                                 bodySnippet.contains("id=\"challenge-form\"", ignoreCase = true) ||
+                                 bodySnippet.contains("challenges.cloudflare.com/turnstile", ignoreCase = true)
 
         if (isChallengeCode || (response.code == 200 && hasChallengeMarkers && bodySnippet.contains("javascript", ignoreCase = true))) {
             if (hasChallengeMarkers || isChallengeCode) {
