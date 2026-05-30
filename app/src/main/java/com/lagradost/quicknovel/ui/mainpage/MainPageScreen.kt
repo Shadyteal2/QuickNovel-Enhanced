@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -157,7 +158,7 @@ fun MainPageScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(top = 140.dp),
+                                .padding(top = 175.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(
@@ -260,7 +261,7 @@ fun MainPageScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(top = 140.dp),
+                                    .padding(top = 175.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -301,7 +302,7 @@ fun MainPageScreen(
                             LazyVerticalGrid(
                                 state = gridState,
                                 columns = GridCells.Fixed(if (isLandscape) 6 else 3),
-                                contentPadding = PaddingValues(top = 140.dp, bottom = 16.dp, start = 16.dp, end = 16.dp),
+                                contentPadding = PaddingValues(top = 175.dp, bottom = 16.dp, start = 16.dp, end = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp),
                                 modifier = Modifier.fillMaxSize()
@@ -408,18 +409,11 @@ fun MainPageScreen(
                                         }
                                     }
                             ) {
-                                OutlinedTextField(
+                                BasicTextField(
                                     value = searchQuery,
                                     onValueChange = { searchQuery = it },
-                                    placeholder = {
-                                        Text(
-                                            text = "Search $apiName…",
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
                                     singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                     keyboardActions = KeyboardActions(
                                         onSearch = {
@@ -429,38 +423,72 @@ fun MainPageScreen(
                                             }
                                         }
                                     ),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.05f),
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.02f)
-                                    ),
-                                    shape = RoundedCornerShape(24.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(52.dp),
-                                    trailingIcon = {
-                                        if (searchQuery.isNotEmpty()) {
-                                            IconButton(
-                                                onClick = {
-                                                    searchQuery = ""
-                                                    viewModel.switchToMain()
+                                    decorationBox = { innerTextField ->
+                                        OutlinedTextFieldDefaults.DecorationBox(
+                                            value = searchQuery,
+                                            innerTextField = innerTextField,
+                                            enabled = true,
+                                            singleLine = true,
+                                            visualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            placeholder = {
+                                                Text(
+                                                    text = "Search $apiName…",
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                if (searchQuery.isNotEmpty()) {
+                                                    IconButton(
+                                                        onClick = {
+                                                            searchQuery = ""
+                                                            viewModel.switchToMain()
+                                                        }
+                                                    ) {
+                                                        Icon(
+                                                            painter = painterResource(id = R.drawable.ic_sharp_clear_24),
+                                                            contentDescription = "Clear Search",
+                                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                        )
+                                                    }
+                                                } else {
+                                                    Icon(
+                                                        painter = painterResource(id = R.drawable.ic_baseline_search_24),
+                                                        contentDescription = "Search icon",
+                                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
                                                 }
-                                            ) {
-                                                Icon(
-                                                    painter = painterResource(id = R.drawable.ic_sharp_clear_24),
-                                                    contentDescription = "Clear Search",
-                                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                            },
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                                focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.05f),
+                                                unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.02f)
+                                            ),
+                                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                                            container = {
+                                                OutlinedTextFieldDefaults.ContainerBox(
+                                                    enabled = true,
+                                                    isError = false,
+                                                    interactionSource = remember { MutableInteractionSource() },
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.05f),
+                                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.02f)
+                                                    ),
+                                                    shape = RoundedCornerShape(24.dp),
+                                                    focusedBorderThickness = 1.dp,
+                                                    unfocusedBorderThickness = 1.dp
                                                 )
                                             }
-                                        } else {
-                                            Icon(
-                                                painter = painterResource(id = R.drawable.ic_baseline_search_24),
-                                                contentDescription = "Search icon",
-                                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
+                                        )
                                     }
                                 )
                             }
@@ -675,7 +703,7 @@ fun MainPageShimmerSkeleton(isLandscape: Boolean) {
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(if (isLandscape) 6 else 3),
-        contentPadding = PaddingValues(top = 140.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
+        contentPadding = PaddingValues(top = 175.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         userScrollEnabled = false,
