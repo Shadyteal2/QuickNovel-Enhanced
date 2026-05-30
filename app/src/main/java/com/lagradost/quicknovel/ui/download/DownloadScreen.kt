@@ -42,6 +42,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.platform.LocalViewConfiguration
+import kotlin.math.abs
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -106,6 +110,8 @@ fun DownloadScreen(
     var isBento3x3 by remember { mutableStateOf(settings.getBoolean("download_bento", false)) }
     val navStyleState = rememberPreferenceString(context.getString(R.string.library_nav_style_key), "0")
     val isSwipeMode = navStyleState.value == "1"
+    var isSwipingPage by remember { mutableStateOf(false) }
+    var isScrollingList by remember { mutableStateOf(false) }
 
     // Dialog & Bottom Sheet triggers
     var showCategorySheet by remember { mutableStateOf(false) }
@@ -395,187 +401,199 @@ fun DownloadScreen(
             // HorizontalPager hosting each Tab Content
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = isSwipeMode // Only swipeable in Swipe View mode
+                modifier = Modifier
+                    .fillMaxSize()
+                    .lockGesturePriority(
+                        enabled = isSwipeMode,
+                        onHorizontalDragDetected = { isSwipingPage = true },
+                        onVerticalDragDetected = { isScrollingList = true },
+                        onRelease = {
+                            isSwipingPage = false
+                            isScrollingList = false
+                        }
+                    ),
+                userScrollEnabled = isSwipeMode && !isScrollingList // Disable pager swipe when scrolling list
             ) { page ->
                 val list = cardsByPage[page] ?: emptyList()
                 val isDownloadsPage = page == 0
 
-                if (list.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MenuBook,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                modifier = Modifier.size(72.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = if (isDownloadsPage) "Your downloads list is empty" else "No books in this category",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                textAlign = TextAlign.Center
-                            )
-                            if (isDownloadsPage) {
-                                Spacer(modifier = Modifier.height(24.dp))
-                                Button(
-                                    onClick = onImportEpubClick,
-                                    shape = RoundedCornerShape(20.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                                ) {
-                                    Icon(Icons.Default.CloudUpload, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Import EPUB / PDF", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    if (isCompact) {
-                        val listState = rememberLazyListState()
-                        
-
-
-                        LazyColumn(
-                            state = listState,
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (list.isEmpty()) {
+                        Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            contentAlignment = Alignment.Center
                         ) {
-                            items(
-                                items = list,
-                                key = { card ->
-                                    when (card) {
-                                        is ResultCached -> "cached_${card.id}"
-                                        is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
-                                        else -> card.hashCode()
-                                    }
-                                }
-                            ) { card ->
-                                val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
-                                    {
-                                        if (card is ResultCached) onBookClick(card)
-                                        else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
-                                    }
-                                }
-                                val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
-                                    {
-                                        if (card is ResultCached) onBookLongClick(card)
-                                        else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
-                                    }
-                                }
-                                val onPauseClick = remember(card, viewModel) {
-                                    {
-                                        if (card is DownloadFragment.DownloadDataLoaded) viewModel.pause(card)
-                                    }
-                                }
-                                val onResumeClick = remember(card, viewModel) {
-                                    {
-                                        if (card is DownloadFragment.DownloadDataLoaded) viewModel.resume(card)
-                                    }
-                                }
-                                val onRefreshClick = remember(card, viewModel) {
-                                    {
-                                        if (card is DownloadFragment.DownloadDataLoaded) viewModel.refreshCard(card)
-                                    }
-                                }
-                                val onDeleteClick = remember(card, viewModel) {
-                                    {
-                                        if (card is DownloadFragment.DownloadDataLoaded) viewModel.deleteAlert(card)
-                                    }
-                                }
-
-                                CompactCardItem(
-                                    card = card,
-                                    isTactileEnabled = isTactileEnabled,
-                                    onClick = currentOnClick,
-                                    onLongClick = currentOnLongClick,
-                                    onPauseClick = onPauseClick,
-                                    onResumeClick = onResumeClick,
-                                    onRefreshClick = onRefreshClick,
-                                    onDeleteClick = onDeleteClick
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MenuBook,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(72.dp)
                                 )
-                            }
-                            // Bottom Import item inside downloads page
-                            if (isDownloadsPage) {
-                                item(key = "import_item_column") {
-                                    ImportCardItem(onClick = onImportEpubClick)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = if (isDownloadsPage) "Your downloads list is empty" else "No books in this category",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    textAlign = TextAlign.Center
+                                )
+                                if (isDownloadsPage) {
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Button(
+                                        onClick = onImportEpubClick,
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Icon(Icons.Default.CloudUpload, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Import EPUB / PDF", fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
                     } else {
-                        // Grid layout (Pinterest/Bento style)
-                        val totalCount = list.size + (if (isDownloadsPage) 1 else 0)
-                        val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
-
-
-                        
-                        LazyVerticalGrid(
-                            state = gridState,
-                            columns = GridCells.Fixed(3),
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            itemsIndexed(
-                                items = list,
-                                key = { _, card ->
-                                    when (card) {
-                                        is ResultCached -> "cached_${card.id}"
-                                        is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
-                                        else -> card.hashCode()
+                        if (isCompact) {
+                            val listState = rememberLazyListState()
+                            
+                            LazyColumn(
+                                state = listState,
+                                userScrollEnabled = !isSwipingPage,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(
+                                    items = list,
+                                    key = { card ->
+                                        when (card) {
+                                            is ResultCached -> "cached_${card.id}"
+                                            is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
+                                            else -> card.hashCode()
+                                        }
                                     }
-                                },
-                                span = { index, _ ->
+                                ) { card ->
+                                    val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
+                                        {
+                                            if (card is ResultCached) onBookClick(card)
+                                            else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                        }
+                                    }
+                                    val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
+                                        {
+                                            if (card is ResultCached) onBookLongClick(card)
+                                            else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                        }
+                                    }
+                                    val onPauseClick = remember(card, viewModel) {
+                                        {
+                                            if (card is DownloadFragment.DownloadDataLoaded) viewModel.pause(card)
+                                        }
+                                    }
+                                    val onResumeClick = remember(card, viewModel) {
+                                        {
+                                            if (card is DownloadFragment.DownloadDataLoaded) viewModel.resume(card)
+                                        }
+                                    }
+                                    val onRefreshClick = remember(card, viewModel) {
+                                        {
+                                            if (card is DownloadFragment.DownloadDataLoaded) viewModel.refreshCard(card)
+                                        }
+                                    }
+                                    val onDeleteClick = remember(card, viewModel) {
+                                        {
+                                            if (card is DownloadFragment.DownloadDataLoaded) viewModel.deleteAlert(card)
+                                        }
+                                    }
+
+                                    CompactCardItem(
+                                        card = card,
+                                        isTactileEnabled = isTactileEnabled,
+                                        onClick = currentOnClick,
+                                        onLongClick = currentOnLongClick,
+                                        onPauseClick = onPauseClick,
+                                        onResumeClick = onResumeClick,
+                                        onRefreshClick = onRefreshClick,
+                                        onDeleteClick = onDeleteClick
+                                    )
+                                }
+                                // Bottom Import item inside downloads page
+                                if (isDownloadsPage) {
+                                    item(key = "import_item_column") {
+                                        ImportCardItem(onClick = onImportEpubClick)
+                                    }
+                                }
+                            }
+                        } else {
+                            // Grid layout (Pinterest/Bento style)
+                            val totalCount = list.size + (if (isDownloadsPage) 1 else 0)
+                            val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+
+                            LazyVerticalGrid(
+                                state = gridState,
+                                columns = GridCells.Fixed(3),
+                                userScrollEnabled = !isSwipingPage,
+                                modifier = Modifier
+                                    .fillMaxSize(),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                itemsIndexed(
+                                    items = list,
+                                    key = { _, card ->
+                                        when (card) {
+                                            is ResultCached -> "cached_${card.id}"
+                                            is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
+                                            else -> card.hashCode()
+                                        }
+                                    },
+                                    span = { index, _ ->
+                                        val spanSize = if (isBento3x3) {
+                                            when (index % 7) {
+                                                0, 5 -> 2
+                                                else -> 1
+                                            }
+                                        } else 1
+                                        GridItemSpan(spanSize)
+                                    }
+                                ) { index, card ->
                                     val spanSize = if (isBento3x3) {
                                         when (index % 7) {
                                             0, 5 -> 2
                                             else -> 1
                                         }
                                     } else 1
-                                    GridItemSpan(spanSize)
-                                }
-                            ) { index, card ->
-                                val spanSize = if (isBento3x3) {
-                                    when (index % 7) {
-                                        0, 5 -> 2
-                                        else -> 1
+                                    val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
+                                        {
+                                            if (card is ResultCached) onBookClick(card)
+                                            else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                        }
                                     }
-                                } else 1
-                                val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
-                                    {
-                                        if (card is ResultCached) onBookClick(card)
-                                        else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                    val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
+                                        {
+                                            if (card is ResultCached) onBookLongClick(card)
+                                            else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                        }
                                     }
+                                    GridCardItem(
+                                        card = card,
+                                        isBento = isBento3x3,
+                                        span = spanSize,
+                                        isTactileEnabled = isTactileEnabled,
+                                        onClick = currentOnClick,
+                                        onLongClick = currentOnLongClick
+                                    )
                                 }
-                                val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
-                                    {
-                                        if (card is ResultCached) onBookLongClick(card)
-                                        else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                if (isDownloadsPage) {
+                                    item(key = "import_item_grid", span = { GridItemSpan(3) }) {
+                                        ImportCardItem(onClick = onImportEpubClick)
                                     }
-                                }
-                                GridCardItem(
-                                    card = card,
-                                    isBento = isBento3x3,
-                                    span = spanSize,
-                                    isTactileEnabled = isTactileEnabled,
-                                    onClick = currentOnClick,
-                                    onLongClick = currentOnLongClick
-                                )
-                            }
-                            if (isDownloadsPage) {
-                                item(key = "import_item_grid", span = { GridItemSpan(3) }) {
-                                    ImportCardItem(onClick = onImportEpubClick)
                                 }
                             }
                         }
@@ -1673,5 +1691,62 @@ fun ModernIconButton(
             tint = iconTint,
             modifier = Modifier.size(22.dp)
         )
+    }
+}
+
+/**
+ * Custom touch gesture lock that prioritizes horizontal category switching swipes
+ * over vertical novel list scrolling, preventing horizontal/vertical gesture fighting.
+ */
+@Composable
+private fun Modifier.lockGesturePriority(
+    enabled: Boolean,
+    onHorizontalDragDetected: () -> Unit,
+    onVerticalDragDetected: () -> Unit,
+    onRelease: () -> Unit
+): Modifier {
+    if (!enabled) return this
+    val viewConfiguration = LocalViewConfiguration.current
+    val touchSlop = viewConfiguration.touchSlop
+    
+    return this.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                var accumX = 0f
+                var accumY = 0f
+                var locked = false
+                
+                do {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val changes = event.changes
+                    var anyPositionChanged = false
+                    
+                    for (change in changes) {
+                        if (change.pressed && change.previousPressed) {
+                            val dragAmount = change.position - change.previousPosition
+                            accumX += dragAmount.x
+                            accumY += dragAmount.y
+                            
+                            if (!locked) {
+                                val absX = abs(accumX)
+                                val absY = abs(accumY)
+                                if (absX > touchSlop || absY > touchSlop) {
+                                    locked = true
+                                    if (absX > absY) {
+                                        onHorizontalDragDetected()
+                                    } else {
+                                        onVerticalDragDetected()
+                                    }
+                                }
+                            }
+                            anyPositionChanged = true
+                        }
+                    }
+                } while (anyPositionChanged && changes.any { it.pressed })
+                
+                onRelease()
+            }
+        }
     }
 }

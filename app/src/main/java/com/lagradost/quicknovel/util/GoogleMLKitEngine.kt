@@ -17,8 +17,8 @@ class GoogleMLKitEngine : TranslationEngine {
     override val name: String = "Google ML"
     override val iconRes: Int = R.drawable.ic_google_ml
     override val type: TranslationEngineType = TranslationEngineType.GoogleMLKit
-    override val prefersBatching: Boolean = true
-    override val recommendedBatchSize: Int = 10
+    override val prefersBatching: Boolean = false
+    override val recommendedBatchSize: Int = 1
     override val maxParallelRequests: Int = 5 
 
     private var currentTranslator: Translator? = null
