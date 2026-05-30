@@ -52,3 +52,6 @@ signing.properties
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ─── Standalone TS / JS Plugin Testing ────────────────────────
+/test ts/

@@ -51,7 +51,8 @@ class TactileRulerSlider @JvmOverloads constructor(
     private var textColor = Color.WHITE
 
     // Mechanical Constants
-    private val tickSpacing = 20f * resources.displayMetrics.density
+    private val density = resources.displayMetrics.density
+    private val tickSpacing = 20f * density
     private var scrollOffset = 0f
     private var maxScroll = 0f
     
@@ -84,13 +85,19 @@ class TactileRulerSlider @JvmOverloads constructor(
         }
 
         textPaint.color = textColor
-        textPaint.textSize = 10f * resources.displayMetrics.density // Smaller text for better fit
+        textPaint.textSize = 10f * density // Smaller text for better fit
         
         _value = valueFrom
     }
 
     fun setOnValueChangeListener(listener: (TactileRulerSlider, Float, Boolean) -> Unit) {
         onValueChangeListener = listener
+    }
+
+    private var onValueChangeFinishedListener: ((Float) -> Unit)? = null
+
+    fun setOnValueChangeFinishedListener(listener: (Float) -> Unit) {
+        onValueChangeFinishedListener = listener
     }
 
     fun setValueRounded(v: Float) {
@@ -117,8 +124,18 @@ class TactileRulerSlider @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         // Compact height (60dp) to prevent layout crowding
-        val h = (60 * resources.displayMetrics.density).toInt()
+        val h = (60 * density).toInt()
         setMeasuredDimension(resolveSize(200, widthMeasureSpec), h)
+    }
+
+    private fun formatFloat(value: Float): String {
+        val intValue = value.toInt()
+        if (value == intValue.toFloat()) {
+            return intValue.toString()
+        }
+        val rounded = (value * 10f).roundToInt() / 10f
+        val dec = abs((value * 10f).roundToInt() % 10)
+        return "${rounded.toInt()}.$dec"
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -129,7 +146,7 @@ class TactileRulerSlider @JvmOverloads constructor(
         val rangeCount = if (stepSize > 0) (valueTo - valueFrom) / stepSize else 1f
 
         // 1. Draw Ruler Ticks
-        paint.strokeWidth = 2f * resources.displayMetrics.density
+        paint.strokeWidth = 2f * density
         paint.strokeCap = Paint.Cap.ROUND
         
         val startTick = floor(-scrollOffset / tickSpacing).toInt() - (width / tickSpacing / 2).toInt() - 2
@@ -161,23 +178,28 @@ class TactileRulerSlider @JvmOverloads constructor(
 
             if (isMajor) {
                 val tickValue = valueFrom + (i * stepSize)
-                val label = if (tickValue % 1f == 0f) tickValue.toInt().toString() else "%.1f".format(tickValue)
-                canvas.drawText(label + valueSuffix, tickX, centerY + (tickHeight/2f) + (14f * resources.displayMetrics.density), textPaint)
+                val label = formatFloat(tickValue)
+                val fullText = if (valueSuffix.isEmpty()) label else label + valueSuffix
+                canvas.drawText(fullText, tickX, centerY + (tickHeight/2f) + (14f * density), textPaint)
             }
         }
 
-        // 2. Draw Static Needle (Transparent center lock)
+        // 2. Draw Static Needle (Hardware accelerated shadow glow via dual drawing)
         paint.alpha = 255
-        paint.color = needleColor
-        paint.strokeWidth = 3f * resources.displayMetrics.density
-        paint.setShadowLayer(10f, 0f, 0f, needleColor)
-        
-        canvas.drawLine(centerX, centerY - (height * 0.3f), centerX, centerY + (height * 0.3f), paint)
-        paint.clearShadowLayer()
+        paint.strokeCap = Paint.Cap.ROUND
 
-        // (Removed Top Bubble Value as it is redundant with scale labels)
+        // Subtle wide outer glow
+        paint.strokeWidth = 6f * density
+        paint.color = Color.argb(40, Color.red(needleColor), Color.green(needleColor), Color.blue(needleColor))
+        canvas.drawLine(centerX, centerY - (height * 0.3f), centerX, centerY + (height * 0.3f), paint)
+
+        // Solid inner needle
+        paint.strokeWidth = 3f * density
+        paint.color = needleColor
+        canvas.drawLine(centerX, centerY - (height * 0.3f), centerX, centerY + (height * 0.3f), paint)
+
         textPaint.typeface = Typeface.MONOSPACE
-        textPaint.textSize = 10f * resources.displayMetrics.density
+        textPaint.textSize = 10f * density
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -220,17 +242,29 @@ class TactileRulerSlider @JvmOverloads constructor(
                 isDragging = false
                 velocityTracker?.recycle()
                 velocityTracker = null
+                
+                // If scroller is already finished, trigger finished callback
+                if (scroller.isFinished) {
+                    onValueChangeFinishedListener?.invoke(_value)
+                }
                 return true
             }
         }
         return super.onTouchEvent(event)
     }
 
+    fun isDragging(): Boolean = isDragging
+
     override fun computeScroll() {
         if (scroller.computeScrollOffset()) {
             scrollOffset = scroller.currX.toFloat()
             updateValueFromScroll(true)
             postInvalidateOnAnimation()
+        } else {
+            // Fling ended and no longer dragging, notify finished value
+            if (!isDragging) {
+                onValueChangeFinishedListener?.invoke(_value)
+            }
         }
     }
 

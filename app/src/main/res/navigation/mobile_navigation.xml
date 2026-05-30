@@ -5,13 +5,6 @@
             android:id="@+id/mobile_navigation"
             app:startDestination="@+id/navigation_download">
     <fragment
-            android:id="@+id/navigation_homepage"
-            android:name="com.lagradost.quicknovel.ui.home.HomeFragment"
-            android:label="@string/title_home"
-            android:layout_height="match_parent"
-            tools:layout="@layout/fragment_home">
-    </fragment>
-    <fragment
             android:id="@+id/navigation_search"
             android:name="com.lagradost.quicknovel.ui.search.SearchFragment"
             android:label="@string/title_search"

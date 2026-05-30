@@ -50,11 +50,25 @@ import com.lagradost.quicknovel.OnGoingSearch
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.mvvm.Resource
-import com.lagradost.quicknovel.ui.home.BrowseAdapter
 import com.lagradost.quicknovel.ui.home.HomeViewModel
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
-import com.lagradost.quicknovel.util.KineticTiltHelper
+private val iconCache = HashMap<String, Int>()
+
+fun resolveIcon(context: android.content.Context, providerName: String): Int {
+    return iconCache.getOrPut(providerName) {
+        val name = providerName.lowercase().replace(" ", "_")
+        if (name.contains("wuxiabox")) {
+            val id = context.resources.getIdentifier("icon_wuxiabox", "drawable", context.packageName)
+            if (id != 0) return@getOrPut id
+        }
+        
+        var id = context.resources.getIdentifier("icon_$name", "drawable", context.packageName)
+        if (id == 0) id = context.resources.getIdentifier(name, "drawable", context.packageName)
+        if (id == 0) id = context.resources.getIdentifier("${name}icon", "drawable", context.packageName)
+        id
+    }
+}
 
 @Composable
 fun SearchScreen(
@@ -288,7 +302,7 @@ fun ProviderCard(
         if (api.pluginContext != null && api.iconId != null && api.iconId != 0) {
             api.pluginContext!!.getDrawable(api.iconId!!) ?: R.drawable.ic_baseline_code_24
         } else {
-            val resId = BrowseAdapter.resolveIcon(context, api.name)
+            val resId = resolveIcon(context, api.name)
             if (resId != 0) resId
             else if (api.iconId != null && api.iconId != 0) api.iconId!!
             else R.drawable.ic_baseline_code_24

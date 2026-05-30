@@ -494,7 +494,8 @@ fun TactileRulerSliderCompose(
     valueFrom: Float,
     valueTo: Float,
     stepSize: Float,
-    onValueChange: (Float) -> Unit,
+    onValueChangeLive: (Float) -> Unit,
+    onValueChangeFinished: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     AndroidView(
@@ -506,8 +507,11 @@ fun TactileRulerSliderCompose(
                 this.value = value
                 setOnValueChangeListener { _, newValue, fromUser ->
                     if (fromUser) {
-                        onValueChange(newValue)
+                        onValueChangeLive(newValue)
                     }
+                }
+                setOnValueChangeFinishedListener { newValue ->
+                    onValueChangeFinished(newValue)
                 }
             }
         },
@@ -515,7 +519,9 @@ fun TactileRulerSliderCompose(
             view.valueFrom = valueFrom
             view.valueTo = valueTo
             view.stepSize = stepSize
-            view.value = value
+            if (!view.isDragging()) {
+                view.value = value
+            }
         },
         modifier = modifier.height(60.dp)
     )
@@ -532,13 +538,27 @@ fun SettingsSliderRow(
     rightIcon: Int,
     onValueChange: (Float) -> Unit
 ) {
+    var liveValue by remember(value) { mutableStateOf(value) }
+    
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text(
-            text = title,
-            fontSize = 14.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                color = Color.Gray
+            )
+            Text(
+                text = if (stepSize >= 1f) liveValue.toInt().toString() else liveValue.toString(),
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -554,7 +574,8 @@ fun SettingsSliderRow(
                 valueFrom = valueFrom,
                 valueTo = valueTo,
                 stepSize = stepSize,
-                onValueChange = onValueChange,
+                onValueChangeLive = { liveValue = it },
+                onValueChangeFinished = onValueChange,
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 12.dp)

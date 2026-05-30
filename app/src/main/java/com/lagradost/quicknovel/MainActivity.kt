@@ -702,7 +702,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
         binding?.apply {
             val navHost = findViewById<android.view.View>(R.id.nav_host_fragment)
-            val isMainBar = isTab || destinationId == R.id.navigation_homepage || destinationId == R.id.navigation_mainpage || destinationId == R.id.navigation_settings
+            val isMainBar = isTab || destinationId == R.id.navigation_mainpage || destinationId == R.id.navigation_settings
             
             navBarContainer.visibility = if (isMainBar) android.view.View.VISIBLE else android.view.View.GONE
 
@@ -857,6 +857,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
+        if (CommonActivity.pendingThemeChangeScreenshot != null) {
+            binding!!.root.alpha = 0f
+        }
         setContentView(binding!!.root)
 
         ioSafe {
@@ -873,45 +876,72 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             decorView.addView(overlay, params)
 
             overlay.doOnPreDraw {
-                it.postDelayed({
-                    if (isFinishing || isDestroyed) return@postDelayed
-                    
-                    val width = it.width.toFloat()
-                    val height = it.height.toFloat()
-                    val cx = CommonActivity.themeCenterX ?: width
-                    val cy = CommonActivity.themeCenterY ?: 0f
-                    val finalRadius = hypot(width.toDouble(), height.toDouble()).toFloat()
+                if (CommonActivity.isFontChangeTransition) {
+                    // ─── Font Change: Dissolve Crossfade ───
+                    overlay.postDelayed({
+                        binding?.root?.animate()
+                            ?.alpha(1f)
+                            ?.setDuration(300)
+                            ?.setInterpolator(android.view.animation.DecelerateInterpolator())
+                            ?.start()
 
-                    try {
-                        overlay.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                        val anim = ViewAnimationUtils.createCircularReveal(overlay, cx.toInt(), cy.toInt(), finalRadius, 0f)
-                        anim.duration = 800 
-                        anim.interpolator = FastOutSlowInInterpolator()
-                        anim.addListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationStart(animation: Animator) {
-                                @Suppress("DEPRECATION")
-                                window?.setWindowAnimations(android.R.style.Animation_Activity)
-                            }
-
-                            override fun onAnimationEnd(animation: Animator) {
+                        overlay.animate()
+                            .alpha(0f)
+                            .setDuration(300)
+                            .setInterpolator(android.view.animation.DecelerateInterpolator())
+                            .withEndAction {
                                 overlay.visibility = android.view.View.GONE
-                                overlay.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                                 decorView.removeView(overlay)
                                 overlay.setImageDrawable(null)
                                 CommonActivity.pendingThemeChangeScreenshot = null
                                 CommonActivity.themeCenterX = null
                                 CommonActivity.themeCenterY = null
+                                CommonActivity.isFontChangeTransition = false
                             }
-                        })
-                        anim.start()
-                    } catch (e: Exception) {
-                        overlay.animate().alpha(0f).setDuration(250).withEndAction {
-                            overlay.visibility = android.view.View.GONE
-                            decorView.removeView(overlay)
-                            CommonActivity.pendingThemeChangeScreenshot = null
-                        }.start()
-                    }
-                }, 50)
+                            .start()
+                    }, 100)
+                } else {
+                    // ─── Theme / Accent Change: Premium Circular Ripple Reveal ───
+                    binding?.root?.alpha = 1f // Show the new theme instantly underneath the screenshot
+                    overlay.postDelayed({
+                        if (isFinishing || isDestroyed) return@postDelayed
+                        val width = overlay.width.toFloat()
+                        val height = overlay.height.toFloat()
+                        val cx = CommonActivity.themeCenterX ?: width
+                        val cy = CommonActivity.themeCenterY ?: 0f
+                        val finalRadius = kotlin.math.hypot(width.toDouble(), height.toDouble()).toFloat()
+
+                        try {
+                            overlay.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                            val anim = android.view.ViewAnimationUtils.createCircularReveal(overlay, cx.toInt(), cy.toInt(), finalRadius, 0f)
+                            anim.duration = 600
+                            anim.interpolator = androidx.interpolator.view.animation.FastOutSlowInInterpolator()
+                            anim.addListener(object : android.animation.AnimatorListenerAdapter() {
+                                override fun onAnimationStart(animation: android.animation.Animator) {
+                                    @Suppress("DEPRECATION")
+                                    window?.setWindowAnimations(android.R.style.Animation_Activity)
+                                }
+
+                                override fun onAnimationEnd(animation: android.animation.Animator) {
+                                    overlay.visibility = android.view.View.GONE
+                                    overlay.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                    decorView.removeView(overlay)
+                                    overlay.setImageDrawable(null)
+                                    CommonActivity.pendingThemeChangeScreenshot = null
+                                    CommonActivity.themeCenterX = null
+                                    CommonActivity.themeCenterY = null
+                                }
+                            })
+                            anim.start()
+                        } catch (e: Exception) {
+                            overlay.animate().alpha(0f).setDuration(250).withEndAction {
+                                overlay.visibility = android.view.View.GONE
+                                decorView.removeView(overlay)
+                                CommonActivity.pendingThemeChangeScreenshot = null
+                            }.start()
+                        }
+                    }, 50)
+                }
             }
         }
 

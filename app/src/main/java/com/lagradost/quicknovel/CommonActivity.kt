@@ -28,6 +28,7 @@ object CommonActivity {
     var pendingThemeChangeScreenshot: Bitmap? = null
     var themeCenterX: Float? = null
     var themeCenterY: Float? = null
+    var isFontChangeTransition: Boolean = false
 
     @JvmStatic
     fun recreateWithSmoothTransition(act: Activity?, x: Float? = null, y: Float? = null) {

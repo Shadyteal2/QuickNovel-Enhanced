@@ -349,6 +349,7 @@ class SubSettingsFragment : Fragment() {
                 val current = sharedPrefs.getString(getString(R.string.app_font_key), "default")
                 activity?.showBottomDialog(names, values.indexOf(current).coerceAtLeast(0), getString(R.string.app_font), false, {}) { selectedIndex ->
                     sharedPrefs.edit().putString(getString(R.string.app_font_key), values[selectedIndex]).apply()
+                    CommonActivity.isFontChangeTransition = true
                     CommonActivity.recreateWithSmoothTransition(activity)
                 }
             }

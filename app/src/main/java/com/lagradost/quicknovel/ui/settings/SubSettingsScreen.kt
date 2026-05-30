@@ -54,46 +54,36 @@ fun SubSettingsScreen(
     val sharedPrefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     var changeTrigger by remember { mutableStateOf(0) }
 
-    // Unified helper to read preference values dynamically
+    // Cache all preferences in memory, refreshed ONLY when changeTrigger is incremented.
+    // This prevents slow disk lookups/mutex locking on sharedPrefs inside scrolling compositions!
+    val cachedPrefs = remember(changeTrigger) {
+        sharedPrefs.all.toMap()
+    }
+
+    // Unified helper to read preference values dynamically from memory cache
     fun getBoolean(key: String, default: Boolean): Boolean {
-        return changeTrigger.run { 
-            try {
-                sharedPrefs.getBoolean(key, default)
-            } catch (e: Exception) {
-                default
-            }
+        return try {
+            cachedPrefs[key] as? Boolean ?: default
+        } catch (e: Exception) {
+            default
         }
     }
 
     fun getInt(key: String, default: Int): Int {
-        return changeTrigger.run { 
-            try {
-                sharedPrefs.getInt(key, default)
-            } catch (e: ClassCastException) {
-                try {
-                    // Gracefully fallback to Float coercion if Int read fails
-                    sharedPrefs.getFloat(key, default.toFloat()).toInt()
-                } catch (e2: Exception) {
-                    default
-                }
-            } catch (e: Exception) {
-                default
-            }
-        }
+        val raw = cachedPrefs[key] ?: return default
+        if (raw is Int) return raw
+        if (raw is Float) return raw.toInt()
+        if (raw is Long) return raw.toInt()
+        if (raw is String) return raw.toIntOrNull() ?: default
+        return default
     }
 
     fun getString(key: String, default: String): String {
-        return changeTrigger.run { 
-            try {
-                sharedPrefs.getString(key, default) ?: default
-            } catch (e: Exception) {
-                default
-            }
-        }
+        return cachedPrefs[key] as? String ?: default
     }
 
     QuickNovelTheme {
-        val imageUri = remember(sharedPrefs, changeTrigger) { sharedPrefs.getString(context.getString(R.string.background_image_key), null) }
+        val imageUri = remember(cachedPrefs) { getString(context.getString(R.string.background_image_key), "") }
         val hasBackground = !imageUri.isNullOrBlank()
         val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
 
@@ -967,8 +957,10 @@ fun ExpressiveSliderPreferenceCard(
                     valueFrom = min.toFloat(),
                     valueTo = max.toFloat(),
                     stepSize = step.toFloat(),
-                    onValueChange = { 
+                    onValueChangeLive = { 
                         liveValue = it.roundToInt()
+                    },
+                    onValueChangeFinished = {
                         onValueChange(it.roundToInt())
                     },
                     modifier = Modifier
@@ -998,7 +990,8 @@ fun TactileRulerSliderCompose(
     valueFrom: Float,
     valueTo: Float,
     stepSize: Float,
-    onValueChange: (Float) -> Unit,
+    onValueChangeLive: (Float) -> Unit,
+    onValueChangeFinished: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     AndroidView(
@@ -1010,8 +1003,11 @@ fun TactileRulerSliderCompose(
                 this.value = value
                 setOnValueChangeListener { _, newValue, fromUser ->
                     if (fromUser) {
-                        onValueChange(newValue)
+                        onValueChangeLive(newValue)
                     }
+                }
+                setOnValueChangeFinishedListener { newValue ->
+                    onValueChangeFinished(newValue)
                 }
             }
         },
@@ -1019,7 +1015,9 @@ fun TactileRulerSliderCompose(
             view.valueFrom = valueFrom
             view.valueTo = valueTo
             view.stepSize = stepSize
-            view.value = value
+            if (!view.isDragging()) {
+                view.value = value
+            }
         },
         modifier = modifier.height(60.dp)
     )
