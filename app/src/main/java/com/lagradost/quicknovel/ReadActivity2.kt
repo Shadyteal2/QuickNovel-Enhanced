@@ -117,6 +117,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
     }
 
+    private var batteryReceiver: BroadcastReceiver? = null
 
     private fun hideSystemUI() {
         WindowInsetsControllerCompat(window, binding.readerContainer).let { controller ->
@@ -340,9 +341,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
     private fun updateLuminescentEffects() {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-        val lEnabled = settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
+        val performanceMode = settingsManager.getBoolean("performance_mode_enabled", false)
+        val lEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
         val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
-        val gEnabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
+        val gEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.living_glass_key), false)
 
         binding.readerHalo.apply {
             if (lEnabled) {
@@ -540,7 +542,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private fun registerBattery() {
-        val mBatInfoReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        val receiver: BroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctxt: Context?, intent: Intent) {
                 val batteryPct: Float = run {
                     val level: Int = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
@@ -551,7 +553,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     getString(R.string.battery_format).format(batteryPct.toInt())
             }
         }
-        this.registerReceiver(mBatInfoReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        batteryReceiver = receiver
+        this.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     }
 
     fun parseAction(input: TTSHelper.TTSActionType): Boolean {
@@ -699,6 +702,51 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             val trailColor = interpolateColor(Color.GRAY, auraColor, 0.4f + progress * 0.6f)
             fill.backgroundTintList = ColorStateList.valueOf(trailColor)
         }
+
+        updateReaderInkFlow(progress)
+    }
+
+    private fun updateReaderInkFlow(progress: Float) {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+        val isPremium = settingsManager.getBoolean(com.lagradost.quicknovel.ui.theme.VibePrefs.PREMIUM_VISUALS_ENABLED, false)
+        val isInkFlow = settingsManager.getBoolean(com.lagradost.quicknovel.ui.theme.VibePrefs.READER_INK_FLOW, false)
+        
+        val overlay = binding.readerInkFlowOverlay
+        if (!isPremium || !isInkFlow) {
+            overlay.visibility = View.GONE
+            return
+        }
+        
+        overlay.visibility = View.VISIBLE
+        val clamped = progress.coerceIn(0f, 1f)
+        
+        // Cool top colors (semi-transparent)
+        val startCool = intArrayOf(0x08, 0x10, 0x3A, 0x55)
+        val endCool = intArrayOf(0x10, 0x08, 0x3A, 0x66)
+        
+        // Warm bottom colors
+        val startWarm = intArrayOf(0x3A, 0x10, 0x08, 0x55)
+        val endWarm = intArrayOf(0x3A, 0x20, 0x08, 0x66)
+        
+        // Interpolated argb colors
+        val topR = (startCool[0] + (startWarm[0] - startCool[0]) * clamped).toInt()
+        val topG = (startCool[1] + (startWarm[1] - startCool[1]) * clamped).toInt()
+        val topB = (startCool[2] + (startWarm[2] - startCool[2]) * clamped).toInt()
+        val topA = (startCool[3] + (startWarm[3] - startCool[3]) * clamped).toInt()
+        
+        val bottomR = (endCool[0] + (endWarm[0] - endCool[0]) * clamped).toInt()
+        val bottomG = (endCool[1] + (endWarm[1] - endCool[1]) * clamped).toInt()
+        val bottomB = (endCool[2] + (endWarm[2] - endCool[2]) * clamped).toInt()
+        val bottomA = (endCool[3] + (endWarm[3] - endCool[3]) * clamped).toInt()
+        
+        val topColor = Color.argb(topA, topR, topG, topB)
+        val bottomColor = Color.argb(bottomA, bottomR, bottomG, bottomB)
+        
+        val gd = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(topColor, bottomColor)
+        )
+        overlay.background = gd
     }
 
     private var cachedChapter: List<SpanDisplay> = emptyList()
@@ -1056,6 +1104,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
     override fun onDestroy() {
         viewModel.stopTTS()
+        batteryReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                // ignore
+            }
+            batteryReceiver = null
+        }
         super.onDestroy()
     }
 
@@ -1081,6 +1137,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         updateGlobalBackground()
         updateGlobalAura()
+        updateReaderInkFlow(0f)
         PreferenceManager.getDefaultSharedPreferences(this)
             .registerOnSharedPreferenceChangeListener { _, key ->
                 if (key == getString(R.string.background_image_key) ||
@@ -1102,6 +1159,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     key == LUMINESCENT_INTENSITY
                 ) {
                     updateGlobalAura()
+                }
+                if (key == com.lagradost.quicknovel.ui.theme.VibePrefs.PREMIUM_VISUALS_ENABLED ||
+                    key == com.lagradost.quicknovel.ui.theme.VibePrefs.READER_INK_FLOW
+                ) {
+                    updateReaderInkFlow(0f)
                 }
             }
 
@@ -1509,10 +1571,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
                 override fun onChildViewAttachedToWindow(view: View) {
                     val settingsManager = PreferenceManager.getDefaultSharedPreferences(this@ReadActivity2)
-                    val lEnabled = settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
+                    val performanceMode = settingsManager.getBoolean("performance_mode_enabled", false)
+                    val lEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
                     if (lEnabled) {
                         val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
-                        val gEnabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
+                        val gEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.living_glass_key), false)
                         applyLuminescenceToView(view, lEnabled, lIntensity, gEnabled)
                     }
                 }

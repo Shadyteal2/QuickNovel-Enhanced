@@ -123,6 +123,7 @@ dependencies {
     implementation "androidx.room:room-ktx:$room_version"
     implementation 'com.google.android.flexbox:flexbox:3.0.0'
     implementation "androidx.dynamicanimation:dynamicanimation:1.0.0"
+    implementation 'androidx.palette:palette-ktx:1.0.0'
 
     // Jetpack Compose
     def composeBom = platform('androidx.compose:compose-bom:2024.04.01')

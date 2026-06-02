@@ -65,6 +65,10 @@ import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
+import com.lagradost.quicknovel.ui.theme.coverAuraGlow
+import com.lagradost.quicknovel.ui.theme.extractAuraColor
+import com.lagradost.quicknovel.ui.theme.rememberAuraEnabled
+import com.lagradost.quicknovel.ui.theme.rememberAccentGradientBrush
 
 // ─── Dimensions ───────────────────────────────────────────────────────────────
 private val POSTER_WIDTH  = 120.dp
@@ -153,6 +157,64 @@ fun ResultDetailDefaultScreen(
                 val res          = state.value
                 val ratingText   = res.rating?.let { context.getRating(it) }
                 val chapterCount = (res as? StreamResponse)?.data?.size
+
+                var showPosterViewer by remember { mutableStateOf(false) }
+
+                // Full-screen dialog viewer for the cover poster
+                if (showPosterViewer) {
+                    androidx.compose.ui.window.Dialog(
+                        onDismissRequest = { showPosterViewer = false },
+                        properties = androidx.compose.ui.window.DialogProperties(
+                            usePlatformDefaultWidth = false
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable { showPosterViewer = false },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Blurred Background Cover Image
+                            AsyncImage(
+                                model = rememberDefaultImageRequest(res.image, context),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .blur(24.dp)
+                            )
+                            // Semi-transparent overlay to ensure good contrast and focus
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.55f))
+                            )
+                            // Sharp cover image in foreground
+                            AsyncImage(
+                                model = rememberDefaultImageRequest(res.image, context),
+                                contentDescription = "Full Cover Poster",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp)
+                            )
+                            IconButton(
+                                onClick = { showPosterViewer = false },
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(16.dp)
+                                    .align(Alignment.TopEnd)
+                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Close Viewer",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // ── Blurred full-screen ambient backdrop ──────────────────────
                 Box(
@@ -246,20 +308,58 @@ fun ResultDetailDefaultScreen(
                                                 .padding(top = 4.dp, bottom = 16.dp),
                                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                                         ) {
-                                            // Poster card
-                                            Card(
-                                                shape = RoundedCornerShape(POSTER_RADIUS),
-                                                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                                            // ─── Cover Aura Glow ─────────────────────────────────────────────────────
+                                            val isAuraEnabled = rememberAuraEnabled()
+                                            var auraColor by remember(res.image) { mutableStateOf(Color.Unspecified) }
+
+                                            if (isAuraEnabled) {
+                                                LaunchedEffect(res.image) {
+                                                    val cacheKey = res.image?.toString() ?: return@LaunchedEffect
+                                                    if (cacheKey.isBlank()) return@LaunchedEffect
+                                                    try {
+                                                        val loader = coil3.SingletonImageLoader.get(context)
+                                                        // Use buildImageRequest to inherit cache path resolution & custom header logic
+                                                        val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, res.image).newBuilder(context)
+                                                            .allowHardware(false)
+                                                            .size(128) // tiny decode — just need dominant color
+                                                            .build()
+                                                        val result = loader.execute(req)
+                                                        val drawable = (result as? coil3.request.SuccessResult)?.image
+                                                        val bmp = (drawable as? coil3.BitmapImage)?.bitmap
+                                                        if (bmp != null) {
+                                                            auraColor = extractAuraColor(
+                                                                bitmap = bmp,
+                                                                cacheKey = cacheKey
+                                                            )
+                                                        }
+                                                    } catch (_: Throwable) { /* fail silently — aura is cosmetic */ }
+                                                }
+                                            }
+
+                                            // Poster card wrapper Box (allows cover aura glow to bleed out unclipped)
+                                            Box(
                                                 modifier = Modifier
-                                                    .width(POSTER_WIDTH)
-                                                    .height(POSTER_HEIGHT)
+                                                    .width(POSTER_WIDTH + 16.dp)
+                                                    .height(POSTER_HEIGHT + 16.dp)
+                                                    .padding(8.dp)
+                                                    .coverAuraGlow(auraColor = auraColor, enabled = isAuraEnabled)
                                             ) {
-                                                AsyncImage(
-                                                    model = rememberDefaultImageRequest(res.image, context),
-                                                    contentDescription = res.name,
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier.fillMaxSize()
-                                                )
+                                                Card(
+                                                    shape = RoundedCornerShape(POSTER_RADIUS),
+                                                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .clickable {
+                                                            showPosterViewer = true
+                                                        }
+                                                ) {
+                                                    AsyncImage(
+                                                        model = rememberDefaultImageRequest(res.image, context),
+                                                        contentDescription = res.name,
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier.fillMaxSize()
+                                                    )
+                                                }
                                             }
 
                                             // Info column
@@ -332,26 +432,33 @@ fun ResultDetailDefaultScreen(
 
                                         // ── Stacked CTA buttons ───────────────
                                         // Continue reading pill
-                                        Button(
-                                            onClick = onContinueReading,
+                                        val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+                                        Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(50.dp),
-                                            shape = RoundedCornerShape(14.dp),
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
-                                                contentColor   = MaterialTheme.colorScheme.background
-                                            ),
-                                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                                                .height(50.dp)
+                                                .background(accentBrush, shape = RoundedCornerShape(14.dp))
+                                                .clickable { onContinueReading() },
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(Icons.Default.PlayArrow, null,
-                                                modifier = Modifier.size(18.dp))
-                                            Spacer(Modifier.width(8.dp))
-                                            Text(
-                                                text = defaultContinueReadingLabel(res, chapters.orEmpty(), viewModel),
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.Center
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.PlayArrow,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp),
+                                                    tint = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    text = defaultContinueReadingLabel(res, chapters.orEmpty(), viewModel),
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            }
                                         }
                                         Spacer(Modifier.height(8.dp))
 
@@ -578,6 +685,7 @@ private fun DefaultTabRow(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
@@ -590,9 +698,9 @@ private fun DefaultTabRow(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(50))
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.onBackground.copy(alpha = 0.82f)
-                        else Color.Transparent
+                    .then(
+                        if (isSelected) Modifier.background(accentBrush)
+                        else Modifier
                     )
                     .clickable { onSelect(index) }
                     .padding(vertical = 10.dp),
@@ -602,7 +710,7 @@ private fun DefaultTabRow(
                     text = title,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     fontSize = 14.sp,
-                    color = if (isSelected) MaterialTheme.colorScheme.background
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
                 )
             }

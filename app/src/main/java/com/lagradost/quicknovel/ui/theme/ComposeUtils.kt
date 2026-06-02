@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.request.allowHardware
+import coil3.request.bitmapConfig
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import com.lagradost.quicknovel.ui.UiImage
@@ -137,9 +139,20 @@ fun rememberImageRequest(data: Any?): ImageRequest {
 
     val resolvedData = resolvedDataState.value
 
-    return remember(resolvedData) {
+    val performanceMode = remember(context) {
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+            .getBoolean("performance_mode_enabled", false)
+    }
+
+    return remember(resolvedData, performanceMode) {
         val builder = ImageRequest.Builder(context)
-            .crossfade(200)
+        if (performanceMode) {
+            builder.crossfade(false)
+            builder.allowHardware(true)
+            builder.bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+        } else {
+            builder.crossfade(200)
+        }
 
         when (resolvedData) {
             is java.io.File -> {

@@ -22,6 +22,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.preference.PreferenceManager
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.request.Disposable
@@ -486,9 +487,27 @@ class ReadActivityViewModel : ViewModel() {
     }
 
 
-    var mlSettings
-        get() = getKey<MLSettings>(EPUB_CURRENT_ML, book.title()) ?: MLSettings("en", "en")
-        set(value) = setKey(EPUB_CURRENT_ML, book.title(), value)
+    private var sessionMlSettings: MLSettings? = null
+
+    var mlSettings: MLSettings
+        get() {
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context ?: return MLSettings("en", "en"))
+            val rememberTranslation = settingsManager.getBoolean("reader_remember_translation_state", true)
+            if (!rememberTranslation) {
+                return sessionMlSettings ?: MLSettings("en", "en")
+            }
+            return getKey<MLSettings>(EPUB_CURRENT_ML, book.title()) ?: MLSettings("en", "en")
+        }
+        set(value) {
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context ?: return)
+            val rememberTranslation = settingsManager.getBoolean("reader_remember_translation_state", true)
+            sessionMlSettings = value
+            if (rememberTranslation) {
+                setKey(EPUB_CURRENT_ML, book.title(), value)
+            } else {
+                setKey(EPUB_CURRENT_ML, book.title(), null)
+            }
+        }
 
     private val _chapterData: MutableLiveData<ChapterUpdate> =
         MutableLiveData<ChapterUpdate>(null)

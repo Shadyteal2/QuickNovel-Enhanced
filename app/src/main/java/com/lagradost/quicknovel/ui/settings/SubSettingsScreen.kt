@@ -23,6 +23,8 @@ import androidx.preference.PreferenceManager
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.ui.theme.glassCard
+import com.lagradost.quicknovel.ui.theme.VibePrefs
+import com.lagradost.quicknovel.ui.theme.rememberAccentGradientBrush
 import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -272,6 +274,31 @@ fun SubSettingsScreen(
                         }
 
                         item {
+                            SwitchPreferenceCard(
+                                title = "Accent Gradient",
+                                summary = "Blend accent into a two-stop gradient on buttons and indicators",
+                                checked = getBoolean(VibePrefs.ACCENT_GRADIENT_ENABLED, false),
+                                iconRes = R.drawable.ic_baseline_color_lens_24,
+                                onCheckedChange = { checked ->
+                                    sharedPrefs.edit().putBoolean(VibePrefs.ACCENT_GRADIENT_ENABLED, checked).apply()
+                                    onPreferenceChange(VibePrefs.ACCENT_GRADIENT_ENABLED, checked)
+                                    changeTrigger++
+                                }
+                            )
+                        }
+
+                        if (getBoolean(VibePrefs.ACCENT_GRADIENT_ENABLED, false)) {
+                            item {
+                                ActionPreferenceCard(
+                                    title = "Gradient End Color",
+                                    summary = "Tap to pick the second color of the accent gradient",
+                                    iconRes = R.drawable.ic_baseline_color_lens_24,
+                                    onClick = { onPreferenceClick("accent_gradient_end_color") }
+                                )
+                            }
+                        }
+
+                        item {
                             ActionPreferenceCard(
                                 title = "App Font Style",
                                 summary = getFontLabel(getString("app_font_key", "default")),
@@ -345,7 +372,25 @@ fun SubSettingsScreen(
                     }
 
                     R.xml.settings_vibe -> {
-                        // ─── Vibe & Aura Settings Category ───
+                        // ─── Vibe & Aura Settings ───────────────────────────────
+
+                        item { PreferenceHeader("Performance Settings") }
+
+                        item {
+                            SwitchPreferenceCard(
+                                title = "Performance Mode (Eco Mode)",
+                                summary = "Disable all visual shimmers, background blur, and spring animations to save battery and speed up older devices",
+                                checked = getBoolean(VibePrefs.PERFORMANCE_MODE_ENABLED, false),
+                                iconRes = R.drawable.ic_baseline_tune_24,
+                                onCheckedChange = { checked ->
+                                    sharedPrefs.edit().putBoolean(VibePrefs.PERFORMANCE_MODE_ENABLED, checked).apply()
+                                    onPreferenceChange(VibePrefs.PERFORMANCE_MODE_ENABLED, checked)
+                                    changeTrigger++
+                                }
+                            )
+                        }
+
+                        // ─ Experimental Aesthetics master gate
                         item { PreferenceHeader("Experimental Aesthetics") }
 
                         item {
@@ -362,60 +407,162 @@ fun SubSettingsScreen(
                             )
                         }
 
-                        if (getBoolean("experimental_visuals", false)) {
-                            item { PreferenceHeader("Living Elements") }
+                        // ─ PREMIUM VISUALS GROUP ────────────────────────────
+                        item { PreferenceHeader("Premium Visuals") }
 
+                        item {
+                            SwitchPreferenceCard(
+                                title = "Premium Visuals",
+                                summary = "Unlock Cover Aura Glow & Reader Ink Flow — best on high-end devices",
+                                checked = getBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, false),
+                                iconRes = R.drawable.ic_baseline_star_24,
+                                onCheckedChange = { checked ->
+                                    sharedPrefs.edit().putBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, checked).apply()
+                                    onPreferenceChange(VibePrefs.PREMIUM_VISUALS_ENABLED, checked)
+                                    changeTrigger++
+                                }
+                            )
+                        }
+
+                        if (getBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, false)) {
                             item {
                                 SwitchPreferenceCard(
-                                    title = "Living Glass Background",
-                                    summary = "Fluid organic gradients that morph with your interactions",
-                                    checked = getBoolean("living_glass", false),
-                                    iconRes = R.drawable.ic_baseline_star_24,
+                                    title = "Cover Aura Glow",
+                                    summary = "Each book cover radiates its own unique dominant color glow",
+                                    checked = getBoolean(VibePrefs.COVER_AURA_GLOW, false),
+                                    iconRes = R.drawable.ic_baseline_color_lens_24,
                                     onCheckedChange = { checked ->
-                                        sharedPrefs.edit().putBoolean("living_glass", checked).apply()
-                                        onPreferenceChange("living_glass", checked)
+                                        sharedPrefs.edit().putBoolean(VibePrefs.COVER_AURA_GLOW, checked).apply()
+                                        onPreferenceChange(VibePrefs.COVER_AURA_GLOW, checked)
                                         changeTrigger++
                                     }
                                 )
                             }
 
-                            if (getBoolean("living_glass", false)) {
+                            item {
+                                SwitchPreferenceCard(
+                                    title = "Reader Ink Flow",
+                                    summary = "Reading surface shifts between cool and warm tones as you scroll",
+                                    checked = getBoolean(VibePrefs.READER_INK_FLOW, false),
+                                    iconRes = R.drawable.ic_baseline_menu_book_24,
+                                    onCheckedChange = { checked ->
+                                        sharedPrefs.edit().putBoolean(VibePrefs.READER_INK_FLOW, checked).apply()
+                                        onPreferenceChange(VibePrefs.READER_INK_FLOW, checked)
+                                        changeTrigger++
+                                    }
+                                )
+                            }
+                        }
+
+                        // ─ AESTHETIC PERSONALIZATION GROUP ─────────────────
+                        item { PreferenceHeader("Aesthetic Personalization") }
+
+                        item {
+                            SwitchPreferenceCard(
+                                title = "Aesthetic Personalization",
+                                summary = "Glass Opacity, Card Border Style & Noise Texture surface controls",
+                                checked = getBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, false),
+                                iconRes = R.drawable.ic_baseline_tune_24,
+                                onCheckedChange = { checked ->
+                                    sharedPrefs.edit().putBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, checked).apply()
+                                    onPreferenceChange(VibePrefs.AESTHETIC_PERSONA_ENABLED, checked)
+                                    changeTrigger++
+                                }
+                            )
+                        }
+
+                        if (getBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, false)) {
+                            // Glass Opacity
+                            item {
+                                SwitchPreferenceCard(
+                                    title = "Glass Opacity Control",
+                                    summary = "Tune the transparency depth of all glass surfaces",
+                                    checked = getBoolean(VibePrefs.GLASS_OPACITY + "_enabled", false),
+                                    iconRes = R.drawable.ic_baseline_tune_24,
+                                    onCheckedChange = { checked ->
+                                        sharedPrefs.edit().putBoolean(VibePrefs.GLASS_OPACITY + "_enabled", checked).apply()
+                                        onPreferenceChange(VibePrefs.GLASS_OPACITY + "_enabled", checked)
+                                        changeTrigger++
+                                    }
+                                )
+                            }
+
+                            if (getBoolean(VibePrefs.GLASS_OPACITY + "_enabled", false)) {
                                 item {
                                     ExpressiveSliderPreferenceCard(
-                                        title = "Aura Visibility Intensity",
-                                        value = getInt("aura_intensity", 70),
-                                        min = 0,
-                                        max = 100,
+                                        title = "Glass Opacity",
+                                        value = getInt(VibePrefs.GLASS_OPACITY, 80),
+                                        min = 5,
+                                        max = 95,
                                         valueSuffix = "%",
                                         iconRes = R.drawable.ic_baseline_tune_24,
                                         onValueChange = { value ->
-                                            sharedPrefs.edit().putInt("aura_intensity", value).apply()
-                                            onPreferenceChange("aura_intensity", value)
+                                            sharedPrefs.edit().putInt(VibePrefs.GLASS_OPACITY, value).apply()
+                                            onPreferenceChange(VibePrefs.GLASS_OPACITY, value)
                                             changeTrigger++
                                         }
                                     )
                                 }
+                            }
 
+                            // Card Border Style
+                            item {
+                                SwitchPreferenceCard(
+                                    title = "Card Border Style",
+                                    summary = "Add animated border accents to all glass cards",
+                                    checked = getBoolean(VibePrefs.CARD_BORDER_STYLE + "_enabled", false),
+                                    iconRes = R.drawable.ic_baseline_tune_24,
+                                    onCheckedChange = { checked ->
+                                        sharedPrefs.edit().putBoolean(VibePrefs.CARD_BORDER_STYLE + "_enabled", checked).apply()
+                                        onPreferenceChange(VibePrefs.CARD_BORDER_STYLE + "_enabled", checked)
+                                        changeTrigger++
+                                    }
+                                )
+                            }
+
+                            if (getBoolean(VibePrefs.CARD_BORDER_STYLE + "_enabled", false)) {
                                 item {
                                     ActionPreferenceCard(
-                                        title = "Aura Color Palette",
-                                        summary = getAuraPaletteLabel(getString("aura_palette", "nebula")),
+                                        title = "Border Style",
+                                        summary = when (getString(VibePrefs.CARD_BORDER_STYLE, "none")) {
+                                            "glow" -> "Glow — soft accent halo"
+                                            "gradient" -> "Gradient — rotating sweep"
+                                            "neon" -> "Neon — electric pulse"
+                                            else -> "None"
+                                        },
                                         iconRes = R.drawable.ic_baseline_color_lens_24,
-                                        onClick = { onPreferenceClick("aura_palette") }
+                                        onClick = { onPreferenceClick("card_border_style_picker") }
                                     )
                                 }
+                            }
 
+                            // Noise Texture
+                            item {
+                                SwitchPreferenceCard(
+                                    title = "Noise Texture Overlay",
+                                    summary = "Subtle paper-like grain rendered once and cached — zero frame-rate impact",
+                                    checked = getBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, false),
+                                    iconRes = R.drawable.ic_baseline_tune_24,
+                                    onCheckedChange = { checked ->
+                                        sharedPrefs.edit().putBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, checked).apply()
+                                        onPreferenceChange(VibePrefs.NOISE_TEXTURE_ENABLED, checked)
+                                        changeTrigger++
+                                    }
+                                )
+                            }
+
+                            if (getBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, false)) {
                                 item {
                                     ExpressiveSliderPreferenceCard(
-                                        title = "Animation Velocity",
-                                        value = getInt("aura_speed", 100),
-                                        min = 50,
-                                        max = 200,
+                                        title = "Grain Intensity",
+                                        value = getInt(VibePrefs.NOISE_TEXTURE_INTENSITY, 30),
+                                        min = 5,
+                                        max = 80,
                                         valueSuffix = "%",
                                         iconRes = R.drawable.ic_baseline_tune_24,
                                         onValueChange = { value ->
-                                            sharedPrefs.edit().putInt("aura_speed", value).apply()
-                                            onPreferenceChange("aura_speed", value)
+                                            sharedPrefs.edit().putInt(VibePrefs.NOISE_TEXTURE_INTENSITY, value).apply()
+                                            onPreferenceChange(VibePrefs.NOISE_TEXTURE_INTENSITY, value)
                                             changeTrigger++
                                         }
                                     )
@@ -423,6 +570,7 @@ fun SubSettingsScreen(
                             }
                         }
 
+                        // ─ LUMINESCENT ENGINE (existing) ──────────────────
                         item { PreferenceHeader("Luminescent Engine") }
 
                         item {
@@ -1033,6 +1181,7 @@ fun PremiumExpressiveSlider(
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
+    val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
     var widthPx by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
 
@@ -1077,7 +1226,7 @@ fun PremiumExpressiveSlider(
             .fillMaxWidth()
             .height(40.dp)
             .onSizeChanged { widthPx = it.width.toFloat() }
-            .pointerInput(valueRange, step) { // Re-bind pointerInput when range or step changes
+            .pointerInput(valueRange, step, value) { // Re-bind pointerInput when range, step, or value changes
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
                         isDragging = true
@@ -1138,14 +1287,7 @@ fun PremiumExpressiveSlider(
                 .fillMaxWidth(fraction = proportion)
                 .height(animatedTrackHeight.dp)
                 .clip(CircleShape)
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.secondary
-                        )
-                    )
-                )
+                .background(accentBrush)
         )
 
         // Thumb
@@ -1162,7 +1304,7 @@ fun PremiumExpressiveSlider(
                     spotColor = MaterialTheme.colorScheme.primary
                 )
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
+                .background(accentBrush)
                 .border(2.dp, Color.White, CircleShape)
         )
     }
@@ -1292,6 +1434,7 @@ fun getFontLabel(key: String): String {
         "ostrich_sans_inline" -> "Ostrich Sans Inline"
         "rude" -> "Rude"
         "shadowhand" -> "Shadow Hand"
+        "alexandriaflf" -> "Alexandria FLF"
         else -> "System Default"
     }
 }

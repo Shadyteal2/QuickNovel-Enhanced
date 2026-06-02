@@ -359,6 +359,20 @@ fun ReaderSettingsSheet(
                         )
                     )
                 }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val prefs = remember(context) { androidx.preference.PreferenceManager.getDefaultSharedPreferences(context) }
+                var rememberTranslationState by remember { 
+                    mutableStateOf(prefs.getBoolean("reader_remember_translation_state", true)) 
+                }
+                SettingsSwitchRow("Remember Translation State", rememberTranslationState) { checked ->
+                    rememberTranslationState = checked
+                    prefs.edit().putBoolean("reader_remember_translation_state", checked).apply()
+                    if (!checked) {
+                        viewModel.mlSettings = viewModel.mlSettings
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
         }

@@ -333,14 +333,14 @@ class SubSettingsFragment : Fragment() {
 
             "app_font_key" -> {
                 val names = listOf(
-                    "System Default", "Product Sans", "Comico", "Instrument Serif", 
+                    "System Default", "Alexandria FLF", "Product Sans", "Comico", "Instrument Serif", 
                     "Manosque", "Nevis", "Nighty Demo", "Orbitron", 
                     "Ostrich Sans Bold", "Ostrich Sans Inline", "Rude", "Shadow Hand",
                     "Skyscapers", "Struggle", "Typefesse Claire-Obscure", "Typefesse Pleine", 
                     "Unique"
                 )
                 val values = listOf(
-                    "default", "productsans", "comico", "instrument_serif", 
+                    "default", "alexandriaflf", "productsans", "comico", "instrument_serif", 
                     "manosque", "nevis", "nightydemo", "orbitron", 
                     "ostrich_sans_bold", "ostrich_sans_inline", "rude", "shadowhand",
                     "skyscapers", "struggle", "typefesse_claire_obscure", "typefesse_pleine", 
@@ -494,6 +494,33 @@ class SubSettingsFragment : Fragment() {
             "clear_cookies_key" -> {
                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                 showToast("Network cookies cleared")
+            }
+
+            "card_border_style_picker" -> {
+                val names = listOf("None", "Glow — soft accent halo", "Gradient — rotating sweep", "Neon — electric pulse")
+                val values = listOf("none", "glow", "gradient", "neon")
+                val current = sharedPrefs.getString(com.lagradost.quicknovel.ui.theme.VibePrefs.CARD_BORDER_STYLE, "none")
+                activity?.showBottomDialog(names, values.indexOf(current).coerceAtLeast(0), "Card Border Style", false, {}) {
+                    sharedPrefs.edit().putString(com.lagradost.quicknovel.ui.theme.VibePrefs.CARD_BORDER_STYLE, values[it]).apply()
+                }
+            }
+
+            "accent_gradient_end_color" -> {
+                val currentArgb = sharedPrefs.getInt(com.lagradost.quicknovel.ui.theme.VibePrefs.ACCENT_GRADIENT_END_COLOR, 0xFF9C27B0.toInt())
+                com.jaredrummler.android.colorpicker.ColorPickerDialog.newBuilder()
+                    .setColor(currentArgb)
+                    .setShowAlphaSlider(false)
+                    .setDialogTitle(R.string.primary_color_settings)
+                    .create()
+                    .also { dialog ->
+                        dialog.setColorPickerDialogListener(object : com.jaredrummler.android.colorpicker.ColorPickerDialogListener {
+                            override fun onColorSelected(dialogId: Int, color: Int) {
+                                sharedPrefs.edit().putInt(com.lagradost.quicknovel.ui.theme.VibePrefs.ACCENT_GRADIENT_END_COLOR, color).apply()
+                            }
+                            override fun onDialogDismissed(dialogId: Int) {}
+                        })
+                        dialog.show(parentFragmentManager, "accent_gradient_color_picker")
+                    }
             }
         }
     }

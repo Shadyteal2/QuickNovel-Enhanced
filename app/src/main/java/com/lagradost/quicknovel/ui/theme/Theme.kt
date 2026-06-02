@@ -64,13 +64,15 @@ fun QuickNovelTheme(
     val context = LocalContext.current
     
     // Resolve theme colors dynamically from the active Android Theme
-    val primaryColor = remember(context, darkTheme) {
+    val basePrimaryColor = remember(context, darkTheme) {
         try {
             Color(context.colorFromAttribute(androidx.appcompat.R.attr.colorPrimary))
         } catch (e: Exception) {
             if (darkTheme) DarkPrimary else LightPrimary
         }
     }
+    
+    val settingsManager = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     
     val secondaryColor = remember(context) {
         try {
@@ -82,7 +84,6 @@ fun QuickNovelTheme(
 
     val themeKey = remember(context) {
         try {
-            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
             settingsManager.getString(context.getString(R.string.theme_key), "Amoled") ?: "Amoled"
         } catch (e: Exception) {
             "Amoled"
@@ -140,7 +141,6 @@ fun QuickNovelTheme(
     // Check if the current theme is Monet (which allows dynamic wallpaper-based colors)
     val isMonet = remember(context, themeKey) {
         try {
-            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
             val primaryColorKey = settingsManager.getString(context.getString(R.string.primary_color_key), "Banana")
             (themeKey == "Monet" || primaryColorKey == "Monet" || primaryColorKey == "Monet2")
         } catch (e: Exception) {
@@ -153,7 +153,7 @@ fun QuickNovelTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> darkColorScheme(
-            primary = primaryColor,
+            primary = basePrimaryColor,
             secondary = secondaryColor,
             tertiary = ColorOngoing,
             background = backgroundColor,
@@ -165,7 +165,7 @@ fun QuickNovelTheme(
             onSurface = textColor,
         )
         else -> lightColorScheme(
-            primary = primaryColor,
+            primary = basePrimaryColor,
             secondary = secondaryColor,
             tertiary = ColorOngoing,
             background = backgroundColor,
@@ -187,8 +187,6 @@ fun QuickNovelTheme(
         }
     }
 
-    val settingsManager = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
-    
     var fontKey by remember { 
         mutableStateOf(
             try {
@@ -241,6 +239,7 @@ fun QuickNovelTheme(
             "ostrich_sans_inline" -> OstrichSansInlineFontFamily
             "rude" -> RudeFontFamily
             "shadowhand" -> ShadowHandFontFamily
+            "alexandriaflf" -> AlexandriaFlfFontFamily
             else -> androidx.compose.ui.text.font.FontFamily.Default
         }
     }

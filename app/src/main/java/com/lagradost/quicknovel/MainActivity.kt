@@ -697,8 +697,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
 
     private fun updateNavBar(destinationId: Int) {
-        val isTab = tabIds.contains(destinationId)
-        val selectedIndex = tabIds.indexOf(destinationId)
+        val isTab = tabIds.contains(destinationId) || destinationId == R.id.navigation_dummy
+        val selectedIndex = if (destinationId == R.id.navigation_dummy) lastActiveTab else tabIds.indexOf(destinationId)
 
         binding?.apply {
             val navHost = findViewById<android.view.View>(R.id.nav_host_fragment)
@@ -720,6 +720,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     mainViewpager.scaleY = 0.95f
                     mainViewpager.translationX = -slideDistance 
                     mainViewpager.visibility = android.view.View.VISIBLE
+                    
+                    // GPU Optimization: Enable hardware layer
+                    mainViewpager.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     mainViewpager.animate()
                         .alpha(1f)
                         .scaleX(1f)
@@ -728,7 +731,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         .setDuration(400)
                         .setInterpolator(android.view.animation.DecelerateInterpolator())
                         .withEndAction {
-                            // Secondary safety lock
+                            // GPU Optimization: Disable hardware layer
+                            mainViewpager.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                             mainViewpager.scaleX = 1f
                             mainViewpager.scaleY = 1f
                             mainViewpager.translationX = 0f
@@ -743,6 +747,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 if (navHost?.visibility == android.view.View.VISIBLE) {
                     navHost.animate().setListener(null)
                     navHost.animate().cancel()
+                    
+                    // GPU Optimization: Enable hardware layer
+                    navHost.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     navHost.animate()
                         .alpha(0f)
                         .scaleX(0.95f)
@@ -751,6 +758,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         .setDuration(300)
                         .setInterpolator(android.view.animation.AccelerateInterpolator())
                         .withEndAction { 
+                            // GPU Optimization: Disable hardware layer
+                            navHost.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                             navHost.visibility = android.view.View.INVISIBLE 
                             navHost.translationX = 0f 
                             navHost.scaleX = 1f
@@ -766,6 +775,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     navHost?.scaleY = 0.95f
                     navHost?.translationX = slideDistance 
                     navHost?.visibility = android.view.View.VISIBLE
+                    
+                    // GPU Optimization: Enable hardware layer
+                    navHost?.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     navHost?.animate()
                         ?.alpha(1f)
                         ?.scaleX(1f)
@@ -774,6 +786,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         ?.setDuration(400)
                         ?.setInterpolator(android.view.animation.DecelerateInterpolator())
                         ?.withEndAction {
+                             // GPU Optimization: Disable hardware layer
+                             navHost?.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                              navHost?.scaleX = 1f
                              navHost?.scaleY = 1f
                              navHost?.translationX = 0f
@@ -783,6 +797,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 if (mainViewpager.visibility == android.view.View.VISIBLE) {
                     mainViewpager.animate().setListener(null)
                     mainViewpager.animate().cancel()
+                    
+                    // GPU Optimization: Enable hardware layer
+                    mainViewpager.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     mainViewpager.animate()
                         .alpha(0f)
                         .scaleX(0.95f)
@@ -791,6 +808,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         .setDuration(300)
                         .setInterpolator(android.view.animation.AccelerateInterpolator())
                         .withEndAction { 
+                            // GPU Optimization: Disable hardware layer
+                            mainViewpager.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                             mainViewpager.visibility = android.view.View.INVISIBLE 
                             mainViewpager.translationX = 0f 
                             mainViewpager.scaleX = 1f
@@ -980,11 +999,11 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val navController = navHostFragment.navController
 
         navController.addOnDestinationChangedListener { _: NavController, navDestination: NavDestination, _: Bundle? ->
-            // If return navigation lands on Download (startDestination) while viewpager is hidden, 
+            // If return navigation lands on Dummy (startDestination) while viewpager is hidden, 
             // it means we are popping back from Results/Settings to the main UI.
             // We force it back to the lastActiveTab instead of defaulting to Tab 0.
-            val targetNavId = if (navDestination.id == R.id.navigation_download && binding?.mainViewpager?.isVisible == false) {
-                tabIds.getOrNull(lastActiveTab) ?: navDestination.id
+            val targetNavId = if (navDestination.id == R.id.navigation_dummy && binding?.mainViewpager?.isVisible == false) {
+                tabIds.getOrNull(lastActiveTab) ?: R.id.navigation_download
             } else {
                 navDestination.id
             }
@@ -1086,7 +1105,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         }
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            val isMainTabs = tabs.contains(destination.id)
+            val isMainTabs = tabs.contains(destination.id) || destination.id == R.id.navigation_dummy
             val currentPos = binding?.mainViewpager?.currentItem ?: 0
             
             // Centralized visibility check
@@ -1452,7 +1471,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         
         // 1. Determine Settings Button Visibility Logic
         val currentDest = navController?.currentDestination?.id
-        val isAtMainTabs = currentDest == null || tabIds.contains(currentDest)
+        val isAtMainTabs = currentDest == null || tabIds.contains(currentDest) || currentDest == R.id.navigation_dummy
         val isLibraryTabActive = selectedIndex == 0 && b.mainViewpager.isVisible == true
         val shouldShowSettings = isLibraryTabActive && isAtMainTabs
 

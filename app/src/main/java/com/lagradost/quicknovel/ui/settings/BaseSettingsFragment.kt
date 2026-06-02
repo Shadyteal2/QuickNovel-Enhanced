@@ -533,14 +533,14 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
         // App Font Preference Selection
         getPref(R.string.app_font_key)?.let { pref ->
             val names = listOf(
-                "System Default", "Product Sans", "Comico", "Instrument Serif", 
+                "System Default", "Alexandria FLF", "Product Sans", "Comico", "Instrument Serif", 
                 "Manosque", "Nevis", "Nighty Demo", "Orbitron", 
                 "Ostrich Sans Bold", "Ostrich Sans Inline", "Rude", "Shadow Hand",
                 "Skyscapers", "Struggle", "Typefesse Claire-Obscure", "Typefesse Pleine", 
                 "Unique"
             )
             val values = listOf(
-                "default", "productsans", "comico", "instrument_serif", 
+                "default", "alexandriaflf", "productsans", "comico", "instrument_serif", 
                 "manosque", "nevis", "nightydemo", "orbitron", 
                 "ostrich_sans_bold", "ostrich_sans_inline", "rude", "shadowhand",
                 "skyscapers", "struggle", "typefesse_claire_obscure", "typefesse_pleine", 

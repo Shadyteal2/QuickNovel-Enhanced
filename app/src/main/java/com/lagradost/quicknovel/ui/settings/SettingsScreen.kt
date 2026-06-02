@@ -25,6 +25,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.*
+import androidx.activity.compose.BackHandler
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.theme.glassCard
 
@@ -67,6 +69,13 @@ fun SettingsScreen(
     onOpenSocialUrl: (url: String) -> Unit
 ) {
     val scrollState = rememberScrollState()
+    var isAboutVisible by remember { mutableStateOf(false) }
+
+    if (isAboutVisible) {
+        BackHandler {
+            isAboutVisible = false
+        }
+    }
     
     Box(
         modifier = Modifier
@@ -135,7 +144,7 @@ fun SettingsScreen(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                        onClick = showAboutDialog
+                        onClick = { isAboutVisible = true }
                     )
             ) {
                 Row(
@@ -387,6 +396,18 @@ fun SettingsScreen(
             }
             
             Spacer(modifier = Modifier.height(130.dp))
+        }
+
+        // ─── Premium About Overlay ────────────────────────────────────────────
+        AnimatedVisibility(
+            visible = isAboutVisible,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            AboutSheet(
+                onDismiss = { isAboutVisible = false }
+            )
         }
     }
 }

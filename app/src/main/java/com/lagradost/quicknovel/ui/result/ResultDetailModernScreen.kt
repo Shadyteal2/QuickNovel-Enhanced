@@ -45,6 +45,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.request.crossfade
+import coil3.request.bitmapConfig
 import com.lagradost.quicknovel.BaseApplication
 import com.lagradost.quicknovel.ChapterData
 import com.lagradost.quicknovel.DOWNLOAD_SETTINGS
@@ -58,6 +59,7 @@ import com.lagradost.quicknovel.ui.download.CategoryItem
 import com.lagradost.quicknovel.ui.download.DownloadViewModel
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
+import com.lagradost.quicknovel.ui.theme.rememberAccentGradientBrush
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
 
@@ -600,13 +602,22 @@ fun ResultDetailModernScreen(
 // at the server's full resolution without artificial downscale ─────────────────
 @Composable
 private fun rememberHighQualityRequest(data: Any?, context: Context): ImageRequest {
+    val performanceMode = remember(context) {
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+            .getBoolean("performance_mode_enabled", false)
+    }
     val baseRequest = rememberImageRequest(data)
-    return remember(data, baseRequest) {
-        baseRequest.newBuilder(context)
-            .allowHardware(true)   // Using hardware bitmap allows GPU-optimized high quality filtering and smoother display
-            .size(coil3.size.Size.ORIGINAL) // Load the original full quality and high resolution of the image
-            .crossfade(300)
-            .build()
+    return remember(data, baseRequest, performanceMode) {
+        val builder = baseRequest.newBuilder(context)
+            .allowHardware(true)
+        if (performanceMode) {
+            builder.crossfade(false)
+            builder.bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+        } else {
+            builder.size(coil3.size.Size.ORIGINAL)
+            builder.crossfade(300)
+        }
+        builder.build()
     }
 }
 
@@ -665,6 +676,7 @@ private fun PremiumTabRow(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
@@ -677,9 +689,9 @@ private fun PremiumTabRow(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(50))
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.primary
-                        else Color.Transparent
+                    .then(
+                        if (isSelected) Modifier.background(accentBrush)
+                        else Modifier.background(Color.Transparent)
                     )
                     .clickable { onSelect(index) }
                     .padding(vertical = 10.dp),
@@ -790,12 +802,15 @@ private fun PremiumActionBar(
             }
 
             // Continue / Start reading pill
+            val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
             Button(
                 onClick = onContinue,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .background(accentBrush, RoundedCornerShape(50)),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
+                    containerColor = Color.Transparent,
                     contentColor   = MaterialTheme.colorScheme.onPrimary
                 ),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),

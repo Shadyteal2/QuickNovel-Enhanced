@@ -8,6 +8,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -64,14 +65,18 @@ fun ReadingStatsScreen(
     var goalToChange by remember { mutableStateOf<String?>(null) } // "Daily" or "Weekly"
     var showGoalDialog by remember { mutableStateOf(false) }
 
+    // Selected bar state for chart tooltips
+    var selectedBarIndex by remember { mutableStateOf<Int?>(null) }
+
     // Stats calculations running in a safe remember block driven by reloadTrigger
     val stats = remember(reloadTrigger) {
         // 1. Get totals and streaks
         val totalMs = context.getKey<Long>("TOTAL_READING_TIME", 0L) ?: 0L
-        val currentStreak = context.getKey<Int>("CURRENT_STREAK", 0) ?: 0
+        val currentStreak = UsageStatsManager.getActiveStreak(context)
         val bestStreak = context.getKey<Int>("BEST_STREAK", 0) ?: 0
         val totalChapters = context.getKey<Int>("TOTAL_CHAPTERS_READ", 0) ?: 0
         val customizations = context.getKey<Int>("CUSTOMIZATION_COUNT", 0) ?: 0
+        val midnightOilCount = context.getKey<Int>("MIDNIGHT_OIL_COUNT", 0) ?: 0
 
         // 2. Accurate Daily/Weekly/Monthly calculations (Separate Calendar instance to prevent shift bugs)
         val calendar = Calendar.getInstance()
@@ -104,6 +109,14 @@ fun ReadingStatsScreen(
         val weekMinutes = weekMs / (1000 * 60)
         val monthMinutes = monthMs / (1000 * 60)
         val totalHours = totalMs / (1000 * 60 * 60)
+
+        // Time per chapter (minutes / chapters)
+        val avgPaceMinutes = if (totalChapters > 0) {
+            val totalMinutes = totalMs / (1000 * 60)
+            totalMinutes / totalChapters
+        } else {
+            0L
+        }
 
         // Level Profile Ratio
         val hoursPerLevel = 5
@@ -141,7 +154,9 @@ fun ReadingStatsScreen(
             dailyProgress = dailyProgress,
             weeklyProgress = weeklyProgress,
             weekHeights = weekHeights,
-            weekLabels = weekLabels
+            weekLabels = weekLabels,
+            avgPaceMinutes = avgPaceMinutes,
+            midnightOilCount = midnightOilCount
         )
     }
 
@@ -294,7 +309,7 @@ fun ReadingStatsScreen(
                     // 2. Metrics Pills Cards
                     item {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             PillMetricCard(
@@ -310,6 +325,11 @@ fun ReadingStatsScreen(
                             PillMetricCard(
                                 label = "Reading",
                                 value = "🕒 ${stats.totalHours}h",
+                                modifier = Modifier.weight(1f)
+                            )
+                            PillMetricCard(
+                                label = "Avg Pace",
+                                value = "⚡ ${stats.avgPaceMinutes}m/ch",
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -410,7 +430,7 @@ fun ReadingStatsScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(130.dp),
+                                        .height(145.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.Bottom
                                 ) {
@@ -418,18 +438,55 @@ fun ReadingStatsScreen(
                                     stats.weekHeights.zip(stats.weekLabels).forEachIndexed { idx, (heightVal, label) ->
                                         val barHeightPercent = (heightVal.toFloat() / maxTime.toFloat()).coerceAtLeast(0.05f)
                                         val isToday = idx == stats.weekHeights.size - 1
+                                        val isSelected = selectedBarIndex == idx
 
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable(
+                                                    interactionSource = remember { MutableInteractionSource() },
+                                                    indication = null
+                                                ) {
+                                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                                    selectedBarIndex = if (selectedBarIndex == idx) null else idx
+                                                }
                                         ) {
+                                            // Tooltip display
+                                            Box(
+                                                modifier = Modifier.height(30.dp),
+                                                contentAlignment = Alignment.BottomCenter
+                                            ) {
+                                                androidx.compose.animation.AnimatedVisibility(
+                                                    visible = isSelected,
+                                                    enter = fadeIn() + scaleIn(initialScale = 0.8f),
+                                                    exit = fadeOut() + scaleOut(targetScale = 0.8f)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .glassCard(RoundedCornerShape(8.dp), backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "${heightVal / (1000 * 60)}m",
+                                                            color = MaterialTheme.colorScheme.onPrimary,
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(4.dp))
+
                                             Box(
                                                 modifier = Modifier
                                                     .width(14.dp)
-                                                    .fillMaxHeight(barHeightPercent * 0.82f)
+                                                    .fillMaxHeight(barHeightPercent * 0.7f)
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
-                                                        if (isToday) MaterialTheme.colorScheme.primary
+                                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                                        else if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                                                         else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                                                     )
                                             )
@@ -682,6 +739,8 @@ fun AchievementCard(ach: Achievement) {
                     imageVector = when (ach.icon) {
                         R.drawable.ic_baseline_autorenew_24 -> Icons.Default.Loop
                         R.drawable.ic_baseline_color_lens_24 -> Icons.Default.Palette
+                        1 -> Icons.Default.NightsStay
+                        2 -> Icons.Default.EmojiEvents
                         else -> Icons.Default.MenuBook
                     },
                     contentDescription = null,
@@ -755,7 +814,9 @@ data class StatsData(
     val dailyProgress: Float,
     val weeklyProgress: Float,
     val weekHeights: List<Long>,
-    val weekLabels: List<String>
+    val weekLabels: List<String>,
+    val avgPaceMinutes: Long,
+    val midnightOilCount: Int
 )
 
 // Helper to construct Roman Numerals
@@ -788,6 +849,8 @@ private fun getAchievementsList(stats: StatsData): List<Achievement> {
     val streakTiers = listOf(3, 7, 30, 100, 365)
     val chapterTiers = listOf(10, 50, 100, 500, 1000, 5000)
     val customTiers = listOf(5, 15, 50, 100)
+    val midnightTiers = listOf(5, 15, 30, 50)
+    val bookwormTiers = listOf(1, 5, 10, 25, 50, 100)
 
     fun getTier(valIn: Int, tiers: List<Int>): Pair<Int, Int> {
         val tierIndex = tiers.indexOfFirst { valIn < it }
@@ -801,6 +864,8 @@ private fun getAchievementsList(stats: StatsData): List<Achievement> {
     val (nextStreak, streakLvl) = getTier(stats.currentStreak, streakTiers)
     val (nextChapter, chapterLvl) = getTier(stats.totalChapters, chapterTiers)
     val (nextCustom, customLvl) = getTier(stats.customizations, customTiers)
+    val (nextMidnight, midnightLvl) = getTier(stats.midnightOilCount, midnightTiers)
+    val (nextBookworm, bookwormLvl) = getTier(stats.totalHours.toInt(), bookwormTiers)
 
     return listOf(
         Achievement(
@@ -823,6 +888,20 @@ private fun getAchievementsList(stats: StatsData): List<Achievement> {
             icon = R.drawable.ic_baseline_color_lens_24,
             currentProgress = stats.customizations,
             maxProgress = nextCustom
+        ),
+        Achievement(
+            title = "Midnight Oil ${toRoman(midnightLvl + 1)}",
+            desc = "Read $nextMidnight times after midnight (12 AM - 4 AM)",
+            icon = 1,
+            currentProgress = stats.midnightOilCount,
+            maxProgress = nextMidnight
+        ),
+        Achievement(
+            title = "Bookworm ${toRoman(bookwormLvl + 1)}",
+            desc = "Spend $nextBookworm hours reading",
+            icon = 2,
+            currentProgress = stats.totalHours.toInt(),
+            maxProgress = nextBookworm
         )
     )
 }

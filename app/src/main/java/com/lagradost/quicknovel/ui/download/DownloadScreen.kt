@@ -34,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -75,6 +77,16 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.ui.graphics.luminance
+import com.lagradost.quicknovel.ui.theme.coverAuraGlow
+import com.lagradost.quicknovel.ui.theme.extractAuraColor
+import com.lagradost.quicknovel.ui.theme.rememberAuraEnabled
+import com.lagradost.quicknovel.ui.theme.VibePrefs
+import com.lagradost.quicknovel.ui.theme.generateNoiseBitmap
+import com.lagradost.quicknovel.ui.theme.noiseTextureOverlay
+import com.lagradost.quicknovel.ui.theme.rememberPreferenceInt
+import androidx.compose.ui.graphics.SolidColor
+import coil3.request.allowHardware
+import androidx.compose.ui.graphics.ImageBitmap
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +106,6 @@ fun DownloadScreen(
     val pagerScrollJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
 
     val isTactileEnabledState = rememberPreferenceBoolean("library_tactile_response", true)
-    val isTactileEnabled = isTactileEnabledState.value
 
     // Observe sorting, query, lists, categories
     // Observe sorting, query, lists, categories
@@ -112,6 +123,24 @@ fun DownloadScreen(
     val isSwipeMode = navStyleState.value == "1"
     var isSwipingPage by remember { mutableStateOf(false) }
     var isScrollingList by remember { mutableStateOf(false) }
+
+    // Hoist Noise texture states to the parent level to prevent per-card loading delays
+    val performanceMode by rememberPreferenceBoolean(VibePrefs.PERFORMANCE_MODE_ENABLED, false)
+    val isTactileEnabled = isTactileEnabledState.value && !performanceMode
+    val aestheticPersonaEnabled by rememberPreferenceBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, false)
+    val noiseTextureEnabled by rememberPreferenceBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, false)
+    val noiseTextureIntensity by rememberPreferenceInt(VibePrefs.NOISE_TEXTURE_INTENSITY, 30)
+
+    val isNoiseEnabled = !performanceMode && aestheticPersonaEnabled && noiseTextureEnabled
+    val noiseIntensity = if (isNoiseEnabled) noiseTextureIntensity else 0
+    var noiseBitmap by remember(noiseIntensity) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(noiseIntensity, isNoiseEnabled) {
+        if (isNoiseEnabled && noiseIntensity > 0) {
+            noiseBitmap = generateNoiseBitmap(noiseIntensity)
+        } else {
+            noiseBitmap = null
+        }
+    }
 
     // Dialog & Bottom Sheet triggers
     var showCategorySheet by remember { mutableStateOf(false) }
@@ -318,6 +347,7 @@ fun DownloadScreen(
                 // Show custom sliding pill tabs in header
                 if (allTabs.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
+
                     ScrollableTabRow(
                         selectedTabIndex = pagerState.currentPage,
                         edgePadding = 0.dp,
@@ -327,34 +357,115 @@ fun DownloadScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         allTabs.forEachIndexed { index, tabName ->
+                            val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+                            val primaryColor = MaterialTheme.colorScheme.primary
                             val isSelected = pagerState.currentPage == index
-                            val scale by animateFloatAsState(if (isSelected) 1.05f else 0.95f, label = "tabScale")
+
+                            val performanceMode by rememberPreferenceBoolean(VibePrefs.PERFORMANCE_MODE_ENABLED, false)
+                            val unselectedBgColor = if (isLightTheme) Color(0x1F000000) else Color(0x1FFFFFFF)
                             
+                            val tabBgColor = if (performanceMode) {
+                                if (isSelected) primaryColor else unselectedBgColor
+                            } else {
+                                animateColorAsState(
+                                     targetValue = if (isSelected) primaryColor else unselectedBgColor,
+                                     animationSpec = tween(durationMillis = 200),
+                                     label = "tabBgColor"
+                                 ).value
+                            }
+                            
+                            val gradientEnabled by rememberPreferenceBoolean(VibePrefs.ACCENT_GRADIENT_ENABLED, false)
+                            val endColorInt by rememberPreferenceInt(VibePrefs.ACCENT_GRADIENT_END_COLOR, 0)
+                            val isGradientActive = gradientEnabled && endColorInt != 0
+
+                            val tabBgBrush = remember(isSelected, tabBgColor, isGradientActive, endColorInt) {
+                                if (isSelected && isGradientActive) {
+                                    Brush.linearGradient(
+                                        colors = listOf(tabBgColor, Color(endColorInt))
+                                    )
+                                } else {
+                                    SolidColor(tabBgColor)
+                                }
+                            }
+                            
+                            val unselectedStrokeColor = if (isLightTheme) Color(0x0A000000) else Color(0x1AFFFFFF)
+                            val targetTextColor = MaterialTheme.colorScheme.onPrimary
+                            val unselectedTextColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+
+                            val tabStrokeColor = if (performanceMode) {
+                                if (isSelected) primaryColor.copy(alpha = 0.5f) else unselectedStrokeColor
+                            } else {
+                                animateColorAsState(
+                                     targetValue = if (isSelected) primaryColor.copy(alpha = 0.5f) else unselectedStrokeColor,
+                                     animationSpec = tween(durationMillis = 200),
+                                     label = "tabStrokeColor"
+                                 ).value
+                            }
+                            
+                            val tabTextColor = if (performanceMode) {
+                                if (isSelected) targetTextColor else unselectedTextColor
+                            } else {
+                                animateColorAsState(
+                                    targetValue = if (isSelected) targetTextColor else unselectedTextColor,
+                                    animationSpec = tween(durationMillis = 200),
+                                    label = "tabTextColor"
+                                ).value
+                            }
+                            
+                            val tabScale = if (performanceMode) {
+                                1.0f
+                            } else {
+                                animateFloatAsState(
+                                    targetValue = if (isSelected) 1.04f else 0.96f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
+                                    label = "tabScale"
+                                ).value
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .padding(end = 8.dp, bottom = 4.dp)
                                     .graphicsLayer {
-                                        scaleX = scale
-                                        scaleY = scale
+                                        scaleX = tabScale
+                                        scaleY = tabScale
                                     }
-                                    .glassCard(
-                                        shape = RoundedCornerShape(16.dp),
-                                        backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                        strokeColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else null
-                                    )
+                                    .drawBehind {
+                                        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+
+                                        // Draw spatial glass capsule background
+                                        drawRoundRect(
+                                            brush = tabBgBrush,
+                                            cornerRadius = cornerRadius
+                                        )
+
+                                        // Draw sleek high-fidelity border contour
+                                        drawRoundRect(
+                                            color = tabStrokeColor,
+                                            cornerRadius = cornerRadius,
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                                        )
+                                    }
+                                    .clip(RoundedCornerShape(16.dp))
                                     .clickable {
                                         if (activeTargetPage != index) {
                                             activeTargetPage = index
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                                             pagerScrollJob[0]?.cancel()
                                             pagerScrollJob[0] = scope.launch {
-                                                pagerState.animateScrollToPage(
-                                                    page = index,
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                                        stiffness = Spring.StiffnessMedium
+                                                if (performanceMode) {
+                                                    pagerState.scrollToPage(index)
+                                                } else {
+                                                    pagerState.animateScrollToPage(
+                                                        page = index,
+                                                        animationSpec = spring(
+                                                            dampingRatio = Spring.DampingRatioLowBouncy,
+                                                            stiffness = 1200f
+                                                        )
                                                     )
-                                                )
+                                                }
                                             }
                                         }
                                     }
@@ -365,7 +476,7 @@ fun DownloadScreen(
                                     text = tabName,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+                                    color = tabTextColor
                                 )
                             }
                         }
@@ -374,21 +485,27 @@ fun DownloadScreen(
             }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                    showSortSheet = true
-                },
-                shape = RoundedCornerShape(24.dp),
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+            Box(
                 modifier = Modifier
                     .navigationBarsPadding()
-                    .padding(bottom = if (!isSwipeMode) 176.dp else 104.dp)
+                    .padding(bottom = if (!isSwipeMode) 156.dp else 84.dp) // Perfect safe height clearance above nav/pill sliders
+                    .size(56.dp)
+                    .glassCard(
+                        shape = RoundedCornerShape(16.dp),
+                        backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        strokeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    )
+                    .clickable {
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                        showSortSheet = true
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Sort, contentDescription = "Sort")
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(context.getString(R.string.filter_dialog_sort_by), fontWeight = FontWeight.Bold)
+                Icon(
+                    imageVector = Icons.Default.Sort,
+                    contentDescription = "Sort",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
     ) { innerPadding ->
@@ -401,8 +518,10 @@ fun DownloadScreen(
             // HorizontalPager hosting each Tab Content
             HorizontalPager(
                 state = pagerState,
+                beyondViewportPageCount = if (allTabs.isNotEmpty()) allTabs.size else 0,
                 modifier = Modifier
                     .fillMaxSize()
+                    .clipToBounds() // Crucial: clips all graphicsLayer translated pages to the viewport boundaries to prevent edge bleeding!
                     .lockGesturePriority(
                         enabled = isSwipeMode,
                         onHorizontalDragDetected = { isSwipingPage = true },
@@ -417,8 +536,38 @@ fun DownloadScreen(
                 val list = cardsByPage[page] ?: emptyList()
                 val isDownloadsPage = page == 0
 
+                // Premium visual sliding parallax depth fade transition (100% GPU-accelerated, zero overdraw/layer overhead)
                 Box(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // Calculate current page position offset relative to focus point
+                            val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                            
+                            // Apply custom depth fade & parallax scaling
+                            if (pageOffset < 0) {
+                                // Outgoing page: shrinks (to 90% scale), fades out, moves slowly (20% speed)
+                                val fraction = 1f + pageOffset // goes from 1 to 0
+                                alpha = fraction.coerceIn(0f, 1f)
+                                
+                                val scale = 0.9f + (fraction * 0.1f).coerceIn(0f, 0.1f)
+                                scaleX = scale
+                                scaleY = scale
+                                
+                                // Cancel 80% of default horizontal translation to make it feel stationary/sinking
+                                translationX = -pageOffset * size.width * 0.8f
+                            } else {
+                                // Incoming page: slides in over it normally, fading in, full scale
+                                val fraction = 1f - pageOffset.coerceIn(0f, 1f) // goes from 0 to 1
+                                alpha = fraction
+                                
+                                scaleX = 1f
+                                scaleY = 1f
+                                
+                                // Standard sliding translation
+                                translationX = 0f
+                            }
+                        }
                 ) {
                     if (list.isEmpty()) {
                         Box(
@@ -458,141 +607,177 @@ fun DownloadScreen(
                             }
                         }
                     } else {
-                        if (isCompact) {
-                            val listState = rememberLazyListState()
-                            
-                            LazyColumn(
-                                state = listState,
-                                userScrollEnabled = !isSwipingPage,
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                items(
-                                    items = list,
-                                    key = { card ->
-                                        when (card) {
-                                            is ResultCached -> "cached_${card.id}"
-                                            is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
-                                            else -> card.hashCode()
+                        androidx.compose.runtime.key(isCompact, isBento3x3) {
+                            if (isCompact) {
+                                val listState = rememberLazyListState()
+                                
+                                LazyColumn(
+                                    state = listState,
+                                    userScrollEnabled = !isSwipingPage,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    items(
+                                        items = list,
+                                        key = { card ->
+                                            val id = when (card) {
+                                                is ResultCached -> "cached_${card.id}"
+                                                is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
+                                                else -> card.hashCode()
+                                            }
+                                            "list_$id"
+                                        },
+                                        contentType = { card ->
+                                            when (card) {
+                                                is ResultCached -> "cached_card"
+                                                is DownloadFragment.DownloadDataLoaded -> "loaded_card"
+                                                else -> "generic_card"
+                                            }
                                         }
-                                    }
-                                ) { card ->
-                                    val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
-                                        {
-                                            if (card is ResultCached) onBookClick(card)
-                                            else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                    ) { card ->
+                                        val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
+                                            {
+                                                if (card is ResultCached) onBookClick(card)
+                                                else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                            }
                                         }
-                                    }
-                                    val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
-                                        {
-                                            if (card is ResultCached) onBookLongClick(card)
-                                            else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                        val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
+                                            {
+                                                if (card is ResultCached) onBookLongClick(card)
+                                                else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                            }
                                         }
-                                    }
-                                    val onPauseClick = remember(card, viewModel) {
-                                        {
-                                            if (card is DownloadFragment.DownloadDataLoaded) viewModel.pause(card)
+                                        val onPauseClick = remember(card, viewModel) {
+                                            {
+                                                if (card is DownloadFragment.DownloadDataLoaded) viewModel.pause(card)
+                                            }
                                         }
-                                    }
-                                    val onResumeClick = remember(card, viewModel) {
-                                        {
-                                            if (card is DownloadFragment.DownloadDataLoaded) viewModel.resume(card)
+                                        val onResumeClick = remember(card, viewModel) {
+                                            {
+                                                if (card is DownloadFragment.DownloadDataLoaded) viewModel.resume(card)
+                                            }
                                         }
-                                    }
-                                    val onRefreshClick = remember(card, viewModel) {
-                                        {
-                                            if (card is DownloadFragment.DownloadDataLoaded) viewModel.refreshCard(card)
+                                        val onRefreshClick = remember(card, viewModel) {
+                                            {
+                                                if (card is DownloadFragment.DownloadDataLoaded) viewModel.refreshCard(card)
+                                            }
                                         }
-                                    }
-                                    val onDeleteClick = remember(card, viewModel) {
-                                        {
-                                            if (card is DownloadFragment.DownloadDataLoaded) viewModel.deleteAlert(card)
+                                        val onDeleteClick = remember(card, viewModel) {
+                                            {
+                                                if (card is DownloadFragment.DownloadDataLoaded) {
+                                                    viewModel.deleteAlert(card)
+                                                } else if (card is ResultCached) {
+                                                    viewModel.deleteAlert(card)
+                                                }
+                                            }
                                         }
-                                    }
 
-                                    CompactCardItem(
-                                        card = card,
-                                        isTactileEnabled = isTactileEnabled,
-                                        onClick = currentOnClick,
-                                        onLongClick = currentOnLongClick,
-                                        onPauseClick = onPauseClick,
-                                        onResumeClick = onResumeClick,
-                                        onRefreshClick = onRefreshClick,
-                                        onDeleteClick = onDeleteClick
-                                    )
-                                }
-                                // Bottom Import item inside downloads page
-                                if (isDownloadsPage) {
-                                    item(key = "import_item_column") {
-                                        ImportCardItem(onClick = onImportEpubClick)
+                                        CompactCardItem(
+                                            card = card,
+                                            isTactileEnabled = isTactileEnabled,
+                                            onClick = currentOnClick,
+                                            onLongClick = currentOnLongClick,
+                                            onPauseClick = onPauseClick,
+                                            onResumeClick = onResumeClick,
+                                            onRefreshClick = onRefreshClick,
+                                            onDeleteClick = onDeleteClick,
+                                            modifier = Modifier.animateItemPlacement(
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            )
+                                        )
+                                    }
+                                    // Bottom Import item inside downloads page
+                                    if (isDownloadsPage) {
+                                        item(key = "import_item_column") {
+                                            ImportCardItem(onClick = onImportEpubClick)
+                                        }
                                     }
                                 }
-                            }
-                        } else {
-                            // Grid layout (Pinterest/Bento style)
-                            val totalCount = list.size + (if (isDownloadsPage) 1 else 0)
-                            val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+                            } else {
+                                // Grid layout (Pinterest/Bento style)
+                                val totalCount = list.size + (if (isDownloadsPage) 1 else 0)
+                                val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
-                            LazyVerticalGrid(
-                                state = gridState,
-                                columns = GridCells.Fixed(3),
-                                userScrollEnabled = !isSwipingPage,
-                                modifier = Modifier
-                                    .fillMaxSize(),
-                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                itemsIndexed(
-                                    items = list,
-                                    key = { _, card ->
-                                        when (card) {
-                                            is ResultCached -> "cached_${card.id}"
-                                            is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
-                                            else -> card.hashCode()
+                                LazyVerticalGrid(
+                                    state = gridState,
+                                    columns = GridCells.Fixed(3),
+                                    userScrollEnabled = !isSwipingPage,
+                                    modifier = Modifier
+                                        .fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomListPadding),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    itemsIndexed(
+                                        items = list,
+                                        key = { _, card ->
+                                            val id = when (card) {
+                                                is ResultCached -> "cached_${card.id}"
+                                                is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
+                                                else -> card.hashCode()
+                                            }
+                                            if (isBento3x3) "bento_$id" else "normal_$id"
+                                        },
+                                        span = { index, _ ->
+                                            val spanSize = if (isBento3x3) {
+                                                when (index % 7) {
+                                                    0, 5 -> 2
+                                                    else -> 1
+                                                }
+                                            } else 1
+                                            GridItemSpan(spanSize)
+                                        },
+                                        contentType = { _, card ->
+                                            when (card) {
+                                                is ResultCached -> "cached_grid"
+                                                is DownloadFragment.DownloadDataLoaded -> "loaded_grid"
+                                                else -> "generic_grid"
+                                            }
                                         }
-                                    },
-                                    span = { index, _ ->
+                                    ) { index, card ->
                                         val spanSize = if (isBento3x3) {
                                             when (index % 7) {
                                                 0, 5 -> 2
                                                 else -> 1
                                             }
                                         } else 1
-                                        GridItemSpan(spanSize)
-                                    }
-                                ) { index, card ->
-                                    val spanSize = if (isBento3x3) {
-                                        when (index % 7) {
-                                            0, 5 -> 2
-                                            else -> 1
+                                        val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
+                                            {
+                                                if (card is ResultCached) onBookClick(card)
+                                                else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                            }
                                         }
-                                    } else 1
-                                    val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
-                                        {
-                                            if (card is ResultCached) onBookClick(card)
-                                            else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                        val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
+                                            {
+                                                if (card is ResultCached) onBookLongClick(card)
+                                                else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                            }
                                         }
+                                        GridCardItem(
+                                            card = card,
+                                            isBento = isBento3x3,
+                                            span = spanSize,
+                                            isTactileEnabled = isTactileEnabled,
+                                            noiseBitmap = noiseBitmap,
+                                            isNoiseEnabled = isNoiseEnabled,
+                                            onClick = currentOnClick,
+                                            onLongClick = currentOnLongClick,
+                                            modifier = Modifier.animateItemPlacement(
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            )
+                                        )
                                     }
-                                    val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
-                                        {
-                                            if (card is ResultCached) onBookLongClick(card)
-                                            else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                    if (isDownloadsPage) {
+                                        item(key = if (isBento3x3) "import_item_bento" else "import_item_normal", span = { GridItemSpan(3) }) {
+                                            ImportCardItem(onClick = onImportEpubClick)
                                         }
-                                    }
-                                    GridCardItem(
-                                        card = card,
-                                        isBento = isBento3x3,
-                                        span = spanSize,
-                                        isTactileEnabled = isTactileEnabled,
-                                        onClick = currentOnClick,
-                                        onLongClick = currentOnLongClick
-                                    )
-                                }
-                                if (isDownloadsPage) {
-                                    item(key = "import_item_grid", span = { GridItemSpan(3) }) {
-                                        ImportCardItem(onClick = onImportEpubClick)
                                     }
                                 }
                             }
@@ -605,71 +790,64 @@ fun DownloadScreen(
             if (!isSwipeMode) {
                 val numTabs = allTabs.size
                 if (numTabs > 0) {
+                    val sliderWidth = 240.dp
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
-                            .padding(bottom = 96.dp)
-                            .width(200.dp) // Sleek, compact size
-                            .height(48.dp)
-                            .pointerInput(numTabs, "drag") {
-                                detectHorizontalDragGestures(
-                                    onDragStart = { offset ->
-                                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                                        val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
-                                        if (activeTargetPage != targetPage) {
-                                            activeTargetPage = targetPage
+                            .padding(bottom = 84.dp) // Perfect safe height clearance
+                            .width(sliderWidth)
+                            .height(72.dp) // Generous, comfortable touch targets
+                            .pointerInput(numTabs) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        val initialFraction = (down.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                        val initialTarget = (initialFraction * numTabs).toInt().coerceIn(0, numTabs - 1)
+                                        
+                                        // Immediately trigger page switch on touch down! Tapping becomes 100% responsive
+                                        if (activeTargetPage != initialTarget) {
+                                            activeTargetPage = initialTarget
                                             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                                             pagerScrollJob[0]?.cancel()
                                             pagerScrollJob[0] = scope.launch {
                                                 pagerState.animateScrollToPage(
-                                                    page = targetPage,
+                                                    page = initialTarget,
                                                     animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                                        stiffness = Spring.StiffnessMedium
+                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                        stiffness = 1200f
                                                     )
                                                 )
                                             }
                                         }
-                                    },
-                                    onHorizontalDrag = { change, _ ->
-                                        change.consume()
-                                        val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
-                                        val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
-                                        if (activeTargetPage != targetPage) {
-                                            activeTargetPage = targetPage
-                                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                            pagerScrollJob[0]?.cancel()
-                                            pagerScrollJob[0] = scope.launch {
-                                                pagerState.animateScrollToPage(
-                                                    page = targetPage,
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                                        stiffness = Spring.StiffnessMedium
-                                                    )
-                                                )
+
+                                        // Track any subsequent drag movements
+                                        var dragChange: PointerInputChange?
+                                        do {
+                                            val event = awaitPointerEvent()
+                                            dragChange = event.changes.firstOrNull { it.pressed }
+                                            if (dragChange != null) {
+                                                val fraction = (dragChange.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                                val dragTarget = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
+                                                if (activeTargetPage != dragTarget) {
+                                                    activeTargetPage = dragTarget
+                                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                                    
+                                                    // While actively dragging, animate smoothly to target page
+                                                    pagerScrollJob[0]?.cancel()
+                                                    pagerScrollJob[0] = scope.launch {
+                                                        pagerState.animateScrollToPage(
+                                                            page = dragTarget,
+                                                            animationSpec = spring(
+                                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                                stiffness = 1200f
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                                dragChange.consume()
                                             }
-                                        }
-                                    }
-                                )
-                            }
-                            .pointerInput(numTabs, "tap") {
-                                detectTapGestures { offset ->
-                                    val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                                    val targetPage = (fraction * numTabs).toInt().coerceIn(0, numTabs - 1)
-                                    if (activeTargetPage != targetPage) {
-                                        activeTargetPage = targetPage
-                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                        pagerScrollJob[0]?.cancel()
-                                        pagerScrollJob[0] = scope.launch {
-                                            pagerState.animateScrollToPage(
-                                                page = targetPage,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                                    stiffness = Spring.StiffnessMedium
-                                                )
-                                            )
-                                        }
+                                        } while (dragChange != null)
                                     }
                                 }
                             },
@@ -712,9 +890,8 @@ fun DownloadScreen(
                             }
                         }
 
-                        // Traveling capsule — driven purely by pagerState offset fraction with GPU-accelerated graphicsLayer
-                        val targetPagerPos = remember { derivedStateOf { pagerState.currentPage + pagerState.currentPageOffsetFraction } }
-                        val segmentWidth = 200.dp / numTabs
+                        // Traveling capsule — driven purely by real-time pagerState with GPU-accelerated graphicsLayer
+                        val segmentWidth = sliderWidth / numTabs
                         val capsuleWidth = 24.dp
 
                         Box(
@@ -724,7 +901,8 @@ fun DownloadScreen(
                                 .graphicsLayer {
                                     val segmentWidthPx = segmentWidth.toPx()
                                     val capsuleWidthPx = capsuleWidth.toPx()
-                                    translationX = (segmentWidthPx * (targetPagerPos.value + 0.5f)) - (capsuleWidthPx / 2)
+                                    val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                                    translationX = (segmentWidthPx * (pos + 0.5f)) - (capsuleWidthPx / 2)
                                 },
                             contentAlignment = Alignment.Center
                         ) {
@@ -1002,13 +1180,15 @@ fun DownloadScreen(
 fun rememberPreferenceBoolean(key: String, defaultValue: Boolean): State<Boolean> {
     val context = LocalContext.current
     val prefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
-    val state = remember { mutableStateOf(prefs.getBoolean(key, defaultValue)) }
-    DisposableEffect(prefs, key) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, k ->
+    val state = remember(key) { mutableStateOf(prefs.getBoolean(key, defaultValue)) }
+    val listener = remember(key, prefs) {
+        SharedPreferences.OnSharedPreferenceChangeListener { _, k ->
             if (k == key) {
                 state.value = prefs.getBoolean(key, defaultValue)
             }
         }
+    }
+    DisposableEffect(prefs, key, listener) {
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose {
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
@@ -1021,13 +1201,15 @@ fun rememberPreferenceBoolean(key: String, defaultValue: Boolean): State<Boolean
 fun rememberPreferenceString(key: String, defaultValue: String): State<String> {
     val context = LocalContext.current
     val prefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
-    val state = remember { mutableStateOf(prefs.getString(key, defaultValue) ?: defaultValue) }
-    DisposableEffect(prefs, key) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, k ->
+    val state = remember(key) { mutableStateOf(prefs.getString(key, defaultValue) ?: defaultValue) }
+    val listener = remember(key, prefs) {
+        SharedPreferences.OnSharedPreferenceChangeListener { _, k ->
             if (k == key) {
                 state.value = prefs.getString(key, defaultValue) ?: defaultValue
             }
         }
+    }
+    DisposableEffect(prefs, key, listener) {
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose {
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
@@ -1079,8 +1261,11 @@ fun GridCardItem(
     isBento: Boolean,
     span: Int = 1,
     isTactileEnabled: Boolean,
+    noiseBitmap: ImageBitmap?,
+    isNoiseEnabled: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val view = LocalView.current
     val context = LocalContext.current
@@ -1102,20 +1287,15 @@ fun GridCardItem(
         }
     }
 
-    val diffCount = remember(card) {
-        when (card) {
-            is ResultCached -> {
-                // Determine read count vs total (simple cached badge)
-                0
-            }
-            is DownloadFragment.DownloadDataLoaded -> {
-                val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
-                    com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
-                    card.name
-                )?.let { it + 1 } ?: 0
-                (card.downloadedCount - realReadCount).coerceAtLeast(0).toInt()
-            }
-            else -> 0
+    val diffCount = remember(card, com.lagradost.quicknovel.DataStore.mutationCounter.value) {
+        if (card is DownloadFragment.DownloadDataLoaded) {
+            val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
+                com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
+                card.name
+            )?.let { it + 1 } ?: 0
+            (card.downloadedCount - realReadCount).coerceAtLeast(0).toInt()
+        } else {
+            0
         }
     }
 
@@ -1131,23 +1311,37 @@ fun GridCardItem(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current,
-                onClick = {
-                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                    onClick()
-                },
-                onLongClick = {
-                    view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                    onLongClick()
+    // ─── Cover Aura Glow ─────────────────────────────────────────────────────
+    val isAuraEnabled = rememberAuraEnabled()
+    var auraColor by remember(posterUrl) { mutableStateOf(Color.Unspecified) }
+
+    if (isAuraEnabled) {
+        LaunchedEffect(card) {
+            // Resolve the bitmap for palette extraction via Coil's cache (IO-safe)
+            val cacheKey = posterUrl?.toString() ?: return@LaunchedEffect
+            if (cacheKey.isBlank()) return@LaunchedEffect
+            try {
+                val loader = coil3.SingletonImageLoader.get(context)
+                // Use buildImageRequest to inherit local cache path resolution & custom header logic
+                val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card).newBuilder(context)
+                    .allowHardware(false)
+                    .size(128) // tiny decode — just need dominant color
+                    .build()
+                val result = loader.execute(req)
+                val drawable = (result as? coil3.request.SuccessResult)?.image
+                val bmp = (drawable as? coil3.BitmapImage)?.bitmap
+                if (bmp != null) {
+                    auraColor = extractAuraColor(
+                        bitmap = bmp,
+                        cacheKey = cacheKey
+                    )
                 }
-            )
-            .tactileResponse(isTactileEnabled, interactionSource)
+            } catch (_: Throwable) { /* fail silently — aura is cosmetic */ }
+        }
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth()
     ) {
         val cardAspectRatio = if (isBento) {
             if (span == 2) 1.32f else 0.66f
@@ -1158,12 +1352,27 @@ fun GridCardItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(cardAspectRatio)
-                .glassCard(shape = RoundedCornerShape(12.dp), strokeWidth = 0.5.dp)
-                .clickable {
-                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                    onLongClick()
-                }
+                .padding(8.dp) // padded outer box to let the aura glow bleed out without clipping
+                .coverAuraGlow(auraColor = auraColor, enabled = isAuraEnabled)
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .tactileResponse(isTactileEnabled, interactionSource)
+                    .glassCard(shape = RoundedCornerShape(12.dp), strokeWidth = 0.5.dp)
+                    .combinedClickable(
+                        interactionSource = interactionSource,
+                        indication = LocalIndication.current,
+                        onClick = {
+                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                            onClick()
+                        },
+                        onLongClick = {
+                            view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            onLongClick()
+                        }
+                    )
+            ) {
             // Premium typographic placeholder for missing/loading covers
             Box(
                 modifier = Modifier
@@ -1214,7 +1423,11 @@ fun GridCardItem(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp))
+                    .graphicsLayer {
+                        clip = true
+                        shape = RoundedCornerShape(12.dp)
+                    }
+                    .noiseTextureOverlay(noiseBitmap = noiseBitmap, enabled = isNoiseEnabled)
             )
 
             // Dim overlay at the bottom for smooth text legibility
@@ -1269,6 +1482,7 @@ fun GridCardItem(
                 }
             }
         }
+    }
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -1294,7 +1508,8 @@ fun CompactCardItem(
     onPauseClick: () -> Unit,
     onResumeClick: () -> Unit,
     onRefreshClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -1328,22 +1543,20 @@ fun CompactCardItem(
         }
     }
 
-    val diffCount = remember(card) {
-        when (card) {
-            is ResultCached -> 0
-            is DownloadFragment.DownloadDataLoaded -> {
-                val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
-                    com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
-                    card.name
-                )?.let { it + 1 } ?: 0
-                (card.downloadedCount - realReadCount).coerceAtLeast(0).toInt()
-            }
-            else -> 0
+    val diffCount = remember(card, com.lagradost.quicknovel.DataStore.mutationCounter.value) {
+        if (card is DownloadFragment.DownloadDataLoaded) {
+            val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
+                com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
+                card.name
+            )?.let { it + 1 } ?: 0
+            (card.downloadedCount - realReadCount).coerceAtLeast(0).toInt()
+        } else {
+            0
         }
     }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .glassCard(shape = RoundedCornerShape(16.dp))
             .combinedClickable(
@@ -1366,7 +1579,10 @@ fun CompactCardItem(
         Box(
             modifier = Modifier
                 .size(width = 54.dp, height = 76.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .graphicsLayer {
+                    clip = true
+                    shape = RoundedCornerShape(8.dp)
+                }
                 .clickable {
                     view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                     onLongClick()
@@ -1436,7 +1652,7 @@ fun CompactCardItem(
                 overflow = TextOverflow.Ellipsis
             )
 
-            val (readCount, totalCount) = remember(card) {
+            val counts = remember(card, com.lagradost.quicknovel.DataStore.mutationCounter.value) {
                 when (card) {
                     is ResultCached -> {
                         card.lastChapterRead to card.currentTotalChapters
@@ -1451,6 +1667,7 @@ fun CompactCardItem(
                     else -> 0 to 0
                 }
             }
+            val (readCount, totalCount) = counts
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -1596,6 +1813,17 @@ fun CompactCardItem(
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
+            }
+        } else if (card is ResultCached) {
+            IconButton(onClick = {
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                onDeleteClick()
+            }) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete bookmark",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

@@ -73,7 +73,14 @@ object CommonActivity {
         }
 
     const val TAG = "COMPACT"
-    var currentToast: Toast? = null
+    
+    private var _currentToast: WeakReference<Toast>? = null
+    @JvmStatic
+    var currentToast: Toast?
+        get() = _currentToast?.get()
+        set(value) {
+            _currentToast = if (value == null) null else WeakReference(value)
+        }
 
     @JvmStatic
     fun showToast(@StringRes message: Int, duration: Int? = null) {

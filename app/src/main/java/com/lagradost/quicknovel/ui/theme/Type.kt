@@ -37,6 +37,7 @@ val OstrichSansBoldFontFamily = FontFamily(Font(R.font.ostrich_sans_bold, FontWe
 val OstrichSansInlineFontFamily = FontFamily(Font(R.font.ostrich_sans_inline_regular, FontWeight.Normal))
 val RudeFontFamily = FontFamily(Font(R.font.rude, FontWeight.Normal))
 val ShadowHandFontFamily = FontFamily(Font(R.font.shadowhand, FontWeight.Normal))
+val AlexandriaFlfFontFamily = FontFamily(Font(R.font.alexandriaflf, FontWeight.Normal))
 
 /**
  * Returns a dynamically themed Typography based on a selected FontFamily and optional scale.
