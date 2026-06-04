@@ -28,6 +28,7 @@ object CommonActivity {
     var pendingThemeChangeScreenshot: Bitmap? = null
     var themeCenterX: Float? = null
     var themeCenterY: Float? = null
+    var isFontChangeTransition: Boolean = false
 
     @JvmStatic
     fun recreateWithSmoothTransition(act: Activity?, x: Float? = null, y: Float? = null) {
@@ -49,6 +50,18 @@ object CommonActivity {
         } catch (e: Exception) {
             logError(e)
         }
+        // Suppress window animations completely during the transition/recreation phase
+        act.window?.setWindowAnimations(0)
+
+        // Override transition BEFORE recreate() so the system transition animation
+        // is suppressed from the moment the activity recreates — eliminates the blink.
+        if (Build.VERSION.SDK_INT >= 34) {
+            act.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+            act.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            act.overridePendingTransition(0, 0)
+        }
         act.recreate()
     }
     private var _activity: WeakReference<Activity>? = null
@@ -60,7 +73,14 @@ object CommonActivity {
         }
 
     const val TAG = "COMPACT"
-    var currentToast: Toast? = null
+    
+    private var _currentToast: WeakReference<Toast>? = null
+    @JvmStatic
+    var currentToast: Toast?
+        get() = _currentToast?.get()
+        set(value) {
+            _currentToast = if (value == null) null else WeakReference(value)
+        }
 
     @JvmStatic
     fun showToast(@StringRes message: Int, duration: Int? = null) {
@@ -202,8 +222,18 @@ object CommonActivity {
             true
         ) // THEME IS SET BEFORE VIEW IS CREATED TO APPLY THE THEME TO THE MAIN VIEW
 
+        val themeString = settingsManager.getString(act.getString(R.string.theme_key), "Amoled")
+        val backgroundRes = when (themeString) {
+            "Black", "Amoled" -> android.R.color.black
+            "Light" -> R.color.lightPrimaryGrayBackground
+            "AmoledLight" -> R.color.amoledModeLight
+            else -> android.R.color.black
+        }
+        act.window?.setBackgroundDrawableResource(backgroundRes)
 
         act.window?.navigationBarColor =
+            android.graphics.Color.TRANSPARENT
+        act.window?.statusBarColor =
             android.graphics.Color.TRANSPARENT
     }
 }

@@ -32,7 +32,6 @@ import com.lagradost.quicknovel.mvvm.logError
 import com.lagradost.quicknovel.mvvm.safe
 import com.lagradost.quicknovel.ui.clear
 import com.lagradost.quicknovel.ui.download.AnyAdapter
-import com.lagradost.quicknovel.ui.history.HistoryAdapter
 import com.lagradost.quicknovel.ui.txt
 import com.lagradost.quicknovel.util.Apis.Companion.apis
 import com.lagradost.quicknovel.util.Apis.Companion.getApiProviderLangSettings
@@ -166,6 +165,14 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
             if (uri == null) return@registerForActivityResult
             val context = context ?: return@registerForActivityResult
+            
+            try {
+                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                context.contentResolver.takePersistableUriPermission(uri, flags)
+            } catch (e: Exception) {
+                logError(e)
+            }
+
             val file = SafeFile.fromUri(context, uri)
             val filePath = file?.filePath()
             
@@ -471,23 +478,17 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
         }
         getPref(R.string.reset_background_key)?.setOnPreferenceClickListener {
             val ctx = context ?: return@setOnPreferenceClickListener true
-            AlertDialog.Builder(ctx, R.style.AlertDialogCustom)
-                .setTitle(R.string.reset_background)
-                .setMessage(R.string.reset_background_summary)
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(R.string.reset_background) { dialog, _ ->
-                    settingsManager.edit {
-                        remove(getString(R.string.background_image_key))
-                        remove(getString(R.string.background_effect_mode_key))
-                        remove(getString(R.string.background_blur_key))
-                        remove(getString(R.string.background_dim_key))
-                        remove(getString(R.string.background_grain_key))
-                        remove(getString(R.string.background_vignette_key))
-                    }
-                    showToast(R.string.background_reset_confirmed)
-                    dialog.dismiss()
+            com.lagradost.quicknovel.util.ComposeDialogHelper.showResetBackgroundDialog(ctx) {
+                settingsManager.edit {
+                    remove(getString(R.string.background_image_key))
+                    remove(getString(R.string.background_effect_mode_key))
+                    remove(getString(R.string.background_blur_key))
+                    remove(getString(R.string.background_dim_key))
+                    remove(getString(R.string.background_grain_key))
+                    remove(getString(R.string.background_vignette_key))
                 }
-                .show()
+                showToast(R.string.background_reset_confirmed)
+            }
             true
         }
 
@@ -535,6 +536,42 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                 CommonActivity.recreateWithSmoothTransition(activity)
             }
             true
+        }
+
+        // App Font Preference Selection
+        getPref(R.string.app_font_key)?.let { pref ->
+            val names = listOf(
+                "System Default", "Alexandria FLF", "Product Sans", "Comico", "Instrument Serif", 
+                "Manosque", "Nevis", "Nighty Demo", "Orbitron", 
+                "Ostrich Sans Bold", "Ostrich Sans Inline", "Rude", "Shadow Hand",
+                "Skyscapers", "Struggle", "Typefesse Claire-Obscure", "Typefesse Pleine", 
+                "Unique"
+            )
+            val values = listOf(
+                "default", "alexandriaflf", "productsans", "comico", "instrument_serif", 
+                "manosque", "nevis", "nightydemo", "orbitron", 
+                "ostrich_sans_bold", "ostrich_sans_inline", "rude", "shadowhand",
+                "skyscapers", "struggle", "typefesse_claire_obscure", "typefesse_pleine", 
+                "unique"
+            )
+            
+            fun updateSummary() {
+                val current = settingsManager.getString(getString(R.string.app_font_key), "default")
+                val index = values.indexOf(current).coerceAtLeast(0)
+                pref.summary = names[index]
+            }
+            
+            updateSummary()
+            
+            pref.setOnPreferenceClickListener {
+                val current = settingsManager.getString(getString(R.string.app_font_key), "default")
+                activity?.showBottomDialog(names, values.indexOf(current).coerceAtLeast(0), getString(R.string.app_font), false, {}) { selectedIndex ->
+                    settingsManager.edit { putString(getString(R.string.app_font_key), values[selectedIndex]) }
+                    updateSummary()
+                    CommonActivity.recreateWithSmoothTransition(activity)
+                }
+                true
+            }
         }
 
         // Manage Data

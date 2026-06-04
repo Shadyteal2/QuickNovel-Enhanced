@@ -14,18 +14,58 @@ android {
         viewBinding = true
         dataBinding = true
         buildConfig = true
+        compose = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
 
     defaultConfig {
         applicationId "com.shady.neoqn"
         minSdkVersion 21
         targetSdkVersion 34
-        versionCode 60
-        versionName "2.1.1"
+        versionCode 65
+        versionName "2.1.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         ndk {
-            abiFilters "arm64-v8a"
+            if (!gradle.startParameter.taskNames.any { it.contains("Release") || it.contains("release") }) {
+                abiFilters "arm64-v8a"
+            }
+        }
+    }
+
+    signingConfigs {
+        release {
+            // Read storeFile path and credentials dynamically from environment variable or local.properties
+            def storeFilePath = System.getenv("SIGNING_STORE_FILE") ?: ""
+            def storePass = System.getenv("SIGNING_STORE_PASSWORD") ?: ""
+            def keyAli = System.getenv("SIGNING_KEY_ALIAS") ?: ""
+            def keyPass = System.getenv("SIGNING_KEY_PASSWORD") ?: ""
+            
+            if (project.rootProject.file('local.properties').exists()) {
+                Properties properties = new Properties()
+                properties.load(project.rootProject.file('local.properties').newDataInputStream())
+                if (!storeFilePath) storeFilePath = properties.getProperty('signing.storeFile', "")
+                if (!storePass) storePass = properties.getProperty('signing.storePassword', "")
+                if (!keyAli) keyAli = properties.getProperty('signing.keyAlias', "")
+                if (!keyPass) keyPass = properties.getProperty('signing.keyPassword', "")
+            }
+            
+            storeFile storeFilePath ? file(storeFilePath) : file("release.keystore")
+            storePassword storePass ?: "dummy_pass"
+            keyAlias keyAli ?: "dummy_alias"
+            keyPassword keyPass ?: "dummy_pass"
+        }
+    }
+
+    splits {
+        abi {
+            enable gradle.startParameter.taskNames.any { it.contains("Release") || it.contains("release") }
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86_64"
+            universalApk false
         }
     }
 
@@ -33,7 +73,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
         debug {
             applicationIdSuffix ".debug"
@@ -46,10 +86,20 @@ android {
         }
     }
 
+
     buildFeatures.buildConfig true
 
-    kotlin {
-        jvmToolchain(19)
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += [
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" + project.rootDir.absolutePath + "/compose_compiler_config.conf"
+        ]
     }
     namespace 'com.lagradost.quicknovel'
 
@@ -93,6 +143,7 @@ dependencies {
     implementation 'com.github.Blatzar:NiceHttp:0.4.11'
     implementation "io.coil-kt.coil3:coil:3.0.4"
     implementation "io.coil-kt.coil3:coil-network-okhttp:3.0.4"
+    implementation "io.coil-kt.coil3:coil-compose:3.0.4"
     implementation "io.noties.markwon:core:4.6.2"
     implementation "io.noties.markwon:html:4.6.2"
     implementation "com.facebook.shimmer:shimmer:0.5.0"
@@ -108,4 +159,21 @@ dependencies {
     implementation "androidx.room:room-ktx:$room_version"
     implementation 'com.google.android.flexbox:flexbox:3.0.0'
     implementation "androidx.dynamicanimation:dynamicanimation:1.0.0"
+    implementation 'androidx.palette:palette-ktx:1.0.0'
+
+    // Jetpack Compose
+    def composeBom = platform('androidx.compose:compose-bom:2024.04.01')
+    implementation composeBom
+    androidTestImplementation composeBom
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    implementation 'androidx.activity:activity-compose:1.9.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0'
+    implementation 'androidx.compose.runtime:runtime-livedata'
+
+    // Profile installer for Baseline Profile support
+    implementation 'androidx.profileinstaller:profileinstaller:1.4.0'
 }

@@ -14,44 +14,7 @@
 
     </PreferenceCategory>
 
-    <PreferenceCategory
-        android:dependency="@string/experimental_visuals_key"
-        android:title="Living Elements">
 
-        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
-            android:defaultValue="false"
-            android:key="@string/living_glass_key"
-            android:summary="@string/living_glass_desc"
-            android:title="@string/living_glass" />
-
-        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
-            android:dependency="@string/living_glass_key"
-            android:key="@string/aura_intensity_key"
-            android:title="@string/aura_intensity"
-            app:defaultValue="70"
-            app:valueFrom="0"
-            app:valueTo="100"
-            app:stepSize="1" />
-
-        <ListPreference
-            android:dependency="@string/living_glass_key"
-            android:entries="@array/aura_palette_entries"
-            android:entryValues="@array/aura_palette_values"
-            android:key="@string/aura_palette_key"
-            android:title="@string/aura_palette"
-            app:defaultValue="nebula"
-            app:useSimpleSummaryProvider="true" />
-
-        <com.lagradost.quicknovel.ui.custom.ElasticSliderPreference
-            android:dependency="@string/living_glass_key"
-            android:key="@string/aura_speed_key"
-            android:title="@string/aura_speed"
-            app:defaultValue="100"
-            app:valueFrom="50"
-            app:valueTo="200"
-            app:stepSize="1" />
-
-    </PreferenceCategory>
 
     <PreferenceCategory android:title="Luminescent Engine">
         <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference

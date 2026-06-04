@@ -95,6 +95,11 @@ data class Editor(
 ) {
     /** Always remember to call apply after */
     fun<T> setKeyRaw(path: String, value: T) {
+        if (value != null) {
+            DataStore.putInCache(path, value)
+        } else {
+            DataStore.removeFromCache(path)
+        }
         @Suppress("UNCHECKED_CAST")
         if (isStringSet(value)) {
             editor.putStringSet(path, value as Set<String>)
@@ -118,6 +123,11 @@ data class Editor(
 
     fun <T> setKey(path: String, value: T) {
         try {
+            if (value != null) {
+                DataStore.putInCache(path, value)
+            } else {
+                DataStore.removeFromCache(path)
+            }
             editor.putString(path, DataStore.mapper.writeValueAsString(value))
         } catch (e: Exception) {
             logError(e)
@@ -125,6 +135,7 @@ data class Editor(
     }
 
     fun removeKey(path: String) {
+        DataStore.removeFromCache(path)
         editor.remove(path)
     }
 
@@ -135,6 +146,38 @@ data class Editor(
 }
 
 object DataStore {
+    val preferenceCache = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    val heavyObjectCache = android.util.LruCache<String, Any>(200)
+    val mutationCounter = androidx.compose.runtime.mutableStateOf(0)
+
+    fun incrementMutationCounter() {
+        mutationCounter.value++
+    }
+
+    fun putInCache(path: String, value: Any?, notifyCompose: Boolean = true) {
+        if (value == null) {
+            removeFromCache(path)
+            return
+        }
+        if (value is Number || value is Boolean || value is String || value is Char) {
+            preferenceCache[path] = value
+        } else {
+            heavyObjectCache.put(path, value)
+        }
+        if (notifyCompose) {
+            incrementMutationCounter()
+        }
+    }
+
+    fun getFromCache(path: String): Any? {
+        return preferenceCache[path] ?: heavyObjectCache.get(path)
+    }
+
+    fun removeFromCache(path: String) {
+        preferenceCache.remove(path)
+        heavyObjectCache.remove(path)
+        incrementMutationCounter()
+    }
 
     fun editor(context : Context, isEditingAppSettings: Boolean = false) : Editor {
         val editor: SharedPreferences.Editor =
@@ -189,6 +232,7 @@ object DataStore {
 
     fun Context.removeKey(path: String) {
         try {
+            removeFromCache(path)
             val prefs = getSharedPrefs()
             if (prefs.contains(path)) {
                 prefs.edit {
@@ -210,6 +254,11 @@ object DataStore {
 
     fun <T> Context.setKey(path: String, value: T) {
         try {
+            if (value != null) {
+                putInCache(path, value)
+            } else {
+                removeFromCache(path)
+            }
             getSharedPrefs().edit {
                 putString(path, mapper.writeValueAsString(value))
             }
@@ -233,8 +282,14 @@ object DataStore {
     // GET KEY GIVEN PATH AND DEFAULT VALUE, NULL IF ERROR
     inline fun <reified T : Any> Context.getKey(path: String, defVal: T?): T? {
         try {
+            val cached = DataStore.getFromCache(path)
+            if (cached != null && cached is T) {
+                return cached
+            }
             val json: String = getSharedPrefs().getString(path, null) ?: return defVal
-            return json.toKotlinObject()
+            val obj = json.toKotlinObject<T>()
+            DataStore.putInCache(path, obj, notifyCompose = false)
+            return obj
         } catch (e: Exception) {
             return null
         }
@@ -242,8 +297,16 @@ object DataStore {
 
     fun <T> Context.getKey(path: String, valueType: Class<T>): T? {
         try {
+            val cached = getFromCache(path)
+            if (cached != null && valueType.isInstance(cached)) {
+                return valueType.cast(cached)
+            }
             val json: String = getSharedPrefs().getString(path, null) ?: return null
-            return json.toKotlinObject(valueType)
+            val obj = json.toKotlinObject(valueType)
+            if (obj != null) {
+                putInCache(path, obj, notifyCompose = false)
+            }
+            return obj
         } catch (e: Exception) {
             return null
         }

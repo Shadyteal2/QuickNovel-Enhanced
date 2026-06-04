@@ -90,6 +90,9 @@ import com.lagradost.quicknovel.ui.TextVisualLine
 import com.lagradost.quicknovel.ui.DictionaryBottomSheet
 import com.lagradost.quicknovel.ui.TranslationBottomSheet
 import com.lagradost.quicknovel.ui.ViewHolderState
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
 import com.lagradost.quicknovel.util.applyGlassStyle
@@ -114,6 +117,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
     }
 
+    private var batteryReceiver: BroadcastReceiver? = null
 
     private fun hideSystemUI() {
         WindowInsetsControllerCompat(window, binding.readerContainer).let { controller ->
@@ -337,9 +341,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
     private fun updateLuminescentEffects() {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-        val lEnabled = settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
+        val performanceMode = settingsManager.getBoolean("performance_mode_enabled", false)
+        val lEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
         val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
-        val gEnabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
+        val gEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.living_glass_key), false)
 
         binding.readerHalo.apply {
             if (lEnabled) {
@@ -537,7 +542,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private fun registerBattery() {
-        val mBatInfoReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        val receiver: BroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctxt: Context?, intent: Intent) {
                 val batteryPct: Float = run {
                     val level: Int = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
@@ -548,7 +553,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     getString(R.string.battery_format).format(batteryPct.toInt())
             }
         }
-        this.registerReceiver(mBatInfoReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        batteryReceiver = receiver
+        this.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     }
 
     fun parseAction(input: TTSHelper.TTSActionType): Boolean {
@@ -696,6 +702,51 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             val trailColor = interpolateColor(Color.GRAY, auraColor, 0.4f + progress * 0.6f)
             fill.backgroundTintList = ColorStateList.valueOf(trailColor)
         }
+
+        updateReaderInkFlow(progress)
+    }
+
+    private fun updateReaderInkFlow(progress: Float) {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
+        val isPremium = settingsManager.getBoolean(com.lagradost.quicknovel.ui.theme.VibePrefs.PREMIUM_VISUALS_ENABLED, false)
+        val isInkFlow = settingsManager.getBoolean(com.lagradost.quicknovel.ui.theme.VibePrefs.READER_INK_FLOW, false)
+        
+        val overlay = binding.readerInkFlowOverlay
+        if (!isPremium || !isInkFlow) {
+            overlay.visibility = View.GONE
+            return
+        }
+        
+        overlay.visibility = View.VISIBLE
+        val clamped = progress.coerceIn(0f, 1f)
+        
+        // Cool top colors (semi-transparent)
+        val startCool = intArrayOf(0x08, 0x10, 0x3A, 0x55)
+        val endCool = intArrayOf(0x10, 0x08, 0x3A, 0x66)
+        
+        // Warm bottom colors
+        val startWarm = intArrayOf(0x3A, 0x10, 0x08, 0x55)
+        val endWarm = intArrayOf(0x3A, 0x20, 0x08, 0x66)
+        
+        // Interpolated argb colors
+        val topR = (startCool[0] + (startWarm[0] - startCool[0]) * clamped).toInt()
+        val topG = (startCool[1] + (startWarm[1] - startCool[1]) * clamped).toInt()
+        val topB = (startCool[2] + (startWarm[2] - startCool[2]) * clamped).toInt()
+        val topA = (startCool[3] + (startWarm[3] - startCool[3]) * clamped).toInt()
+        
+        val bottomR = (endCool[0] + (endWarm[0] - endCool[0]) * clamped).toInt()
+        val bottomG = (endCool[1] + (endWarm[1] - endCool[1]) * clamped).toInt()
+        val bottomB = (endCool[2] + (endWarm[2] - endCool[2]) * clamped).toInt()
+        val bottomA = (endCool[3] + (endWarm[3] - endCool[3]) * clamped).toInt()
+        
+        val topColor = Color.argb(topA, topR, topG, topB)
+        val bottomColor = Color.argb(bottomA, bottomR, bottomG, bottomB)
+        
+        val gd = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(topColor, bottomColor)
+        )
+        overlay.background = gd
     }
 
     private var cachedChapter: List<SpanDisplay> = emptyList()
@@ -918,67 +969,24 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
     }*/
     private fun showFonts() {
-        val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
-        val dialogView = layoutInflater.inflate(R.layout.font_bottom_sheet, null)
-        bottomSheetDialog.setContentView(dialogView)
-
-        val res = dialogView.findViewById<RecyclerView>(R.id.sort_click)!!
-        val addButton = dialogView.findViewById<android.widget.Button>(R.id.add_custom_font)
-
-        addButton?.setOnClickListener {
-            bottomSheetDialog.dismiss()
-            selectFontLauncher.launch("*/*")
-        }
-
-        val customFontsFolder = java.io.File(filesDir, "fonts")
-        val customFonts = if (customFontsFolder.exists()) customFontsFolder.listFiles() ?: emptyArray<java.io.File>() else emptyArray<java.io.File>()
-        val fonts = customFonts + systemFonts
-        val items = listOf(FontFile(null)) + fonts.map { FontFile(it) }
-
-        val currentName = viewModel.textFont ?: ""
-        val storingIndex = items.indexOfFirst { (it.file?.name ?: "") == currentName }
-
-        val adapter = FontAdapter(
-            this, 
-            storingIndex,
-            clickCallback = { file ->
-                viewModel.textFont = file.file?.name ?: ""
-                bottomSheetDialog.dismiss()
+        val currentFontName = viewModel.textFont ?: ""
+        val sheet = com.lagradost.quicknovel.ui.reader.FontPickerBottomSheet.newInstance(
+            currentFontName,
+            binding.readNormalLayout.id
+        )
+        sheet.setListeners(
+            onFontSelected = { fontFile ->
+                viewModel.textFont = fontFile.file?.name ?: ""
             },
-            deleteCallback = { file ->
-                file.file?.delete()
+            onDeleteFont = { fontFile ->
+                fontFile.file?.delete()
                 showToast("Font deleted")
-                bottomSheetDialog.dismiss()
-                showFonts()
+            },
+            onAddCustomFont = {
+                selectFontLauncher.launch("*/*")
             }
         )
-        res.adapter = adapter
-        adapter.submitIncomparableList(items)
-        res.scrollToPosition(storingIndex)
-
-        // Background scaling and blur
-        val activityBinding = this.binding
-        val backgroundView = activityBinding.readNormalLayout
-        val behavior = bottomSheetDialog.behavior
-        // Crucial fix: Reset scaling when dismissed regardless of how it's closed
-        bottomSheetDialog.setOnDismissListener {
-            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-        }
-
-        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
-                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
-                    newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
-                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                }
-            }
-            override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
-                com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
-            }
-        })
-
-        bottomSheetDialog.show()
-        bottomSheetDialog.applyGlassStyle()
+        sheet.show(supportFragmentManager, "font_picker")
     }
 
     private fun saveCustomFont(uri: android.net.Uri) {
@@ -1096,6 +1104,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
     override fun onDestroy() {
         viewModel.stopTTS()
+        batteryReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                // ignore
+            }
+            batteryReceiver = null
+        }
         super.onDestroy()
     }
 
@@ -1121,6 +1137,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         updateGlobalBackground()
         updateGlobalAura()
+        updateReaderInkFlow(0f)
         PreferenceManager.getDefaultSharedPreferences(this)
             .registerOnSharedPreferenceChangeListener { _, key ->
                 if (key == getString(R.string.background_image_key) ||
@@ -1142,6 +1159,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     key == LUMINESCENT_INTENSITY
                 ) {
                     updateGlobalAura()
+                }
+                if (key == com.lagradost.quicknovel.ui.theme.VibePrefs.PREMIUM_VISUALS_ENABLED ||
+                    key == com.lagradost.quicknovel.ui.theme.VibePrefs.READER_INK_FLOW
+                ) {
+                    updateReaderInkFlow(0f)
                 }
             }
 
@@ -1357,22 +1379,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     downloadProgressDialog?.dismiss()
                     downloadProgressDialog = null
 
-                    // Only show restart dialog if a new model was actually applied/downloaded
                     if (resource.value == "Model applied") {
-                        com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AlertDialogCustom)
-                            .setTitle(R.string.restart_required)
-                            .setMessage(R.string.restart_ml_message)
-                            .setPositiveButton(R.string.restart) { _, _ ->
-                                val intent = Intent(this, MainActivity::class.java)
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                startActivity(intent)
-                                Runtime.getRuntime().exit(0)
-                            }
-                            .setNegativeButton(R.string.later, null)
-                            .setOnDismissListener {
-                                com.lagradost.quicknovel.util.DrawerHelper.resetScaling(binding.readNormalLayout)
-                            }
-                            .show()
+                        CommonActivity.showToast(this, "Translation model loaded successfully!")
                     }
                 }
             }
@@ -1418,65 +1426,18 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         observe(viewModel.chaptersTitles) { titles ->
             binding.readActionChapters.setOnClickListener {
-                val currentChapter = viewModel.desiredIndex?.index
-                val validChapter = currentChapter != null && currentChapter >= 0 && currentChapter < titles.size
+                val currentChapter = viewModel.desiredIndex?.index ?: -1
+                val titlesList = ArrayList(titles.map { it.asString(this) })
                 
-                val bottomSheetDialog = BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
-                val dialogBinding = com.lagradost.quicknovel.databinding.ReadBottomChaptersBinding.inflate(layoutInflater, null, false)
-                bottomSheetDialog.setContentView(dialogBinding.root)
-
-                dialogBinding.readChaptersTitle.text = if (validChapter) {
-                    titles[currentChapter!!].asString(this)
-                } else {
-                    getString(R.string.select_chapter)
-                }
-
-                val arrayAdapter = object : ArrayAdapter<String>(this, R.layout.chapter_select_dialog) {
-                    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                        val view = super.getView(position, convertView, parent) as TextView
-                        if (position == currentChapter) {
-                            view.setTypeface(null, android.graphics.Typeface.BOLD)
-                            view.setTextColor(colorFromAttribute(R.attr.colorPrimary))
-                        } else {
-                            view.setTypeface(null, android.graphics.Typeface.NORMAL)
-                            view.setTextColor(viewModel.textColor)
-                        }
-                        return view
-                    }
-                }
-                arrayAdapter.addAll(titles.map { it.asString(this) })
-                dialogBinding.readChaptersList.adapter = arrayAdapter
-                
-                if (validChapter) {
-                    dialogBinding.readChaptersList.setSelection(currentChapter!!)
-                }
-
-                dialogBinding.readChaptersList.setOnItemClickListener { _, _, which, _ ->
+                val sheet = com.lagradost.quicknovel.ui.reader.ChapterListBottomSheet.newInstance(
+                    titlesList,
+                    currentChapter,
+                    binding.readNormalLayout.id
+                )
+                sheet.setOnChapterSelectedListener { which ->
                     viewModel.seekToChapter(which)
-                    bottomSheetDialog.dismiss()
                 }
-
-                // Background scaling animation
-                val backgroundView = binding.readNormalLayout
-                val behavior = bottomSheetDialog.behavior
-                
-                // Crucial fix: Reset scaling when dismissed regardless of how it's closed
-                bottomSheetDialog.setOnDismissListener {
-                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                }
-
-                behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
-                    override fun onStateChanged(bottomSheet: View, newState: Int) {
-                        if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
-                            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                        }
-                    }
-                    override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                        com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
-                    }
-                })
-
-                bottomSheetDialog.show()
+                sheet.show(supportFragmentManager, "chapter_list")
             }
         }
 
@@ -1610,10 +1571,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
                 override fun onChildViewAttachedToWindow(view: View) {
                     val settingsManager = PreferenceManager.getDefaultSharedPreferences(this@ReadActivity2)
-                    val lEnabled = settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
+                    val performanceMode = settingsManager.getBoolean("performance_mode_enabled", false)
+                    val lEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
                     if (lEnabled) {
                         val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
-                        val gEnabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
+                        val gEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.living_glass_key), false)
                         applyLuminescenceToView(view, lEnabled, lIntensity, gEnabled)
                     }
                 }
@@ -1756,9 +1718,159 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             hideSystemUI()
             
             val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
-            val binding = ReadBottomSettingsBinding.inflate(layoutInflater, null, false)
-            bottomSheetDialog.setContentView(binding.root)
-            
+            bottomSheetDialog.behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            bottomSheetDialog.behavior.isDraggable = false
+            val composeView = androidx.compose.ui.platform.ComposeView(this).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                setContent {
+                    com.lagradost.quicknovel.ui.theme.QuickNovelTheme {
+                        com.lagradost.quicknovel.ui.reader.ReaderSettingsSheet(
+                            viewModel = viewModel,
+                            onHardReset = {
+                                showToast(getString(R.string.reload_chapter_format).format(""))
+                                viewModel.reloadChapter()
+                            },
+                            onShowAliases = { showAliasManagementDialog() },
+                            onReadingTypeClick = {
+                                val items = ReadingType.entries.toTypedArray()
+                                val displayItems = ArrayList(items.map { getString(it.stringRes) })
+                                val currentIndex = items.indexOf(viewModel.readerType)
+
+                                val sheet = com.lagradost.quicknovel.ui.reader.OptionsSelectionBottomSheet.newInstance(
+                                    getString(R.string.scroll_type),
+                                    displayItems,
+                                    currentIndex,
+                                    this@ReadActivity2.binding.readNormalLayout.id
+                                )
+                                sheet.setOnItemSelectedListener { which ->
+                                    viewModel.readerType = items[which]
+                                }
+                                sheet.show(supportFragmentManager, "reading_type")
+                            },
+                            onShowFonts = { showFonts() },
+                            onLanguageClick = {
+                                ioSafe {
+                                    viewModel.ttsSession.requireEngine({ tts ->
+                                        runOnUiThread {
+                                            val voices = tts.getVoices()
+                                            val languages = mutableListOf<java.util.Locale?>(null).apply {
+                                                addAll(voices.map { it.locale }.distinct().sortedBy { it.displayName })
+                                            }
+                                            val currentVoiceName = tts.getCurrentVoiceName()
+                                            val currentVoice = voices.find { it.name == currentVoiceName }
+                                            val currentIndex = if (currentVoice != null) languages.indexOf(currentVoice.locale) else 0
+                                            
+                                            this@ReadActivity2.showDialog(
+                                                languages.map { it?.displayName ?: getString(R.string.default_text) },
+                                                currentIndex,
+                                                getString(R.string.tts_locale), false, {}
+                                            ) { index ->
+                                                viewModel.setTTSVoice(null)
+                                            }
+                                        }
+                                    }, action = { false })
+                                }
+                            },
+                            onVoiceClick = {
+                                ioSafe {
+                                    viewModel.ttsSession.requireEngine({ tts ->
+                                        runOnUiThread {
+                                            val allVoices = tts.getVoices()
+                                            val currentVoiceName = tts.getCurrentVoiceName()
+                                            val matchAgainst = allVoices.find { it.name == currentVoiceName }?.locale
+                                            val voices = mutableListOf<Pair<String, com.lagradost.quicknovel.EngineVoice?>>(getString(R.string.default_text) to null).apply {
+                                                val filtered = if (matchAgainst == null) allVoices else allVoices.filter { it.locale == matchAgainst }
+                                                addAll(filtered.map { ("${it.name} ${if (it.isNetworkRequired) "(☁)" else ""}") to it }.sortedBy { (name, _) -> name })
+                                            }
+                                            val selectedIndex = if (currentVoiceName != null) voices.indexOfFirst { it.second?.name == currentVoiceName }.takeIf { it != -1 } ?: 0 else 0
+                                            this@ReadActivity2.showDialog(
+                                                voices.map { it.first },
+                                                selectedIndex,
+                                                getString(R.string.tts_locale), false, {}
+                                            ) { index ->
+                                                val voice = voices.getOrNull(index)?.second
+                                                viewModel.setTTSVoice(voice?.name)
+                                            }
+                                        }
+                                    }, action = { false })
+                                }
+                            },
+                            onSleepTimerClick = {
+                                val items = mutableListOf(getString(R.string.default_text) to 0L)
+                                for (i in 1L..120L) items.add(getString(R.string.sleep_format).format(i.toInt()) to (i * 60000L))
+                                this@ReadActivity2.showDialog(
+                                    items.mapNotNull { it.first },
+                                    items.map { it.second }.indexOf(viewModel.ttsTimer),
+                                    getString(R.string.sleep_timer), false, {}
+                                ) { index ->
+                                    if (index >= 0 && index < items.size) viewModel.ttsTimer = items[index].second
+                                }
+                            },
+                            onMlFromClick = {
+                                val items = ReadActivityViewModel.MLSettings.list
+                                this@ReadActivity2.showDialog(
+                                    items.map { it.second },
+                                    items.map { it.first }.indexOf(viewModel.mlFromLanguage),
+                                    getString(R.string.sleep_timer), false, {}
+                                ) { index ->
+                                    viewModel.mlFromLanguage = items[index].first
+                                }
+                            },
+                            onMlToClick = {
+                                val items = ReadActivityViewModel.MLSettings.list
+                                this@ReadActivity2.showDialog(
+                                    items.map { it.second },
+                                    items.map { it.first }.indexOf(viewModel.mlToLanguage),
+                                    getString(R.string.sleep_timer), false, {}
+                                ) { index ->
+                                    viewModel.mlToLanguage = items[index].first
+                                }
+                            },
+                            onApplyTranslationClick = {
+                                viewModel.applyMLSettings(true)
+                                bottomSheetDialog.dismiss()
+                            },
+                            onMlInfoClick = {
+                                com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ReadActivity2, R.style.AlertDialogCustom)
+                                    .setTitle(R.string.ml_info_title)
+                                    .setMessage(R.string.ml_info_text)
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show()
+                            },
+                            onColorCustomClick = {
+                                val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ReadActivity2, R.style.AlertDialogCustom)
+                                builder.setTitle(getString(R.string.reading_color))
+                                val colorAdapter = ArrayAdapter<String>(this@ReadActivity2, R.layout.chapter_select_dialog)
+                                colorAdapter.addAll(arrayListOf(getString(R.string.background_color), getString(R.string.text_color)))
+                                builder.setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss(); updateImages() }
+                                builder.setAdapter(colorAdapter) { _, which ->
+                                    ColorPickerDialog.newBuilder()
+                                        .setDialogId(which)
+                                        .setColor(when (which) { 0 -> viewModel.backgroundColor; 1 -> viewModel.textColor; else -> 0 })
+                                        .show(this@ReadActivity2)
+                                }
+                                builder.show().applyGlassStyle()
+                                updateImages()
+                            },
+                            onColorSelect = { bg, txt ->
+                                viewModel.backgroundColor = bg
+                                viewModel.textColor = txt
+                                updateImages()
+                                if (viewModel.premiumAnimations) this@ReadActivity2.binding.readerLivingGlass.flare()
+                            }
+                        )
+                    }
+                }
+            }
+            composeView.setViewTreeLifecycleOwner(this@ReadActivity2)
+            composeView.setViewTreeViewModelStoreOwner(this@ReadActivity2)
+            composeView.setViewTreeSavedStateRegistryOwner(this@ReadActivity2)
+            bottomSheetDialog.setContentView(composeView)
+
             // Background scaling animation using activity outer binding
             val activityBinding = this@ReadActivity2.binding
             val backgroundView = activityBinding.readNormalLayout
@@ -1766,575 +1878,20 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             
             // Crucial fix: Reset scaling when dismissed regardless of how it's closed
             bottomSheetDialog.setOnDismissListener {
-                DrawerHelper.resetScaling(backgroundView)
+                com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
             }
 
             behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
                 override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
                     if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN || 
                         newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
-                        DrawerHelper.resetScaling(backgroundView)
+                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
                     }
                 }
                 override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
-                    DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                    com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
                 }
             })
-
-            bottomSheetDialog.show()
-            bottomSheetDialog.applyGlassStyle()
-
-
-
-            binding.readSettingsCharacterAliases.setOnClickListener {
-                showAliasManagementDialog()
-            }
-
-            binding.readReadingType.setText(viewModel.readerType.stringRes)
-            binding.readReadingType.setOnLongClickListener {
-                it.popupMenu(items = listOf(1 to R.string.reset_value), selectedItemId = null) {
-                    if (itemId == 1) {
-                        binding.readReadingType.setText(ReadingType.DEFAULT.stringRes)
-                        viewModel.readerType = ReadingType.DEFAULT
-                    }
-                }
-                return@setOnLongClickListener true
-            }
-            binding.readReadingType.setOnClickListener {
-                val items = ReadingType.entries.toTypedArray()
-                val displayItems = items.map { getString(it.stringRes) }
-                val currentIndex = items.indexOf(viewModel.readerType)
-
-                val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
-                val scrollBinding = com.lagradost.quicknovel.databinding.ReadBottomChaptersBinding.inflate(layoutInflater, null, false)
-                bottomSheetDialog.setContentView(scrollBinding.root)
-                
-                scrollBinding.readChaptersTitle.text = getString(R.string.scroll_type)
-                
-                val arrayAdapter = object : ArrayAdapter<String>(this, R.layout.chapter_select_dialog, displayItems) {
-                    override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
-                        val view = super.getView(position, convertView, parent) as android.widget.TextView
-                        view.setTextColor(viewModel.textColor)
-                        return view
-                    }
-                }
-                
-                scrollBinding.readChaptersList.adapter = arrayAdapter
-                scrollBinding.readChaptersList.setOnItemClickListener { _, _, which, _ ->
-                    val set = items[which]
-                    binding.readReadingType.setText(set.stringRes)
-                    viewModel.readerType = set
-                    bottomSheetDialog.dismiss()
-                }
-
-                // Background scaling animation
-                val activityBinding = this@ReadActivity2.binding
-                val backgroundView = activityBinding.readNormalLayout
-                val behavior = bottomSheetDialog.behavior
-                
-                // Crucial fix: Reset scaling when dismissed regardless of how it's closed
-                bottomSheetDialog.setOnDismissListener {
-                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                }
-
-                behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
-                    override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
-                        if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN || 
-                            newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
-                            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                        }
-                    }
-                    override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
-                        com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
-                    }
-                })
-
-                bottomSheetDialog.show()
-                bottomSheetDialog.applyGlassStyle()
-            }
-
-            binding.readSettingsTextSizeText.setOnClickListener {
-                it.popupMenu(items = listOf(1 to R.string.reset_value), selectedItemId = null) {
-                    if (itemId == 1) {
-                        viewModel.textSize = DEF_FONT_SIZE
-                        binding.readSettingsTextSize.setValueRounded(
-                            DEF_FONT_SIZE.toFloat()
-                        )
-                    }
-                }
-            }
-
-            binding.readSettingsTextSize.apply {
-                valueSuffix = "pt"
-                valueTo = 30.0f
-                valueFrom = 10.0f
-                setValueRounded((viewModel.textSize).toFloat())
-                setOnValueChangeListener { _, value, fromUser ->
-                    viewModel.textSize = value.roundToInt()
-                    UsageStatsManager.incrementCustomization(this@ReadActivity2)
-                }
-            }
-
-            binding.readSettingsTtsPitchText.setOnClickListener {
-                it.popupMenu(
-                    items = listOf(1 to R.string.reset_value),
-                    selectedItemId = null
-                ) {
-                    if (itemId == 1) {
-                        viewModel.ttsPitch = 1.0f
-                        binding.readSettingsTtsPitch.setValueRounded(viewModel.ttsPitch)
-                    }
-                }
-            }
-
-            binding.readSettingsTtsSpeedText.setOnClickListener {
-                it.popupMenu(
-                    items = listOf(1 to R.string.reset_value),
-                    selectedItemId = null
-                ) {
-                    if (itemId == 1) {
-                        viewModel.ttsSpeed = 1.0f
-                        binding.readSettingsTtsSpeed.setValueRounded(viewModel.ttsSpeed)
-                    }
-                }
-            }
-
-            binding.readSettingsTextVerticalPaddingText.setOnClickListener {
-                it.popupMenu(
-                    items = listOf(1 to R.string.reset_value),
-                    selectedItemId = null
-                ) {
-                    if (itemId == 1) {
-                        viewModel.textVerticalPadding = 7.5f
-                        binding.readSettingsTextVerticalPadding.setValueRounded(viewModel.textVerticalPadding)
-                    }
-                }
-            }
-
-            binding.readSettingsTtsPitch.apply {
-                valueSuffix = "x"
-                setValueRounded(viewModel.ttsPitch)
-                setOnValueChangeListener { _, value, fromUser ->
-                    viewModel.ttsPitch = value
-                }
-            }
-
-            binding.readSettingsTtsSpeed.apply {
-                valueSuffix = "x"
-                setValueRounded(viewModel.ttsSpeed)
-                setOnValueChangeListener { _, value, fromUser ->
-                    viewModel.ttsSpeed = value
-                }
-            }
-
-            binding.readSettingsTextPaddingText.setOnClickListener {
-                it.popupMenu(
-                    items = listOf(1 to R.string.reset_value),
-                    selectedItemId = null
-                ) {
-                    if (itemId == 1) {
-                        viewModel.paddingHorizontal = DEF_HORIZONTAL_PAD
-                        binding.readSettingsTextPadding.setValueRounded(DEF_HORIZONTAL_PAD.toFloat())
-                    }
-                }
-            }
-
-            binding.readSettingsTextPaddingTextTop.setOnClickListener {
-                it.popupMenu(
-                    items = listOf(1 to R.string.reset_value),
-                    selectedItemId = null
-                ) {
-                    if (itemId == 1) {
-                        viewModel.paddingVertical = DEF_VERTICAL_PAD
-                        binding.readSettingsTextPaddingTop.setValueRounded(DEF_VERTICAL_PAD.toFloat())
-                    }
-                }
-            }
-
-            binding.readSettingsTextPadding.apply {
-                valueSuffix = "px"
-                valueTo = 50.0f
-                setValueRounded(viewModel.paddingHorizontal.toFloat())
-                setOnValueChangeListener { _, value, fromUser ->
-                    viewModel.paddingHorizontal = value.roundToInt()
-                }
-            }
-
-            binding.readSettingsTextPaddingTop.apply {
-                valueSuffix = "px"
-                valueTo = 50.0f
-                setValueRounded(viewModel.paddingVertical.toFloat())
-                setOnValueChangeListener { _, value, fromUser ->
-                    viewModel.paddingVertical = value.roundToInt()
-                }
-            }
-
-            binding.readSettingsTextVerticalPadding.apply {
-                valueSuffix = "px"
-                setValueRounded(viewModel.textVerticalPadding)
-                setOnValueChangeListener { _, value, fromUser ->
-                    viewModel.textVerticalPadding = value
-                }
-            }
-
-
-            binding.readSettingsUseGoogle.apply {
-                isChecked = viewModel.ttsUseGoogle
-                setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.ttsUseGoogle = isChecked
-                }
-            }
-
-
-            viewModel.ttsUseGoogleLive.observe(this) {
-                binding.readSettingsUseGoogle.isChecked = it == true
-            }
-
-            binding.readShowFonts.apply {
-                //text = UIHelper.parseFontFileName(getKey(EPUB_FONT))
-                setOnClickListener {
-                    showFonts()
-                }
-            }
-
-            binding.readSettingsTextFontText.setOnClickListener {
-                it.popupMenu(items = listOf(1 to R.string.reset_value), selectedItemId = null) {
-                    if (itemId == 1) {
-                        viewModel.textFont = ""
-                    }
-                }
-            }
-
-            binding.readMlTo.setOnClickListener { view ->
-                if (view == null) return@setOnClickListener
-                val context = view.context
-
-                val items = ReadActivityViewModel.MLSettings.list
-
-                context.showDialog(
-                    items.map {
-                        it.second
-                    },
-                    items.map { it.first }.indexOf(viewModel.mlToLanguage),
-                    context.getString(R.string.sleep_timer), false, {
-                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                    }
-                ) { index ->
-                    viewModel.mlToLanguage = items[index].first
-                    binding.readMlTo.text =
-                        ReadActivityViewModel.MLSettings.fromShortToDisplay(viewModel.mlToLanguage)
-                }
-            }
-
-            binding.readMlFrom.setOnClickListener { view ->
-                if (view == null) return@setOnClickListener
-                val context = view.context
-
-                val items = ReadActivityViewModel.MLSettings.list
-
-                context.showDialog(
-                    items.map {
-                        it.second
-                    },
-                    items.map { it.first }.indexOf(viewModel.mlFromLanguage),
-                    context.getString(R.string.sleep_timer), false, {
-                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                    }
-                ) { index ->
-                    viewModel.mlFromLanguage = items[index].first
-                    binding.readMlFrom.text =
-                        ReadActivityViewModel.MLSettings.fromShortToDisplay(viewModel.mlFromLanguage)
-                }
-            }
-
-
-            binding.readApplyTranslation.setOnClickListener { _ ->
-                viewModel.applyMLSettings(true)
-                bottomSheetDialog.dismiss()
-            }
-
-            binding.readMlInfoBtn.setOnClickListener {
-                com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ReadActivity2, R.style.AlertDialogCustom)
-                    .setTitle(R.string.ml_info_title)
-                    .setMessage(R.string.ml_info_text)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .setOnDismissListener {
-                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                    }
-                    .show()
-            }
-
-            binding.readMlTo.text =
-                ReadActivityViewModel.MLSettings.fromShortToDisplay(viewModel.mlToLanguage)
-            binding.readMlFrom.text =
-                ReadActivityViewModel.MLSettings.fromShortToDisplay(viewModel.mlFromLanguage)
-
-            val mlSettings = viewModel.mlSettings
-
-            binding.readMlTitle.text = if (viewModel.isTranslationActive) {
-                "${getString(R.string.google_ml)} (${mlSettings.fromDisplay} -> ${mlSettings.toDisplay})"
-            } else {
-                getString(R.string.google_ml)
-            }
-
-            binding.readLanguage.setOnClickListener { _ ->
-                ioSafe {
-                    viewModel.ttsSession.requireEngine({ tts ->
-                        runOnUiThread {
-                            val voices = tts.getVoices()
-                            val languages = mutableListOf<Locale?>(null).apply {
-                                val allLocales = voices.map { it.locale }.distinct().sortedBy { it.displayName }
-                                addAll(allLocales)
-                            }
-                            val currentVoiceName = tts.getCurrentVoiceName()
-                            val currentVoice = voices.find { it.name == currentVoiceName }
-                            val ctx = binding.readLanguage.context ?: return@runOnUiThread
-                            
-                            val currentIndex = if (currentVoice != null) languages.indexOf(currentVoice.locale) else 0
-                            
-                            ctx.showDialog(
-                                languages.map {
-                                    it?.displayName ?: ctx.getString(R.string.default_text)
-                                },
-                                currentIndex,
-                                ctx.getString(R.string.tts_locale), false, {
-                                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                                }
-                            ) { index ->
-                                viewModel.setTTSVoice(null)
-                            }
-                        }
-                    }, action = { false })
-                }
-            }
-
-            binding.readLanguage.setOnLongClickListener {
-                it.popupMenu(items = listOf(1 to R.string.reset_value), selectedItemId = null) {
-                    if (itemId == 1) {
-                        viewModel.setTTSVoice(null)
-                    }
-                }
-
-                return@setOnLongClickListener true
-            }
-
-            binding.readVoice.setOnLongClickListener {
-                it.popupMenu(items = listOf(1 to R.string.reset_value), selectedItemId = null) {
-                    if (itemId == 1) {
-                        viewModel.setTTSVoice(null)
-                    }
-                }
-
-                return@setOnLongClickListener true
-            }
-
-            binding.readSleepTimer.setOnClickListener { view ->
-                if (view == null) return@setOnClickListener
-                val context = view.context
-
-                val items =
-                    mutableListOf(
-                        context.getString(R.string.default_text) to 0L,
-                    )
-
-                for (i in 1L..120L) {
-                    items.add(
-                        context.getString(R.string.sleep_format).format(i.toInt()) to (i * 60000L)
-                    )
-                }
-
-                context.showDialog(
-                    items.mapNotNull { it.first },
-                    items.map { it.second }.indexOf(viewModel.ttsTimer),
-                    context.getString(R.string.sleep_timer), false, {
-                        try {
-                            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                        } catch (e: Exception) {}
-                    }
-                ) { index ->
-                    if (index >= 0 && index < items.size) {
-                        viewModel.ttsTimer = items[index].second
-                    }
-                }
-            }
-
-            binding.readVoice.setOnClickListener {
-                ioSafe {
-                    viewModel.ttsSession.requireEngine({ tts ->
-                        runOnUiThread {
-                            val allVoices = tts.getVoices()
-                            val currentVoiceName = tts.getCurrentVoiceName()
-                            val matchAgainst = allVoices.find { it.name == currentVoiceName }?.locale
-                            val ctx = binding.readVoice.context ?: return@runOnUiThread
-                            val voices =
-                                mutableListOf<Pair<String, EngineVoice?>>(ctx.getString(R.string.default_text) to null).apply {
-                                    val filtered = if (matchAgainst == null) {
-                                        allVoices
-                                    } else {
-                                        allVoices.filter { it.locale == matchAgainst }
-                                    }
-
-                                    val mapped = filtered.map {
-                                        ("${it.name} ${
-                                            if (it.isNetworkRequired) {
-                                                "(☁)"
-                                            } else {
-                                                ""
-                                            }
-                                        }") to it
-                                    }
-
-                                    addAll(mapped.sortedBy { (name, _) -> name })
-                                }
-
-                            val selectedIndex = if (currentVoiceName != null) {
-                                voices.indexOfFirst { it.second?.name == currentVoiceName }.takeIf { it != -1 } ?: 0
-                            } else 0
-
-                            ctx.showDialog(
-                                voices.map { it.first },
-                                selectedIndex,
-                                ctx.getString(R.string.tts_locale), false, {
-                                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                                }
-                            ) { index ->
-                                val voice = voices.getOrNull(index)?.second
-                                viewModel.setTTSVoice(voice?.name)
-                            }
-                        }
-                    }, action = { false })
-                }
-            }
-
-            binding.apply {
-                hardResetStream.isVisible = viewModel.canReload()
-                hardResetStream.setOnClickListener {
-                    showToast(getString(R.string.reload_chapter_format).format(""))
-                    viewModel.reloadChapter()
-                }
-
-                readSettingsScrollVol.isChecked = viewModel.scrollWithVolume
-                readSettingsScrollVol.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.scrollWithVolume = isChecked
-                }
-
-                readSettingsAuthorNotes.isChecked = viewModel.authorNotes
-                readSettingsAuthorNotes.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.authorNotes = isChecked
-                    viewModel.refreshChapters()
-                }
-
-                readSettingsShowBionic.isChecked = viewModel.bionicReading
-                readSettingsShowBionic.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.bionicReading = isChecked
-                }
-
-                readSettingsIsTextSelectable.isChecked = viewModel.isTextSelectable
-                readSettingsIsTextSelectable.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.isTextSelectable = isChecked
-                }
-
-                readSettingsLockTts.isChecked = viewModel.ttsLock
-                readSettingsLockTts.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.ttsLock = isChecked
-                }
-
-                readSettingsShowTime.isChecked = viewModel.showTime
-                readSettingsShowTime.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.showTime = isChecked
-                }
-
-                //readSettingsTwelveHourTime.isChecked = viewModel.time12H
-                //readSettingsTwelveHourTime.setOnCheckedChangeListener { _, isChecked ->
-                //    viewModel.time12H = isChecked
-                //}
-
-                readSettingsShowBattery.isChecked = viewModel.showBattery
-                readSettingsShowBattery.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.showBattery = isChecked
-                }
-
-                readSettingsShowProgress.isChecked = viewModel.showReaderProgress
-                readSettingsShowProgress.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.showReaderProgress = isChecked
-                }
-
-                readSettingsKeepScreenActive.setOnCheckedChangeListener { _, isChecked ->
-                    viewModel.screenAwake = isChecked
-                }
-                
-
-            }
-
-            val bgColors = resources.getIntArray(R.array.readerBgColors)
-            val textColors = resources.getIntArray(R.array.readerTextColors)
-
-            imageHolder = binding.readSettingsColors
-            for ((newBgColor, newTextColor) in bgColors zip textColors) {
-                ColorRoundCheckmarkBinding.inflate(
-                    layoutInflater,
-                    binding.readSettingsColors,
-                    true
-                ).image1.apply {
-                    backgroundTintList = ColorStateList.valueOf(newBgColor)
-                    //foregroundTintList = ColorStateList.valueOf(newTextColor)
-                    setOnClickListener {
-                        viewModel.backgroundColor = newBgColor
-                        viewModel.textColor = newTextColor
-                        updateImages()
-                        if (viewModel.premiumAnimations) this@ReadActivity2.binding.readerLivingGlass.flare()
-                    }
-                }
-            }
-
-            ColorRoundCheckmarkBinding.inflate(
-                layoutInflater,
-                binding.readSettingsColors,
-                true
-            ).image1.apply {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    foreground =
-                        ContextCompat.getDrawable(this.context, R.drawable.ic_baseline_add_24)
-                }
-
-                setOnClickListener {
-                    val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this.context, R.style.AlertDialogCustom)
-                    builder.setTitle(getString(R.string.reading_color))
-                    builder.setOnDismissListener {
-                        com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                    }
-
-                    val colorAdapter =
-                        ArrayAdapter<String>(this.context, R.layout.chapter_select_dialog)
-                    val array = arrayListOf(
-                        getString(R.string.background_color),
-                        getString(R.string.text_color)
-                    )
-                    colorAdapter.addAll(array)
-
-                    builder.setPositiveButton(R.string.ok) { dialog, _ ->
-                        dialog.dismiss()
-                        updateImages()
-                    }
-
-                    builder.setAdapter(colorAdapter) { _, which ->
-                        ColorPickerDialog.newBuilder()
-                            .setDialogId(which)
-                            .setColor(
-                                when (which) {
-                                    0 -> viewModel.backgroundColor
-                                    1 -> viewModel.textColor
-                                    else -> 0
-                                }
-                            )
-                            .show(readActivity ?: return@setAdapter)
-                    }
-
-                    builder.show().applyGlassStyle()
-                    updateImages()
-                }
-            }
-            updateImages()
 
             bottomSheetDialog.show()
             bottomSheetDialog.applyGlassStyle()
@@ -2342,170 +1899,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private fun showAliasManagementDialog() {
-        val backgroundView = binding.readNormalLayout
-        val currentAliases = viewModel.aliases.value ?: emptyMap()
-        val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
-        val dialogBinding = com.lagradost.quicknovel.databinding.ReadBottomAliasesBinding.inflate(layoutInflater, null, false)
-        bottomSheetDialog.setContentView(dialogBinding.root)
-
-        dialogBinding.readAliasesTitle.text = getString(R.string.character_aliases)
-        dialogBinding.readAddAliasBtn.setOnClickListener {
-            showAddAliasDialog()
-            bottomSheetDialog.dismiss()
-        }
-
-        if (currentAliases.isEmpty()) {
-            dialogBinding.readAliasesEmptyText.visibility = android.view.View.VISIBLE
-            dialogBinding.readAliasesList.visibility = android.view.View.GONE
-        } else {
-            dialogBinding.readAliasesEmptyText.visibility = android.view.View.GONE
-            dialogBinding.readAliasesList.visibility = android.view.View.VISIBLE
-            
-            val items = currentAliases.keys.toTypedArray()
-            val displayItems = items.map { "$it -> ${currentAliases[it]}" }.toTypedArray()
-            
-            val arrayAdapter = object : ArrayAdapter<String>(this, R.layout.chapter_select_dialog, displayItems) {
-                override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
-                    val view = super.getView(position, convertView, parent) as android.widget.TextView
-                    view.setTextColor(viewModel.textColor)
-                    view.textSize = 16f
-                    return view
-                }
-            }
-            dialogBinding.readAliasesList.adapter = arrayAdapter
-            dialogBinding.readAliasesList.setOnItemClickListener { _, _, which, _ ->
-                val key = items[which]
-                val options = arrayOf(getString(R.string.edit_alias), getString(R.string.delete_alias))
-                
-                val optionsDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this@ReadActivity2, R.style.BottomSheetDrawerTheme)
-                val optionsBinding = com.lagradost.quicknovel.databinding.ReadBottomChaptersBinding.inflate(layoutInflater, null, false)
-                optionsDialog.setContentView(optionsBinding.root)
-                
-                optionsBinding.readChaptersTitle.text = key
-                
-                val optAdapter = object : ArrayAdapter<String>(this@ReadActivity2, R.layout.chapter_select_dialog, options) {
-                    override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
-                        val v = super.getView(position, convertView, parent) as android.widget.TextView
-                        v.setTextColor(viewModel.textColor)
-                        return v
-                    }
-                }
-                
-                optionsBinding.readChaptersList.adapter = optAdapter
-                optionsBinding.readChaptersList.setOnItemClickListener { _, _, optIdx, _ ->
-                    if (optIdx == 0) {
-                        showAddAliasDialog(key, currentAliases[key])
-                        optionsDialog.dismiss()
-                        bottomSheetDialog.dismiss()
-                    } else {
-                        viewModel.removeAlias(key)
-                        optionsDialog.dismiss()
-                        showAliasManagementDialog()
-                        bottomSheetDialog.dismiss()
-                    }
-                }
-
-                // Background scaling and blur
-                val behavior2 = optionsDialog.behavior
-                
-                // Crucial fix: Reset scaling when dismissed regardless of how it's closed
-                optionsDialog.setOnDismissListener {
-                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                }
-
-                behavior2.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
-                    override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
-                        if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
-                            newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
-                            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                        }
-                    }
-                    override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
-                        com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
-                    }
-                })
-
-                optionsDialog.show()
-                optionsDialog.applyGlassStyle()
-            }
-        }
-
-        // Background scaling and blur animation
-        val behavior = bottomSheetDialog.behavior
-        
-        // Crucial fix: Reset scaling when dismissed regardless of how it's closed
-        bottomSheetDialog.setOnDismissListener {
-            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-        }
-
-        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
-                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
-                    newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
-                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                }
-            }
-            override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
-                com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
-            }
-        })
-
-        bottomSheetDialog.show()
-        bottomSheetDialog.applyGlassStyle()
-    }
-
-
-    private fun showAddAliasDialog(editKey: String? = null, editValue: String? = null) {
-        val backgroundView = binding.readNormalLayout
-        val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
-        val dialogBinding = com.lagradost.quicknovel.databinding.ReadBottomAddAliasBinding.inflate(layoutInflater, null, false)
-        bottomSheetDialog.setContentView(dialogBinding.root)
-
-        dialogBinding.readAddAliasTitle.text = getString(if (editKey == null) R.string.add_alias else R.string.edit_alias)
-        dialogBinding.originalInput.setText(editKey)
-        dialogBinding.originalInput.setTextColor(viewModel.textColor)
-        dialogBinding.replacementInput.setText(editValue)
-        dialogBinding.replacementInput.setTextColor(viewModel.textColor)
-
-        dialogBinding.readAddAliasCancel.setOnClickListener {
-            bottomSheetDialog.dismiss()
-        }
-
-        dialogBinding.readAddAliasSave.setOnClickListener {
-            val original = dialogBinding.originalInput.text.toString().trim()
-            val replacement = dialogBinding.replacementInput.text.toString().trim()
-            if (original.isNotEmpty() && replacement.isNotEmpty()) {
-                if (editKey != null && editKey != original) {
-                    viewModel.removeAlias(editKey)
-                }
-                viewModel.addAlias(original, replacement)
-                bottomSheetDialog.dismiss()
-                showAliasManagementDialog()
-            }
-        }
-
-        // Background scaling and blur animation
-        val behavior = bottomSheetDialog.behavior
-        
-        // Crucial fix: Reset scaling when dismissed regardless of how it's closed
-        bottomSheetDialog.setOnDismissListener {
-            com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-        }
-
-        behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: android.view.View, newState: Int) {
-                if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||
-                    newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED) {
-                    com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
-                }
-            }
-            override fun onSlide(bottomSheet: android.view.View, slideOffset: Float) {
-                com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
-            }
-        })
-
-        bottomSheetDialog.show()
-        bottomSheetDialog.applyGlassStyle()
+        val sheet = com.lagradost.quicknovel.ui.reader.AliasManagementBottomSheet.newInstance(
+            binding.readNormalLayout.id
+        )
+        sheet.setViewModel(viewModel)
+        sheet.show(supportFragmentManager, "alias_management")
     }
 
     private fun showThemePicker() {
@@ -2513,6 +1911,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.BottomSheetDrawerTheme)
         val dialogBinding = ReadThemePickerBinding.inflate(layoutInflater, null, false)
         bottomSheetDialog.setContentView(dialogBinding.root)
+
+        // Set imageHolder so updateImages() can locate the checkmark views and custom color button
+        imageHolder = dialogBinding.readThemeColorsContainer
 
         val bgColors = resources.getIntArray(R.array.readerBgColors)
         val textColors = resources.getIntArray(R.array.readerTextColors)
@@ -2594,6 +1995,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
         })
 
+        updateImages() // Dynamic theme and checkmark initialization
         bottomSheetDialog.show()
         bottomSheetDialog.applyGlassStyle()
     }

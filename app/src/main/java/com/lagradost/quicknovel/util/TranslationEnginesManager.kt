@@ -29,12 +29,13 @@ object TranslationEnginesManager {
 
     fun getActiveEngine(context: Context): TranslationEngine? {
         val engineKey = context.getString(R.string.translation_engine_key)
-        val engineTypeStr = BaseApplication.getKey<String>(engineKey, "0") ?: "0"
+        val engineTypeStr = BaseApplication.getKey<String>(engineKey, "1") ?: "1"
         
         val engineType = try {
-            TranslationEngineType.fromInt(engineTypeStr.toInt())
+            val type = TranslationEngineType.fromInt(engineTypeStr.toInt())
+            if (type == TranslationEngineType.None) TranslationEngineType.GoogleMLKit else type
         } catch (e: Exception) {
-            TranslationEngineType.values().find { it.name.equals(engineTypeStr, ignoreCase = true) } ?: TranslationEngineType.None
+            TranslationEngineType.values().find { it.name.equals(engineTypeStr, ignoreCase = true) } ?: TranslationEngineType.GoogleMLKit
         }
         
         return getEngine(engineType)

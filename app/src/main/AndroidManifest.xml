@@ -71,6 +71,7 @@
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:windowSoftInputMode="adjustResize"
+            android:windowLayoutInDisplayCutoutMode="shortEdges"
             android:exported="true">
             <intent-filter android:label="Read with NeoQN">
                 <action android:name="android.intent.action.SEND" />
@@ -242,5 +243,11 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!-- Allow Macrobenchmark to profile the app on user/release builds -->
+        <profileable
+            android:shell="true"
+            tools:targetApi="29" />
     </application>
 </manifest>
+

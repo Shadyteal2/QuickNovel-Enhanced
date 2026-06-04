@@ -1,29 +1,57 @@
-*.iml
-.gradle
-/local.properties
-.idea/
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# ─────────────────────────────────────────────────────────────
+# NeoQN (QuickNovel-Enhanced) — Master Git Ignore Configuration
+# ─────────────────────────────────────────────────────────────
+
+# ─── Build Outputs & Gradle Caches ───────────────────────────
 .gradle/
 .gradle-home/
 build/
+.externalNativeBuild
+.cxx
+.kotlin/
 *.class
 *.jar
 *.lock
 *.bins
-.agent/
-stitch_screens/
-scripts/
-.kotlin/
-.vscode/
-gradle.properties
-.venv/
-/recommendation
-todoprovide/
-.gemini/
 build_*.txt
 git_status.tmp
-visualizer preset/
+
+# ─── IDE Settings & Configurations ───────────────────────────
+.idea/
+*.iml
+.vscode/
+/captures
+
+# ─── Android SDK & Local Properties ──────────────────────────
+/local.properties
+gradle.properties
+
+# ─── Python Virtual Environments ─────────────────────────────
+.venv/
+
+# ─── AI Coding Agent & Local Drafting Assets ──────────────────
+.agent/
+.gemini/
+AGENTS.md
+temp_readme.md
+
+# ─── Graphify Knowledge Graph ────────────────────────────────
+graphify-out/
+.agents/rules/graphify.md
+.agents/workflows/graphify.md
+.cursor/rules/graphify.mdc
+
+# ─── Android Keystores & Signing Secrets ─────────────────────
+*.jks
+*.keystore
+*.pepk
+*.p12
+signing.properties
+
+# ─── System / OS Caches ──────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Standalone TS / JS Plugin Testing ────────────────────────
+/test ts/

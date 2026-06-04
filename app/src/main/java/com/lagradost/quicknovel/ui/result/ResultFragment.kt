@@ -36,6 +36,13 @@ import com.lagradost.quicknovel.databinding.*
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
+import com.lagradost.quicknovel.util.SettingsHelper.isModernDetailScreen
+import com.lagradost.quicknovel.util.SettingsHelper.isDefaultDetailScreen
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.mainpage.MainAdapter
 import com.lagradost.quicknovel.ui.mainpage.MainPageFragment
@@ -62,13 +69,17 @@ import com.lagradost.quicknovel.util.MagicAnimator
 const val MAX_SYNO_LENGH = 300
 
 class ResultFragment : Fragment() {
-    lateinit var binding: FragmentResultBinding
+    private lateinit var binding: FragmentResultBinding
     private val viewModel: ResultViewModel by viewModels()
 
     private var novelTabBinding: ResultNovelTabBinding? = null
     private var chaptersTabBinding: ResultChaptersTabBinding? = null
 
     private var chapterAdapter: ChapterAdapter? = null
+    private var modernChapterList: RecyclerView? = null
+    private var defaultChapterList: RecyclerView? = null
+    private var usesModernStyle  = false
+    private var usesDefaultStyle = false
 
     companion object {
         fun newInstance(url: String, apiName: String, startAction: Int = 0, startChapterUrl: String? = null): Bundle =
@@ -84,7 +95,6 @@ class ResultFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        sharedElementEnterTransition = android.transition.TransitionInflater.from(requireContext()).inflateTransition(android.R.transition.move)
     }
 
     override fun onCreateView(
@@ -92,8 +102,26 @@ class ResultFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-        binding = FragmentResultBinding.inflate(inflater)
-        return binding.root
+        usesModernStyle  = requireContext().isModernDetailScreen()
+        usesDefaultStyle = requireContext().isDefaultDetailScreen()
+        if (!usesModernStyle && !usesDefaultStyle) {
+            // Classic ("2") — XML layout
+            sharedElementEnterTransition = android.transition.TransitionInflater.from(requireContext())
+                .inflateTransition(android.R.transition.move)
+            binding = FragmentResultBinding.inflate(inflater, container, false)
+            return binding.root
+        }
+        // Modern ("1") or Default ("0") — Compose
+        sharedElementEnterTransition = null
+        sharedElementReturnTransition = null
+        return ComposeView(requireContext()).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setBackgroundColor(Color.TRANSPARENT)
+        }
     }
 
     private fun setupGridView() {
@@ -102,26 +130,32 @@ class ResultFragment : Fragment() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        binding.resultHolder.post {
-            updateScrollHeight()
+        if (!usesModernStyle && !usesDefaultStyle) {
+            binding.resultHolder.post {
+                updateScrollHeight()
+            }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        if(viewModel.isResume){
+        val nowModern  = requireContext().isModernDetailScreen()
+        val nowDefault = requireContext().isDefaultDetailScreen()
+        // Reload the fragment if the user changed the detail screen style in Settings
+        if ((nowModern != usesModernStyle || nowDefault != usesDefaultStyle) && isAdded) {
+            usesModernStyle  = nowModern
+            usesDefaultStyle = nowDefault
+            parentFragmentManager.beginTransaction()
+                .detach(this)
+                .attach(this)
+                .commit()
+            return
+        }
+        if (viewModel.isResume) {
             chapterAdapter?.notifyDataSetChanged()
             viewModel.isResume = false
         }
         viewModel.reorderChapters()
-
-
-        val savedNote = viewModel.getNote() ?: ""
-        novelTabBinding?.resultNotesEdittext?.let { et ->
-            if (et.text?.toString() != savedNote) {
-                et.setText(savedNote)
-            }
-        }
     }
 
     private fun updateScrollHeight() {
@@ -134,86 +168,7 @@ class ResultFragment : Fragment() {
     }
 
     private fun updateTabData() {
-        val loadResponse = viewModel.loadResponse.value
-        if (loadResponse !is Resource.Success) return
-        val res = loadResponse.value
-
-        novelTabBinding?.apply {
-            val state = viewModel.readState.value ?: ReadType.NONE
-            resultUpdatesToggle.isVisible = state != ReadType.NONE
-            val isEnabled = viewModel.isSyncEnabledDisplay.value ?: true
-            resultUpdatesToggle.alpha = if (isEnabled) 1.0f else 0.4f
-
-            downloadWarning.isVisible = (repo?.rateLimitTime ?: 0) > 2000
-
-            resultRatingVotedCount.text = getString(R.string.no_data)
-            res.rating?.let { rating ->
-                resultRating.text = context?.getRating(rating)
-                val votes = res.peopleVoted
-                if (votes != null) {
-                    resultRatingVotedCount.text = getString(R.string.votes_format).format(votes)
-                }
-            }
-            resultViews.text = res.views?.let { views -> humanReadableByteCountSI(views) }
-                ?: getString(R.string.no_data)
-
-            resultTag.removeAllViews()
-            res.tags?.forEach { tag ->
-                val chip = Chip(requireContext())
-                val chipDrawable = ChipDrawable.createFromAttributes(requireContext(), null, 0, R.style.ChipFilled)
-                chip.setChipDrawable(chipDrawable)
-                chip.text = tag
-                chip.isClickable = false
-                
-                val tagIndex = repo?.tags?.indexOfFirst { it.first == tag }?.takeIf { it != -1 }
-                if (tagIndex != null) {
-                    chip.isClickable = true
-                    chip.setOnClickListener {
-                        val currentApi = repo ?: return@setOnClickListener
-                        activity?.navigate(
-                            R.id.global_to_navigation_mainpage,
-                            MainPageFragment.newInstance(currentApi.name, tag = tagIndex),
-                            options = com.lagradost.quicknovel.MainActivity.navOptions
-                        )
-                    }
-                }
-                chip.setTextColor(requireContext().colorFromAttribute(R.attr.textColor))
-                resultTag.addView(chip)
-            }
-
-            res.synopsis?.let { synopsis ->
-                resultSynopsisText.text = synopsis.html()
-                
-                var isExpanded = false
-                val toggleExpand = {
-                    isExpanded = !isExpanded
-                    resultSynopsisText.maxLines = if (isExpanded) Integer.MAX_VALUE else 4
-                    resultSynopsisTapMore.isVisible = !isExpanded
-                    resultSynopsisCollapseArrow.rotation = if (isExpanded) 180f else 0f
-                    root.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                }
-                synopsisCard.setOnClickListener { toggleExpand() }
-                resultSynopsisCollapseArrow.setOnClickListener { toggleExpand() }
-            } ?: run {
-                resultSynopsisText.text = "..."
-                resultSynopsisTapMore.isVisible = false
-                resultSynopsisCollapseArrow.isVisible = false
-            }
-
-            if (res is StreamResponse) {
-                resultChaptersInfoHolder.isVisible = true
-                resultChapters.text = res.data.size.toString()
-                resultChaptersInfo.text = if (res.data.size == 1) getString(R.string.chapter) else getString(R.string.chapters)
-            } else {
-                resultChaptersInfoHolder.isVisible = false
-            }
-            // Notes text restoration managed by onResume and LiveData observer
-        }
-        
-        // Populate chapter count in its tab if available
-        chaptersTabBinding?.apply {
-           // If we need extra population logic here
-        }
+        // Compose automatically reacts to LiveData changes inside the ComposeView.
     }
 
     private fun newState(loadResponse: Resource<LoadResponse>?) {
@@ -452,6 +407,14 @@ class ResultFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        if (usesModernStyle) {
+            setupModernResultScreen(view as ComposeView, savedInstanceState)
+            return
+        }
+        if (usesDefaultStyle) {
+            setupDefaultResultScreen(view as ComposeView, savedInstanceState)
+            return
+        }
 
         // Expand backdrop to 1.5x screen height so parallax never exposes a gap at the bottom.
         // At 0.25x parallax factor, max upward shift ≈ (contentHeight - screenHeight) * 0.25.
@@ -522,12 +485,17 @@ class ResultFragment : Fragment() {
             
             val tintList = android.content.res.ColorStateList.valueOf(iconTint)
             resultBack.imageTintList = tintList
+            resultBell.imageTintList = tintList
             resultOpeninbrower.imageTintList = tintList
             resultShare.imageTintList = tintList
 
             // #F2F2F2 for Light theme fallback absolute backdrops setups
             resultContinueReading.setCardBackgroundColor(android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF")))
             resultContinueReading.strokeColor = android.graphics.Color.parseColor(if (isLightTheme) "#E0E0E0" else "#11FFFFFF")
+            
+            resultBookmark.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF"))
+            resultBookmark.strokeColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#E0E0E0" else "#11FFFFFF"))
+            resultBookmark.strokeWidth = (1 * (context?.resources?.displayMetrics?.density ?: 1f)).toInt()
             
             resultProviderChip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isLightTheme) "#F2F2F2" else "#22FFFFFF"))
             resultProviderChip.setTextColor(if (isLightTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
@@ -536,11 +504,13 @@ class ResultFragment : Fragment() {
             MagicAnimator.applyIconPress(resultBack)
             MagicAnimator.applyIconPress(resultShare)
             MagicAnimator.applyIconPress(resultOpeninbrower)
+            MagicAnimator.applyIconPress(resultBell)
             MagicAnimator.applyCardPress(resultContinueReading)
             // ────────────────────────────────────────────────────────────────
 
             resultReloadConnectionerror.setOnClickListener { viewModel.initState(apiName, url) }
             resultOpeninbrower.setOnClickListener { viewModel.openInBrowser() }
+            resultBell.setOnClickListener { viewModel.toggleSyncEnabled() }
             resultReloadConnectionOpenInBrowser.setOnClickListener { viewModel.openInBrowser() }
 
 
@@ -589,7 +559,7 @@ class ResultFragment : Fragment() {
                 
                 popup.setOnItemClickListener { _, _, position, _ ->
                     when (items[position]) {
-                        "Filter & Sort" -> showFilterBottomSheet(act)
+                        "Filter & Sort" -> showFilterBottomSheet(act, binding.resultMainscroll)
                         "Go to Latest Chapter" -> chaptersTabBinding?.chapterList?.let { list ->
                              val chapters = viewModel.chapters.value ?: return@setOnItemClickListener
                              if (chapters.isNotEmpty()) {
@@ -803,7 +773,16 @@ class ResultFragment : Fragment() {
                 title = if (systemCat != null) {
                     "In Library (${getString(systemCat.stringRes ?: R.string.bookmark)})"
                 } else {
-                    "In Library"
+                    val json = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+                    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                    val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList() }
+                    val customCat = customCats.find { it.id == duplicateState }
+                    if (customCat != null) {
+                        "In Library (${customCat.name})"
+                    } else {
+                        "In Library"
+                    }
                 }
                 hasBookmark = true // Fill icon
             }
@@ -813,30 +792,15 @@ class ResultFragment : Fragment() {
                 if (!hasBookmark) R.drawable.ic_baseline_bookmark_border_24 else R.drawable.ic_baseline_bookmark_24
             )
             binding.resultBookmark.iconGravity = com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_START
-            novelTabBinding?.resultUpdatesToggle?.isVisible = (currentStateId != -1) // Sync only for current provider
-
-            // Update notes UI when read status changes
-            novelTabBinding?.apply {
-                val isDropped = state == ReadType.DROPPED
-                resultNotesLayout.hint = if (isDropped) getString(R.string.dropped_reason) else getString(R.string.notes)
-                val primaryColor = requireContext().colorFromAttribute(R.attr.colorPrimary)
-                resultNotesLayout.boxStrokeColor = if (isDropped) Color.RED else primaryColor
-                resultNotesLayout.setHintTextColor(android.content.res.ColorStateList.valueOf(if (isDropped) Color.RED else primaryColor))
-            }
         }
 
         observe(viewModel.isSyncEnabledDisplay) { isEnabled ->
-            novelTabBinding?.resultUpdatesToggle?.alpha = if (isEnabled) 1.0f else 0.4f
+            binding.resultBell.setImageResource(
+                if (isEnabled) R.drawable.ic_baseline_notifications_active_24 else R.drawable.ic_baseline_notifications_none_24
+            )
         }
 
         observeNullable(viewModel.userNote) { note ->
-            novelTabBinding?.apply {
-                val current = resultNotesEdittext.text?.toString() ?: ""
-                val saved = note ?: ""
-                if (current != saved) {
-                    resultNotesEdittext.setText(saved)
-                }
-            }
         }
 
         observeNullable(viewModel.duplicateBookmarkState) {
@@ -844,21 +808,26 @@ class ResultFragment : Fragment() {
             viewModel.readState.postValue(viewModel.readState.value)
         }
 
-        observeNullable(viewModel.chapters) { chapters ->
+        observeNullable(viewModel.chapters) { chaptersList ->
+            val chapters = chaptersList ?: emptyList()
             chapterAdapter?.let { adapter ->
-                if (chapters == null || chapters.size > 300) {
-                    adapter.submitIncomparableList(chapters)
-                } else {
-                    adapter.submitList(chapters)
+                if (chapters.isNotEmpty()) {
+                    if (adapter.immutableCurrentList != chapters) {
+                        if (adapter.immutableCurrentList.isEmpty()) {
+                            adapter.submitIncomparableList(chapters)
+                        } else {
+                            adapter.submitList(chapters)
+                        }
+                    } else {
+                        adapter.notifyDataSetChanged()
+                    }
                 }
             }
 
             val streamResponse = (viewModel.loadResponse.value as? Resource.Success)?.value as? StreamResponse
-            if (streamResponse != null && !chapters.isNullOrEmpty()) {
+            if (streamResponse != null && chapters.isNotEmpty()) {
                 val total = chapters.size
                 val readCount = chapters.count { viewModel.hasReadChapter(it) }
-                
-                // Update Continue text with guaranteed loaded data
                 val name = streamResponse.name
                 val lastReadIndex = chapters.indexOfLast { ch ->
                     val idx = viewModel.chapterIndex(ch) ?: -1
@@ -867,22 +836,10 @@ class ResultFragment : Fragment() {
                     com.lagradost.quicknovel.BaseApplication.getKey<Long>(com.lagradost.quicknovel.EPUB_CURRENT_POSITION_READ_AT, key) != null
                 }
                 binding.resultContinueText.text = if (lastReadIndex != -1) "Continue Chapter ${lastReadIndex + 1}" else "Start Reading"
-
-                novelTabBinding?.apply {
-                    if (readCount > 0) {
-                        resultProgressLayout.isVisible = true
-                        val progress = (readCount * 100) / total
-                        resultProgressBar.progress = progress
-                        resultProgressText.text = getString(R.string.latest_format).format("$progress% Read ($readCount/$total)")
-                    } else {
-                        resultProgressLayout.isVisible = false
-                    }
-                }
             }
         }
 
         observe(viewModel.downloadState) { progressState ->
-            updateDownloadInfo(progressState)
         }
 
         binding.resultMainscroll.setOnScrollChangeListener { v: NestedScrollView, _, scrollY, _, oldScrollY ->
@@ -959,6 +916,7 @@ class ResultFragment : Fragment() {
         observe(viewModel.selectedChapters) { selected ->
             val count = selected.size
             binding.resultSelectionCount.text = if (count == 0) getString(R.string.no_data) else "$count Selected"
+            chapterAdapter?.notifyDataSetChanged()
         }
 
 
@@ -1034,90 +992,249 @@ class ResultFragment : Fragment() {
         }
     }
 
+    private fun setupModernResultScreen(composeView: ComposeView, savedInstanceState: Bundle?) {
+        val url = savedInstanceState?.getString("url") ?: arguments?.getString("url") ?: throw NotImplementedError()
+        val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
+        val startAction = savedInstanceState?.getInt("startAction") ?: arguments?.getInt("startAction") ?: 0
+        val startChapterUrl = savedInstanceState?.getString("startChapterUrl") ?: arguments?.getString("startChapterUrl")
+
+        if (viewModel.loadResponse.value == null) {
+            viewModel.initState(apiName, url)
+        }
+
+        if (chapterAdapter == null) {
+            chapterAdapter = ChapterAdapter(viewModel)
+        }
+
+        var hasTriggeredStart = false
+        observe(viewModel.loadResponse) { res ->
+            if (res is Resource.Success && !hasTriggeredStart && startAction == 2 && startChapterUrl != null) {
+                hasTriggeredStart = true
+                val stream = res.value as? StreamResponse
+                val chapter = stream?.data?.find { it.url == startChapterUrl }
+                if (chapter != null) {
+                    viewModel.streamRead(chapter)
+                }
+            }
+        }
+
+        observeNullable(viewModel.chapters) { chaptersList ->
+            val chapters = chaptersList ?: emptyList()
+            chapterAdapter?.let { adapter ->
+                if (chapters.isNotEmpty()) {
+                    if (adapter.immutableCurrentList != chapters) {
+                        if (adapter.immutableCurrentList.isEmpty()) {
+                            adapter.submitIncomparableList(chapters)
+                        } else {
+                            adapter.submitList(chapters)
+                        }
+                    } else {
+                        adapter.notifyDataSetChanged()
+                    }
+                }
+            }
+        }
+
+        observeNullable(viewModel.duplicateBookmarkState) {
+            viewModel.readState.postValue(viewModel.readState.value)
+        }
+
+        val backCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                viewModel.setSelectionMode(false)
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
+        observe(viewModel.isInSelectionMode) { enabled ->
+            backCallback.isEnabled = enabled
+        }
+
+        val act = requireActivity()
+        composeView.setContent {
+            QuickNovelTheme {
+                ResultDetailModernScreen(
+                    viewModel = viewModel,
+                    apiName = apiName,
+                    url = url,
+                    activity = act,
+                    chapterAdapter = chapterAdapter!!,
+                    onBack = { act.onBackPressedDispatcher.onBackPressed() },
+                    onReload = { viewModel.initState(apiName, url) },
+                    onOpenInBrowser = { viewModel.openInBrowser() },
+                    onShare = { viewModel.share() },
+                    onToggleSync = { viewModel.toggleSyncEnabled() },
+                    onContinueReading = { handleContinueReading() },
+                    onShowFilterSort = { showFilterBottomSheet(act, null) },
+                    onScrollToLatestChapter = { scrollModernChaptersToLatest() },
+                    onScrollToLastRead = { scrollModernChaptersToLastRead() },
+                    onChapterRecyclerReady = { modernChapterList = it },
+                )
+            }
+        }
+    }
+
+    private fun setupDefaultResultScreen(composeView: ComposeView, savedInstanceState: Bundle?) {
+        val url = savedInstanceState?.getString("url") ?: arguments?.getString("url") ?: throw NotImplementedError()
+        val apiName = savedInstanceState?.getString("apiName") ?: arguments?.getString("apiName") ?: throw NotImplementedError()
+        val startAction = savedInstanceState?.getInt("startAction") ?: arguments?.getInt("startAction") ?: 0
+        val startChapterUrl = savedInstanceState?.getString("startChapterUrl") ?: arguments?.getString("startChapterUrl")
+
+        if (viewModel.loadResponse.value == null) {
+            viewModel.initState(apiName, url)
+        }
+
+        if (chapterAdapter == null) {
+            chapterAdapter = ChapterAdapter(viewModel)
+        }
+
+        var hasTriggeredStart = false
+        observe(viewModel.loadResponse) { res ->
+            if (res is Resource.Success && !hasTriggeredStart && startAction == 2 && startChapterUrl != null) {
+                hasTriggeredStart = true
+                val stream = res.value as? StreamResponse
+                val chapter = stream?.data?.find { it.url == startChapterUrl }
+                if (chapter != null) {
+                    viewModel.streamRead(chapter)
+                }
+            }
+        }
+
+        observeNullable(viewModel.chapters) { chaptersList ->
+            val chapters = chaptersList ?: emptyList()
+            chapterAdapter?.let { adapter ->
+                if (chapters.isNotEmpty()) {
+                    if (adapter.immutableCurrentList != chapters) {
+                        if (adapter.immutableCurrentList.isEmpty()) {
+                            adapter.submitIncomparableList(chapters)
+                        } else {
+                            adapter.submitList(chapters)
+                        }
+                    } else {
+                        adapter.notifyDataSetChanged()
+                    }
+                }
+            }
+        }
+
+        observeNullable(viewModel.duplicateBookmarkState) {
+            viewModel.readState.postValue(viewModel.readState.value)
+        }
+
+        val backCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                viewModel.setSelectionMode(false)
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
+        observe(viewModel.isInSelectionMode) { enabled ->
+            backCallback.isEnabled = enabled
+        }
+
+        val act = requireActivity()
+        composeView.setContent {
+            QuickNovelTheme {
+                ResultDetailDefaultScreen(
+                    viewModel    = viewModel,
+                    apiName      = apiName,
+                    url          = url,
+                    activity     = act,
+                    chapterAdapter = chapterAdapter!!,
+                    onBack               = { act.onBackPressedDispatcher.onBackPressed() },
+                    onReload             = { viewModel.initState(apiName, url) },
+                    onOpenInBrowser      = { viewModel.openInBrowser() },
+                    onShare              = { viewModel.share() },
+                    onToggleSync         = { viewModel.toggleSyncEnabled() },
+                    onContinueReading    = { handleContinueReading() },
+                    onShowFilterSort     = { showFilterBottomSheet(act, null) },
+                    onScrollToLatestChapter = { scrollDefaultChaptersToLatest() },
+                    onScrollToLastRead      = { scrollDefaultChaptersToLastRead() },
+                    onChapterRecyclerReady  = { defaultChapterList = it },
+                )
+            }
+        }
+    }
+
+    private fun scrollDefaultChaptersToLatest() {
+        val list     = defaultChapterList ?: return
+        val chapters = viewModel.chapters.value ?: return
+        if (chapters.isEmpty()) return
+        val sortType = ResultViewModel.sortChapterBy
+        val index = if (sortType == com.lagradost.quicknovel.ui.download.REVERSE_CHAPTER_SORT ||
+                        sortType == REVERSE_LAST_ACCES_SORT) 0 else chapters.lastIndex
+        list.scrollToPosition(index)
+    }
+
+    private fun scrollDefaultChaptersToLastRead() {
+        val list     = defaultChapterList ?: return
+        val chapters = viewModel.chapters.value ?: return
+        val name     = (viewModel.loadResponse.value as? Resource.Success)?.value?.name ?: return
+        val index    = chapters.indexOfLast { ch ->
+            val key = "$name/${chapters.indexOf(ch)}"
+            BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, key) != null
+        }
+        if (index != -1) {
+            list.scrollToPosition(index)
+        } else {
+            CommonActivity.showToast(activity, "No last read position found")
+        }
+    }
+
+    private fun handleContinueReading() {
+        val streamResponse = (viewModel.loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
+        val name = streamResponse.name
+        val index = streamResponse.data.indexOfLast { ch ->
+            val idx = streamResponse.data.indexOf(ch)
+            val key = "$name/$idx"
+            BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, key) != null
+        }
+        if (index != -1 && index < streamResponse.data.size) {
+            viewModel.streamRead(streamResponse.data[index])
+        } else {
+            viewModel.streamRead()
+        }
+    }
+
+    private fun scrollModernChaptersToLatest() {
+        val list = modernChapterList ?: return
+        val chapters = viewModel.chapters.value ?: return
+        if (chapters.isEmpty()) return
+        val sortType = ResultViewModel.sortChapterBy
+        val target = if (sortType == REVERSE_CHAPTER_SORT || sortType == REVERSE_LAST_ACCES_SORT) 0 else chapters.size - 1
+        list.scrollToPosition(target)
+    }
+
+    private fun scrollModernChaptersToLastRead() {
+        val list = modernChapterList ?: return
+        val chapters = viewModel.chapters.value ?: return
+        val name = (viewModel.loadResponse.value as? Resource.Success)?.value.let { it as? StreamResponse }?.name ?: ""
+        val index = chapters.indexOfLast { ch ->
+            val key = "$name/${chapters.indexOf(ch)}"
+            BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, key) != null
+        }
+        if (index != -1) {
+            list.scrollToPosition(index)
+        } else {
+            CommonActivity.showToast(activity, "No last read position found")
+        }
+    }
+
     private fun onBindingCreated(tabView: View) {
         val binding = ResultNovelTabBinding.bind(tabView)
         novelTabBinding = binding
-        updateDownloadInfo(viewModel.downloadState.value)
         
-        binding.apply {
-            resultUpdatesToggle.setOnClickListener { 
-                viewModel.toggleSyncEnabled() 
-                val isCurrentlyEnabled = viewModel.isSyncEnabledDisplay.value ?: false
-                com.lagradost.quicknovel.CommonActivity.showToast(if (!isCurrentlyEnabled) "Updates Enabled" else "Updates Disabled")
-            }
-            resultSynopsisText.setOnClickListener {
-                val res = (viewModel.loadResponse.value as? Resource.Success)?.value ?: return@setOnClickListener
-                val syno = if (res.synopsis?.length ?: 0 > MAX_SYNO_LENGH) {
-                    res.synopsis?.substring(0, MAX_SYNO_LENGH) + "..."
-                } else {
-                    res.synopsis
-                }
-                val isExpanded = resultSynopsisText.text.length > (syno?.length ?: 0)
-                resultSynopsisText.text = if (!isExpanded) res.synopsis?.html() else syno?.html()
-            }
-            resultDownloadGenerateEpub.setOnClickListener { viewModel.readEpub() }
-            resultDownloadBtt.setOnClickListener { v ->
-                val apiName = arguments?.getString("apiName") ?: ""
-                if (apiName == "OceanOfPDF") {
-                    val res = (viewModel.loadResponse.value as? Resource.Success)?.value as? com.lagradost.quicknovel.EpubResponse
-                    val link = res?.downloadLinks?.firstOrNull()
-                    if (link != null) {
-                        showOceanOfPDFDownloadDialog(link)
-                    } else {
-                        com.lagradost.quicknovel.CommonActivity.showToast("No download links found")
-                    }
-                    return@setOnClickListener
-                }
-                val actions = getActions()
-                if (actions == null) {
-                    viewModel.downloadOrPause()
-                } else if (actions.size == 1) {
-                    doAction(actions[0])
-                } else if (actions.contains(R.string.download) || actions.contains(R.string.pause)) {
-                    viewModel.downloadOrPause()
-                } else {
-                    v.popupMenu(actions.map { it to it }, null) { doAction(itemId) }
+        binding.novelTabComposeView.apply {
+            setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                val loadResponse by viewModel.loadResponse.observeAsState()
+                val res = (loadResponse as? Resource.Success<LoadResponse>)?.value ?: return@setContent
+                
+                QuickNovelTheme {
+                    NovelTabScreen(viewModel, res, requireActivity())
                 }
             }
-            resultDownloadBtt.setOnLongClickListener { v ->
-                val items = getActions() ?: return@setOnLongClickListener true
-                v.popupMenu(items.map { it to it }, null) { doAction(itemId) }
-                true
-            }
-
-            // Initial Notes Population
-            val currentNote = resultNotesEdittext.text?.toString() ?: ""
-            val savedNote = viewModel.getNote() ?: ""
-            if (currentNote != savedNote) {
-                resultNotesEdittext.setText(savedNote)
-            }
-
-            // Setup Notes Update Trigger
-            resultNotesEdittext.doOnTextChanged { text, _, _, _ ->
-                if (viewModel.hasLoaded) {
-                    viewModel.updateNote(text?.toString())
-                }
-            }
-
-            // Keyboard Scrolling Focus Listener
-            resultNotesEdittext.setOnFocusChangeListener { view, hasFocus ->
-                if (hasFocus) {
-                    val scrollHandler = android.os.Handler(android.os.Looper.getMainLooper())
-                    scrollHandler.postDelayed({
-                        val scrollPos =
-                            this@ResultFragment.binding.resultViewpager.top + resultNotesLayout.top - 100.toPx
-                        this@ResultFragment.binding.resultMainscroll.smoothScrollTo(
-                            0,
-                            Math.max(0, scrollPos)
-                        )
-                    }, 400)
-                }
-            }
-
-            // --- End of binding.apply block ---
         }
     }
-    private fun showFilterBottomSheet(act: android.app.Activity) {
+    private fun showFilterBottomSheet(act: android.app.Activity, backgroundView: View?) {
          val bottomSheetDialog = BottomSheetDialog(act, R.style.BottomSheetDrawerTheme)
          val filterBinding = com.lagradost.quicknovel.databinding.ChapterFilterPopupBinding.inflate(act.layoutInflater, null, false)
          bottomSheetDialog.setContentView(filterBinding.root)
@@ -1165,19 +1282,19 @@ class ResultFragment : Fragment() {
          }
          filterBinding.sortContent.layoutManager = LinearLayoutManager(act)
 
-         // Background scaling animation
-         val backgroundView = binding.resultMainscroll
-         val behavior = bottomSheetDialog.behavior
-         behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
-             override fun onStateChanged(bottomSheet: View, newState: Int) {
-                 if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
-                     DrawerHelper.resetScaling(backgroundView)
+         if (backgroundView != null) {
+             val behavior = bottomSheetDialog.behavior
+             behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
+                 override fun onStateChanged(bottomSheet: View, newState: Int) {
+                     if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN) {
+                         DrawerHelper.resetScaling(backgroundView)
+                     }
                  }
-             }
-             override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                 com.lagradost.quicknovel.util.DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
-             }
-         })
+                 override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                     DrawerHelper.applyScalingAnimation(backgroundView, slideOffset)
+                 }
+             })
+         }
 
          bottomSheetDialog.show()
     }
@@ -1276,74 +1393,7 @@ class ResultFragment : Fragment() {
     }
 
     private fun updateDownloadInfo(progressState: DownloadProgressState?) {
-        val binding = novelTabBinding ?: return
-        if (progressState == null) return
-
-        binding.apply {
-            resultDownloadProgressText.text = "${progressState.progress}/${progressState.total}"
-
-            resultDownloadProgressBarNotDownloaded.apply {
-                max = progressState.total.toInt() * 100
-                val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                    this, "progress", this.progress,
-                    (progressState.progress - progressState.downloaded).toInt() * 100
-                )
-                animation.duration = 500
-                animation.setAutoCancel(true)
-                animation.interpolator = DecelerateInterpolator()
-                animation.start()
-            }
-
-            resultDownloadProgressBar.apply {
-                max = progressState.total.toInt() * 100
-                val animation: ObjectAnimator = ObjectAnimator.ofInt(
-                    this, "progress", this.progress,
-                    progressState.progress.toInt() * 100
-                )
-                animation.duration = 500
-                animation.setAutoCancel(true)
-                animation.interpolator = DecelerateInterpolator()
-                animation.start()
-            }
-
-            val ePubGeneration = progressState.progress > 0
-            resultDownloadGenerateEpub.apply {
-                isClickable = ePubGeneration
-                alpha = if (ePubGeneration) 1f else 0.5f
-                isVisible = true
-            }
-
-            val canDownload = progressState.progress < progressState.total
-            val canClick = progressState.total > 0
-            resultDownloadBtt.apply {
-                isClickable = canClick
-                alpha = if (canClick) 1f else 0.5f
-                isVisible = true
-
-                setText(
-                    when (progressState.state) {
-                        DownloadState.IsDone -> R.string.manage
-                        DownloadState.IsDownloading -> R.string.pause
-                        DownloadState.IsPaused -> R.string.resume
-                        DownloadState.IsFailed -> R.string.re_downloaded
-                        DownloadState.IsStopped -> R.string.downloaded
-                        DownloadState.Nothing -> if (canDownload) R.string.download else R.string.manage
-                        DownloadState.IsPending -> R.string.loading
-                        else -> if (canDownload) R.string.download else R.string.manage
-                    }
-                )
-                setIconResource(
-                    when (progressState.state) {
-                        DownloadState.IsDownloading -> R.drawable.ic_baseline_pause_24
-                        DownloadState.IsPaused -> R.drawable.netflix_play
-                        DownloadState.IsFailed -> R.drawable.ic_baseline_autorenew_24
-                        DownloadState.IsDone -> R.drawable.ic_outline_settings_24
-                        DownloadState.Nothing -> if (canDownload) R.drawable.netflix_download else R.drawable.ic_outline_settings_24
-                        else -> R.drawable.netflix_download
-                    }
-                )
-            }
-        }
+        // Obsolete function, download info is observed directly in Compose
     }
 
     inner class SortAdapter(val sortMethods: Array<SortingMethod>, val onClick: (Int) -> Unit) :
@@ -1392,4 +1442,4 @@ class ResultFragment : Fragment() {
         inner class SortViewHolder(val binding: SortByItemBinding) :
             RecyclerView.ViewHolder(binding.root)
     }
-}
+}

@@ -6,6 +6,7 @@ import com.lagradost.quicknovel.RESULT_BOOKMARK
 import com.lagradost.quicknovel.ui.UiImage
 import com.lagradost.quicknovel.ui.img
 
+@androidx.compose.runtime.Immutable
 data class ResultCached(
     val source : String,
     val name: String,

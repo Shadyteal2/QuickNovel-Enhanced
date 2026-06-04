@@ -110,6 +110,14 @@ object ResultPrefs {
     const val CHAPTER_BOOKMARK      = "result_chapter_bookmarked"
 }
 
+// ─── Appearance ──────────────────────────────────────────────────────────────
+
+/** Keys for global appearance and layout preferences. */
+object AppearancePrefs {
+    /** "0" = Classic XML detail screen, "1" = Modern Compose detail screen. */
+    const val DETAIL_SCREEN_STYLE = "detail_screen_style"
+}
+
 // ─── App-wide ────────────────────────────────────────────────────────────────
 
 /** App-wide keys not tied to a specific feature. */

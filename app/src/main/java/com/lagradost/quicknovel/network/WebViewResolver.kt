@@ -101,14 +101,14 @@ class WebViewResolver(
         var fixedRequest: Request? = null
         val extraRequestList = mutableListOf<Request>()
 
-        main {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
             // Useful for debugging
             WebView.setWebContentsDebuggingEnabled(true)
             try {
                 // IMPORTANT: For AlertDialog we MUST use an Activity context.
                 // We try to get the current activity from CommonActivity.
                 val activity = com.lagradost.quicknovel.CommonActivity.activity
-                val ctx = activity ?: context ?: return@main
+                val ctx = activity ?: context ?: return@withContext
                 
                 println("Creating WebView with context: $ctx (isActivity: ${ctx is android.app.Activity})")
                 
@@ -127,12 +127,13 @@ class WebViewResolver(
                 if (showDialog) {
                     if (activity == null) {
                         println("Cannot show dialog: No Activity context available!")
-                        return@main
+                        return@withContext
                     }
                     
-                    val builder = androidx.appcompat.app.AlertDialog.Builder(activity)
+                    val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity, com.lagradost.quicknovel.R.style.AlertDialogCustom)
                         .setView(webView)
                         .setTitle("Cloudflare Verification")
+                        .setMessage("Please complete the verification challenge below to safely access the provider.")
                         .setNegativeButton("Cancel") { _, _ -> destroyWebView() }
                         .setOnCancelListener { destroyWebView() }
                     
@@ -142,7 +143,7 @@ class WebViewResolver(
                     // Resize to be useful but not full screen
                     dialog?.window?.setLayout(
                         (activity.resources.displayMetrics.widthPixels * 0.9).toInt(),
-                        (activity.resources.displayMetrics.heightPixels * 0.8).toInt()
+                        (activity.resources.displayMetrics.heightPixels * 0.85).toInt()
                     )
                 }
 
@@ -194,7 +195,7 @@ class WebViewResolver(
                             ".woff2",
                             ".woff",
                             ".ttf",
-                            ".css",
+                            // ".css", removed to allow Cloudflare's own layout/dark mode to render
                             ".vtt",
                             ".srt",
                             ".ts",

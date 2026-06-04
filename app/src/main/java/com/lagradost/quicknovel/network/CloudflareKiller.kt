@@ -38,6 +38,13 @@ class CloudflareKiller : Interceptor {
 
         // Check if we are being blocked by Cloudflare (403/503) or generic challenge (200)
         val isChallengeCode = response.code == 403 || response.code == 503 || response.code == 429
+        val contentType = response.header("Content-Type", "") ?: ""
+
+        // Fast-path: if not a challenge status code and not an HTML content type, skip body analysis entirely.
+        if (!isChallengeCode && !contentType.contains("text/html", ignoreCase = true)) {
+            return@runBlocking response
+        }
+
         val bodySnippet = try {
             response.peekBody(1024 * 10).string()
         } catch (e: Exception) {
@@ -46,14 +53,22 @@ class CloudflareKiller : Interceptor {
         
         // Refined markers: for 200 OK, we want to be more certain it's a challenge, not just a site mention
         val hasChallengeMarkers = response.header("cf-mitigated") == "challenge" ||
-                                 bodySnippet.contains("cf-challenge", ignoreCase = true) ||
-                                 bodySnippet.contains("Turnstile", ignoreCase = true) ||
-                                 bodySnippet.contains("ctp-button", ignoreCase = true) ||
-                                 (bodySnippet.contains("cloudflare", ignoreCase = true) && 
-                                  bodySnippet.contains("challenges.cloudflare.com", ignoreCase = true))
+                                 bodySnippet.contains("class=\"cf-turnstile\"", ignoreCase = true) ||
+                                 bodySnippet.contains("class='cf-turnstile'", ignoreCase = true) ||
+                                 bodySnippet.contains("cf-challenge-response", ignoreCase = true) ||
+                                 bodySnippet.contains("/cdn-cgi/challenge-platform/", ignoreCase = true) ||
+                                 bodySnippet.contains("id=\"cf-bubble\"", ignoreCase = true) ||
+                                 bodySnippet.contains("id=\"challenge-form\"", ignoreCase = true) ||
+                                 bodySnippet.contains("challenges.cloudflare.com/turnstile", ignoreCase = true)
 
         if (isChallengeCode || (response.code == 200 && hasChallengeMarkers && bodySnippet.contains("javascript", ignoreCase = true))) {
             if (hasChallengeMarkers || isChallengeCode) {
+                // QN-Enhanced: Do NOT trigger solver for background cover images / asset requests
+                if (isImageRequest(request)) {
+                    Log.d(TAG, "Exempting cover/image asset request from Cloudflare auto-solve: ${request.url}")
+                    return@runBlocking response
+                }
+
                 val ctx = com.lagradost.quicknovel.BaseApplication.context
                 val settingsManager = androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx ?: return@runBlocking response)
                 val autoSolveKey = ctx.getString(com.lagradost.quicknovel.R.string.cloudflare_auto_solve_key)
@@ -80,6 +95,24 @@ class CloudflareKiller : Interceptor {
         }
 
         return@runBlocking response
+    }
+
+    private fun isImageRequest(request: Request): Boolean {
+        val url = request.url.toString().lowercase()
+        val accept = request.header("Accept")?.lowercase() ?: ""
+        if (accept.contains("image/")) return true
+        
+        val path = request.url.encodedPath.lowercase()
+        return path.endsWith(".jpg") || 
+               path.endsWith(".jpeg") || 
+               path.endsWith(".png") || 
+               path.endsWith(".webp") || 
+               path.endsWith(".gif") || 
+               path.endsWith(".ico") || 
+               path.endsWith(".bmp") ||
+               path.contains("/cover") ||
+               path.contains("/image") ||
+               path.contains("cover")
     }
 
     private fun getWebViewCookie(url: String): String? {
@@ -110,8 +143,19 @@ class CloudflareKiller : Interceptor {
         ).await()
     }
 
+    private fun isBackgroundProcess(): Boolean {
+        val stackTrace = Thread.currentThread().stackTrace
+        return stackTrace.any { 
+            val name = it.className
+            name.contains("UpdatesSyncWorker") || 
+            name.contains("BookDownloader2") ||
+            name.contains("DownloadViewModel")
+        }
+    }
+
     private suspend fun bypassCloudflare(request: Request): Response? {
         val url = request.url.toString()
+        val isBackground = isBackgroundProcess()
 
         // 1. Attempt background resolution (hidden webview)
         WebViewResolver(
@@ -125,11 +169,16 @@ class CloudflareKiller : Interceptor {
 
         // 2. Check if background solve worked
         if (trySolveWithSavedCookies(request)) {
-            val cookies = savedCookies[request.url.host] ?: return null
-            return proceed(request, cookies)
+            Log.d(TAG, "Background solve successful for ${request.url.host}")
+            return proceed(request, savedCookies[request.url.host]!!)
         }
 
-        // 3. Fallback: Manual solve (Visible WebView Dialog)
+        if (isBackground) {
+            Log.d(TAG, "Background solve failed, skipping dialog for background process")
+            return null
+        }
+
+        // 3. Fallback to visible dialog solver (Visible WebView Dialog)
         Log.d(TAG, "Background solve failed, showing manual dialog for $url")
         WebViewResolver(
             Regex(".^"),

@@ -74,21 +74,6 @@
             android:icon="@drawable/ic_baseline_color_lens_24"
             app:layout="@layout/setting_tile" />
 
-        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
-            android:key="@string/library_pinterest_bento_key"
-            android:title="@string/library_pinterest_bento_title"
-            android:summary="@string/library_pinterest_bento_desc"
-            app:defaultValue="false"
-            android:icon="@drawable/ic_baseline_color_lens_24"
-            app:layout="@layout/setting_tile" />
-
-        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
-            android:key="library_bento_3x3"
-            android:title="3×3 Bento Grid"
-            android:summary="Display library as a 3-column grid with fixed-height bento cards"
-            app:defaultValue="false"
-            android:icon="@drawable/ic_baseline_grid_view_24"
-            app:layout="@layout/setting_tile" />
 
         <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
             android:key="@string/library_tactile_response_key"

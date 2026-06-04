@@ -302,6 +302,7 @@ class ResultViewModel : ViewModel() {
 
     var id: MutableLiveData<Int> = MutableLiveData<Int>(-1)
     var readState: MutableLiveData<ReadType> = MutableLiveData<ReadType>(ReadType.NONE)
+    var bookmarkState: MutableLiveData<Int> = MutableLiveData<Int>(-1)
     val duplicateBookmarkState = MutableLiveData<Int?>(null)
 
     var apiName : String = ""
@@ -467,7 +468,7 @@ class ResultViewModel : ViewModel() {
             BookDownloader2.downloadInfoMutex.withLock {
                 downloadProgress[loadId]?.let { downloadState ->
                     when (downloadState.state) {
-                        DownloadState.IsPaused -> BookDownloader2.addPendingAction(
+                        DownloadState.IsPaused, DownloadState.IsStopped, DownloadState.IsFailed -> BookDownloader2.addPendingAction(
                             loadId,
                             DownloadActionType.Resume
                         )
@@ -728,7 +729,7 @@ class ResultViewModel : ViewModel() {
     }
 
     private fun checkDuplicates() {
-        val novel = (loadResponse.value as? Resource.Success)?.value ?: return
+        val novel = if (::load.isInitialized) load else ((loadResponse.value as? Resource.Success)?.value ?: return)
         duplicateBookmarkState.postValue(findDuplicateState(novel.name, novel.author))
     }
 
@@ -745,7 +746,22 @@ class ResultViewModel : ViewModel() {
             if (novel != null) {
                 val duplicate = findDuplicateState(novel.name, novel.author)
                 if (duplicate != null && currentState == -1) {
-                    showToast(R.string.already_in_library)
+                    val context = context
+                    val catName = if (context != null) {
+                        val systemCat = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories.find { it.id == duplicate }
+                        if (systemCat != null) {
+                            context.getString(systemCat.stringRes ?: R.string.bookmark)
+                        } else {
+                            val json = getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+                            val mapper = com.lagradost.quicknovel.DataStore.mapper
+                            val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList() }
+                            val customCat = customCats.find { it.id == duplicate }
+                            customCat?.name ?: "Library"
+                        }
+                    } else "Library"
+                    
+                    showToast(if (context != null) context.getString(R.string.already_in_library) + " ($catName)" else "Already in Library ($catName)")
+                    
                     // Trigger UI to show where it is
                     duplicateBookmarkState.postValue(duplicate)
                     return@launch
@@ -764,6 +780,7 @@ class ResultViewModel : ViewModel() {
                 )
                 updateBookmarkData()
             }
+            bookmarkState.postValue(state)
             readState.postValue(ReadType.fromSpinner(state))
 
             // SSOT: Sync with Room Database
@@ -887,37 +904,65 @@ class ResultViewModel : ViewModel() {
         loadMutex.withLock {
             if (!hasLoaded) return@launch
 
+            val dbState = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val ctx = context ?: return@withContext null
+                    com.lagradost.quicknovel.db.AppDatabase.getDatabase(ctx).novelDao().getById(loadId)
+                } catch (t: Throwable) {
+                    com.lagradost.quicknovel.mvvm.logError(t)
+                    null
+                }
+            }
+
             BookDownloader2.downloadInfoMutex.withLock {
-                val current = downloadProgress[loadId]
-                if (current != null) {
-                    setDownloadState(current)
+                if (dbState != null && dbState.downloadStatus != null) {
+                    val stateEnum = dbState.downloadStatus.let { statusInt ->
+                        DownloadState.values().getOrNull(statusInt)
+                    } ?: DownloadState.Nothing
+
+                    val inMemory = downloadProgress[loadId]
+                    val new = DownloadProgressState(
+                        state = stateEnum,
+                        progress = dbState.downloadProgress ?: inMemory?.progress ?: 0L,
+                        total = dbState.downloadTotal ?: inMemory?.total ?: (load as? StreamResponse)?.data?.size?.toLong() ?: 1L,
+                        downloaded = dbState.downloadProgress ?: inMemory?.downloaded ?: 0L,
+                        lastUpdatedMs = System.currentTimeMillis(),
+                        etaMs = null
+                    )
+                    downloadProgress[loadId] = new
+                    setDownloadState(new)
                 } else {
-                    BookDownloader2Helper.downloadInfo(
-                        context,
-                        load.author,
-                        load.name,
-                        load.apiName
-                    )?.let { info ->
-                        val new = DownloadProgressState(
-                            state = DownloadState.Nothing,
-                            progress = info.progress,
-                            total = info.total,
-                            downloaded = info.downloaded,
-                            lastUpdatedMs = System.currentTimeMillis(),
-                            etaMs = null
-                        )
-                        downloadProgress[loadId] = new
-                        setDownloadState(new)
-                    } ?: run {
-                        val new = DownloadProgressState(
-                            state = DownloadState.Nothing,
-                            progress = 0,
-                            total = (load as? StreamResponse)?.data?.size?.toLong() ?: 1,
-                            downloaded = 0,
-                            lastUpdatedMs = System.currentTimeMillis(),
-                            etaMs = null
-                        )
-                        setDownloadState(new)
+                    val current = downloadProgress[loadId]
+                    if (current != null) {
+                        setDownloadState(current)
+                    } else {
+                        BookDownloader2Helper.downloadInfo(
+                            context,
+                            load.author,
+                            load.name,
+                            load.apiName
+                        )?.let { info ->
+                            val new = DownloadProgressState(
+                                state = DownloadState.Nothing,
+                                progress = info.progress,
+                                total = info.total,
+                                downloaded = info.downloaded,
+                                lastUpdatedMs = System.currentTimeMillis(),
+                                etaMs = null
+                            )
+                            downloadProgress[loadId] = new
+                            setDownloadState(new)
+                        } ?: run {
+                            val new = DownloadProgressState(
+                                state = DownloadState.Nothing,
+                                progress = 0,
+                                total = (load as? StreamResponse)?.data?.size?.toLong() ?: 1,
+                                downloaded = 0,
+                                lastUpdatedMs = System.currentTimeMillis(),
+                                etaMs = null
+                            )
+                            setDownloadState(new)
+                        }
                     }
                 }
             }
@@ -953,13 +998,9 @@ class ResultViewModel : ViewModel() {
         loadId = tid
         id.postValue(tid)
 
-        readState.postValue(
-            ReadType.fromSpinner(
-                getKey(
-                    RESULT_BOOKMARK_STATE, tid.toString()
-                )
-            )
-        )
+        val state = getKey<Int>(RESULT_BOOKMARK_STATE, tid.toString()) ?: -1
+        bookmarkState.postValue(state)
+        readState.postValue(ReadType.fromSpinner(state))
 
         setKey(
             DOWNLOAD_EPUB_LAST_ACCESS, tid.toString(), System.currentTimeMillis()
@@ -977,6 +1018,10 @@ class ResultViewModel : ViewModel() {
 
         // insert a download progress if not found
         insertZeroData()
+
+        if (::load.isInitialized) {
+            reorderChapters(load)
+        }
     }
 
     fun initState(card: DownloadFragment.DownloadDataLoaded) = viewModelScope.launch {

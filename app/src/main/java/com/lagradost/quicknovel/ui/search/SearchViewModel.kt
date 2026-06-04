@@ -15,8 +15,7 @@ import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.Apis.Companion.apis
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.amap
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.*
 
 class SearchViewModel : ViewModel() {
     private val _searchResponse: MutableLiveData<Resource<ArrayList<SearchResponse>>?> =
@@ -28,6 +27,8 @@ class SearchViewModel : ViewModel() {
 
     @Volatile
     var searchCounter = 0
+
+    var lastSearchQuery = ""
 
     fun clearSearch() {
         searchCounter++
@@ -53,27 +54,37 @@ class SearchViewModel : ViewModel() {
             return
         }
         ongoingSearchJob?.cancel()
+        lastSearchQuery = query
         ongoingSearchJob = ioSafe {
             searchCounter++
             val localSearchCounter = searchCounter
             _searchResponse.postValue(Resource.Loading())
 
-            val currentList = ArrayList<OnGoingSearch>()
+            // Thread-safe list collection to prevent concurrent write crashes
+            val currentList = java.util.Collections.synchronizedList(ArrayList<OnGoingSearch>())
 
             _currentSearch.postValue(ArrayList())
             // Use pre-warmed repo cache from Apis — avoids creating new APIRepository objects on every search
             val repos = Apis.getActiveRepositories()
 
-            repos.amap { a ->
-                if(!isActive) return@amap
-                currentList.add(OnGoingSearch(a.name, a.search(query)))
-                if (localSearchCounter == searchCounter) {
-                    _currentSearch.postValue(currentList)
-                }
+            // Run in local coroutineScope with structured concurrency so child async jobs cancel immediately on parent cancel()
+            kotlinx.coroutines.coroutineScope {
+                repos.map { a ->
+                    async {
+                        if (!isActive) return@async
+                        val result = a.search(query)
+                        if (!isActive) return@async
+                        currentList.add(OnGoingSearch(a.name, result))
+                        if (localSearchCounter == searchCounter) {
+                            // Shallow-copy to ensure rendering thread does not get concurrent modifications
+                            _currentSearch.postValue(ArrayList(currentList))
+                        }
+                    }
+                }.forEach { it.await() }
             }
             if(!isActive) return@ioSafe
 
-            _currentSearch.postValue(currentList)
+            _currentSearch.postValue(ArrayList(currentList))
 
             if (localSearchCounter != searchCounter) return@ioSafe
 

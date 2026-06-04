@@ -22,6 +22,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.preference.PreferenceManager
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.request.Disposable
@@ -486,9 +487,27 @@ class ReadActivityViewModel : ViewModel() {
     }
 
 
-    var mlSettings
-        get() = getKey<MLSettings>(EPUB_CURRENT_ML, book.title()) ?: MLSettings("en", "en")
-        set(value) = setKey(EPUB_CURRENT_ML, book.title(), value)
+    private var sessionMlSettings: MLSettings? = null
+
+    var mlSettings: MLSettings
+        get() {
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context ?: return MLSettings("en", "en"))
+            val rememberTranslation = settingsManager.getBoolean("reader_remember_translation_state", true)
+            if (!rememberTranslation) {
+                return sessionMlSettings ?: MLSettings("en", "en")
+            }
+            return getKey<MLSettings>(EPUB_CURRENT_ML, book.title()) ?: MLSettings("en", "en")
+        }
+        set(value) {
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context ?: return)
+            val rememberTranslation = settingsManager.getBoolean("reader_remember_translation_state", true)
+            sessionMlSettings = value
+            if (rememberTranslation) {
+                setKey(EPUB_CURRENT_ML, book.title(), value)
+            } else {
+                setKey(EPUB_CURRENT_ML, book.title(), null)
+            }
+        }
 
     private val _chapterData: MutableLiveData<ChapterUpdate> =
         MutableLiveData<ChapterUpdate>(null)
@@ -1119,11 +1138,11 @@ class ReadActivityViewModel : ViewModel() {
                             if (result is Resource.Success) {
                                 val translatedValue = result.value
                                 val prefersBatching = engine.prefersBatching
-                                val sep = if (prefersBatching) "\n###BATCH_SEP###\n" else ""
-                                val wasBatched = translatedValue != null && sep.isNotEmpty() && translatedValue.contains(sep)
+                                val separatorRegex = Regex("""(?i)\s*###\s*BATCH_SEP\s*###\s*""")
+                                val wasBatched = translatedValue != null && prefersBatching && separatorRegex.containsMatchIn(translatedValue)
                                 
                                 if (wasBatched && batchSpans.size > 1) {
-                                    val translatedTexts = translatedValue?.split(sep) ?: emptyList()
+                                    val translatedTexts = translatedValue?.split(separatorRegex) ?: emptyList()
                                     for (j in batchSpans.indices) {
                                         val translatedParagraph = translatedTexts.getOrNull(j)?.trim() ?: batchSpans[j].text.toString()
                                         val start = builder.length
@@ -1132,7 +1151,7 @@ class ReadActivityViewModel : ViewModel() {
                                     }
                                 } else {
                                     val translatedParagraph = translatedValue?.trim() ?: batchSpans[0].text.toString()
-                                    val cleanedText = if (sep.isNotEmpty() && translatedParagraph.contains(sep)) translatedParagraph.replace(sep, "\n\n") else translatedParagraph
+                                    val cleanedText = translatedParagraph.replace(separatorRegex, "\n\n")
                                     val start = builder.length
                                     builder.append(cleanedText).append("\n\n")
                                     out.add(TextSpan(cleanedText.toSpanned(), start, builder.length - 2, batchSpans[0].index, batchSpans[0].innerIndex))
@@ -1321,7 +1340,7 @@ class ReadActivityViewModel : ViewModel() {
             val translator = Translation.getClient(options)
             mlTranslator = translator
 
-            if (allowDownload) {
+            if (allowDownload && isDownloadNeeded) {
                 _translationLoadingStatus.postValue(Resource.Loading("Downloading local model..."))
                 try {
                     Tasks.await(
@@ -1377,6 +1396,12 @@ class ReadActivityViewModel : ViewModel() {
         when (loadedBook) {
             is Resource.Success -> {
                 init(loadedBook.value, context)
+
+                // Restore translation active state based on whether mlSettings is valid
+                isTranslationActive = mlSettings.isValid()
+                if (isTranslationActive) {
+                    isShowingOriginalLive.postValue(false)
+                }
 
                 initMLFromSettings(mlSettings, false)
 

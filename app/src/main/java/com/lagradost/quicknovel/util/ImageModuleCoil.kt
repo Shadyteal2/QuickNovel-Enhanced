@@ -64,6 +64,13 @@ object ImageLoader {
                     OkHttpClient()
                         .newBuilder()
                         .ignoreAllSSLErrors()
+                        .addInterceptor(com.lagradost.quicknovel.network.CloudflareKiller())
+                        .addInterceptor { chain ->
+                            val request = chain.request().newBuilder()
+                                .header("User-Agent", com.lagradost.quicknovel.USER_AGENT)
+                                .build()
+                            chain.proceed(request)
+                        }
                         .build()
                 }))
             }
