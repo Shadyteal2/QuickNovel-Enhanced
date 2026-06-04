@@ -35,11 +35,12 @@ NeoQN is a complete overhaul of the original QuickNovel app — rebuilt from the
 - **Custom Categories & Live Updates** — Create and reorder personal library folders. Background sync notifies you the moment new chapters drop.
 - **3 Novel Detail Screen Layouts** — Switch between three premium landing page designs with dynamic cover-matched color palettes.
 - **AMOLED / Light / Material You Themes** — True pitch-black AMOLED mode, a clean light theme, and full Monet dynamic coloring on Android 12+.
-- **Custom Backgrounds & Fonts** — Set any wallpaper behind your library shelf with blur/dim controls. Inject any `.ttf` / `.otf` font.
+- **Custom Backgrounds & Fonts** — Set any wallpaper behind your library shelf with blur/dim controls and many Trendy fonts in the app with scaling option.
 - **Decentralized Plugin System** — Providers are modular, sandboxed plugins downloaded separately. Update, repair, or expand sources without touching the app.
 - **Reading Stats & For You Feed** — Detailed reading history metrics and a locally computed recommendation dashboard.
 - **Pinterest Bento Grid** — Masonry layout with GPU-accelerated 3D tilt effects on cover art.
 - **Vibe & Aura Settings** — Global character rename dictionary, visual contrast overlays, and advanced tuning toggles.
+-  and many more features , try them in app.
 
 ---
 
@@ -77,8 +78,6 @@ NeoQN is a complete overhaul of the original QuickNovel app — rebuilt from the
 ## Extensible Plugin Ecosystem
 
 NeoQN does not bundle, host, or pre-configure any copyrighted novel sources. It provides a sandboxed **External Plugin System** allowing users to load their own self-hosted scrapers, personal web archives, or custom third-party extensions.
-
-To learn more about developing or installing plugins, refer to the plugin template guidelines.
 
 ---
 
