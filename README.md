@@ -45,7 +45,6 @@ NeoQN is a complete overhaul of the original QuickNovel app — rebuilt from the
 
 ## Screenshots
 
-> Drop your screenshots into the [`screenshots/`](./screenshots/) folder and they'll appear here automatically.
 
 | <img src="./screenshots/01_library.png" width="180"/> | <img src="./screenshots/02_source_explorer.png" width="180"/> | <img src="./screenshots/03_novel_detail.png" width="180"/> | <img src="./screenshots/04_reader.png" width="180"/> | <img src="./screenshots/05_settings.png" width="180"/> |
 |:---:|:---:|:---:|:---:|:---:|
