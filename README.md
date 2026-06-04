@@ -45,13 +45,15 @@ NeoQN is a complete overhaul of the original QuickNovel app — rebuilt from the
 
 ## Screenshots
 
-| <img src="./app/assets/NeoQN%20(5).png" width="180"/> | <img src="./app/assets/NeoQN%20(6).png" width="180"/> | <img src="./app/assets/NeoQN%20(7).png" width="180"/> | <img src="./app/assets/NeoQN%20(8).png" width="180"/> | <img src="./app/assets/NeoQN%20(9).png" width="180"/> |
-|:---:|:---:|:---:|:---:|:---:|
-| **Library with Custom BG** | **Source Explorer** | **History** | **Settings** | **Novels Library** |
+> Drop your screenshots into the [`screenshots/`](./screenshots/) folder and they'll appear here automatically.
 
-| <img src="./app/assets/placeholder.png" width="180"/> | <img src="./app/assets/placeholder.png" width="180"/> | <img src="./app/assets/placeholder.png" width="180"/> | <img src="./app/assets/placeholder.png" width="180"/> | <img src="./app/assets/placeholder.png" width="180"/> |
+| <img src="./screenshots/01_library.png" width="180"/> | <img src="./screenshots/02_source_explorer.png" width="180"/> | <img src="./screenshots/03_novel_detail.png" width="180"/> | <img src="./screenshots/04_reader.png" width="180"/> | <img src="./screenshots/05_settings.png" width="180"/> |
 |:---:|:---:|:---:|:---:|:---:|
-| **[Screenshot 6]** | **[Screenshot 7]** | **[Screenshot 8]** | **[Screenshot 9]** | **[Screenshot 10]** |
+| **Library** | **Source Explorer** | **Novel Detail** | **Reader** | **Settings** |
+
+| <img src="./screenshots/06_vibe_aura.png" width="180"/> | <img src="./screenshots/07_search.png" width="180"/> | <img src="./screenshots/08_updates.png" width="180"/> | <img src="./screenshots/09_history.png" width="180"/> | <img src="./screenshots/10_providers.png" width="180"/> |
+|:---:|:---:|:---:|:---:|:---:|
+| **Vibe & Aura** | **Search** | **Updates** | **History** | **Providers** |
 
 ---
 
