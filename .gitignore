@@ -30,7 +30,6 @@ gradle.properties
 .venv/
 
 # ─── Scratch / Temp Scripts ───────────────────────────────────
-# Specific filenames are listed in .git/info/exclude (local-only, not tracked)
 *.csv
 
 # ─── Graphify Knowledge Graph ────────────────────────────────
