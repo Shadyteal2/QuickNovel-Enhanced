@@ -29,7 +29,7 @@ This is a major release. Covers a full Compose UI migration, a rewritten downloa
 
 **Providers & Plugins**
 - Replaced the sync provider FAB with a direct **Import APK** button in the Providers tab
-- Hot reload plugin functionality — providers reload in the backend without requiring a restart
+- Hot reload plugin functionality — new fixed providers can now replace old broken providers.
 
 **Download Engine**
 - Increased batch download quantity for faster overall download speeds
@@ -55,13 +55,13 @@ This is a major release. Covers a full Compose UI migration, a rewritten downloa
 - Fixed a crash in the global search bar
 - Fixed novel download failures and improved overall download reliability
 - Fixed reading stats tracking mechanics
-- Resolved a significant memory leak in the reader
+- Resolved a significant memory leak in the library tab.
 
 ---
 
 ### Getting providers
 
-Providers ship separately from the app. Grab the latest provider APK from the **[Telegram channel](https://t.me/+i9MSwgeoXzU0NTE1)**, or sideload any `.apk` directly using the new **Import APK** button in the Providers tab.
+Providers ship separately from the app. Grab the latest provider APK from the **[Telegram channel](https://t.me/+i9MSwgeoXzU0NTE1)**, and tap "+" fab in providers tab to import it.
 
 ---
 
