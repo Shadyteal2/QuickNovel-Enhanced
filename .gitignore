@@ -39,9 +39,7 @@ AGENTS.md
 temp_readme.md
 
 # ─── Scratch / Temp Scripts ───────────────────────────────────
-generate_data.py
-massive_dummy_data.csv
-parse_data.py
+# Specific filenames are listed in .git/info/exclude (local-only, not tracked)
 *.csv
 
 # ─── Graphify Knowledge Graph ────────────────────────────────
