@@ -29,24 +29,12 @@ gradle.properties
 # ─── Python Virtual Environments ─────────────────────────────
 .venv/
 
-# ─── AI Coding Agent & Local Drafting Assets ──────────────────
-.agent/
-.agents/
-.gemini/
-.codex/
-.cursor/
-AGENTS.md
-temp_readme.md
-
 # ─── Scratch / Temp Scripts ───────────────────────────────────
 # Specific filenames are listed in .git/info/exclude (local-only, not tracked)
 *.csv
 
 # ─── Graphify Knowledge Graph ────────────────────────────────
 graphify-out/
-.agents/rules/graphify.md
-.agents/workflows/graphify.md
-.cursor/rules/graphify.mdc
 
 # ─── Android Keystores & Signing Secrets ─────────────────────
 *.jks
