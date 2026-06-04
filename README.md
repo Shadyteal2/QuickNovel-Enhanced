@@ -36,7 +36,7 @@ NeoQN is a complete overhaul of the original QuickNovel app — rebuilt from the
 - **3 Novel Detail Screen Layouts** — Switch between three premium landing page designs with dynamic cover-matched color palettes.
 - **AMOLED / Light / Material You Themes** — True pitch-black AMOLED mode, a clean light theme, and full Monet dynamic coloring on Android 12+.
 - **Custom Backgrounds & Fonts** — Set any wallpaper behind your library shelf with blur/dim controls and many Trendy fonts in the app with scaling option.
-- **Decentralized Plugin System** — Providers are modular, sandboxed plugins downloaded separately. Update, repair, or expand sources without touching the app.
+- **Decentralized Plugin System** — Providers are modular, sandboxed plugins downloaded separately. Update, repair, or expand sources without touching the app. Join my telegram(https://t.me/+i9MSwgeoXzU0NTE1) to get the latest provider apk.
 - **Reading Stats & For You Feed** — Detailed reading history metrics and a locally computed recommendation dashboard.
 - **Pinterest Bento Grid** — Masonry layout with GPU-accelerated 3D tilt effects on cover art.
 - **Vibe & Aura Settings** — Global character rename dictionary, visual contrast overlays, and advanced tuning toggles.
@@ -69,7 +69,7 @@ NeoQN is a complete overhaul of the original QuickNovel app — rebuilt from the
 ## Links
 
 - **Original Project:** [LagradOst/QuickNovel](https://github.com/LagradOst/QuickNovel)
-- **Telegram:** [Join the community](https://t.me/+i9MSwgeoXzU0NTE1)
+- **Telegram:** [Join the community , latest Beta Release and Providers APK](https://t.me/+i9MSwgeoXzU0NTE1)
 - **Discord:** [Join the server](https://discord.gg/njMumTKvVw)
 - **Releases:** [Get the latest APK](https://github.com/Shadyteal2/QuickNovel-Enhanced/releases)
 
