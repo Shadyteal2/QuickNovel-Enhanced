@@ -1313,8 +1313,11 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             }
         }
 
-        ioSafe {
-            runAutoUpdate()
+        val isBenchmark = intent?.getBooleanExtra("is_benchmark", false) == true
+        if (!isBenchmark) {
+            ioSafe {
+                runAutoUpdate()
+            }
         }
 
         handleIntent(intent)

@@ -1,35 +1,68 @@
-# v2.1.0: Premium Glass, Plugins & Reading Stats
+# NeoQN v2.1.5
 
-We're excited to introduce the biggest update yet to QuickNovel-Enhanced! This release focuses on a complete visual overhaul, introducing the new **Spatial Glass UI** across the app, powerful new **plugin capabilities**, and numerous quality-of-life enhancements.
+> Get the latest **provider APK**, betas, and early access — join the **[Telegram channel](https://t.me/+i9MSwgeoXzU0NTE1)**.
 
-### ✨ Major Additions
-- **External Plugin System**: Added a robust system for external plugins, enabling infinite extensibility and easier provider updates.
-- **Reading Stats & "For You"**: Monitor your reading habits with new statistics and discover new novels tailored for you.
-- **Swipe Navigation**: Navigate intuitively with new swipe options in the home section.
-- **Provider Expansion**: Added 8 brand new novel providers!
-- **Tactile Poster & Bento Grid**: Re-imagined home library UI with a beautiful Pinterest-style bento grid and tactile poster view.
-- **Custom Reader Backgrounds**: Personalize your reading experience with custom background support.
-- **Offline ML Translation**: Integrated Google ML for smooth, reliable offline translations.
-- **Inbuilt Dictionary & Aliases**: Added an offline dictionary and "Add Alias" character replacement feature for managing complex names (plus a management screen for notes and aliases).
-- **Advanced TTS**: Added Google Online TTS with advanced optimizations for a superior listening experience.
-- **Chapter Index Toolbar**: Easily navigate through novels with the new chapter index toolbar.
+---
 
-### 🎨 Changes & Refinements
-- **Premium Spatial Glass UI**: Complete rehaul of rounded glass styling and animations across all UI popups and cards.
-- **Elasticity Sliders**: New tactile, elastic tap sliders introduced throughout the app UI.
-- **Premium Haptics**: Improved haptics across all interactions for a more premium, responsive feel.
-- **Animation Optimizations**: Optimized animations and introduced smooth radial reveals for theme switching.
-- **Floating Reader Header**: Refined the reader interface with a sleek, floating header.
-- **Cloudflare Integration**: Added new Cloudflare-related features for better bypass and stability.
-- **Performance & Size**: Significant backend optimization, cleaning up the codebase to make the app smoother and smaller in size.
-- **Backup Function**: Optimized the backup function to resolve ghost download issues.
+This is a major release. Covers a full Compose UI migration, a rewritten download engine, deep backend changes, and a large wave of quality-of-life additions across the app.
 
-### 🐛 Bug Fixes
-- Fixed UI bleeding bugs within the achievements section.
-- Refined reading stats to prevent crashing on older Android devices.
-- Fixed dynamic blur rendering issues in the novel detail screen.
-- Fixed keyboard alignment bugs within the notes function.
-- Resolved navigation bugs and optimized transitions between screens.
-- Fixed visibility bugs specifically related to the "Flashbang" theme.
-- Fixed floating bar and shimmering effect glitches during novel loading.
-- Added logic to prevent duplicate bookmarks from being created.
+---
+
+### New Features
+
+**UI & Design**
+- Full Jetpack Compose migration across all major app screens
+- Completely revamped Novel Detail screens — new layouts plus a redesigned original
+- Flexible dynamic grid viewports across Library tabs
+- Smooth shimmer skeleton loading states across all screens
+- Tactile high-precision haptic ruler sliders in Settings
+- Color-graded download status badges — Green (Downloaded), Yellow (Downloading), Red (Stopped)
+- Streamlined theme selection: AMOLED, Light (Flashbang), and Monet only — Dark and Gray removed
+- Library entry animations and a minimal sort FAB
+- Global search bar redesigned with a glassmorphic style
+
+**Customization (Vibe & Aura)**
+- Accent gradient — blend two accent colors across the UI
+- Eco Mode — reduces rendering load for smoother performance on lower-end devices
+- Custom Font & Scale Manager — dynamic font loading with high-performance rendering
+- Additional customization options throughout the Vibe & Aura panel
+
+**Providers & Plugins**
+- Replaced the sync provider FAB with a direct **Import APK** button in the Providers tab
+- Hot reload plugin functionality — providers reload in the backend without requiring a restart
+
+**Download Engine**
+- Increased batch download quantity for faster overall download speeds
+- Failsafe download queue with improved retry logic and network restoration handling
+- Intelligent concurrency controls and backoff algorithms for resource management
+
+**Backend & Data**
+- Reactive Room SQLite database as the library single source of truth, backed by Kotlin Flows
+- GPU-accelerated Coil 3 image loading with smart local cover caching
+- Enhanced CloudflareKiller — better false-positive prevention and background task handling
+- Improved backup system with full custom category preservation
+- Safe post-restore app rebuild to prevent preference desync
+- Optimized ML-Kit Translation engine — no repeated model downloads, better state restoration
+
+---
+
+### Fixes
+
+- Fixed repeated/duplicate options appearing in Settings
+- Restored the missing Languages option in Settings
+- Fixed non-functional chapter index toolbar and sort FAB
+- Fixed a navigation list layout style issue
+- Fixed a crash in the global search bar
+- Fixed novel download failures and improved overall download reliability
+- Fixed reading stats tracking mechanics
+- Resolved a significant memory leak in the reader
+
+---
+
+### Getting providers
+
+Providers ship separately from the app. Grab the latest provider APK from the **[Telegram channel](https://t.me/+i9MSwgeoXzU0NTE1)**, or sideload any `.apk` directly using the new **Import APK** button in the Providers tab.
+
+---
+
+[Telegram](https://t.me/+i9MSwgeoXzU0NTE1) · [Discord](https://discord.gg/njMumTKvVw) · [All releases](https://github.com/Shadyteal2/QuickNovel-Enhanced/releases)

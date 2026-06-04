@@ -20,3 +20,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "QuickNovel"
 include(":app")
+include(":benchmark")
+

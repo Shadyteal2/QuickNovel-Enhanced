@@ -243,5 +243,11 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!-- Allow Macrobenchmark to profile the app on user/release builds -->
+        <profileable
+            android:shell="true"
+            tools:targetApi="29" />
     </application>
 </manifest>
+

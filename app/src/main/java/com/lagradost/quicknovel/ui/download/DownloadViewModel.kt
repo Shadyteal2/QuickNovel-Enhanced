@@ -160,6 +160,10 @@ class DownloadViewModel : ViewModel() {
     val readList: List<CategoryItem> get() = _readList.value
 
     var activeQuery: String = ""
+    private var resortJob: Job? = null
+    private val cardsUpdateFlow = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(
+        extraBufferCapacity = 64
+    )
     val _pages: androidx.lifecycle.MutableLiveData<List<Page>?> = androidx.lifecycle.MutableLiveData(null)
     val pages: androidx.lifecycle.LiveData<List<Page>?> = _pages
     val categories: LiveData<List<CategoryItem>> = _readList.asLiveData()
@@ -199,6 +203,13 @@ class DownloadViewModel : ViewModel() {
             bookmarkChanged.collect {
                 loadAllData(false)
             }
+        }
+        viewModelScope.launch(Dispatchers.Default) {
+            cardsUpdateFlow
+                .sample(500L)
+                .collect {
+                    postCards()
+                }
         }
         viewModelScope.launch(Dispatchers.IO) {
             dao.getAllAsFlow().collect { novels ->
@@ -286,7 +297,8 @@ class DownloadViewModel : ViewModel() {
             searchQuery.postValue(query)
         }
         activeQuery = query.lowercase()
-        resortAllData()
+        resortJob?.cancel()
+        resortJob = resortAllData()
     }
 
     fun readEpub(card: DownloadFragment.DownloadDataLoaded) = ioSafe {
@@ -588,7 +600,7 @@ class DownloadViewModel : ViewModel() {
     }
 
     // QN-Enhanced: Optimized background sorting to prevent UI lag with 10k items
-    fun resortAllData() = viewModelScope.launch(Dispatchers.Default) {
+    fun resortAllData(): Job = viewModelScope.launch(Dispatchers.Default) {
         val data = _pages.value ?: return@launch
         if (data.isEmpty()) return@launch
 
@@ -616,16 +628,18 @@ class DownloadViewModel : ViewModel() {
         val newSortingMethod = getKey(DOWNLOAD_SETTINGS, DOWNLOAD_NORMAL_SORTING_METHOD) ?: DEFAULT_SORT
 
         // Fetch sorted/filtered subset natively from Room to support 10k+ books efficiently
-        val bookmarks = if (activeQuery.isNotBlank()) {
-            val queryPattern = "%${activeQuery}%"
-            dao.getBookmarksFiltered(queryPattern)
-        } else {
-            when (newSortingMethod) {
-                ALPHA_SORT -> dao.getBookmarksSortedAlphabetical()
-                REVERSE_ALPHA_SORT -> dao.getBookmarksSortedAlphabeticalDesc()
-                LAST_UPDATED_SORT -> dao.getBookmarksSortedLastDownloaded()
-                REVERSE_LAST_UPDATED_SORT -> dao.getBookmarksSortedLastDownloadedAsc()
-                else -> dao.getAllBookmarksAsFlow().first()
+        val bookmarks = withContext(Dispatchers.IO) {
+            if (activeQuery.isNotBlank()) {
+                val queryPattern = "%${activeQuery}%"
+                dao.getBookmarksFiltered(queryPattern)
+            } else {
+                when (newSortingMethod) {
+                    ALPHA_SORT -> dao.getBookmarksSortedAlphabetical()
+                    REVERSE_ALPHA_SORT -> dao.getBookmarksSortedAlphabeticalDesc()
+                    LAST_UPDATED_SORT -> dao.getBookmarksSortedLastDownloaded()
+                    REVERSE_LAST_UPDATED_SORT -> dao.getBookmarksSortedLastDownloadedAsc()
+                    else -> dao.getAllBookmarksAsFlow().first()
+                }
             }
         }
 
@@ -694,13 +708,13 @@ class DownloadViewModel : ViewModel() {
     }
 
 
-    private suspend fun postCards() {
+    private suspend fun postCards() = withContext(Dispatchers.Default) {
         val currentPages = _pages.value
         if (currentPages == null) {
             // If they haven't been loaded yet, trigger a full load
             // This prevents the "silent fail" when postCards() is called before loadAllData()
             loadAllData(false)
-            return
+            return@withContext
         }
         val list = CopyOnWriteArrayList(currentPages)
         if (list.isEmpty()) {
@@ -749,7 +763,7 @@ class DownloadViewModel : ViewModel() {
 
 
     private fun progressChanged(data: Pair<Int, DownloadProgressState>) =
-        viewModelScope.launchSafe {
+        viewModelScope.launchSafe(Dispatchers.Default) {
             cardsDataMutex.withLock {
                 val (id, state) = data
                 val newState = state.eta(context ?: return@launchSafe)
@@ -764,18 +778,18 @@ class DownloadViewModel : ViewModel() {
                     readCount = if (state.progress % 10 == 0L) getKey<Int>(DOWNLOAD_EPUB_SIZE, id.toString()) ?: current.readCount else current.readCount
                 )
             }
-            postCards()
+            cardsUpdateFlow.tryEmit(Unit)
         }
 
-    private fun downloadRemoved(id: Int) = viewModelScope.launchSafe {
+    private fun downloadRemoved(id: Int) = viewModelScope.launchSafe(Dispatchers.Default) {
         cardsDataMutex.withLock {
             cardsData -= id
         }
-        postCards()
+        cardsUpdateFlow.tryEmit(Unit)
     }
 
     private fun progressDataChanged(data: Pair<Int, DownloadFragment.DownloadData>) =
-        viewModelScope.launchSafe {
+        viewModelScope.launchSafe(Dispatchers.Default) {
             cardsDataMutex.withLock {
                 val (id, value) = data
                 cardsData[id] = cardsData[id]?.copy(
@@ -815,7 +829,7 @@ class DownloadViewModel : ViewModel() {
                     )
                 }
             }
-            postCards()
+            cardsUpdateFlow.tryEmit(Unit)
         }
 
     suspend fun fetchAllData(postCard: Boolean) {

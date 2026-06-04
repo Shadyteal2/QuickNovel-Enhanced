@@ -25,12 +25,47 @@ android {
         applicationId "com.shady.neoqn"
         minSdkVersion 21
         targetSdkVersion 34
-        versionCode 60
-        versionName "2.1.1"
+        versionCode 65
+        versionName "2.1.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         ndk {
-            abiFilters "arm64-v8a"
+            if (!gradle.startParameter.taskNames.any { it.contains("Release") || it.contains("release") }) {
+                abiFilters "arm64-v8a"
+            }
+        }
+    }
+
+    signingConfigs {
+        release {
+            // Read storeFile path and credentials dynamically from environment variable or local.properties
+            def storeFilePath = System.getenv("SIGNING_STORE_FILE") ?: ""
+            def storePass = System.getenv("SIGNING_STORE_PASSWORD") ?: ""
+            def keyAli = System.getenv("SIGNING_KEY_ALIAS") ?: ""
+            def keyPass = System.getenv("SIGNING_KEY_PASSWORD") ?: ""
+            
+            if (project.rootProject.file('local.properties').exists()) {
+                Properties properties = new Properties()
+                properties.load(project.rootProject.file('local.properties').newDataInputStream())
+                if (!storeFilePath) storeFilePath = properties.getProperty('signing.storeFile', "")
+                if (!storePass) storePass = properties.getProperty('signing.storePassword', "")
+                if (!keyAli) keyAli = properties.getProperty('signing.keyAlias', "")
+                if (!keyPass) keyPass = properties.getProperty('signing.keyPassword', "")
+            }
+            
+            storeFile storeFilePath ? file(storeFilePath) : file("release.keystore")
+            storePassword storePass ?: "dummy_pass"
+            keyAlias keyAli ?: "dummy_alias"
+            keyPassword keyPass ?: "dummy_pass"
+        }
+    }
+
+    splits {
+        abi {
+            enable gradle.startParameter.taskNames.any { it.contains("Release") || it.contains("release") }
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86_64"
+            universalApk false
         }
     }
 
@@ -38,7 +73,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
         debug {
             applicationIdSuffix ".debug"
@@ -50,6 +85,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
 
     buildFeatures.buildConfig true
 
@@ -137,4 +173,7 @@ dependencies {
     implementation 'androidx.activity:activity-compose:1.9.0'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0'
     implementation 'androidx.compose.runtime:runtime-livedata'
+
+    // Profile installer for Baseline Profile support
+    implementation 'androidx.profileinstaller:profileinstaller:1.4.0'
 }

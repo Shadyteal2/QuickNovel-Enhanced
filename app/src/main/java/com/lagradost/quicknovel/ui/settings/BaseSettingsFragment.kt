@@ -165,6 +165,14 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
             if (uri == null) return@registerForActivityResult
             val context = context ?: return@registerForActivityResult
+            
+            try {
+                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                context.contentResolver.takePersistableUriPermission(uri, flags)
+            } catch (e: Exception) {
+                logError(e)
+            }
+
             val file = SafeFile.fromUri(context, uri)
             val filePath = file?.filePath()
             

@@ -350,7 +350,7 @@ fun DownloadScreen(
 
                     ScrollableTabRow(
                         selectedTabIndex = pagerState.currentPage,
-                        edgePadding = 0.dp,
+                        edgePadding = 16.dp,
                         containerColor = Color.Transparent,
                         divider = {},
                         indicator = {},
@@ -611,6 +611,27 @@ fun DownloadScreen(
                             if (isCompact) {
                                 val listState = rememberLazyListState()
                                 
+                                // Prefetch cover images of the upcoming 12 novels as the user scrolls
+                                LaunchedEffect(listState.firstVisibleItemIndex) {
+                                    val totalItems = list.size
+                                    val startIndex = (listState.firstVisibleItemIndex + 8).coerceAtMost(totalItems)
+                                    val endIndex = (startIndex + 12).coerceAtMost(totalItems)
+                                    for (i in startIndex until endIndex) {
+                                        val card = list.getOrNull(i) ?: continue
+                                        val posterUrl = when (card) {
+                                            is ResultCached -> card.poster
+                                            is DownloadFragment.DownloadDataLoaded -> card.posterUrl
+                                            else -> null
+                                        } ?: continue
+                                        val req = ImageRequest.Builder(context)
+                                            .data(posterUrl)
+                                            .size(coil3.size.Size.ORIGINAL)
+                                            .allowHardware(true)
+                                            .build()
+                                        coil3.SingletonImageLoader.get(context).enqueue(req)
+                                    }
+                                }
+                                
                                 LazyColumn(
                                     state = listState,
                                     userScrollEnabled = !isSwipingPage,
@@ -701,6 +722,27 @@ fun DownloadScreen(
                                 // Grid layout (Pinterest/Bento style)
                                 val totalCount = list.size + (if (isDownloadsPage) 1 else 0)
                                 val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+                                
+                                // Prefetch cover images of the upcoming 18 novels as the user scrolls
+                                LaunchedEffect(gridState.firstVisibleItemIndex) {
+                                    val totalItems = list.size
+                                    val startIndex = (gridState.firstVisibleItemIndex + 12).coerceAtMost(totalItems)
+                                    val endIndex = (startIndex + 18).coerceAtMost(totalItems)
+                                    for (i in startIndex until endIndex) {
+                                        val card = list.getOrNull(i) ?: continue
+                                        val posterUrl = when (card) {
+                                            is ResultCached -> card.poster
+                                            is DownloadFragment.DownloadDataLoaded -> card.posterUrl
+                                            else -> null
+                                        } ?: continue
+                                        val req = ImageRequest.Builder(context)
+                                            .data(posterUrl)
+                                            .size(coil3.size.Size.ORIGINAL)
+                                            .allowHardware(true)
+                                            .build()
+                                        coil3.SingletonImageLoader.get(context).enqueue(req)
+                                    }
+                                }
 
                                 LazyVerticalGrid(
                                     state = gridState,
