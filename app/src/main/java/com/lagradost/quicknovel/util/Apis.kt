@@ -17,8 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 class Apis {
     companion object {
         private val internalApis: List<MainAPI> = listOf<MainAPI>(
-            // All internal providers have been migrated to external extension bundles.
-            // Only non-migrated or core providers remain here.
+            com.lagradost.quicknovel.providers.WebToEpubAPI()
         ).sortedBy { it.name }
 
 

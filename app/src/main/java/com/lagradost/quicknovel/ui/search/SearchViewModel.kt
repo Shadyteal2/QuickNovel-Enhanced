@@ -15,6 +15,7 @@ import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.Apis.Companion.apis
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.amap
+import com.lagradost.quicknovel.providers.WebToEpubMap
 import kotlinx.coroutines.*
 
 class SearchViewModel : ViewModel() {
@@ -64,8 +65,15 @@ class SearchViewModel : ViewModel() {
             val currentList = java.util.Collections.synchronizedList(ArrayList<OnGoingSearch>())
 
             _currentSearch.postValue(ArrayList())
-            // Use pre-warmed repo cache from Apis — avoids creating new APIRepository objects on every search
-            val repos = Apis.getActiveRepositories()
+            
+            // If the query is a supported URL, skip other providers and use WebToEpub directly
+            val webToEpubParser = WebToEpubMap.getParserForUrl(query)
+            val repos = if (webToEpubParser != null) {
+                listOf(Apis.getApiFromName("WebToEpub"))
+            } else {
+                // Use pre-warmed repo cache from Apis — avoids creating new APIRepository objects on every search
+                Apis.getActiveRepositories()
+            }
 
             // Run in local coroutineScope with structured concurrency so child async jobs cancel immediately on parent cancel()
             kotlinx.coroutines.coroutineScope {
