@@ -78,7 +78,7 @@ NeoQN is a complete overhaul of the original QuickNovel app — rebuilt from the
 ## Extensible Plugin Ecosystem
 
 NeoQN does not bundle, host, or pre-configure any copyrighted novel sources. It provides a sandboxed **External Plugin System** allowing users to load their own self-hosted scrapers, personal web archives, or custom third-party extensions.
-
+(Will provide more detail on how to do it later) 👌
 ---
 
 ## Legal Disclaimer & Notice
