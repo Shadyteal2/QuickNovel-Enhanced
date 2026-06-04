@@ -31,9 +31,18 @@ gradle.properties
 
 # ─── AI Coding Agent & Local Drafting Assets ──────────────────
 .agent/
+.agents/
 .gemini/
+.codex/
+.cursor/
 AGENTS.md
 temp_readme.md
+
+# ─── Scratch / Temp Scripts ───────────────────────────────────
+generate_data.py
+massive_dummy_data.csv
+parse_data.py
+*.csv
 
 # ─── Graphify Knowledge Graph ────────────────────────────────
 graphify-out/
