@@ -176,4 +176,8 @@ dependencies {
 
     // Profile installer for Baseline Profile support
     implementation 'androidx.profileinstaller:profileinstaller:1.4.0'
+
+    // Local Wi-Fi Sync (Lightweight QR Generator and Google Code Scanner)
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
 }

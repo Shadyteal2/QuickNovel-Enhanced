@@ -504,4 +504,10 @@
     <string name="auto_backup_disclaimer_title">Automatic Backup Setup</string>
     <string name="auto_backup_disclaimer_msg">To enable automatic backups, please select a dedicated folder. QuickNovel will save backups periodically and auto-delete old backups, keeping only the 5 most recent ones to save storage space.</string>
     <string name="select_folder">Select Folder</string>
+
+    <!-- Wi-Fi Sync -->
+    <string name="wifi_sync_title">Local Wi-Fi Sync</string>
+    <string name="wifi_sync_desc">Synchronize bookmarks and settings directly between devices over local Wi-Fi</string>
+    <string name="wifi_sync_camera_rationale">Camera permission is required to scan the connection QR code.</string>
+    <string name="wifi_sync_restart_desc">Database synchronization completed successfully. Restart QuickNovel to apply the changes.</string>
 </resources>

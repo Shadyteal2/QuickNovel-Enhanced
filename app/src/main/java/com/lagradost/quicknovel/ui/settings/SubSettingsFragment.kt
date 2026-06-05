@@ -518,6 +518,11 @@ class SubSettingsFragment : Fragment() {
                 activity?.restorePrompt()
             }
 
+            "wifi_sync_key" -> {
+                val intent = android.content.Intent(activity, WifiSyncActivity::class.java)
+                activity?.startActivity(intent)
+            }
+
             "manage_data_key" -> {
                 findNavController().navigate(R.id.navigation_manage_data)
             }

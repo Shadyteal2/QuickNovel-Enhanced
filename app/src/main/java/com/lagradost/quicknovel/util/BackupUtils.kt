@@ -388,4 +388,63 @@ object BackupUtils {
             }
         }
     }
+
+    fun backupToFile(context: Context, file: java.io.File) {
+        // Run database checkpoint on Room to make sure WAL files are merged before copying
+        try {
+            com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
+                .openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL);")
+        } catch (e: Exception) {
+            logError(e)
+        }
+
+        val allData = context.getSharedPrefs().all
+        val allSettings = context.getDefaultSharedPrefs().all
+
+        val allDataFiltered = allData.filterKeys { !isDownloadKey(it) }
+
+        val allDataSorted = BackupVars(
+            allDataFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
+            allDataFiltered.filter { it.value is Int } as? Map<String, Int>,
+            allDataFiltered.filter { it.value is String } as? Map<String, String>,
+            allDataFiltered.filter { it.value is Float } as? Map<String, Float>,
+            allDataFiltered.filter { it.value is Long } as? Map<String, Long>,
+            allDataFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
+        )
+
+        val allSettingsFiltered = allSettings.filterKeys { !isDownloadKey(it) }
+
+        val allSettingsSorted = BackupVars(
+            allSettingsFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
+            allSettingsFiltered.filter { it.value is Int } as? Map<String, Int>,
+            allSettingsFiltered.filter { it.value is String } as? Map<String, String>,
+            allSettingsFiltered.filter { it.value is Float } as? Map<String, Float>,
+            allSettingsFiltered.filter { it.value is Long } as? Map<String, Long>,
+            allSettingsFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
+        )
+
+        val novels = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao().getAll()
+            .filter { it.bookmarkType != null && it.bookmarkType != 0 }
+
+        val backupFile = BackupFile(
+            allDataSorted,
+            allSettingsSorted,
+            novels
+        )
+
+        file.outputStream().use { stream ->
+            mapper.writeValue(stream, backupFile)
+        }
+    }
+
+    fun restoreFromFile(context: Context, file: java.io.File): Boolean {
+        return try {
+            val backupFile = mapper.readValue<BackupFile>(file)
+            context.restore(backupFile, restoreSettings = true, restoreDataStore = true)
+            true
+        } catch (e: Exception) {
+            logError(e)
+            false
+        }
+    }
 }

@@ -751,6 +751,15 @@ fun SubSettingsScreen(
 
                         item {
                             ActionPreferenceCard(
+                                title = "Local Wi-Fi Sync",
+                                summary = "Synchronize bookmarks and settings directly between devices over local Wi-Fi",
+                                iconRes = R.drawable.ic_baseline_public_24,
+                                onClick = { onPreferenceClick("wifi_sync_key") }
+                            )
+                        }
+
+                        item {
+                            ActionPreferenceCard(
                                 title = "Manage Notes & Aliases",
                                 summary = "View and delete saved notes and character renames",
                                 iconRes = R.drawable.ic_baseline_collections_bookmark_24,
