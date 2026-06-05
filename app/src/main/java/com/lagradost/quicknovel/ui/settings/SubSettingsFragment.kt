@@ -71,6 +71,37 @@ class SubSettingsFragment : Fragment() {
             }
         }
 
+    // Auto Backup Path Picker Activity Callback
+    private val autoBackupPathPicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri == null) {
+                // If user cancels, reset interval to "never"
+                val context = context ?: return@registerForActivityResult
+                PreferenceManager.getDefaultSharedPreferences(context).edit {
+                    putString("auto_backup_interval", "never")
+                }
+                return@registerForActivityResult
+            }
+            val context = context ?: return@registerForActivityResult
+            
+            try {
+                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                context.contentResolver.takePersistableUriPermission(uri, flags)
+            } catch (e: Exception) {
+                com.lagradost.quicknovel.mvvm.logError(e)
+            }
+
+            val file = SafeFile.fromUri(context, uri)
+            val filePath = file?.filePath()
+            
+            PreferenceManager.getDefaultSharedPreferences(context).edit {
+                putString("auto_backup_path", uri.toString())
+                putString("auto_backup_path_pref", filePath ?: uri.toString())
+            }
+
+            com.lagradost.quicknovel.BackupWorkHelper.scheduleBackupWorker(context)
+        }
+
     // Image Background Picker Callback
     private val imagePicker =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -438,6 +469,45 @@ class SubSettingsFragment : Fragment() {
                         putString(getString(R.string.download_path_pref), dirs[it])
                     }
                 }
+            }
+
+            "auto_backup_interval" -> {
+                val names = listOf("Never (Disabled)", "Daily", "Weekly", "Monthly")
+                val values = listOf("never", "daily", "weekly", "monthly")
+                val current = sharedPrefs.getString("auto_backup_interval", "never") ?: "never"
+                
+                activity?.showBottomDialog(names, values.indexOf(current), "Automatic Backup", false, {}) { selectedIndex ->
+                    val selectedValue = values[selectedIndex]
+                    
+                    if (selectedValue != "never") {
+                        val path = sharedPrefs.getString("auto_backup_path", null)
+                        if (path.isNullOrBlank()) {
+                            com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.AlertDialogCustom)
+                                .setTitle(getString(R.string.auto_backup_disclaimer_title))
+                                .setMessage(getString(R.string.auto_backup_disclaimer_msg))
+                                .setCancelable(true)
+                                .setPositiveButton(getString(R.string.select_folder)) { dialog, _ ->
+                                    dialog.dismiss()
+                                    sharedPrefs.edit().putString("auto_backup_interval", selectedValue).apply()
+                                    autoBackupPathPicker.launch(Uri.EMPTY)
+                                }
+                                .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
+                                    dialog.dismiss()
+                                }
+                                .show()
+                        } else {
+                            sharedPrefs.edit().putString("auto_backup_interval", selectedValue).apply()
+                            com.lagradost.quicknovel.BackupWorkHelper.scheduleBackupWorker(context)
+                        }
+                    } else {
+                        sharedPrefs.edit().putString("auto_backup_interval", selectedValue).apply()
+                        com.lagradost.quicknovel.BackupWorkHelper.scheduleBackupWorker(context)
+                    }
+                }
+            }
+
+            "auto_backup_path" -> {
+                autoBackupPathPicker.launch(Uri.EMPTY)
             }
 
             "backup_key" -> {

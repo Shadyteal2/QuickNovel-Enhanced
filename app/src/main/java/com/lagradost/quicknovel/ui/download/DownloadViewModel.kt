@@ -868,4 +868,40 @@ class DownloadViewModel : ViewModel() {
     private fun downloadDataRefreshed(_id: Int) = viewModelScope.launchSafe {
         fetchAllData(true)
     }
+
+    fun deleteMultiple(ids: List<Int>) {
+        ioSafe {
+            for (id in ids) {
+                val novel = dao.getById(id)
+                if (novel != null) {
+                    val hasDownload = novel.downloadStatus != null && novel.downloadStatus != DownloadState.Nothing.ordinal
+                    if (hasDownload) {
+                        BookDownloader2.deleteNovel(novel.author, novel.name, novel.apiName)
+                    } else {
+                        dao.updateBookmarkType(id, null)
+                        removeKey(RESULT_BOOKMARK_STATE, id.toString())
+                        removeKey(RESULT_BOOKMARK, id.toString())
+                    }
+                } else {
+                    dao.updateBookmarkType(id, null)
+                    removeKey(RESULT_BOOKMARK_STATE, id.toString())
+                    removeKey(RESULT_BOOKMARK, id.toString())
+                }
+            }
+            loadAllData(false)
+            bookmarkChanged.emit(Unit)
+        }
+    }
+
+    fun changeCategoryMultiple(ids: List<Int>, categoryId: Int) {
+        ioSafe {
+            for (id in ids) {
+                dao.updateBookmarkType(id, categoryId)
+                setKey(RESULT_BOOKMARK_STATE, id.toString(), categoryId)
+            }
+            loadAllData(false)
+            bookmarkChanged.emit(Unit)
+        }
+    }
 }
+

@@ -883,6 +883,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
         ioSafe {
             com.lagradost.quicknovel.util.BookmarkMigrationManager.migrateIfNeeded(this@MainActivity)
+            com.lagradost.quicknovel.BackupWorkHelper.scheduleBackupWorker(this@MainActivity)
         }
 
         if (CommonActivity.pendingThemeChangeScreenshot != null) {

@@ -127,3 +127,13 @@ object AppPrefs {
     const val HISTORY_FOLDER        = "result_history"
     const val CURRENT_TAB           = "current_tab"
 }
+
+// ─── Backup ──────────────────────────────────────────────────────────────────
+
+/** Keys for the automated background backup system. */
+object BackupPrefs {
+    const val AUTO_BACKUP_INTERVAL  = "auto_backup_interval"
+    const val AUTO_BACKUP_PATH      = "auto_backup_path"
+    const val AUTO_BACKUP_PATH_PREF = "auto_backup_path_pref"
+}
+

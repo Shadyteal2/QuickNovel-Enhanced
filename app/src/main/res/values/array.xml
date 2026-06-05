@@ -195,4 +195,17 @@
         <item>AMOLED Black</item>
         <item>White</item>
     </string-array>
+
+    <string-array name="auto_backup_entries">
+        <item>Never (Disabled)</item>
+        <item>Daily</item>
+        <item>Weekly</item>
+        <item>Monthly</item>
+    </string-array>
+    <string-array name="auto_backup_values">
+        <item>never</item>
+        <item>daily</item>
+        <item>weekly</item>
+        <item>monthly</item>
+    </string-array>
 </resources>

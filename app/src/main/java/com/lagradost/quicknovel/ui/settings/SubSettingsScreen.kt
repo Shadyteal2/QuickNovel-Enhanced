@@ -708,6 +708,31 @@ fun SubSettingsScreen(
 
                         item {
                             ActionPreferenceCard(
+                                title = "Automatic Backup",
+                                summary = when (getString("auto_backup_interval", "never")) {
+                                    "daily" -> "Daily"
+                                    "weekly" -> "Weekly"
+                                    "monthly" -> "Monthly"
+                                    else -> "Never (Disabled)"
+                                },
+                                iconRes = R.drawable.baseline_save_as_24,
+                                onClick = { onPreferenceClick("auto_backup_interval") }
+                            )
+                        }
+
+                        if (getString("auto_backup_interval", "never") != "never") {
+                            item {
+                                ActionPreferenceCard(
+                                    title = "Auto Backup Path",
+                                    summary = getString("auto_backup_path_pref", "No folder selected"),
+                                    iconRes = R.drawable.ic_baseline_public_24,
+                                    onClick = { onPreferenceClick("auto_backup_path") }
+                                )
+                            }
+                        }
+
+                        item {
+                            ActionPreferenceCard(
                                 title = "Backup data",
                                 summary = "Backup your library and settings locally",
                                 iconRes = R.drawable.baseline_save_as_24,

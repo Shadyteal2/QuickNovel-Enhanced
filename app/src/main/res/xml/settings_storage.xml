@@ -9,6 +9,23 @@
         android:title="@string/download_path_pref"
         app:layout="@layout/setting_tile" />
 
+    <ListPreference
+        android:icon="@drawable/baseline_save_as_24"
+        android:key="@string/auto_backup_key"
+        android:title="@string/auto_backup_title"
+        android:summary="@string/auto_backup_desc"
+        android:entries="@array/auto_backup_entries"
+        android:entryValues="@array/auto_backup_values"
+        android:defaultValue="never"
+        app:layout="@layout/setting_tile" />
+
+    <Preference
+        android:icon="@drawable/ic_baseline_public_24"
+        android:key="@string/auto_backup_path_key"
+        android:title="@string/auto_backup_path_title"
+        android:summary="@string/auto_backup_path_desc"
+        app:layout="@layout/setting_tile" />
+
     <Preference
         android:icon="@drawable/baseline_save_as_24"
         android:key="@string/backup_key"

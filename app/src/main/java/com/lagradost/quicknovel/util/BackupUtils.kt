@@ -106,6 +106,87 @@ object BackupUtils {
                key.contains("download_history") // Catch any history related to downloads
     }
 
+    fun backupToDirectory(context: Context, targetDir: SafeFile) {
+        // Run database checkpoint on Room to make sure WAL files are merged before copying
+        try {
+            com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
+                .openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL);")
+        } catch (e: Exception) {
+            logError(e)
+        }
+
+        val date = SimpleDateFormat("yyyy_MM_dd_HH_mm").format(Date(currentTimeMillis()))
+        val displayName = "neoQN_Backup_${date}"
+        val fileName = "$displayName.json"
+
+        val allData = context.getSharedPrefs().all
+        val allSettings = context.getDefaultSharedPrefs().all
+
+        val allDataFiltered = allData.filterKeys { !isDownloadKey(it) }
+
+        val allDataSorted = BackupVars(
+            allDataFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
+            allDataFiltered.filter { it.value is Int } as? Map<String, Int>,
+            allDataFiltered.filter { it.value is String } as? Map<String, String>,
+            allDataFiltered.filter { it.value is Float } as? Map<String, Float>,
+            allDataFiltered.filter { it.value is Long } as? Map<String, Long>,
+            allDataFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
+        )
+
+        val allSettingsFiltered = allSettings.filterKeys { !isDownloadKey(it) }
+
+        val allSettingsSorted = BackupVars(
+            allSettingsFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
+            allSettingsFiltered.filter { it.value is Int } as? Map<String, Int>,
+            allSettingsFiltered.filter { it.value is String } as? Map<String, String>,
+            allSettingsFiltered.filter { it.value is Float } as? Map<String, Float>,
+            allSettingsFiltered.filter { it.value is Long } as? Map<String, Long>,
+            allSettingsFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
+        )
+
+        val novels = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao().getAll()
+            .filter { it.bookmarkType != null && it.bookmarkType != 0 }
+
+        val backupFile = BackupFile(
+            allDataSorted,
+            allSettingsSorted,
+            novels
+        )
+
+        val rFile = targetDir.findFile(fileName)
+        if (rFile?.exists() == true) {
+            rFile.delete()
+        }
+        val file = targetDir.createFile(fileName) ?: throw IOException("Error creating file")
+        if (file.exists() != true) throw IOException("File does not exist")
+        val stream = file.openOutputStream() ?: throw IOException("Error opening export stream")
+
+        val printStream = PrintWriter(stream)
+        printStream.print(mapper.writeValueAsString(backupFile))
+        printStream.close()
+
+        pruneOldBackups(targetDir)
+    }
+
+    fun pruneOldBackups(targetDir: SafeFile, maxBackupCount: Int = 5) {
+        try {
+            val files = targetDir.listFiles() ?: return
+            val backupFiles = files.filter {
+                val name = it.name() ?: ""
+                name.startsWith("neoQN_Backup_") && name.endsWith(".json")
+            }
+            if (backupFiles.size > maxBackupCount) {
+                val sorted = backupFiles.sortedBy { it.lastModified() ?: 0L }
+                val deleteCount = backupFiles.size - maxBackupCount
+                for (i in 0 until deleteCount) {
+                    sorted[i].delete()
+                }
+            }
+        } catch (e: Exception) {
+            logError(e)
+        }
+    }
+
     fun FragmentActivity.backup() {
         thread {
             try {

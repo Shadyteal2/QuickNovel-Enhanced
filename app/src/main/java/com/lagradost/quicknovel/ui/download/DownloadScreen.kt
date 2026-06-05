@@ -7,6 +7,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -145,6 +146,16 @@ fun DownloadScreen(
     // Dialog & Bottom Sheet triggers
     var showCategorySheet by remember { mutableStateOf(false) }
     var showSortSheet by remember { mutableStateOf(false) }
+    var isSelectionMode by remember { mutableStateOf(false) }
+    val selectedNovels = remember { mutableStateListOf<Int>() }
+    var showMultiSelectCategorySheet by remember { mutableStateOf(false) }
+    var showMultiSelectDeleteDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isSelectionMode) {
+        if (!isSelectionMode) {
+            selectedNovels.clear()
+        }
+    }
 
     // Set up tabs list directly from pages
     val allTabs = remember(pages) {
@@ -263,6 +274,17 @@ fun DownloadScreen(
                                 view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                                 viewModel.loadAllData(true)
                                 com.lagradost.quicknovel.CommonActivity.showToast(activity, "Checking for updates...")
+                            }
+                        )
+
+                        // Toggle Selection mode
+                        ModernIconButton(
+                            icon = Icons.Default.DoneAll,
+                            contentDescription = "Toggle Selection Mode",
+                            isActive = isSelectionMode,
+                            onClick = {
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                isSelectionMode = !isSelectionMode
                             }
                         )
 
@@ -657,16 +679,49 @@ fun DownloadScreen(
                                             }
                                         }
                                     ) { card ->
-                                        val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
-                                            {
-                                                if (card is ResultCached) onBookClick(card)
-                                                else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                        val cardId = remember(card) {
+                                            when (card) {
+                                                is ResultCached -> card.id
+                                                is DownloadFragment.DownloadDataLoaded -> card.id
+                                                else -> -1
                                             }
                                         }
-                                        val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
+                                        val isSelectedState = remember(cardId) {
+                                            derivedStateOf { selectedNovels.contains(cardId) }
+                                        }
+                                        val isSelected = isSelectedState.value
+                                        val currentOnClick = remember<() -> Unit>(card, isSelectionMode, isSelected, onBookClick, onBookClickLoaded) {
                                             {
-                                                if (card is ResultCached) onBookLongClick(card)
-                                                else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                                if (isSelectionMode) {
+                                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                                    if (isSelected) {
+                                                        selectedNovels.remove(cardId)
+                                                    } else {
+                                                        selectedNovels.add(cardId)
+                                                    }
+                                                } else {
+                                                    if (card is ResultCached) onBookClick(card)
+                                                    else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                                    else {}
+                                                }
+                                                Unit
+                                            }
+                                        }
+                                        val currentOnLongClick = remember<() -> Unit>(card, isSelectionMode, isSelected, onBookLongClick, onBookLongClickLoaded) {
+                                            {
+                                                if (isSelectionMode) {
+                                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                                    if (isSelected) {
+                                                        selectedNovels.remove(cardId)
+                                                    } else {
+                                                        selectedNovels.add(cardId)
+                                                    }
+                                                } else {
+                                                    if (card is ResultCached) onBookLongClick(card)
+                                                    else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                                    else {}
+                                                }
+                                                Unit
                                             }
                                         }
                                         val onPauseClick = remember(card, viewModel) {
@@ -703,6 +758,8 @@ fun DownloadScreen(
                                             onResumeClick = onResumeClick,
                                             onRefreshClick = onRefreshClick,
                                             onDeleteClick = onDeleteClick,
+                                            isSelectionMode = isSelectionMode,
+                                            isSelected = isSelected,
                                             modifier = Modifier.animateItemPlacement(
                                                 animationSpec = spring(
                                                     dampingRatio = Spring.DampingRatioNoBouncy,
@@ -787,16 +844,49 @@ fun DownloadScreen(
                                                 else -> 1
                                             }
                                         } else 1
-                                        val currentOnClick = remember(card, onBookClick, onBookClickLoaded) {
-                                            {
-                                                if (card is ResultCached) onBookClick(card)
-                                                else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                        val cardId = remember(card) {
+                                            when (card) {
+                                                is ResultCached -> card.id
+                                                is DownloadFragment.DownloadDataLoaded -> card.id
+                                                else -> -1
                                             }
                                         }
-                                        val currentOnLongClick = remember(card, onBookLongClick, onBookLongClickLoaded) {
+                                        val isSelectedState = remember(cardId) {
+                                            derivedStateOf { selectedNovels.contains(cardId) }
+                                        }
+                                        val isSelected = isSelectedState.value
+                                        val currentOnClick = remember<() -> Unit>(card, isSelectionMode, isSelected, onBookClick, onBookClickLoaded) {
                                             {
-                                                if (card is ResultCached) onBookLongClick(card)
-                                                else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                                if (isSelectionMode) {
+                                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                                    if (isSelected) {
+                                                        selectedNovels.remove(cardId)
+                                                    } else {
+                                                        selectedNovels.add(cardId)
+                                                    }
+                                                } else {
+                                                    if (card is ResultCached) onBookClick(card)
+                                                    else if (card is DownloadFragment.DownloadDataLoaded) onBookClickLoaded(card)
+                                                    else {}
+                                                }
+                                                Unit
+                                            }
+                                        }
+                                        val currentOnLongClick = remember<() -> Unit>(card, isSelectionMode, isSelected, onBookLongClick, onBookLongClickLoaded) {
+                                            {
+                                                if (isSelectionMode) {
+                                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                                    if (isSelected) {
+                                                        selectedNovels.remove(cardId)
+                                                    } else {
+                                                        selectedNovels.add(cardId)
+                                                    }
+                                                } else {
+                                                    if (card is ResultCached) onBookLongClick(card)
+                                                    else if (card is DownloadFragment.DownloadDataLoaded) onBookLongClickLoaded(card)
+                                                    else {}
+                                                }
+                                                Unit
                                             }
                                         }
                                         GridCardItem(
@@ -808,6 +898,8 @@ fun DownloadScreen(
                                             isNoiseEnabled = isNoiseEnabled,
                                             onClick = currentOnClick,
                                             onLongClick = currentOnLongClick,
+                                            isSelectionMode = isSelectionMode,
+                                            isSelected = isSelected,
                                             modifier = Modifier.animateItemPlacement(
                                                 animationSpec = spring(
                                                     dampingRatio = Spring.DampingRatioNoBouncy,
@@ -955,6 +1047,116 @@ fun DownloadScreen(
                                         color = MaterialTheme.colorScheme.primary,
                                         shape = RoundedCornerShape(4.dp)
                                     )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Multi-Select Action Rail (Vertical Floating Capsule on Right Edge)
+            AnimatedVisibility(
+                visible = isSelectionMode && selectedNovels.isNotEmpty(),
+                enter = slideInHorizontally(
+                    initialOffsetX = { it },
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium)
+                ) + fadeIn(),
+                exit = slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+                ) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .wrapContentHeight()
+                        .glassCard(
+                            shape = RoundedCornerShape(24.dp),
+                            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            strokeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                            strokeWidth = 1.dp
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Count Badge
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "${selectedNovels.size}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+
+                        // Divider line (using a basic Box for full Compose Material compatibility)
+                        Box(
+                            modifier = Modifier
+                                .width(28.dp)
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                        )
+
+                        // Change Category button
+                        IconButton(
+                            onClick = {
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                showMultiSelectCategorySheet = true
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Category,
+                                contentDescription = "Move Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        // Delete button
+                        IconButton(
+                            onClick = {
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                showMultiSelectDeleteDialog = true
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete Selected",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        // Cancel selection button
+                        IconButton(
+                            onClick = {
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                selectedNovels.clear()
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel Selection",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
@@ -1216,6 +1418,98 @@ fun DownloadScreen(
             }
         }
     }
+
+    // Modal Bottom Sheet: Multi-Select Category Move
+    if (showMultiSelectCategorySheet) {
+        val isSheetLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+        val sheetBgColor = if (isSheetLightTheme) Color(0xEEFFFFFF) else {
+            val themeKey = settings.getString(context.getString(R.string.theme_key), "Amoled")
+            if (themeKey == "Amoled" || themeKey == "Black") Color(0xEE000000) else Color(0xEE121215)
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { showMultiSelectCategorySheet = false },
+            containerColor = sheetBgColor,
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, bottom = 48.dp)
+            ) {
+                Text(
+                    text = "Move Selected to Category",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(categories) { categoryItem ->
+                        val categoryName = if (categoryItem.isSystem && categoryItem.stringRes != null) context.getString(categoryItem.stringRes) else categoryItem.name
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                    viewModel.changeCategoryMultiple(selectedNovels.toList(), categoryItem.id)
+                                    selectedNovels.clear()
+                                    isSelectionMode = false
+                                    showMultiSelectCategorySheet = false
+                                }
+                                .padding(vertical = 14.dp, horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Category,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = categoryName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Alert Dialog: Multi-Select Delete Confirmation
+    if (showMultiSelectDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showMultiSelectDeleteDialog = false },
+            title = { Text("Delete Novels") },
+            text = { Text("Are you sure you want to permanently delete the ${selectedNovels.size} selected novels?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        viewModel.deleteMultiple(selectedNovels.toList())
+                        selectedNovels.clear()
+                        isSelectionMode = false
+                        showMultiSelectDeleteDialog = false
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMultiSelectDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1307,6 +1601,8 @@ fun GridCardItem(
     isNoiseEnabled: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val view = LocalView.current
@@ -1523,6 +1819,48 @@ fun GridCardItem(
                     )
                 }
             }
+
+            if (isSelectionMode) {
+                val strokeColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                val overlayColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(overlayColor, shape = RoundedCornerShape(12.dp))
+                        .border(
+                            width = 3.dp,
+                            color = strokeColor,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0x66000000),
+                        )
+                        .border(
+                            width = 2.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -1551,6 +1889,8 @@ fun CompactCardItem(
     onResumeClick: () -> Unit,
     onRefreshClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1809,7 +2149,31 @@ fun CompactCardItem(
         Spacer(modifier = Modifier.width(8.dp))
 
         // Action Buttons (Pause / Resume / Delete)
-        if (card is DownloadFragment.DownloadDataLoaded) {
+        if (isSelectionMode) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    )
+                    .border(
+                        width = 2.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        } else if (card is DownloadFragment.DownloadDataLoaded) {
             val isDoneByCount = card.downloadedCount >= card.downloadedTotal && card.downloadedTotal > 0
             val realState = if (isDoneByCount && card.state != DownloadState.IsDownloading) DownloadState.IsDone else card.state
 
