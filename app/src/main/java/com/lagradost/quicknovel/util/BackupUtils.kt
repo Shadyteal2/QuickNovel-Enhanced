@@ -17,9 +17,14 @@ import com.lagradost.quicknovel.BookDownloader2Helper.requestRW
 import com.lagradost.quicknovel.CommonActivity.showToast
 import com.lagradost.quicknovel.DataStore
 import com.lagradost.quicknovel.DataStore.setKey
-import com.lagradost.quicknovel.DataStore.getDefaultSharedPrefs
-import com.lagradost.quicknovel.DataStore.getSharedPrefs
+import com.lagradost.quicknovel.DataStore.getKey
+import com.lagradost.quicknovel.DataStore.removeKey
+import androidx.preference.PreferenceManager
+import com.lagradost.quicknovel.PREFERENCES_NAME
 import com.lagradost.quicknovel.DataStore.mapper
+import com.lagradost.quicknovel.RESULT_BOOKMARK_STATE
+import com.lagradost.quicknovel.RESULT_BOOKMARK
+import com.lagradost.quicknovel.HISTORY_FOLDER
 import com.lagradost.quicknovel.util.BookmarkMigrationManager.MIGRATION_KEY
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.mvvm.logError
@@ -32,8 +37,106 @@ import java.lang.System.currentTimeMillis
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.concurrent.thread
+import com.lagradost.quicknovel.LoadResponse
+import com.lagradost.quicknovel.BookDownloader2Helper
+import com.lagradost.quicknovel.util.ResultCached
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 object BackupUtils {
+    const val SYNC_BOOKMARKS_KEY = "sync_bookmarks"
+    const val SYNC_SETTINGS_KEY = "sync_settings"
+    const val SYNC_HISTORY_KEY = "sync_history"
+
+    fun getSyncBookmarks(context: Context): Boolean {
+        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(SYNC_BOOKMARKS_KEY, true)
+    }
+
+    fun getSyncSettings(context: Context): Boolean {
+        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(SYNC_SETTINGS_KEY, true)
+    }
+
+    fun getSyncHistory(context: Context): Boolean {
+        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(SYNC_HISTORY_KEY, true)
+    }
+
+    fun isHistoryKey(key: String): Boolean {
+        return key.startsWith("reader_epub_position") || 
+               key.startsWith("result_history") || 
+               key.contains("history")
+    }
+
+    fun isBookmarkKey(key: String): Boolean {
+        return key.startsWith("result_bookmarked") || 
+               key.startsWith("result_chapter_bookmarked") || 
+               key.startsWith("result_bookmarked_state")
+    }
+
+    suspend fun generateBackup(context: Context): BackupFile = withContext(Dispatchers.IO) {
+        val syncBookmarks = getSyncBookmarks(context)
+        val syncSettings = getSyncSettings(context)
+        val syncHistory = getSyncHistory(context)
+
+        val allData = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE).all
+        val allSettings = PreferenceManager.getDefaultSharedPreferences(context).all
+
+        val allDataFiltered = withContext(Dispatchers.Default) {
+            allData.filterKeys { key ->
+                if (isDownloadKey(key)) return@filterKeys false
+                val isHistory = isHistoryKey(key)
+                val isBookmark = isBookmarkKey(key)
+                when {
+                    isHistory -> syncHistory
+                    isBookmark -> syncBookmarks
+                    else -> true
+                }
+            }
+        }
+
+        val allDataSorted = withContext(Dispatchers.Default) {
+            BackupVars(
+                allDataFiltered.filter { entry -> entry.value is Boolean } as? Map<String, Boolean>,
+                allDataFiltered.filter { entry -> entry.value is Int } as? Map<String, Int>,
+                allDataFiltered.filter { entry -> entry.value is String } as? Map<String, String>,
+                allDataFiltered.filter { entry -> entry.value is Float } as? Map<String, Float>,
+                allDataFiltered.filter { entry -> entry.value is Long } as? Map<String, Long>,
+                allDataFiltered.filter { entry -> entry.value as? Set<*> != null } as? Map<String, Set<String>>
+            )
+        }
+
+        val allSettingsFiltered = withContext(Dispatchers.Default) {
+            if (syncSettings) {
+                allSettings.filterKeys { !isDownloadKey(it) }
+            } else if (syncBookmarks) {
+                allSettings.filterKeys { key ->
+                    key == "download_settings/CUSTOM_CATEGORIES" || key == "download_settings/CATEGORIES_ORDER"
+                }
+            } else {
+                emptyMap()
+            }
+        }
+
+        val allSettingsSorted = withContext(Dispatchers.Default) {
+            BackupVars(
+                allSettingsFiltered.filter { entry -> entry.value is Boolean } as? Map<String, Boolean>,
+                allSettingsFiltered.filter { entry -> entry.value is Int } as? Map<String, Int>,
+                allSettingsFiltered.filter { entry -> entry.value is String } as? Map<String, String>,
+                allSettingsFiltered.filter { entry -> entry.value is Float } as? Map<String, Float>,
+                allSettingsFiltered.filter { entry -> entry.value is Long } as? Map<String, Long>,
+                allSettingsFiltered.filter { entry -> entry.value as? Set<*> != null } as? Map<String, Set<String>>
+            )
+        }
+
+        val novels = if (syncBookmarks) {
+            com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao().getAll()
+                .filter { it.bookmarkType != null && it.bookmarkType != 0 }
+        } else {
+            emptyList<com.lagradost.quicknovel.db.NovelEntity>()
+        }
+
+        BackupFile(allDataSorted, allSettingsSorted, novels)
+    }
+
     private var restoreFileSelector: ActivityResultLauncher<Array<String>>? = null
 
     // Kinda hack, but I couldn't think of a better way
@@ -119,8 +222,8 @@ object BackupUtils {
         val displayName = "neoQN_Backup_${date}"
         val fileName = "$displayName.json"
 
-        val allData = context.getSharedPrefs().all
-        val allSettings = context.getDefaultSharedPrefs().all
+        val allData = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE).all
+        val allSettings = PreferenceManager.getDefaultSharedPreferences(context).all
 
         val allDataFiltered = allData.filterKeys { !isDownloadKey(it) }
 
@@ -191,43 +294,13 @@ object BackupUtils {
         thread {
             try {
                 if (checkWrite()) {
-                    val subDir = getDefaultDir(context = this)//getBasePath().first
+                    val subDir = getDefaultDir(context = this)
                     val date = SimpleDateFormat("yyyy_MM_dd_HH_mm").format(Date(currentTimeMillis()))
                     val displayName = "neoQN_Backup_${date}"
 
-                    val allData = getSharedPrefs().all
-                    val allSettings = getDefaultSharedPrefs().all
-
-                    val allDataFiltered = allData.filterKeys { !isDownloadKey(it) }
-
-                    val allDataSorted = BackupVars(
-                        allDataFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
-                        allDataFiltered.filter { it.value is Int } as? Map<String, Int>,
-                        allDataFiltered.filter { it.value is String } as? Map<String, String>,
-                        allDataFiltered.filter { it.value is Float } as? Map<String, Float>,
-                        allDataFiltered.filter { it.value is Long } as? Map<String, Long>,
-                        allDataFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
-                    )
-
-                    val allSettingsFiltered = allSettings.filterKeys { !isDownloadKey(it) }
-
-                    val allSettingsSorted = BackupVars(
-                        allSettingsFiltered.filter { it.value is Boolean } as? Map<String, Boolean>,
-                        allSettingsFiltered.filter { it.value is Int } as? Map<String, Int>,
-                        allSettingsFiltered.filter { it.value is String } as? Map<String, String>,
-                        allSettingsFiltered.filter { it.value is Float } as? Map<String, Float>,
-                        allSettingsFiltered.filter { it.value is Long } as? Map<String, Long>,
-                        allSettingsFiltered.filter { it.value as? Set<String> != null } as? Map<String, Set<String>>
-                    )
-
-                    val novels = com.lagradost.quicknovel.db.AppDatabase.getDatabase(this).novelDao().getAll()
-                        .filter { it.bookmarkType != null && it.bookmarkType != 0 }
-
-                    val backupFile = BackupFile(
-                        allDataSorted,
-                        allSettingsSorted,
-                        novels
-                    )
+                    val backupFile = kotlinx.coroutines.runBlocking {
+                        generateBackup(this@backup)
+                    }
                     val (stream, fileUri) = setupStream(this, displayName, "json", subDir)
                     if (stream == null) throw IOException("Error creating export stream")
 
@@ -289,11 +362,13 @@ object BackupUtils {
                                     mapper.readValue<BackupFile>(input)
 
                                 thread {
-                                    activity.restore(
-                                        restoredValue,
-                                        restoreSettings = true,
-                                        restoreDataStore = true
-                                    )
+                                    kotlinx.coroutines.runBlocking {
+                                        activity.restore(
+                                            restoredValue,
+                                            restoreSettings = true,
+                                            restoreDataStore = true
+                                        )
+                                    }
                                     activity.runOnUiThread {
                                         com.google.android.material.dialog.MaterialAlertDialogBuilder(activity, R.style.AlertDialogCustom)
                                             .setTitle(R.string.backup_restored_title)
@@ -343,13 +418,38 @@ object BackupUtils {
         }
     }
 
+    private fun <T> Context.restoreMapFiltered(
+        map: Map<String, T>?,
+        syncBookmarks: Boolean,
+        syncHistory: Boolean,
+        isEditingAppSettings: Boolean = false
+    ) {
+        if (map == null) return
+        val editor = DataStore.editor(this, isEditingAppSettings)
+        map.forEach { entry ->
+            val key = entry.key
+            if (!isDownloadKey(key)) {
+                val isHistory = isHistoryKey(key)
+                val isBookmark = isBookmarkKey(key)
+                val shouldRestore = when {
+                    isHistory -> syncHistory
+                    isBookmark -> syncBookmarks
+                    else -> true
+                }
+                if (shouldRestore) {
+                    editor.setKeyRaw(key, entry.value)
+                }
+            }
+        }
+        editor.apply()
+    }
+
     private fun <T> Context.restoreMap(
         map: Map<String, T>?,
         isEditingAppSettings: Boolean = false
     ) {
         val editor = DataStore.editor(this, isEditingAppSettings)
         map?.forEach {
-            // QN-Enhanced: Prevent ANY download metadata from leaking into the 'Downloaded' section post-restore
             if (!isDownloadKey(it.key)) {
                 editor.setKeyRaw(it.key, it.value)
             }
@@ -357,34 +457,50 @@ object BackupUtils {
         editor.apply()
     }
 
-    fun Context.restore(
+    suspend fun Context.restore(
         backupFile: BackupFile,
         restoreSettings: Boolean,
         restoreDataStore: Boolean
-    ) {
-        if (restoreSettings) {
-            restoreMap(backupFile.settings._Bool, true)
-            restoreMap(backupFile.settings._Int, true)
-            restoreMap(backupFile.settings._String, true)
-            restoreMap(backupFile.settings._Float, true)
-            restoreMap(backupFile.settings._Long, true)
-            restoreMap(backupFile.settings._StringSet, true)
+    ) = withContext(Dispatchers.IO) {
+        val syncBookmarks = getSyncBookmarks(this@restore)
+        val syncSettings = getSyncSettings(this@restore) && restoreSettings
+        val syncHistory = getSyncHistory(this@restore)
+
+        if (syncSettings) {
+            this@restore.restoreMap(backupFile.settings._Bool, true)
+            this@restore.restoreMap(backupFile.settings._Int, true)
+            this@restore.restoreMap(backupFile.settings._String, true)
+            this@restore.restoreMap(backupFile.settings._Float, true)
+            this@restore.restoreMap(backupFile.settings._Long, true)
+            this@restore.restoreMap(backupFile.settings._StringSet, true)
+        } else if (syncBookmarks) {
+            val filterBlock: (String) -> Boolean = { key ->
+                key == "download_settings/CUSTOM_CATEGORIES" || key == "download_settings/CATEGORIES_ORDER"
+            }
+            this@restore.restoreMap(backupFile.settings._Bool?.filterKeys(filterBlock), true)
+            this@restore.restoreMap(backupFile.settings._Int?.filterKeys(filterBlock), true)
+            this@restore.restoreMap(backupFile.settings._String?.filterKeys(filterBlock), true)
+            this@restore.restoreMap(backupFile.settings._Float?.filterKeys(filterBlock), true)
+            this@restore.restoreMap(backupFile.settings._Long?.filterKeys(filterBlock), true)
+            this@restore.restoreMap(backupFile.settings._StringSet?.filterKeys(filterBlock), true)
         }
 
         if (restoreDataStore) {
-            restoreMap(backupFile.datastore._Bool)
-            restoreMap(backupFile.datastore._Int)
-            restoreMap(backupFile.datastore._String)
-            restoreMap(backupFile.datastore._Float)
-            restoreMap(backupFile.datastore._Long)
-            restoreMap(backupFile.datastore._StringSet)
+            withContext(Dispatchers.Default) {
+                this@restore.restoreMapFiltered(backupFile.datastore._Bool, syncBookmarks, syncHistory)
+                this@restore.restoreMapFiltered(backupFile.datastore._Int, syncBookmarks, syncHistory)
+                this@restore.restoreMapFiltered(backupFile.datastore._String, syncBookmarks, syncHistory)
+                this@restore.restoreMapFiltered(backupFile.datastore._Float, syncBookmarks, syncHistory)
+                this@restore.restoreMapFiltered(backupFile.datastore._Long, syncBookmarks, syncHistory)
+                this@restore.restoreMapFiltered(backupFile.datastore._StringSet, syncBookmarks, syncHistory)
+            }
 
-            if (backupFile.novels != null && backupFile.novels.isNotEmpty()) {
-                com.lagradost.quicknovel.db.AppDatabase.getDatabase(this).novelDao().insertAll(backupFile.novels)
-            } else {
-                // QN-Enhanced: If novels are missing from the backup (legacy or bugged backup),
-                // we reset the migration flag to force a re-migration of SharedPreferences bookmarks.
-                this.setKey(MIGRATION_KEY, false)
+            if (syncBookmarks) {
+                if (backupFile.novels != null && backupFile.novels.isNotEmpty()) {
+                    com.lagradost.quicknovel.db.AppDatabase.getDatabase(this@restore).novelDao().insertAll(backupFile.novels)
+                } else {
+                    this@restore.setKey(MIGRATION_KEY, false)
+                }
             }
         }
     }
@@ -398,8 +514,8 @@ object BackupUtils {
             logError(e)
         }
 
-        val allData = context.getSharedPrefs().all
-        val allSettings = context.getDefaultSharedPrefs().all
+        val allData = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE).all
+        val allSettings = PreferenceManager.getDefaultSharedPreferences(context).all
 
         val allDataFiltered = allData.filterKeys { !isDownloadKey(it) }
 
@@ -437,10 +553,76 @@ object BackupUtils {
         }
     }
 
+    suspend fun migrateNovel(context: Context, oldId: Int, newNovel: LoadResponse, newApiName: String) = withContext(Dispatchers.IO) {
+        val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
+        val dao = db.novelDao()
+        val oldEntity = dao.getById(oldId) ?: return@withContext
+
+        val newId = BookDownloader2Helper.generateId(newNovel, newApiName)
+
+        // Clean delete old novel downloaded files (and old entity download meta in DB)
+        BookDownloader2Helper.deleteNovel(context, oldEntity.author, oldEntity.name, oldEntity.apiName)
+
+        // Clone/map the new entity
+        val newEntity = oldEntity.copy(
+            id = newId,
+            source = newNovel.url,
+            apiName = newApiName,
+            author = newNovel.author ?: oldEntity.author,
+            posterUrl = newNovel.posterUrl ?: oldEntity.posterUrl,
+            rating = newNovel.rating ?: oldEntity.rating,
+            peopleVoted = newNovel.peopleVoted ?: oldEntity.peopleVoted,
+            views = newNovel.views ?: oldEntity.views,
+            synopsis = newNovel.synopsis ?: oldEntity.synopsis,
+            tags = newNovel.tags ?: oldEntity.tags,
+            // Reset download fields to reflect clean deletion
+            downloadStatus = null,
+            downloadProgress = null,
+            downloadTotal = null,
+            filePath = null,
+            lastDownloaded = null
+        )
+
+        // Insert new entity
+        dao.insert(newEntity)
+
+        // Safely remove the old entity from Room database
+        dao.deleteById(oldId)
+
+        // Shared preferences notes migration: copy the raw JSON string directly to be fail-safe
+        val prefs = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        val noteJson = prefs.getString("RESULT_USER_NOTE/$oldId", null)
+        if (noteJson != null) {
+            DataStore.removeFromCache("RESULT_USER_NOTE/$oldId")
+            DataStore.removeFromCache("RESULT_USER_NOTE/$newId")
+            prefs.edit().putString("RESULT_USER_NOTE/$newId", noteJson).remove("RESULT_USER_NOTE/$oldId").apply()
+        }
+
+        val history = context.getKey<ResultCached>(HISTORY_FOLDER, oldId.toString())
+        if (history != null) {
+            context.setKey(HISTORY_FOLDER, newId.toString(), history.copy(id = newId, apiName = newApiName, source = newNovel.url))
+            context.removeKey(HISTORY_FOLDER, oldId.toString())
+        }
+
+        val bookmark = context.getKey<ResultCached>(RESULT_BOOKMARK, oldId.toString())
+        if (bookmark != null) {
+            context.setKey(RESULT_BOOKMARK, newId.toString(), bookmark.copy(id = newId, apiName = newApiName, source = newNovel.url))
+            context.removeKey(RESULT_BOOKMARK, oldId.toString())
+        }
+
+        val state = context.getKey<Int>(RESULT_BOOKMARK_STATE, oldId.toString())
+        if (state != null) {
+            context.setKey(RESULT_BOOKMARK_STATE, newId.toString(), state)
+            context.removeKey(RESULT_BOOKMARK_STATE, oldId.toString())
+        }
+    }
+
     fun restoreFromFile(context: Context, file: java.io.File): Boolean {
         return try {
             val backupFile = mapper.readValue<BackupFile>(file)
-            context.restore(backupFile, restoreSettings = true, restoreDataStore = true)
+            kotlinx.coroutines.runBlocking {
+                context.restore(backupFile, restoreSettings = true, restoreDataStore = true)
+            }
             true
         } catch (e: Exception) {
             logError(e)

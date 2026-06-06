@@ -96,6 +96,7 @@ fun ResultDetailDefaultScreen(
 ) {
     val loadResponse     by viewModel.loadResponse.observeAsState()
     val isSyncEnabled    by viewModel.isSyncEnabledDisplay.observeAsState(false)
+    val isMigrating      by viewModel.isMigrating.observeAsState(false)
     val isSelectionMode  by viewModel.isInSelectionMode.observeAsState(false)
     val selectedChapters by viewModel.selectedChapters.observeAsState(emptySet())
     val chapters         by viewModel.chapters.observeAsState(emptyList())
@@ -269,6 +270,26 @@ fun ResultDetailDefaultScreen(
                                 )
                             }
                             Spacer(Modifier.weight(1f))
+                            if (hasBookmark) {
+                                var showMigrationSheet by remember { mutableStateOf(false) }
+                                IconButton(onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showMigrationSheet = true
+                                }) {
+                                    Icon(
+                                        Icons.Default.CompareArrows,
+                                        contentDescription = "Migrate Provider",
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
+                                if (showMigrationSheet) {
+                                    MigrationBottomSheet(
+                                        viewModel = viewModel,
+                                        novelName = res.name,
+                                        onDismiss = { showMigrationSheet = false }
+                                    )
+                                }
+                            }
                             IconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onOpenInBrowser()
@@ -377,7 +398,7 @@ fun ResultDetailDefaultScreen(
                                                         .padding(horizontal = 10.dp, vertical = 4.dp)
                                                 ) {
                                                     Text(
-                                                        text = apiName,
+                                                        text = res.apiName,
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.SemiBold,
                                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
@@ -671,6 +692,52 @@ fun ResultDetailDefaultScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+    
+    if (isMigrating) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = {},
+            properties = androidx.compose.ui.window.DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 280.dp, height = 180.dp)
+                    .glassCard(
+                        shape = RoundedCornerShape(20.dp),
+                        strokeWidth = 1.dp
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 4.dp,
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "Migrating Provider",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Transferring bookmarks & notes...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
                 }
             }
         }

@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,6 +47,16 @@ import com.lagradost.quicknovel.ui.foryou.recommendation.TagCategory
 import com.lagradost.quicknovel.ui.foryou.recommendation.UserTasteProfile
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.alpha
+import kotlin.math.absoluteValue
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -198,6 +210,13 @@ fun RecommendationsContent(
     onBookClick: (String, String) -> Unit,
     onRefresh: () -> Unit
 ) {
+    val carouselItems = remember(groups) {
+        groups.flatMap { it.recommendations }
+            .distinctBy { it.novel.url }
+            .sortedByDescending { it.score }
+            .take(5)
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp) // Padding for bottom nav
@@ -229,6 +248,12 @@ fun RecommendationsContent(
                 FilledTonalIconButton(onClick = onRefresh) {
                     Text("↻") // Simple text icon for refresh, can be replaced with an actual Icon
                 }
+            }
+        }
+
+        if (carouselItems.isNotEmpty()) {
+            item {
+                FeaturedCarousel(items = carouselItems, onBookClick = onBookClick)
             }
         }
 
@@ -425,3 +450,153 @@ fun GlassTagChip(
         )
     }
 }
+
+@Composable
+fun FeaturedCarousel(
+    items: List<Recommendation>,
+    onBookClick: (String, String) -> Unit
+) {
+    val pagerState = rememberPagerState(pageCount = { items.size })
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            contentPadding = PaddingValues(horizontal = 32.dp),
+            pageSpacing = 16.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+        ) { page ->
+            val rec = items[page]
+            val novel = rec.novel
+            
+            val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue
+            
+            val scale = 0.9f + (1f - pageOffset.coerceIn(0f, 1f)) * 0.1f
+            val alpha = 0.6f + (1f - pageOffset.coerceIn(0f, 1f)) * 0.4f
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    }
+                    .glassCard(
+                        shape = RoundedCornerShape(16.dp),
+                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                    )
+                    .clickable { onBookClick(novel.url, novel.apiName) }
+            ) {
+                // Blurred background
+                AsyncImage(
+                    model = rememberImageRequest(data = novel),
+                    contentDescription = null,
+                    imageLoader = SingletonImageLoader.get(LocalContext.current),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(12.dp)
+                        .alpha(0.15f)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = rememberImageRequest(data = novel),
+                        contentDescription = novel.name,
+                        imageLoader = SingletonImageLoader.get(LocalContext.current),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .aspectRatio(0.66f)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = novel.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Text(
+                            text = novel.apiName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .glassCard(shape = RoundedCornerShape(6.dp), strokeWidth = 0.5.dp)
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "Match ${(rec.score * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Dots Indicator
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            repeat(items.size) { index ->
+                val isSelected = pagerState.currentPage == index
+                val width by animateDpAsState(
+                    targetValue = if (isSelected) 18.dp else 6.dp,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+                    label = "width"
+                )
+                val color = if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                }
+                Box(
+                    modifier = Modifier
+                        .height(6.dp)
+                        .width(width)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+            }
+        }
+    }
+}
+

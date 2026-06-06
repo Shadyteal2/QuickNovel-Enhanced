@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -38,6 +39,17 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.lagradost.quicknovel.util.GoogleDriveSyncManager
+import com.lagradost.quicknovel.util.BackupUtils
+import com.lagradost.quicknovel.GoogleSyncWorkHelper
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import android.app.Activity
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -696,6 +708,10 @@ fun SubSettingsScreen(
                     R.xml.settings_storage -> {
                         // ─── Storage Settings Category ───
                         item { PreferenceHeader("Backup & storage locations") }
+
+                        item {
+                            CloudSyncPreferencesCard()
+                        }
 
                         item {
                             ActionPreferenceCard(
@@ -1472,3 +1488,485 @@ fun getFontLabel(key: String): String {
         else -> "System Default"
     }
 }
+
+@Composable
+fun CloudSyncPreferencesCard() {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var isExpanded by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Google Drive Cloud Sync, 1 = Sync & Backup Preferences
+    
+    // Shared and specific states
+    var syncBookmarks by remember { mutableStateOf(BackupUtils.getSyncBookmarks(context)) }
+    var syncSettings by remember { mutableStateOf(BackupUtils.getSyncSettings(context)) }
+    var syncHistory by remember { mutableStateOf(BackupUtils.getSyncHistory(context)) }
+
+    var accountEmail by remember { mutableStateOf(GoogleDriveSyncManager.getAccountEmail(context)) }
+    var isAutoSyncEnabled by remember { mutableStateOf(GoogleDriveSyncManager.isAutoSyncEnabled(context)) }
+    var lastSyncedTime by remember { mutableStateOf(GoogleDriveSyncManager.getLastSyncedTime(context)) }
+    var isSyncing by remember { mutableStateOf(false) }
+    
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val email = GoogleDriveSyncManager.handleSignInResult(context, result.data)
+            accountEmail = email
+            if (email != null) {
+                isSyncing = true
+                coroutineScope.launch {
+                    val success = GoogleDriveSyncManager.syncNow(context)
+                    isSyncing = false
+                    lastSyncedTime = GoogleDriveSyncManager.getLastSyncedTime(context)
+                    if (success) {
+                        com.lagradost.quicknovel.CommonActivity.showToast("Initial Google sync completed successfully!")
+                    } else {
+                        com.lagradost.quicknovel.CommonActivity.showToast("Initial Google sync failed.")
+                    }
+                }
+                GoogleSyncWorkHelper.scheduleSyncWorker(context)
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(shape = RoundedCornerShape(20.dp))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Header clickable to expand/collapse
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .glassCard(
+                                shape = RoundedCornerShape(12.dp),
+                                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_cloud_24),
+                            contentDescription = "Cloud Sync & Preferences",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Cloud Sync & Preferences",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        val summaryText = if (accountEmail != null) "Linked to $accountEmail" else "Configure backup & sync"
+                        Text(
+                            text = summaryText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(if (isExpanded) 180f else 0f)
+                )
+            }
+
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                var dropdownExpanded by remember { mutableStateOf(false) }
+                val options = listOf("Google Drive Cloud Sync", "Sync & Backup Preferences")
+
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .glassCard(
+                                shape = RoundedCornerShape(12.dp),
+                                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                                strokeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                strokeWidth = 1.dp
+                            )
+                            .clickable { dropdownExpanded = true }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = options[selectedTab],
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                            contentDescription = "Select Section",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.rotate(if (dropdownExpanded) 180f else 0f)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                    ) {
+                        options.forEachIndexed { index, title ->
+                            DropdownMenuItem(
+                                text = { 
+                                    Text(
+                                        text = title, 
+                                        fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selectedTab == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    ) 
+                                },
+                                onClick = {
+                                    selectedTab = index
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (selectedTab == 0) {
+                    Text(
+                        text = "Automatically backup and sync your reading library, bookmarks, and settings privately to your Google Drive account.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (accountEmail == null) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val signInIntent = GoogleDriveSyncManager.getSignInIntent(context)
+                                    launcher.launch(signInIntent)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Link Google Account")
+                            }
+
+                            Text(
+                                text = "Note: Because NeoQN is not on the Play Store, Google MAY show an 'Unverified App' warning. Click 'Advanced -> Continue' to link your account safely.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Account Connected",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = accountEmail ?: "",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        GoogleDriveSyncManager.logout(context) {
+                                            accountEmail = null
+                                            isAutoSyncEnabled = false
+                                            lastSyncedTime = 0L
+                                            GoogleSyncWorkHelper.scheduleSyncWorker(context)
+                                        }
+                                    }
+                                ) {
+                                    Text("Disconnect", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Auto-Sync Library",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Keep bookmarks and settings synced in the background automatically.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Switch(
+                                    checked = isAutoSyncEnabled,
+                                    onCheckedChange = { checked ->
+                                        isAutoSyncEnabled = checked
+                                        GoogleDriveSyncManager.setAutoSyncEnabled(context, checked)
+                                        GoogleSyncWorkHelper.scheduleSyncWorker(context)
+                                    }
+                                )
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (lastSyncedTime > 0L) {
+                                            val date = Date(lastSyncedTime)
+                                            val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+                                            "Last synced: ${sdf.format(date)}"
+                                        } else {
+                                            "Not synced yet"
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "Note: If restoring to another device, restart the app on that device to fully apply the restored library and preferences.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        if (!isSyncing) {
+                                            com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.AlertDialogCustom)
+                                                .setTitle("Restore from Cloud?")
+                                                .setMessage("This will overwrite your local bookmarks, settings, and reading progress with the backup stored on Google Drive.")
+                                                .setNegativeButton("Cancel", null)
+                                                .setPositiveButton("Restore") { _, _ ->
+                                                    isSyncing = true
+                                                    coroutineScope.launch {
+                                                        val success = GoogleDriveSyncManager.restoreFromCloud(context)
+                                                        isSyncing = false
+                                                        if (success) {
+                                                            com.lagradost.quicknovel.CommonActivity.showToast("Restored from cloud successfully!")
+                                                            com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.AlertDialogCustom)
+                                                                .setTitle(R.string.backup_restored_title)
+                                                                .setMessage(R.string.backup_restored_message)
+                                                                .setCancelable(false)
+                                                                .setPositiveButton(R.string.got_it) { _, _ ->
+                                                                    (context as? Activity)?.finishAffinity()
+                                                                }.show()
+                                                        } else {
+                                                            com.lagradost.quicknovel.CommonActivity.showToast("Cloud restore failed or no backup found.")
+                                                        }
+                                                    }
+                                                }.show()
+                                        }
+                                    },
+                                    enabled = !isSyncing,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Restore")
+                                }
+
+                                Button(
+                                    onClick = {
+                                        if (!isSyncing) {
+                                            com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.AlertDialogCustom)
+                                                .setTitle("Sync to Cloud?")
+                                                .setMessage("This will upload your current local library, bookmarks, settings, and progress, completely overwriting the backup stored on Google Drive.")
+                                                .setNegativeButton("Cancel", null)
+                                                .setPositiveButton("Sync") { _, _ ->
+                                                    isSyncing = true
+                                                    coroutineScope.launch {
+                                                        val success = GoogleDriveSyncManager.syncNow(context)
+                                                        isSyncing = false
+                                                        lastSyncedTime = GoogleDriveSyncManager.getLastSyncedTime(context)
+                                                        if (success) {
+                                                            com.lagradost.quicknovel.CommonActivity.showToast("Cloud sync completed successfully!")
+                                                        } else {
+                                                            com.lagradost.quicknovel.CommonActivity.showToast("Cloud sync failed.")
+                                                        }
+                                                    }
+                                                }.show()
+                                        }
+                                    },
+                                    enabled = !isSyncing,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(if (isSyncing) "Syncing..." else "Sync Now")
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Select what data is included when syncing or backing up your library. These options apply globally to Google Drive Sync, manual backups, and transfers.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Sync Bookmarks & Library",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Include novel bookmarks, categories, and custom sorting metadata.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                        Switch(
+                            checked = syncBookmarks,
+                            onCheckedChange = { checked ->
+                                syncBookmarks = checked
+                                PreferenceManager.getDefaultSharedPreferences(context).edit()
+                                    .putBoolean(BackupUtils.SYNC_BOOKMARKS_KEY, checked)
+                                    .apply()
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Sync App Settings",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Include visual themes, fonts, reader configuration, and layout settings.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                        Switch(
+                            checked = syncSettings,
+                            onCheckedChange = { checked ->
+                                syncSettings = checked
+                                PreferenceManager.getDefaultSharedPreferences(context).edit()
+                                    .putBoolean(BackupUtils.SYNC_SETTINGS_KEY, checked)
+                                    .apply()
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Sync Progress & History",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Include reading history, last read chapters, scroll positions, and TTS state.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                        Switch(
+                            checked = syncHistory,
+                            onCheckedChange = { checked ->
+                                syncHistory = checked
+                                PreferenceManager.getDefaultSharedPreferences(context).edit()
+                                    .putBoolean(BackupUtils.SYNC_HISTORY_KEY, checked)
+                                    .apply()
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+

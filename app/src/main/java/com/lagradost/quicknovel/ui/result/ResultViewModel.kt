@@ -44,6 +44,8 @@ import com.lagradost.quicknovel.StreamResponse
 import com.lagradost.quicknovel.UserReview
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.launchSafe
+import com.lagradost.quicknovel.mvvm.logError
+import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.download.CHAPTER_SORT
 import com.lagradost.quicknovel.ui.download.DownloadFragment
@@ -58,6 +60,11 @@ import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.RESULT_CHAPTER_BOOKMARK
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.lagradost.quicknovel.util.BackupUtils
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
@@ -1075,6 +1082,121 @@ class ResultViewModel : ViewModel() {
             }
         }
     }
+
+    val isMigrating = MutableLiveData<Boolean>(false)
+    val migrationSearchState = MutableLiveData<MigrationSearchStatus>(MigrationSearchStatus.Idle)
+
+    private fun getRelevanceScore(title: String, query: String): Int {
+        val titleLower = title.lowercase()
+        val queryLower = query.lowercase().trim()
+        
+        if (titleLower == queryLower) return 1000
+        if (titleLower.startsWith(queryLower)) return 800
+        if (titleLower.contains(queryLower)) return 600
+        
+        val fuzzy = me.xdrop.fuzzywuzzy.FuzzySearch.partialRatio(titleLower, queryLower)
+        if (fuzzy >= 75) return 100 + fuzzy
+        return 0
+    }
+
+    fun searchAlternatives(query: String) = viewModelScope.launch {
+        migrationSearchState.value = MigrationSearchStatus.Loading
+        try {
+            val currentApi = apiName
+            val activeApis = withContext(Dispatchers.IO) {
+                Apis.apis.filter { it.name != currentApi }
+            }
+            
+            if (activeApis.isEmpty()) {
+                migrationSearchState.value = MigrationSearchStatus.Success(emptyList())
+                return@launch
+            }
+
+            val deferreds = activeApis.map { api ->
+                async(Dispatchers.IO) {
+                    try {
+                        val repo = Apis.getApiFromName(api.name)
+                        when (val res = repo.search(query)) {
+                            is Resource.Success -> res.value
+                            else -> emptyList()
+                        }
+                    } catch (t: Throwable) {
+                        logError(t)
+                        emptyList()
+                    }
+                }
+            }
+
+            val allResults = deferreds.awaitAll().flatten()
+
+            val sortedResults = withContext(Dispatchers.Default) {
+                allResults.map { searchRes ->
+                    val score = getRelevanceScore(searchRes.name, query)
+                    searchRes to score
+                }.sortedByDescending { it.second }
+                 .map { it.first }
+            }
+
+            migrationSearchState.value = MigrationSearchStatus.Success(sortedResults)
+        } catch (e: Exception) {
+            logError(e)
+            migrationSearchState.value = MigrationSearchStatus.Error(e.message ?: "Unknown error occurred")
+        }
+    }
+
+    fun migrateToAlternative(searchResponse: SearchResponse) = viewModelScope.launchSafe {
+        val context = context ?: return@launchSafe
+        val oldId = loadId
+        isMigrating.postValue(true)
+        
+        val repo = Apis.getApiFromNameOrNull(searchResponse.apiName)
+        if (repo == null) {
+            showToast("Migration failed: Provider not found")
+            isMigrating.postValue(false)
+            return@launchSafe
+        }
+        
+        val dataResource = withContext(Dispatchers.IO) {
+            repo.load(searchResponse.url)
+        }
+        
+        when (dataResource) {
+            is Resource.Success -> {
+                val newNovel = dataResource.value
+                val migrationSuccess = withContext(Dispatchers.IO) {
+                    try {
+                        BackupUtils.migrateNovel(context, oldId, newNovel, searchResponse.apiName)
+                        true
+                    } catch (t: Throwable) {
+                        logError(t)
+                        false
+                    }
+                }
+                if (migrationSuccess) {
+                    showToast("Successfully migrated to ${searchResponse.apiName}!")
+                    isMigrating.postValue(false)
+                    initState(searchResponse.apiName, newNovel.url)
+                } else {
+                    showToast("Migration failed: Database/file copy error")
+                    isMigrating.postValue(false)
+                }
+            }
+            is Resource.Failure -> {
+                showToast("Migration failed: ${dataResource.errorString}")
+                isMigrating.postValue(false)
+            }
+            else -> {
+                isMigrating.postValue(false)
+            }
+        }
+    }
 }
 
 data class NoteWrapper(val note: String? = "")
+
+sealed class MigrationSearchStatus {
+    object Idle : MigrationSearchStatus()
+    object Loading : MigrationSearchStatus()
+    data class Success(val results: List<SearchResponse>) : MigrationSearchStatus()
+    data class Error(val message: String) : MigrationSearchStatus()
+}

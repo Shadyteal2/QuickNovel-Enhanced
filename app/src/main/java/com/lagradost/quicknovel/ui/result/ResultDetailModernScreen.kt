@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -51,6 +53,7 @@ import com.lagradost.quicknovel.ChapterData
 import com.lagradost.quicknovel.DOWNLOAD_SETTINGS
 import com.lagradost.quicknovel.EPUB_CURRENT_POSITION_READ_AT
 import com.lagradost.quicknovel.LoadResponse
+import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.RESULT_BOOKMARK_STATE
 import com.lagradost.quicknovel.StreamResponse
@@ -89,6 +92,7 @@ fun ResultDetailModernScreen(
 ) {
     val loadResponse     by viewModel.loadResponse.observeAsState()
     val isSyncEnabled    by viewModel.isSyncEnabledDisplay.observeAsState(false)
+    val isMigrating      by viewModel.isMigrating.observeAsState(false)
     val isSelectionMode  by viewModel.isInSelectionMode.observeAsState(false)
     val selectedChapters by viewModel.selectedChapters.observeAsState(emptySet())
     val readState        by viewModel.readState.observeAsState()
@@ -303,6 +307,27 @@ fun ResultDetailModernScreen(
                                     .align(Alignment.TopEnd),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                if (hasBookmark) {
+                                    var showMigrationSheet by remember { mutableStateOf(false) }
+                                    HeroPill(onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        showMigrationSheet = true
+                                    }) {
+                                        Icon(
+                                            Icons.Default.CompareArrows,
+                                            contentDescription = "Migrate Provider",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    if (showMigrationSheet) {
+                                        MigrationBottomSheet(
+                                            viewModel = viewModel,
+                                            novelName = res.name,
+                                            onDismiss = { showMigrationSheet = false }
+                                        )
+                                    }
+                                }
                                 HeroPill(onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onShare()
@@ -396,7 +421,7 @@ fun ResultDetailModernScreen(
                                         Modifier.size(13.dp),
                                         tint = MaterialTheme.colorScheme.primary)
                                 },
-                                text = apiName
+                                text = res.apiName
                             )
                             if (!ratingText.isNullOrBlank()) {
                                 PillChip(
@@ -575,7 +600,7 @@ fun ResultDetailModernScreen(
                                 onMarkUnread = { viewModel.executeBatchMarkRead(false) },
                             )
                         }
-                        apiName != "OceanOfPDF" -> {
+                        res.apiName != "OceanOfPDF" -> {
                             PremiumActionBar(
                                 continueLabel        = continueReadingLabel(res, chapters.orEmpty(), viewModel),
                                 bookmarkLabel        = bookmarkLabel,
@@ -595,6 +620,52 @@ fun ResultDetailModernScreen(
             } // end Box
         } // end Resource.Success
     } // end when state
+    
+    if (isMigrating) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = {},
+            properties = androidx.compose.ui.window.DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 280.dp, height = 180.dp)
+                    .glassCard(
+                        shape = RoundedCornerShape(20.dp),
+                        strokeWidth = 1.dp
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 4.dp,
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "Migrating Provider",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Transferring bookmarks & notes...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
 } // end root Box
 } // end fun ResultDetailModernScreen
 
@@ -1077,5 +1148,175 @@ private fun ShimmerSkeletonScreen() {
                 Spacer(modifier = Modifier.height(12.dp))
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MigrationBottomSheet(
+    viewModel: ResultViewModel,
+    novelName: String,
+    onDismiss: () -> Unit
+) {
+    val searchState by viewModel.migrationSearchState.observeAsState(MigrationSearchStatus.Idle)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "Migrate Provider",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            when (val state = searchState) {
+                is MigrationSearchStatus.Idle -> {
+                    // Do nothing
+                }
+                is MigrationSearchStatus.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(Modifier.height(12.dp))
+                            Text("Searching alternative sources...", fontSize = 14.sp)
+                        }
+                    }
+                }
+                is MigrationSearchStatus.Error -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = state.message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Button(onClick = { viewModel.searchAlternatives(novelName) }) {
+                            Text("Retry Search")
+                        }
+                    }
+                }
+                is MigrationSearchStatus.Success -> {
+                    val results = state.results
+                    if (results.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No matches found on other providers",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 400.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(results) { match ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.migrateToAlternative(match)
+                                            onDismiss()
+                                        },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = match.name,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(Modifier.height(6.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                // Provider Badge
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = match.apiName,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+
+                                                if (!match.latestChapter.isNullOrBlank()) {
+                                                    Text(
+                                                        text = "Ch: ${match.latestChapter}",
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Icon(
+                                            Icons.Default.ChevronRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(novelName) {
+        viewModel.searchAlternatives(novelName)
     }
 }

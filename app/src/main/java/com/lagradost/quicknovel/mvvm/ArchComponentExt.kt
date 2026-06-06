@@ -148,17 +148,17 @@ fun <T, V> Resource<T>?.letInner(transform: (T) -> V): V? {
 
 
 fun throwableToMessage(throwable: Throwable): String {
+    // Check if the exception originated from provider parsing code
+    val providerLine = throwable.stackTrace.firstOrNull { line ->
+        line?.className?.contains("com.lagradost.quicknovel.providers") == true ||
+        line?.fileName?.contains("provider", ignoreCase = true) == true
+    }
+    if (providerLine != null) {
+        return "Provider Layout Error: The scraper encountered a parsing issue at ${providerLine.fileName}:${providerLine.lineNumber}.\n\nThis typically means the source website changed its layout. Please try opening the novel in your browser or check for an app update."
+    }
+
     return when (throwable) {
         is MLException -> {
-            safeFailMessage(throwable)
-        }
-
-        is NullPointerException -> {
-            for (line in throwable.stackTrace) {
-                if (line?.fileName?.endsWith("provider.kt", ignoreCase = true) == true) {
-                    return "NullPointerException at ${line.fileName} ${line.lineNumber}\nSite might have updated or added Cloudflare/DDOS protection"
-                }
-            }
             safeFailMessage(throwable)
         }
 

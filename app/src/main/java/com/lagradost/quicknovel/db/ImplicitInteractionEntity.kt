@@ -2,7 +2,13 @@ package com.lagradost.quicknovel.db
 
 import androidx.room.*
 
-@Entity(tableName = "implicit_interactions")
+@Entity(
+    tableName = "implicit_interactions",
+    indices = [
+        Index(value = ["novelUrl"]),
+        Index(value = ["timestamp"])
+    ]
+)
 data class ImplicitInteractionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val novelUrl: String,

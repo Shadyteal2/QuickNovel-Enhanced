@@ -239,7 +239,7 @@ class ResultFragment : Fragment() {
                     resultStatus.text = readStatusText
                     resultStatus.isVisible = readStatusText.isNotBlank()
 
-                    resultProviderChip.text = arguments?.getString("apiName") ?: ""
+                    resultProviderChip.text = res.apiName
                     resultProviderChip.isVisible = true
                     
                     if (res is StreamResponse) {

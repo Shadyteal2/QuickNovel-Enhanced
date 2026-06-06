@@ -70,7 +70,9 @@ class InAppUpdater {
                 val response =
                     mapper.readValue<GithubRelease>(app.get(url, headers = headers).text)
 
-                val versionRegex = Regex("""(.*?((\d)\.(\d)\.(\d)).*\.apk)""")
+                // Match version pattern like 2.1.5 inside tag_name (e.g. "v2.1.5")
+                val versionRegex = Regex("""((\d+)\.(\d+)\.(\d+))""")
+                val foundVersion = versionRegex.find(response.tag_name)
 
                 val foundAsset = response.assets.find { it.content_type == "application/vnd.android.package-archive" }
                     ?: response.assets.find { it.name.endsWith(".apk") }
@@ -82,10 +84,9 @@ class InAppUpdater {
                     )
                 }
 
-                val foundVersion = foundAsset?.name?.let { versionRegex.find(it) }
-                val shouldUpdate = if (foundAsset?.browser_download_url != "" && foundVersion != null) {
+                val shouldUpdate = if (foundAsset != null && foundAsset.browser_download_url != "" && foundVersion != null) {
                     val current = currentVersion?.versionName?.split(".")?.mapNotNull { it.toIntOrNull() } ?: emptyList()
-                    val found = foundVersion.groupValues[2].split(".").mapNotNull { it.toIntOrNull() }
+                    val found = foundVersion.groupValues[1].split(".").mapNotNull { it.toIntOrNull() }
                     
                     if (current.isNotEmpty() && found.isNotEmpty()) {
                         var updateNeeded = false
@@ -102,11 +103,11 @@ class InAppUpdater {
                         updateNeeded
                     } else false
                 } else false
-                return if (foundVersion != null) {
+                return if (foundVersion != null && foundAsset != null) {
                     Update(
                         shouldUpdate,
                         foundAsset.browser_download_url,
-                        foundVersion.groupValues[2],
+                        foundVersion.groupValues[1],
                         response.body
                     )
                 } else {
