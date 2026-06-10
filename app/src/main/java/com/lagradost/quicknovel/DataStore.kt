@@ -154,6 +154,12 @@ object DataStore {
         mutationCounter.value++
     }
 
+    fun clearCache() {
+        preferenceCache.clear()
+        heavyObjectCache.evictAll()
+        incrementMutationCounter()
+    }
+
     fun putInCache(path: String, value: Any?, notifyCompose: Boolean = true) {
         if (value == null) {
             removeFromCache(path)

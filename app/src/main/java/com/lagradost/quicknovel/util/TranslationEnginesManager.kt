@@ -6,7 +6,6 @@ import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.ReadActivityViewModel
 import android.util.Log
-import com.lagradost.quicknovel.BaseApplication
 import com.lagradost.quicknovel.DataStore.getKey
 
 object TranslationEnginesManager {
@@ -17,6 +16,9 @@ object TranslationEnginesManager {
 
     init {
         registerEngine(GoogleMLKitEngine())
+        registerEngine(GoogleGTXEngine())
+        registerEngine(YandexEngine())
+        registerEngine(CloudAITranslator())
     }
 
     fun getEngine(type: TranslationEngineType): TranslationEngine? {
@@ -29,16 +31,11 @@ object TranslationEnginesManager {
 
     fun getActiveEngine(context: Context): TranslationEngine? {
         val engineKey = context.getString(R.string.translation_engine_key)
-        val engineTypeStr = BaseApplication.getKey<String>(engineKey, "1") ?: "1"
-        
-        val engineType = try {
-            val type = TranslationEngineType.fromInt(engineTypeStr.toInt())
-            if (type == TranslationEngineType.None) TranslationEngineType.GoogleMLKit else type
-        } catch (e: Exception) {
-            TranslationEngineType.values().find { it.name.equals(engineTypeStr, ignoreCase = true) } ?: TranslationEngineType.GoogleMLKit
-        }
-        
-        return getEngine(engineType)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        val engineVal = prefs.getInt(engineKey, 1)
+        val engineType = TranslationEngineType.fromInt(engineVal)
+        val finalType = if (engineType == TranslationEngineType.None) TranslationEngineType.GoogleMLKit else engineType
+        return getEngine(finalType)
     }
 
     fun getEngineModel(context: Context, type: TranslationEngineType): String {
@@ -46,19 +43,19 @@ object TranslationEnginesManager {
     }
 
     fun getTargetLanguage(context: Context): String {
-        return BaseApplication.getKey<String>(PrefKeys.TRANSLATION_TO_LANG, "en") ?: "en"
+        return context.getKey<String>(PrefKeys.TRANSLATION_TO_LANG, "en") ?: "en"
     }
 
     fun getOriginLanguage(context: Context): String {
-        return BaseApplication.getKey<String>(PrefKeys.TRANSLATION_FROM_LANG, "auto") ?: "auto"
+        return context.getKey<String>(PrefKeys.TRANSLATION_FROM_LANG, "auto") ?: "auto"
     }
 
     fun getTranslationTone(context: Context): String {
-        return BaseApplication.getKey<String>(PrefKeys.TRANSLATION_TONE, "Neutral") ?: "Neutral"
+        return context.getKey<String>(PrefKeys.TRANSLATION_TONE, "Neutral") ?: "Neutral"
     }
 
     fun getTranslationContentType(context: Context): String {
-        return BaseApplication.getKey<String>(PrefKeys.TRANSLATION_CONTENT_TYPE, "General") ?: "General"
+        return context.getKey<String>(PrefKeys.TRANSLATION_CONTENT_TYPE, "General") ?: "General"
     }
 
     suspend fun translate(context: Context, text: String): Resource<String> {

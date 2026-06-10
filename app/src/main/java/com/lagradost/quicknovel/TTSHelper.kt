@@ -33,28 +33,39 @@ import java.util.Stack
 import kotlin.math.roundToInt
 
 
-class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boolean) {
+class TTSSession(context: Context, val event: (TTSHelper.TTSActionType) -> Boolean) {
+    private val appContext = context.applicationContext
     private val intentFilter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
     private val myNoisyAudioStreamReceiver = BecomingNoisyReceiver()
 
     //private var mediaSession: MediaSessionCompat
     private var focusRequest: AudioFocusRequest? = null
+    private var pausedDueToFocusLoss = false
     private val myAudioFocusListener =
-        AudioManager.OnAudioFocusChangeListener {
-            val pause =
-                when (it) {
-                    AudioManager.AUDIOFOCUS_GAIN -> false
-                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE -> false
-                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT -> false
-                    else -> true
+        AudioManager.OnAudioFocusChangeListener { focusChange ->
+            when (focusChange) {
+                AudioManager.AUDIOFOCUS_GAIN -> {
+                    if (pausedDueToFocusLoss) {
+                        pausedDueToFocusLoss = false
+                        event(TTSHelper.TTSActionType.Resume)
+                    }
                 }
-            if (pause) {
-                event(TTSHelper.TTSActionType.Pause)
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    if (event(TTSHelper.TTSActionType.Pause)) {
+                        pausedDueToFocusLoss = true
+                    }
+                }
+                AudioManager.AUDIOFOCUS_LOSS -> {
+                    pausedDueToFocusLoss = false
+                    event(TTSHelper.TTSActionType.Stop)
+                }
             }
         }
     private var isRegistered = false
     private var engine: TTSEngine? = null
-    private var TTSQueue: Pair<TTSHelper.TTSLine, Int>? = null
+    private var currentQueued: Pair<TTSHelper.TTSLine, Int>? = null
+    private var nextQueued: Pair<TTSHelper.TTSLine, Int>? = null
 
     private var TTSQueueId = 0
     private var TTSStartSpeakId = 0
@@ -69,7 +80,8 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
 
     private fun clearTTS(engine: TTSEngine) {
         engine.stop()
-        TTSQueue = null
+        currentQueued = null
+        nextQueued = null
     }
 
     fun setSpeed(speed: Float) {
@@ -119,17 +131,31 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
 
     suspend fun speak(line: TTSHelper.TTSLine, next: TTSHelper.TTSLine?, action: () -> Boolean): Int? {
         return requireEngine({ engine ->
-            val ret: Int
-            val queue = TTSQueue
-            ret = if (queue?.first == line) {
-                queue.second
+            val lineId: Int
+            if (currentQueued?.first == line) {
+                lineId = currentQueued!!.second
+            } else if (nextQueued?.first == line) {
+                currentQueued = nextQueued
+                nextQueued = null
+                lineId = currentQueued!!.second
             } else {
+                engine.stop()
                 TTSQueueId++
-                engine.speak(line.speakOutMsg, TTSQueueId, false)
-                TTSQueue = line to TTSQueueId
-                TTSQueueId
+                lineId = TTSQueueId
+                engine.speak(line.speakOutMsg, lineId, false)
+                currentQueued = line to lineId
+                nextQueued = null
             }
-            ret
+
+            if (next != null && nextQueued?.first != next) {
+                val nextId = lineId + 1
+                TTSQueueId = maxOf(TTSQueueId, nextId)
+                val queued = engine.speak(next.speakOutMsg, nextId, true)
+                if (queued) {
+                    nextQueued = next to nextId
+                }
+            }
+            lineId
         }, action)
     }
 
@@ -163,8 +189,8 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
                     }
 
                     val newEngine: TTSEngine = when {
-                        useGoogle -> GoogleTTSEngine(context).apply { setStatusUpdateCallback(onStatusUpdate) }
-                        else -> NativeTTSEngine(context, onStatusUpdate)
+                        useGoogle -> GoogleTTSEngine(appContext).apply { setStatusUpdateCallback(onStatusUpdate) }
+                        else -> NativeTTSEngine(appContext, onStatusUpdate)
                     }
                     
                     newEngine.setSpeed(speed)
@@ -194,9 +220,9 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
     fun register() {
         if (isRegistered) return
         isRegistered = true
-        context.registerReceiver(myNoisyAudioStreamReceiver, intentFilter)
+        appContext.registerReceiver(myNoisyAudioStreamReceiver, intentFilter)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.requestAudioFocus(focusRequest)
+            appContext.requestAudioFocus(focusRequest)
         }
     }
 
@@ -211,7 +237,7 @@ class TTSSession(val context: Context, event: (TTSHelper.TTSActionType) -> Boole
     fun unregister() {
         if (!isRegistered) return
         isRegistered = false
-        context.unregisterReceiver(myNoisyAudioStreamReceiver)
+        appContext.unregisterReceiver(myNoisyAudioStreamReceiver)
     }
 
 

@@ -25,6 +25,7 @@ class GoogleTTSEngine(
     }
 
     override suspend fun speak(text: String, id: Int, isQueueAdd: Boolean): Boolean {
+        if (isQueueAdd) return false
         stop()
         
         return try {
@@ -39,30 +40,38 @@ class GoogleTTSEngine(
         }
     }
 
-    private suspend fun playAudioFromUrl(url: String, id: Int) = withContext(Dispatchers.Main) {
+    private suspend fun playAudioFromUrl(url: String, id: Int) = coroutineScope {
         val completer = CompletableDeferred<Unit>()
         
-        mediaPlayer = MediaPlayer().apply {
-            setAudioAttributes(AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build())
-            setDataSource(url)
-            setOnPreparedListener { 
-                onStatusUpdate(id, true)
-                start() 
+        val mp = withContext(Dispatchers.IO) {
+            MediaPlayer().apply {
+                setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build())
+                setDataSource(url)
             }
-            setOnCompletionListener { 
-                onStatusUpdate(id, false)
-                completer.complete(Unit)
+        }
+        
+        withContext(Dispatchers.Main) {
+            mediaPlayer = mp
+            mp.apply {
+                setOnPreparedListener { 
+                    onStatusUpdate(id, true)
+                    start() 
+                }
+                setOnCompletionListener { 
+                    onStatusUpdate(id, false)
+                    completer.complete(Unit)
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.e("GoogleTTS", "MediaPlayer error: $what, $extra")
+                    onStatusUpdate(id, false)
+                    completer.complete(Unit)
+                    true
+                }
+                prepareAsync()
             }
-            setOnErrorListener { _, what, extra ->
-                Log.e("GoogleTTS", "MediaPlayer error: $what, $extra")
-                onStatusUpdate(id, false)
-                completer.complete(Unit)
-                true
-            }
-            prepareAsync()
         }
         completer.await()
     }

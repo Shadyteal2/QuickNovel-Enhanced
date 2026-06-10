@@ -5,7 +5,10 @@ import com.lagradost.quicknovel.mvvm.Resource
 
 enum class TranslationEngineType(val value: Int) {
     None(0),
-    GoogleMLKit(1);
+    GoogleMLKit(1),
+    GoogleGTX(2),
+    Yandex(3),
+    CloudAI(4);
 
     companion object {
         fun fromInt(value: Int) = entries.firstOrNull { it.value == value } ?: None

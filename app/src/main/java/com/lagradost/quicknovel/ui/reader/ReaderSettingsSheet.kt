@@ -29,6 +29,9 @@ import com.lagradost.quicknovel.ReadActivityViewModel
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.ReadingType
 import com.lagradost.quicknovel.ui.custom.TactileRulerSlider
+import com.lagradost.quicknovel.DataStore.getKey
+import com.lagradost.quicknovel.DataStore.setKey
+import com.lagradost.quicknovel.util.TranslationEngineType
 import kotlin.math.roundToInt
 
 @Composable
@@ -363,6 +366,112 @@ fun ReaderSettingsSheet(
                 Spacer(modifier = Modifier.height(12.dp))
                 val context = androidx.compose.ui.platform.LocalContext.current
                 val prefs = remember(context) { androidx.preference.PreferenceManager.getDefaultSharedPreferences(context) }
+                
+                // Get configured credentials
+                val apiUrl = remember(prefs) { 
+                    prefs.getString("pref_translation_api_url", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent")?.trim() ?: "" 
+                }
+                val apiKey = remember(prefs) { prefs.getString("pref_translation_api_key", "")?.trim() ?: "" }
+                val isCloudConfigured = apiUrl.isNotEmpty() && apiKey.isNotEmpty()
+                
+                val engineKey = remember(context) { context.getString(R.string.translation_engine_key) }
+                var currentEngineValue by remember(engineKey) {
+                    mutableStateOf(prefs.getInt(engineKey, 1))
+                }
+                
+                // If current selected is Cloud AI but not configured, fallback to Google ML Kit (1)
+                LaunchedEffect(isCloudConfigured, currentEngineValue) {
+                    if (currentEngineValue == 4 && !isCloudConfigured) {
+                        currentEngineValue = 1
+                        prefs.edit().putInt(engineKey, 1).apply()
+                    }
+                }
+                
+                val availableEngines = remember(isCloudConfigured) {
+                    buildList {
+                        add(TranslationEngineType.GoogleMLKit)
+                        add(TranslationEngineType.GoogleGTX)
+                        add(TranslationEngineType.Yandex)
+                        if (isCloudConfigured) {
+                            add(TranslationEngineType.CloudAI)
+                        }
+                    }
+                }
+                
+                fun getEngineName(type: TranslationEngineType): String {
+                    return when (type) {
+                        TranslationEngineType.GoogleMLKit -> "On-Device (Google ML Kit)"
+                        TranslationEngineType.GoogleGTX -> "Online (Google GTX Scraper)"
+                        TranslationEngineType.Yandex -> "Online (Yandex Scraper)"
+                        TranslationEngineType.CloudAI -> "Cloud AI (API Key)"
+                        else -> "None"
+                    }
+                }
+                
+                var dropdownExpanded by remember { mutableStateOf(false) }
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { dropdownExpanded = true }
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Translation Engine",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = getEngineName(TranslationEngineType.fromInt(currentEngineValue)),
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Box {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                            contentDescription = "Select Engine",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        
+                        DropdownMenu(
+                            expanded = dropdownExpanded,
+                            onDismissRequest = { dropdownExpanded = false },
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                        ) {
+                            availableEngines.forEach { type ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = getEngineName(type),
+                                            fontWeight = if (currentEngineValue == type.value) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (currentEngineValue == type.value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        currentEngineValue = type.value
+                                        prefs.edit().putInt(engineKey, type.value).apply()
+                                        dropdownExpanded = false
+                                        if (viewModel.isTranslationActive) {
+                                            onApplyTranslationClick()
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
                 var rememberTranslationState by remember { 
                     mutableStateOf(prefs.getBoolean("reader_remember_translation_state", true)) 
                 }

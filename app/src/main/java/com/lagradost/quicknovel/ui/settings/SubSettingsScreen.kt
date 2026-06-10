@@ -703,6 +703,13 @@ fun SubSettingsScreen(
                                 onClick = { onPreferenceClick("manual_check_update") }
                             )
                         }
+
+                        // ─── Translation Settings Category ───
+                        item { PreferenceHeader("Translation Settings") }
+
+                        item {
+                            TranslationSettingsCard(sharedPrefs, { changeTrigger++ })
+                        }
                     }
 
                     R.xml.settings_storage -> {
@@ -935,6 +942,7 @@ fun StepSelectorPreferenceCard(
     valueSuffix: String,
     iconRes: Int,
     presets: List<Int> = listOf(80, 100, 115, 130),
+    customValueLabel: String? = null,
     onValueChange: (Int) -> Unit
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -982,7 +990,7 @@ fun StepSelectorPreferenceCard(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "$value$valueSuffix",
+                        text = customValueLabel ?: "$value$valueSuffix",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
@@ -1046,7 +1054,7 @@ fun StepSelectorPreferenceCard(
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = "$preset$valueSuffix",
+                                text = if (preset == 0) "Auto" else "$preset$valueSuffix",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
@@ -1514,17 +1522,7 @@ fun CloudSyncPreferencesCard() {
             val email = GoogleDriveSyncManager.handleSignInResult(context, result.data)
             accountEmail = email
             if (email != null) {
-                isSyncing = true
-                coroutineScope.launch {
-                    val success = GoogleDriveSyncManager.syncNow(context)
-                    isSyncing = false
-                    lastSyncedTime = GoogleDriveSyncManager.getLastSyncedTime(context)
-                    if (success) {
-                        com.lagradost.quicknovel.CommonActivity.showToast("Initial Google sync completed successfully!")
-                    } else {
-                        com.lagradost.quicknovel.CommonActivity.showToast("Initial Google sync failed.")
-                    }
-                }
+                com.lagradost.quicknovel.CommonActivity.showToast("Google account connected successfully!")
                 GoogleSyncWorkHelper.scheduleSyncWorker(context)
             }
         }
@@ -1967,6 +1965,254 @@ fun CloudSyncPreferencesCard() {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun TranslationSettingsCard(
+    sharedPrefs: android.content.SharedPreferences,
+    onChanged: () -> Unit
+) {
+    var provider by remember {
+        mutableStateOf(sharedPrefs.getString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, "gemini") ?: "gemini")
+    }
+    var apiUrl by remember {
+        mutableStateOf(sharedPrefs.getString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_URL, "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent") ?: "")
+    }
+    var apiKey by remember {
+        mutableStateOf(sharedPrefs.getString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_KEY, "") ?: "")
+    }
+    var apiModel by remember {
+        mutableStateOf(sharedPrefs.getString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_MODEL, "gemini-2.0-flash") ?: "")
+    }
+
+    // ─── Rate-limit tuning state ───────────────────────────────────────────────
+    var maxParallel by remember {
+        mutableStateOf(sharedPrefs.getInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_MAX_PARALLEL, com.lagradost.quicknovel.util.CloudAITranslator.DEFAULT_MAX_PARALLEL))
+    }
+    var delayMs by remember {
+        mutableStateOf(sharedPrefs.getInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_DELAY_MS, com.lagradost.quicknovel.util.CloudAITranslator.DEFAULT_DELAY_MS.toInt()))
+    }
+    var batchSize by remember {
+        mutableStateOf(sharedPrefs.getInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE, com.lagradost.quicknovel.util.CloudAITranslator.DEFAULT_BATCH_SIZE))
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(shape = RoundedCornerShape(24.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Cloud AI Translation (BYOK)",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        // ─── AI Provider Presets segmented selector ───────────────────────
+        Text(
+            text = "AI Provider Preset",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            val options = listOf(
+                "gemini" to "Gemini",
+                "openrouter" to "OpenRouter",
+                "nvidia" to "NVIDIA",
+                "custom" to "Custom"
+            )
+            options.forEach { (key, label) ->
+                val isSelected = provider == key
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent)
+                        .clickable {
+                            provider = key
+                            sharedPrefs.edit().putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, key).apply()
+                            
+                            // Auto-populate defaults
+                            when (key) {
+                                "gemini" -> {
+                                    apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+                                    apiModel = "gemini-2.0-flash"
+                                    maxParallel = 1
+                                    delayMs = 5000
+                                    batchSize = 0 // Auto
+                                }
+                                "openrouter" -> {
+                                    apiUrl = "https://openrouter.ai/api/v1/chat/completions"
+                                    apiModel = "openrouter/auto"
+                                    maxParallel = 2
+                                    delayMs = 2000
+                                    batchSize = 0 // Auto
+                                }
+                                "nvidia" -> {
+                                    apiUrl = "https://integrate.api.nvidia.com/v1/chat/completions"
+                                    apiModel = "meta/llama-3.1-8b-instruct"
+                                    maxParallel = 2
+                                    delayMs = 2000
+                                    batchSize = 0 // Auto
+                                }
+                            }
+                            sharedPrefs.edit().apply {
+                                putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_URL, apiUrl)
+                                putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_MODEL, apiModel)
+                                putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_MAX_PARALLEL, maxParallel)
+                                putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_DELAY_MS, delayMs)
+                                putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE, batchSize)
+                            }.apply()
+                            onChanged()
+                        }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+
+        OutlinedTextField(
+            value = apiUrl,
+            onValueChange = {
+                apiUrl = it
+                provider = "custom"
+                sharedPrefs.edit()
+                    .putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_URL, it)
+                    .putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, "custom")
+                    .apply()
+                onChanged()
+            },
+            label = { Text("API URL") },
+            placeholder = { Text("e.g. Gemini or OpenRouter endpoint") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = {
+                apiKey = it
+                sharedPrefs.edit().putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_KEY, it).apply()
+                onChanged()
+            },
+            label = { Text("API Key") },
+            placeholder = { Text("Enter your API Key") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+
+        OutlinedTextField(
+            value = apiModel,
+            onValueChange = {
+                apiModel = it
+                provider = "custom"
+                sharedPrefs.edit()
+                    .putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_MODEL, it)
+                    .putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, "custom")
+                    .apply()
+                onChanged()
+            },
+            label = { Text("Model Name (Optional)") },
+            placeholder = { Text("e.g. gemini-2.0-flash or google/gemini-2.5-flash") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+
+        // ─── Rate-limit & throughput tuning ───────────────────────────────────
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+        Text(
+            text = "Rate Limit Tuning",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+        )
+        Text(
+            text = "Adjust these to match your API plan. Free-tier Gemini: keep Parallel=1, Delay≥2000ms.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        )
+
+        StepSelectorPreferenceCard(
+            title = "Parallel Requests",
+            value = maxParallel,
+            min = 1,
+            max = 5,
+            step = 1,
+            valueSuffix = "",
+            iconRes = R.drawable.ic_baseline_tune_24,
+            presets = listOf(1, 2, 3, 5),
+            onValueChange = { v ->
+                maxParallel = v
+                sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_MAX_PARALLEL, v).apply()
+                onChanged()
+            }
+        )
+
+        StepSelectorPreferenceCard(
+            title = "Request Delay (ms)",
+            value = delayMs,
+            min = 0,
+            max = 10000,
+            step = 500,
+            valueSuffix = "ms",
+            iconRes = R.drawable.ic_baseline_tune_24,
+            presets = listOf(0, 1000, 2000, 3000, 5000),
+            onValueChange = { v ->
+                delayMs = v
+                sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_DELAY_MS, v).apply()
+                onChanged()
+            }
+        )
+
+        StepSelectorPreferenceCard(
+            title = "Paragraphs per Batch",
+            value = batchSize,
+            min = 0,
+            max = 20,
+            step = 1,
+            valueSuffix = "",
+            iconRes = R.drawable.ic_baseline_tune_24,
+            presets = listOf(0, 1, 5, 10, 15),
+            customValueLabel = if (batchSize == 0) "Auto (Dynamic)" else null,
+            onValueChange = { v ->
+                batchSize = v
+                sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE, v).apply()
+                onChanged()
+            }
+        )
     }
 }
 

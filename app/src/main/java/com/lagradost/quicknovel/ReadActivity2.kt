@@ -752,37 +752,76 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     private var cachedChapter: List<SpanDisplay> = emptyList()
     private fun scrollToDesired() {
         val desired: ScrollIndex = viewModel.desiredIndex ?: return
-        val adapterPosition =
-            cachedChapter.indexOfFirst { display -> display.index == desired.index && display.innerIndex == desired.innerIndex }
-        if (adapterPosition == -1) return
+        val chapterCopy = cachedChapter
+        
+        ioSafe {
+            val adapterPosition = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                var pos = -1
+                if (desired.innerIndex == 0 && desired.char > 0) {
+                    pos = chapterCopy.indexOfFirst { display ->
+                        display.index == desired.index && display is TextSpan &&
+                                display.start <= desired.char && desired.char <= display.end
+                    }
+                }
+                if (pos == -1) {
+                    pos = chapterCopy.indexOfFirst { display ->
+                        display.index == desired.index && display.innerIndex == desired.innerIndex
+                    }
+                }
+                pos
+            }
+            
+            if (adapterPosition == -1) return@ioSafe
 
-        //val offset = 7.toPx
-        textLayoutManager.scrollToPositionWithOffset(adapterPosition, 1)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                textLayoutManager.scrollToPositionWithOffset(adapterPosition, 1)
 
-        // don't inner-seek if zero because that is chapter break
-        if (desired.innerIndex == 0) return
+                val targetInnerIndex = if (adapterPosition != -1) {
+                    chapterCopy.getOrNull(adapterPosition)?.innerIndex ?: desired.innerIndex
+                } else {
+                    desired.innerIndex
+                }
 
-        binding.realText.post {
-            getAllLines().also { postLines(it) }.firstOrNull { line ->
-                line.index == desired.index && line.endChar >= desired.char
-            }?.let { line ->
-                //binding.tmpTtsStart2.fixLine(line.top)
-                //binding.tmpTtsEnd2.fixLine(line.bottom)
-                binding.realText.scrollBy(0, line.top - getTopY())
+                // don't inner-seek if zero because that is chapter break
+                if (targetInnerIndex == 0 && desired.char == 0) return@withContext
+
+                var sought = false
+                fun performSeek() {
+                    if (sought) return
+                    val lines = getAllLines()
+                    if (lines.isNotEmpty()) {
+                        sought = true
+                        postLines(lines)
+                        lines.firstOrNull { line ->
+                            line.index == desired.index && line.endChar >= desired.char
+                        }?.let { line ->
+                            binding.realText.scrollBy(0, line.top - getTopY())
+                        }
+                    }
+                }
+
+                binding.realText.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+                    override fun onLayoutChange(
+                        v: View?,
+                        left: Int,
+                        top: Int,
+                        right: Int,
+                        bottom: Int,
+                        oldLeft: Int,
+                        oldTop: Int,
+                        oldRight: Int,
+                        oldBottom: Int
+                    ) {
+                        binding.realText.removeOnLayoutChangeListener(this)
+                        performSeek()
+                    }
+                })
+
+                binding.realText.post {
+                    performSeek()
+                }
             }
         }
-
-        /*desired.firstVisibleChar?.let { visible ->
-                binding.realText.post {
-                    binding.realText.scrollBy(
-                        0,
-                        (textAdapter.getViewOffset(
-                            transformIndexToScrollVisibilityItem(adapterPosition),
-                            visible
-                        ) ?: 0) + offset
-                    )
-                }
-            }*/
 
     }
 
@@ -1103,7 +1142,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
 
     override fun onDestroy() {
-        viewModel.stopTTS()
+        if (isFinishing) {
+            viewModel.stopTTS()
+        }
+        viewModel.context = null
         batteryReceiver?.let {
             try {
                 unregisterReceiver(it)
@@ -1335,6 +1377,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             viewModel.stopTTS()
         }
 
+        binding.readStopTranslationBtn.setOnClickListener {
+            viewModel.stopTranslation()
+        }
+
         viewModel.isShowingOriginalLive.observe(this) { isOriginal ->
             binding.readTranslateToggle.setImageResource(
                 if (isOriginal) R.drawable.ic_google_translate // Show "Translated" icon when showing original
@@ -1537,22 +1583,56 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
                 is Resource.Loading -> {
                     binding.readFail.isVisible = false
-                    
-                    // Chapter loading should use shimmer
-                    binding.readLoading.isVisible = false
-                    binding.readNormalLayout.isVisible = true 
-                    binding.readNormalLayout.alpha = 1f
-                    
-                    val shimmer = binding.readSkeletonShimmer.root as? ShimmerFrameLayout
-                    shimmer?.isVisible = true
-                    shimmer?.startShimmer()
-                    
-                    // Ensure the real text is hidden while shimmering
                     binding.realText.isVisible = false
 
-                    binding.loadingText.apply {
-                        isGone = loading.url.isNullOrBlank()
-                        text = loading.url ?: ""
+                    val urlText = loading.url
+                    val isTranslatingProgress = urlText != null && urlText.contains("/") && urlText.contains("(")
+
+                    if (isTranslatingProgress) {
+                        // Translation progress active - show translation progress card overlay
+                        binding.readLoading.isVisible = true
+                        binding.readSkeletonShimmer.root.isVisible = false
+                        (binding.readSkeletonShimmer.root as? ShimmerFrameLayout)?.stopShimmer()
+
+                        val regex = Regex("""\((\d+)/(\d+)\)""")
+                        val match = regex.find(urlText!!)
+                        if (match != null) {
+                            val current = match.groupValues[1].toIntOrNull() ?: 0
+                            val total = match.groupValues[2].toIntOrNull() ?: 100
+                            binding.readLoadingProgressBar.apply {
+                                max = total
+                                progress = current
+                            }
+                            binding.readLoadingPercentage.text = "${if (total > 0) (current * 100) / total else 0}%"
+                            binding.readLoadingFraction.text = "$current / $total"
+                            
+                            // Clean the text shown inside the loading card to look nice
+                            val cleanText = urlText.replace(regex, "").trim()
+                            binding.loadingText.apply {
+                                isVisible = true
+                                text = cleanText
+                            }
+                        } else {
+                            binding.loadingText.apply {
+                                isVisible = true
+                                text = urlText
+                            }
+                            binding.readLoadingProgressBar.isIndeterminate = true
+                        }
+                    } else {
+                        // Standard chapter loading - hide progress card and show skeleton shimmer
+                        binding.readLoading.isVisible = false
+                        binding.readNormalLayout.isVisible = true 
+                        binding.readNormalLayout.alpha = 1f
+                        
+                        val shimmer = binding.readSkeletonShimmer.root as? ShimmerFrameLayout
+                        shimmer?.isVisible = true
+                        shimmer?.startShimmer()
+
+                        binding.loadingText.apply {
+                            isGone = urlText.isNullOrBlank()
+                            text = urlText ?: ""
+                        }
                     }
                 }
 

@@ -503,6 +503,7 @@ object BackupUtils {
                 }
             }
         }
+        DataStore.clearCache()
     }
 
     fun backupToFile(context: Context, file: java.io.File) {

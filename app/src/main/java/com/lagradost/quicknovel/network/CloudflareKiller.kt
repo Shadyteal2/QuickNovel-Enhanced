@@ -32,6 +32,13 @@ class CloudflareKiller : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response = runBlocking {
         val request = chain.request()
+        val host = request.url.host.lowercase()
+        if (host.contains("googleapis.com") ||
+            host.contains("yandex.net") ||
+            host.contains("yandex.com") ||
+            host.contains("openrouter.ai")) {
+            return@runBlocking chain.proceed(request)
+        }
         val response = chain.proceed(request)
         
         Log.d(TAG, "Intercepted ${request.url} - Code: ${response.code}")
