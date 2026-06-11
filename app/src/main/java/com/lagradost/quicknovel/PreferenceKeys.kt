@@ -27,6 +27,8 @@ object DownloadPrefs {
     const val SORTING_METHOD        = "download_sorting"
     const val NORMAL_SORTING_METHOD = "download_normal_sorting"
     const val SETTINGS              = "download_settings"
+    const val CUSTOM_PARALLEL_DOWNLOADS = "custom_parallel_downloads"
+    const val CUSTOM_RATE_LIMIT         = "custom_rate_limit"
 }
 
 // ─── Reader ──────────────────────────────────────────────────────────────────

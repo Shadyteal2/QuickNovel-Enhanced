@@ -650,7 +650,10 @@ object BookDownloader2Helper {
         }
         rFile.parentFile?.mkdirs()
         if (rFile.isDirectory) rFile.delete()
-        val rateLimit = api.rateLimitTime > 0
+        // Snapshot once — avoids 3+ SharedPreferences reads per chapter attempt.
+        // If the user changes the setting mid-download the new value takes effect on the next book session.
+        val rateLimitMs = api.rateLimitTime
+        val rateLimit = rateLimitMs > 0
         for (i in 0..maxTries) {
             // Lock the rate-limit mutex only for the HTTP request itself.
             // Releasing it before the backoff sleep lets other coroutines make progress.
@@ -668,7 +671,7 @@ object BookDownloader2Helper {
             }
 
             if (!page.isNullOrBlank()) {
-                // Fix: Atomic write — write to a .tmp file first, then rename atomically.
+                // Atomic write — write to a .tmp file first, then rename atomically.
                 // Prevents corrupt/partial chapter files if the app is killed mid-write.
                 val tmpFile = File(rFile.parentFile, rFile.name + ".tmp")
                 tmpFile.parentFile?.mkdirs()
@@ -682,18 +685,18 @@ object BookDownloader2Helper {
                     tmpFile.delete()
                     throw e
                 }
-                if (api.rateLimitTime > 0) {
-                    delay(api.rateLimitTime)
-                }
+                // Rate-limit delay applied AFTER atomic write and AFTER mutex is released,
+                // so other serialised coroutines can proceed with their own HTTP request
+                // while this coroutine politely sleeps.
+                if (rateLimit) delay(rateLimitMs)
                 return@withContext true
             } else {
-                // Fix: Exponential backoff on failure — 2s, 4s, 8s, 16s, 32s (capped).
+                // Exponential backoff on failure — 2s, 4s, 8s, 16s, 32s (capped).
                 // Mimics human behaviour and avoids triggering server-side rate limiting.
                 val backoffMs = minOf(2000L * (1L shl i), 32000L)
                 delay(backoffMs)
-                if (api.rateLimitTime > 0) {
-                    delay(api.rateLimitTime)
-                }
+                // Additional rate-limit courtesy delay after each failed attempt.
+                if (rateLimit) delay(rateLimitMs)
             }
         }
         return@withContext false
@@ -2794,7 +2797,10 @@ object BookDownloader2 {
             // 2. download the text files
             var currentState = DownloadState.IsDownloading
             val timePerLoadMs = java.util.concurrent.atomic.AtomicReference(1000.0)
-            val semaphore = Semaphore(5)
+            val parallelDownloads = context?.let {
+                PreferenceManager.getDefaultSharedPreferences(it).getInt("custom_parallel_downloads", 5)
+            }?.coerceIn(1, 20) ?: 5
+            val semaphore = Semaphore(parallelDownloads)
 
             coroutineScope {
                 val jobs = mutableListOf<kotlinx.coroutines.Job>()
@@ -2962,7 +2968,10 @@ object BookDownloader2 {
         try {
             downloadImage(load, sApiName, sAuthor, sName, filesDir)
             var currentState = DownloadState.IsDownloading
-            val semaphore = Semaphore(5)
+            val parallelDownloads = context?.let {
+                PreferenceManager.getDefaultSharedPreferences(it).getInt("custom_parallel_downloads", 5)
+            }?.coerceIn(1, 20) ?: 5
+            val semaphore = Semaphore(parallelDownloads)
 
             coroutineScope {
                 val jobs = mutableListOf<kotlinx.coroutines.Job>()

@@ -277,7 +277,7 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                     val destJson  = File(pluginsDir, "$destFileName.json")
 
                     // ── 3. Legacy cleanup — remove stale bundles for these providers ──
-                    val mapper = jacksonObjectMapper()
+                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
                     pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
                         try {
                             val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
@@ -360,7 +360,7 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                         url           = "local://$bundleId",  // placeholder; sync skips isManualImport
                         isManualImport = true
                     )
-                    destJson.writeText(jacksonObjectMapper().writeValueAsString(meta))
+                    destJson.writeText(com.lagradost.quicknovel.util.AppUtils.mapper.writeValueAsString(meta))
 
                     // ── 8. Hot-reload so providers appear immediately ──────────────
                     PluginManager.loadAllPlugins(ctx)

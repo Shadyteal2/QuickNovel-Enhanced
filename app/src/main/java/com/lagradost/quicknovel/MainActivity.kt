@@ -106,6 +106,7 @@ import com.lagradost.quicknovel.util.getSafeInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.content.SharedPreferences
+import okhttp3.Cache
 import okhttp3.Protocol
 import okhttp3.OkHttpClient
 import okhttp3.ConnectionPool
@@ -230,7 +231,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     val destFileName = "${bundleId}_$timestamp"
                     val destApk  = File(pluginsDir, "$destFileName.apk")
                     val destJson = File(pluginsDir, "$destFileName.json")
-                    val mapper   = jacksonObjectMapper()
+                    val mapper   = com.lagradost.quicknovel.util.AppUtils.mapper
 
                     // ── 6. Legacy cleanup — remove stale bundles for these providers ──
                     // On existing installs, providers may be stored under an old filename-based
@@ -377,17 +378,15 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 .newBuilder()
                 .ignoreAllSSLErrors()
                 .addInterceptor(com.lagradost.quicknovel.network.CloudflareKiller())
+                .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)) // prefer HTTP/2 multiplexing
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
-                .connectionPool(ConnectionPool(64, 5, TimeUnit.MINUTES))
+                .connectionPool(ConnectionPool(64, 10, TimeUnit.MINUTES)) // bumped keep-alive 5→10 min
                 .build(),
             responseParser = object : ResponseParser {
-                val mapper: ObjectMapper = jacksonObjectMapper().configure(
-                    DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
-                    false
-                )
+                val mapper: ObjectMapper = com.lagradost.quicknovel.util.AppUtils.mapper
 
                 override fun <T : Any> parse(text: String, kClass: KClass<T>): T {
                     return mapper.readValue(text, kClass.java)
@@ -1173,6 +1172,15 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             }
         }
 
+        observe(viewModel.isPinned) { pinned ->
+            bottomPreviewBinding?.previewPinButton?.apply {
+                setImageResource(if (pinned) R.drawable.ic_baseline_push_pin_24 else R.drawable.ic_outline_push_pin_24)
+                imageTintList = android.content.res.ColorStateList.valueOf(
+                    getResourceColor(if (pinned) R.attr.colorPrimary else R.attr.iconColor)
+                )
+            }
+        }
+
         observeNullable(viewModel.loadResponse) { resource ->
             if (resource == null) {
                 bottomPreviewPopup?.dismiss()
@@ -1258,6 +1266,10 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                         }
 
                         resultviewPreviewTitle.text = d.name
+
+                        previewPinButton.setOnClickListener {
+                            viewModel.togglePin()
+                        }
 
                         resultviewPreviewMoreInfo.setOnClickListener {
                             loadResult(d.url, viewModel.apiName)

@@ -659,8 +659,7 @@ class ResultFragment : Fragment() {
                 view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 val context = view.context ?: return@setOnClickListener
                 val json = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-                val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
-                    .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
                 val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList<com.lagradost.quicknovel.ui.download.CategoryItem>() }
                 
                 val orderJson = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
@@ -758,8 +757,7 @@ class ResultFragment : Fragment() {
                     hasBookmark = true
                 } else {
                     val json = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-                    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
-                        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
                     val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList() }
                     val customCat = customCats.find { it.id == currentStateId }
                     if (customCat != null) {
@@ -774,8 +772,7 @@ class ResultFragment : Fragment() {
                     "In Library (${getString(systemCat.stringRes ?: R.string.bookmark)})"
                 } else {
                     val json = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-                    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
-                        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
                     val customCats = try { mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<com.lagradost.quicknovel.ui.download.CategoryItem>>() {}) } catch(t: Throwable) { emptyList() }
                     val customCat = customCats.find { it.id == duplicateState }
                     if (customCat != null) {

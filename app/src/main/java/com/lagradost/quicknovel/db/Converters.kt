@@ -5,7 +5,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 
 class Converters {
-    private val mapper = jacksonObjectMapper()
+    private val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
 
     @TypeConverter
     fun fromStringList(value: List<String>?): String? {

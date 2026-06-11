@@ -265,7 +265,7 @@ object PluginManager {
                     
                     try {
                         val json = metaFile.readText()
-                        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                        val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
                         val item = mapper.readValue(json, PluginItem::class.java)
                         
                         if (item.minApiVersion > API_VERSION) {

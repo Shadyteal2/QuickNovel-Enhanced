@@ -4,6 +4,7 @@ import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.logError
 import com.lagradost.quicknovel.mvvm.safeApiCall
 import com.lagradost.quicknovel.util.Coroutines.threadSafeListOf
+import androidx.preference.PreferenceManager
 import org.jsoup.Jsoup
 import java.util.concurrent.ConcurrentHashMap
 
@@ -57,7 +58,14 @@ class APIRepository(val api: MainAPI) {
     val name: String get() = api.name
     val mainUrl: String get() = api.mainUrl
     val hasReviews: Boolean get() = api.hasReviews
-    val rateLimitTime: Long get() = api.rateLimitTime
+    val rateLimitTime: Long
+        get() {
+            val context = BaseApplication.context ?: return api.rateLimitTime
+            val sp = PreferenceManager.getDefaultSharedPreferences(context)
+            val custom = sp.getInt("custom_rate_limit", 0)
+            return if (custom > 0) custom.toLong() else api.rateLimitTime
+        }
+    val hasRateLimit: Boolean get() = rateLimitTime > 0L
     val hasMainPage: Boolean get() = api.hasMainPage
 
     val iconId: Int? get() = api.iconId
@@ -70,7 +78,7 @@ class APIRepository(val api: MainAPI) {
     suspend fun load(url: String, allowCache: Boolean = true): Resource<LoadResponse> {
         return safeApiCall {
             try {
-                if (api.hasRateLimit) {
+                if (hasRateLimit) {
                     api.rateLimitMutex.lock()
                 }
                 val fixedUrl = api.fixUrl(url)
@@ -102,7 +110,7 @@ class APIRepository(val api: MainAPI) {
                     }
                 } ?: throw ErrorLoadingException("No data")
             } finally {
-                if (api.hasRateLimit) {
+                if (hasRateLimit) {
                     api.rateLimitMutex.unlock()
                 }
             }

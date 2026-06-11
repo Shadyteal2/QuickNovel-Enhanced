@@ -94,6 +94,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.*
+import com.lagradost.quicknovel.mvvm.launchSafe
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -445,6 +446,18 @@ data class ChapterUpdate(
 )
 
 class ReadActivityViewModel : ViewModel() {
+    private val activeJobs = java.util.concurrent.CopyOnWriteArrayList<Job>()
+
+    private fun <T> T.ioSafe(work: suspend (CoroutineScope.(T) -> Unit)): Job {
+        val value = this
+        val job = CoroutineScope(Dispatchers.IO).launchSafe {
+            work(value)
+        }
+        activeJobs.add(job)
+        job.invokeOnCompletion { activeJobs.remove(job) }
+        return job
+    }
+
     var context: Context? = null
     private var loadId: Int = -1
     private var hasPerformedInitialSeek = false
@@ -1149,7 +1162,7 @@ class ReadActivityViewModel : ViewModel() {
                                 
                                 val prefersBatching = engine.prefersBatching
                                 val isBatch = batchSpans.size > 1 && prefersBatching
-                                val sep = if (isBatch) "\n###BATCH_SEP###\n" else ""
+                                val sep = if (isBatch) "\n###_0_###\n" else ""
                                 val batchText = if (isBatch) {
                                     batchSpans.joinToString(sep) { it.text.toString() }
                                 } else {
@@ -1212,7 +1225,7 @@ class ReadActivityViewModel : ViewModel() {
                             if (result is Resource.Success) {
                                 val translatedValue = result.value
                                 val prefersBatching = engine.prefersBatching
-                                val separatorRegex = Regex("""(?i)\s*###\s*BATCH_SEP\s*###\s*""")
+                                val separatorRegex = Regex("""(?i)\s*###\s*(_\s*0\s*_|BATCH_SEP)\s*###\s*""")
                                 val wasBatched = translatedValue != null && prefersBatching && separatorRegex.containsMatchIn(translatedValue)
                                 
                                 if (wasBatched && batchSpans.size > 1) {
@@ -2189,6 +2202,8 @@ class ReadActivityViewModel : ViewModel() {
         stopTranslation()
         mlTranslator?.close()
         mlTranslator = null
+        activeJobs.forEach { it.cancel() }
+        activeJobs.clear()
         super.onCleared()
     }
 
@@ -2524,4 +2539,5 @@ class ReadActivityViewModel : ViewModel() {
     )
 
     /* Removed onlineTranslate function */
+
 }

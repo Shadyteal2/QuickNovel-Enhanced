@@ -7,12 +7,14 @@ import com.lagradost.quicknovel.MainAPI
 import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.mvvm.logError
 import com.lagradost.quicknovel.newStreamResponse
+import androidx.annotation.WorkerThread
 
 class WebToEpubAPI : MainAPI() {
     override val mainUrl = "https://github.com/dteviot/WebToEpub"
     override val name = "WebToEpub"
     override val lang = "en"
 
+    @WorkerThread
     override suspend fun search(query: String): List<SearchResponse>? {
         val trimmed = query.trim()
         if (WebToEpubMap.getParserForUrl(trimmed) == null) return null
@@ -37,6 +39,7 @@ class WebToEpubAPI : MainAPI() {
         )
     }
 
+    @WorkerThread
     override suspend fun load(url: String): LoadResponse? {
         val trimmed = url.trim()
         val parserFile = WebToEpubMap.getParserForUrl(trimmed) 
@@ -65,6 +68,7 @@ class WebToEpubAPI : MainAPI() {
         }
     }
 
+    @WorkerThread
     override suspend fun loadHtml(url: String): String? {
         val trimmed = url.trim()
         val parserFile = WebToEpubMap.getParserForUrl(trimmed) ?: return null

@@ -35,6 +35,7 @@ import com.lagradost.quicknovel.PreferenceDelegate
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.RESULT_BOOKMARK
 import com.lagradost.quicknovel.RESULT_BOOKMARK_STATE
+import com.lagradost.quicknovel.RESULT_PINNED
 import com.lagradost.quicknovel.RESULT_CHAPTER_FILTER_BOOKMARKED
 import com.lagradost.quicknovel.RESULT_CHAPTER_FILTER_DOWNLOADED
 import com.lagradost.quicknovel.RESULT_CHAPTER_FILTER_READ
@@ -311,6 +312,7 @@ class ResultViewModel : ViewModel() {
     var readState: MutableLiveData<ReadType> = MutableLiveData<ReadType>(ReadType.NONE)
     var bookmarkState: MutableLiveData<Int> = MutableLiveData<Int>(-1)
     val duplicateBookmarkState = MutableLiveData<Int?>(null)
+    val isPinned = MutableLiveData<Boolean>(false)
 
     var apiName : String = ""
 
@@ -650,6 +652,8 @@ class ResultViewModel : ViewModel() {
     fun delete() = viewModelScope.launch {
         loadMutex.withLock {
             if (!hasLoaded) return@launch
+            removeKey(RESULT_PINNED, loadId.toString())
+            isPinned.postValue(false)
             BookDownloader2.deleteNovel(load.author, load.name, apiName)
         }
     }
@@ -781,6 +785,8 @@ class ResultViewModel : ViewModel() {
             if (state == -1) {
                 removeKey(RESULT_BOOKMARK_STATE, loadId.toString())
                 removeKey(RESULT_BOOKMARK, loadId.toString())
+                removeKey(RESULT_PINNED, loadId.toString())
+                isPinned.postValue(false)
             } else {
                 setKey(
                     RESULT_BOOKMARK_STATE, loadId.toString(), state
@@ -837,6 +843,23 @@ class ResultViewModel : ViewModel() {
                 RESULT_BOOKMARK, loadId.toString(), currentCached.copy(isSyncEnabled = isSyncEnabled)
             )
         }
+    }
+
+    fun togglePin() = viewModelScope.launch {
+        val currentId = loadId
+        if (currentId == -1) return@launch
+        val currentPinned = isPinned.value ?: false
+        val newPinned = !currentPinned
+        setKey(RESULT_PINNED, currentId.toString(), newPinned)
+        isPinned.postValue(newPinned)
+
+        // Auto-bookmark as Reading if the novel is pinned but not in any category
+        if (newPinned && readState.value == ReadType.NONE) {
+            bookmark(ReadType.READING.prefValue)
+        }
+
+        // Notify lists
+        com.lagradost.quicknovel.ui.download.DownloadViewModel.bookmarkChanged.emit(Unit)
     }
 
     fun share() = viewModelScope.launch {
@@ -1008,6 +1031,7 @@ class ResultViewModel : ViewModel() {
         val state = getKey<Int>(RESULT_BOOKMARK_STATE, tid.toString()) ?: -1
         bookmarkState.postValue(state)
         readState.postValue(ReadType.fromSpinner(state))
+        isPinned.postValue(getKey<Boolean>(RESULT_PINNED, tid.toString()) == true)
 
         setKey(
             DOWNLOAD_EPUB_LAST_ACCESS, tid.toString(), System.currentTimeMillis()

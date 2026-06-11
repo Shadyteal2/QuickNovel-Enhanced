@@ -42,6 +42,7 @@ abstract class MainAPI {
     open val iconBackgroundId: Int = R.color.primaryGrayBackground
     open val iconFullScreen: Boolean = false
 
+    @WorkerThread
     open suspend fun loadMainPage(
         page: Int,
         mainCategory: String?,
@@ -52,6 +53,7 @@ abstract class MainAPI {
     }
 
     open val hasReviews: Boolean = false
+    @WorkerThread
     open suspend fun loadReviews(
         url: String,
         page: Int,
@@ -60,14 +62,17 @@ abstract class MainAPI {
         throw NotImplementedError()
     }
 
+    @WorkerThread
     open suspend fun search(query: String): List<SearchResponse>? {
         throw NotImplementedError()
     }
 
+    @WorkerThread
     open suspend fun load(url: String): LoadResponse? {
         throw NotImplementedError()
     }
 
+    @WorkerThread
     open suspend fun loadHtml(url: String): String? {
         throw NotImplementedError()
     }

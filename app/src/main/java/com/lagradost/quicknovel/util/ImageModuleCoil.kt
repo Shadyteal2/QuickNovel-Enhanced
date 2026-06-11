@@ -49,7 +49,7 @@ object ImageLoader {
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
             .memoryCache {
-                MemoryCache.Builder().maxSizePercent(context, 0.1) // Use 10 % of the app's available memory for caching
+                MemoryCache.Builder().maxSizePercent(context, 0.25) // Use 25% of app RAM (was 10%)
                     .build()
             }
             .diskCache {
@@ -61,9 +61,13 @@ object ImageLoader {
             }
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = {
+                    val dynamicProxySelector = com.lagradost.quicknovel.network.DynamicProxySelector(context)
+                    val proxyAuthenticator = com.lagradost.quicknovel.network.ProxyAuthenticator(dynamicProxySelector)
                     OkHttpClient()
                         .newBuilder()
                         .ignoreAllSSLErrors()
+                        .proxySelector(dynamicProxySelector)
+                        .proxyAuthenticator(proxyAuthenticator)
                         .addInterceptor(com.lagradost.quicknovel.network.CloudflareKiller())
                         .addInterceptor { chain ->
                             val request = chain.request().newBuilder()
@@ -71,6 +75,8 @@ object ImageLoader {
                                 .build()
                             chain.proceed(request)
                         }
+                        .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
+                        .connectionPool(okhttp3.ConnectionPool(16, 10, java.util.concurrent.TimeUnit.MINUTES))
                         .build()
                 }))
             }

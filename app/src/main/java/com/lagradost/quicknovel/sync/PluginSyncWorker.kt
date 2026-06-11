@@ -96,7 +96,7 @@ class PluginSyncWorker(
             }
 
             showToast("Syncing plugins...")
-            val mapper = jacksonObjectMapper()
+            val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
             val manifest = mapper.readValue(manifestText, PluginManifest::class.java)
             android.util.Log.i("PluginSync", "Manifest loaded: ${manifest.plugins.size} plugins. New hash: $currentHash")
 
@@ -152,7 +152,7 @@ class PluginSyncWorker(
         
         // Use a stable filename based on the URL or the first plugin's ID
         val bundleId = plugins.first().pluginId 
-        val mapper = jacksonObjectMapper()
+        val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
 
         // 1. Find existing json file for this bundleId
         val existingJsons = pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.filter { json ->

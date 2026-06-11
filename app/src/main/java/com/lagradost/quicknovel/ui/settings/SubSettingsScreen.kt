@@ -31,6 +31,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -44,7 +46,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.lagradost.quicknovel.util.GoogleDriveSyncManager
 import com.lagradost.quicknovel.util.BackupUtils
 import com.lagradost.quicknovel.GoogleSyncWorkHelper
+import com.lagradost.quicknovel.mvvm.safeApiCall
+import com.lagradost.quicknovel.mvvm.Resource
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -853,6 +859,63 @@ fun SubSettingsScreen(
                                 onClick = { onPreferenceClick("clear_cookies_key") }
                             )
                         }
+
+                        item { PreferenceHeader("Advanced download configurations") }
+
+                        item {
+                            WarningBannerCard(
+                                message = "Only touch these if you know what you're doing. Wrong settings can get you IP-banned by providers or make downloads unusably slow."
+                            )
+                        }
+
+                        item {
+                            AdvancedStepSelectorPreferenceCard(
+                                title = "Parallel Downloads",
+                                value = getInt("custom_parallel_downloads", 5),
+                                min = 1,
+                                max = 20,
+                                step = 1,
+                                valueSuffix = "",
+                                iconRes = R.drawable.netflix_download,
+                                presets = listOf(1, 3, 5, 10, 15, 20),
+                                infoDescription = "Controls the number of chapters downloaded simultaneously (Default: 5). Higher concurrency speeds up downloads but heavily increases the risk of being blocked, rate-limited, or permanently IP-banned by providers.",
+                                onValueChange = { value ->
+                                    sharedPrefs.edit().putInt("custom_parallel_downloads", value).apply()
+                                    onPreferenceChange("custom_parallel_downloads", value)
+                                    changeTrigger++
+                                }
+                            )
+                        }
+
+                        item {
+                            val rateLimitCurrent = getInt("custom_rate_limit", 0)
+                            AdvancedStepSelectorPreferenceCard(
+                                title = "Custom Rate Limit",
+                                value = rateLimitCurrent,
+                                min = 0,
+                                max = 3000,
+                                step = 250,
+                                valueSuffix = "ms",
+                                iconRes = R.drawable.ic_baseline_tune_24,
+                                presets = listOf(0, 500, 1000, 1500, 2000, 3000),
+                                customValueLabel = if (rateLimitCurrent == 0) "Auto" else "$rateLimitCurrent ms",
+                                infoDescription = "Adds a delay (in milliseconds) between chapter requests. Default: Auto/0ms (respects provider defaults). Setting a delay (e.g., 500ms or 1000ms) helps bypass strict Cloudflare checks or anti-scraping blocks on rate-limited providers, though it slows down downloads.",
+                                onValueChange = { value ->
+                                    sharedPrefs.edit().putInt("custom_rate_limit", value).apply()
+                                    onPreferenceChange("custom_rate_limit", value)
+                                    changeTrigger++
+                                }
+                            )
+                        }
+
+                        item {
+                            ProxySettingsCard(
+                                sharedPrefs = sharedPrefs,
+                                changeTrigger = changeTrigger,
+                                onPreferenceChange = onPreferenceChange,
+                                onTriggerChange = { changeTrigger++ }
+                            )
+                        }
                     }
                 }
 
@@ -1029,36 +1092,42 @@ fun StepSelectorPreferenceCard(
                 }
 
                 // Preset Pills
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(horizontal = 8.dp)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp)
                 ) {
-                    presets.forEach { preset ->
-                        val isSelected = value == preset
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                    else Color.Transparent
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
+                        presets.forEach { preset ->
+                            val isSelected = value == preset
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                        else Color.Transparent
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable {
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        onValueChange(preset)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = if (preset == 0) "Auto" else "$preset$valueSuffix",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .clickable {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    onValueChange(preset)
-                                }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = if (preset == 0) "Auto" else "$preset$valueSuffix",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
+                            }
                         }
                     }
                 }
@@ -2019,28 +2088,66 @@ fun TranslationSettingsCard(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        var dropdownExpanded by remember { mutableStateOf(false) }
+
+        Box(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            val options = listOf(
-                "gemini" to "Gemini",
-                "openrouter" to "OpenRouter",
-                "nvidia" to "NVIDIA",
-                "custom" to "Custom"
-            )
-            options.forEach { (key, label) ->
-                val isSelected = provider == key
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent)
-                        .clickable {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                    .clickable { dropdownExpanded = true }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val currentLabel = when (provider) {
+                    "gemini" -> "Gemini"
+                    "openrouter" -> "OpenRouter"
+                    "nvidia" -> "NVIDIA"
+                    else -> "Custom"
+                }
+                Text(
+                    text = currentLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium
+                )
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                    contentDescription = "Select Provider",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(if (dropdownExpanded) 180f else 0f)
+                )
+            }
+            DropdownMenu(
+                expanded = dropdownExpanded,
+                onDismissRequest = { dropdownExpanded = false },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+            ) {
+                val options = listOf(
+                    "gemini" to "Gemini",
+                    "openrouter" to "OpenRouter",
+                    "nvidia" to "NVIDIA",
+                    "custom" to "Custom"
+                )
+                options.forEach { (key, label) ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (provider == key) FontWeight.Bold else FontWeight.Normal,
+                                color = if (provider == key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        onClick = {
                             provider = key
                             sharedPrefs.edit().putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, key).apply()
                             
@@ -2076,15 +2183,8 @@ fun TranslationSettingsCard(
                                 putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE, batchSize)
                             }.apply()
                             onChanged()
+                            dropdownExpanded = false
                         }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
             }
@@ -2215,4 +2315,514 @@ fun TranslationSettingsCard(
         )
     }
 }
+
+@Composable
+fun WarningBannerCard(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(
+                shape = RoundedCornerShape(20.dp),
+                backgroundColor = Color(0x11EF5350), // Semi-transparent soft red/pink
+                strokeColor = Color(0x44EF5350),     // Soft red border
+                strokeWidth = 1.dp
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_baseline_warning_24),
+                contentDescription = "Warning",
+                tint = Color(0xFFEF5350), // Premium red
+                modifier = Modifier.size(28.dp)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 18.sp
+                ),
+                color = Color(0xFFEF5350)
+            )
+        }
+    }
+}
+
+@Composable
+fun AdvancedStepSelectorPreferenceCard(
+    title: String,
+    value: Int,
+    min: Int,
+    max: Int,
+    step: Int = 1,
+    valueSuffix: String,
+    iconRes: Int,
+    presets: List<Int>,
+    customValueLabel: String? = null,
+    infoDescription: String,
+    onValueChange: (Int) -> Unit
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var showInfo by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(RoundedCornerShape(20.dp))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = title,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            showInfo = !showInfo
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_error_outline_24),
+                            contentDescription = "Info",
+                            tint = if (showInfo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                
+                // Glowing value indicator
+                Box(
+                    modifier = Modifier
+                        .glassCard(
+                            shape = RoundedCornerShape(8.dp),
+                            backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            strokeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            strokeWidth = 0.5.dp
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = customValueLabel ?: "$value$valueSuffix",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            if (showInfo) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 40.dp)
+                        .glassCard(
+                            shape = RoundedCornerShape(12.dp),
+                            backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                            strokeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                            strokeWidth = 0.5.dp
+                        )
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = infoDescription,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Step Selector Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Decrement Button
+                OutlinedIconButton(
+                    onClick = {
+                        if (value > min) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            onValueChange(value - step)
+                        }
+                    },
+                    enabled = value > min,
+                    modifier = Modifier.size(44.dp),
+                    colors = IconButtonDefaults.outlinedIconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = "-",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                // Preset Pills Container
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
+                        presets.forEach { preset ->
+                            val isSelected = value == preset
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                        else Color.Transparent
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable {
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        onValueChange(preset)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = if (preset == 0) "Auto" else "$preset$valueSuffix",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Increment Button
+                OutlinedIconButton(
+                    onClick = {
+                        if (value < max) {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            onValueChange(value + step)
+                        }
+                    },
+                    enabled = value < max,
+                    modifier = Modifier.size(44.dp),
+                    colors = IconButtonDefaults.outlinedIconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = "+",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProxySettingsCard(
+    sharedPrefs: android.content.SharedPreferences,
+    changeTrigger: Int,
+    onPreferenceChange: (String, Any) -> Unit,
+    onTriggerChange: () -> Unit
+) {
+    val context = LocalContext.current
+    var enabled by remember(changeTrigger) { mutableStateOf(sharedPrefs.getBoolean("custom_proxy_enabled", false)) }
+    var host by remember(changeTrigger) { mutableStateOf(sharedPrefs.getString("custom_proxy_host", "") ?: "") }
+    var port by remember(changeTrigger) { mutableStateOf(sharedPrefs.getString("custom_proxy_port", "") ?: "") }
+    var proxyType by remember(changeTrigger) { mutableStateOf(sharedPrefs.getString("custom_proxy_type", "HTTP") ?: "HTTP") }
+    var username by remember(changeTrigger) { mutableStateOf(sharedPrefs.getString("custom_proxy_username", "") ?: "") }
+    var password by remember(changeTrigger) { mutableStateOf(sharedPrefs.getString("custom_proxy_password", "") ?: "") }
+
+    fun updateAndSync(key: String, value: Any, editBlock: android.content.SharedPreferences.Editor.() -> Unit) {
+        sharedPrefs.edit().apply(editBlock).apply()
+        onPreferenceChange(key, value)
+        com.lagradost.quicknovel.network.WebViewProxyHelper.syncProxy(context)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(RoundedCornerShape(20.dp))
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_baseline_public_24),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Custom Proxy Connection",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (enabled) "Route download requests through proxy" else "Disabled",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = { checked ->
+                    enabled = checked
+                    updateAndSync("custom_proxy_enabled", checked) {
+                        putBoolean("custom_proxy_enabled", checked)
+                    }
+                    onTriggerChange()
+                }
+            )
+        }
+
+        if (enabled) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("HTTP", "SOCKS").forEach { type ->
+                    val isSelected = proxyType.uppercase() == type
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                proxyType = type
+                                updateAndSync("custom_proxy_type", type) {
+                                    putString("custom_proxy_type", type)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = type,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = host,
+                    onValueChange = {
+                        host = it
+                        updateAndSync("custom_proxy_host", it) {
+                            putString("custom_proxy_host", it)
+                        }
+                    },
+                    label = { Text("Host / IP") },
+                    placeholder = { Text("e.g. 127.0.0.1") },
+                    modifier = Modifier.weight(1.5f),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+
+                OutlinedTextField(
+                    value = port,
+                    onValueChange = {
+                        port = it
+                        updateAndSync("custom_proxy_port", it) {
+                            putString("custom_proxy_port", it)
+                        }
+                    },
+                    label = { Text("Port") },
+                    placeholder = { Text("8080") },
+                    modifier = Modifier.weight(0.8f),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = {
+                        username = it
+                        updateAndSync("custom_proxy_username", it) {
+                            putString("custom_proxy_username", it)
+                        }
+                    },
+                    label = { Text("Username (Optional)") },
+                    placeholder = { Text("Proxy Username") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        updateAndSync("custom_proxy_password", it) {
+                            putString("custom_proxy_password", it)
+                        }
+                    },
+                    label = { Text("Password (Optional)") },
+                    placeholder = { Text("Proxy Password") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            var isTesting by remember { mutableStateOf(false) }
+            val scope = rememberCoroutineScope()
+
+            Button(
+                onClick = {
+                    if (isTesting) return@Button
+                    isTesting = true
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            safeApiCall {
+                                val response = com.lagradost.quicknovel.MainActivity.app.get("https://api.ipify.org?format=json")
+                                com.lagradost.quicknovel.DataStore.mapper.readValue(
+                                    response.text,
+                                    com.lagradost.quicknovel.network.IpifyResponse::class.java
+                                )
+                            }
+                        }
+                        withContext(Dispatchers.Main) {
+                            isTesting = false
+                            when (result) {
+                                is Resource.Success -> {
+                                    val ip = result.value.ip
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "✅ Proxy Active! Your IP is hidden as: $ip",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                is Resource.Failure -> {
+                                    val errMsg = result.errorString ?: "Unknown error"
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "❌ Proxy Failed: $errMsg",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                else -> {}
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                ),
+                shape = RoundedCornerShape(10.dp),
+                enabled = !isTesting
+            ) {
+                if (isTesting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onSecondary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Testing Connection...")
+                } else {
+                    Text("Test Proxy Connection")
+                }
+            }
+        }
+    }
+}
+
+
 

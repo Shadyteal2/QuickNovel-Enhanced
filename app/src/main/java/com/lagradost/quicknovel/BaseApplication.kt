@@ -14,7 +14,9 @@ import com.lagradost.quicknovel.DataStore.removeKey
 import com.lagradost.quicknovel.DataStore.removeKeys
 import com.lagradost.quicknovel.DataStore.setKey
 import kotlinx.coroutines.*
+import java.io.File
 import java.lang.ref.WeakReference
+import okhttp3.Cache
 
 class BaseApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider  {
     override fun attachBaseContext(base: Context?) {
@@ -22,10 +24,33 @@ class BaseApplication : Application(), SingletonImageLoader.Factory, Configurati
         context = base
     }
 
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onCreate() {
         super.onCreate()
-        @OptIn(DelicateCoroutinesApi::class)
-        GlobalScope.launch(Dispatchers.IO) {
+
+        // ── Attach OkHttp disk response cache (50 MB) ────────────────────────
+        // This must happen in Application.onCreate() because we need cacheDir (Context).
+        // The static `app` field was already created with a no-cache client; we swap it
+        // here for an identical client that additionally caches HTTP responses to disk.
+        // Transparent benefit: repeated GETs to the same URL are served from cache
+        // when the server returns Cache-Control headers (most novel CDNs do).
+        val okHttpDiskCache = Cache(
+            directory = File(cacheDir, "okhttp_response_cache"),
+            maxSize = 50L * 1024 * 1024 // 50 MB
+        )
+        val dynamicProxySelector = com.lagradost.quicknovel.network.DynamicProxySelector(this)
+        val proxyAuthenticator = com.lagradost.quicknovel.network.ProxyAuthenticator(dynamicProxySelector)
+        MainActivity.app.baseClient = MainActivity.app.baseClient
+            .newBuilder()
+            .cache(okHttpDiskCache)
+            .proxySelector(dynamicProxySelector)
+            .proxyAuthenticator(proxyAuthenticator)
+            .build()
+
+        com.lagradost.quicknovel.network.WebViewProxyHelper.syncProxy(this)
+
+        appScope.launch {
             com.lagradost.quicknovel.util.PluginManager.loadAllPlugins(this@BaseApplication)
         }
     }

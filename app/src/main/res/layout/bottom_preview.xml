@@ -54,32 +54,51 @@
                     android:layout_marginStart="10dp"
                     android:orientation="vertical">
 
-                <FrameLayout
+                <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content">
 
                     <TextView
-                            android:layout_marginEnd="25dp"
                             android:id="@+id/resultview_preview_title"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_toStartOf="@id/preview_actions_layout"
                             android:textColor="?attr/textColor"
                             android:textSize="16sp"
-
+                            android:layout_centerVertical="true"
                             android:textStyle="bold"
                             tools:text="The Perfect Run" />
 
-                    <ImageView
-                            android:id="@+id/download_delete_trash_from_result"
-                            android:background="?selectableItemBackgroundBorderless"
-                            android:src="@drawable/ic_baseline_delete_outline_24"
-                            android:layout_width="25dp"
-                            android:layout_height="match_parent"
-                            android:layout_gravity="end"
-                            android:layout_marginEnd="5dp"
-                            android:contentDescription="@string/delete"
-                            app:tint="?attr/textColor" />
-                </FrameLayout>
+                    <LinearLayout
+                            android:id="@+id/preview_actions_layout"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:orientation="horizontal">
+
+                        <ImageView
+                                android:id="@+id/preview_pin_button"
+                                android:background="?selectableItemBackgroundBorderless"
+                                android:src="@drawable/ic_outline_push_pin_24"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginEnd="8dp"
+                                android:padding="2dp"
+                                android:contentDescription="Pin to Top"
+                                app:tint="?attr/textColor" />
+
+                        <ImageView
+                                android:id="@+id/download_delete_trash_from_result"
+                                android:background="?selectableItemBackgroundBorderless"
+                                android:src="@drawable/ic_baseline_delete_outline_24"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:padding="2dp"
+                                android:contentDescription="@string/delete"
+                                app:tint="?attr/textColor" />
+                    </LinearLayout>
+                </RelativeLayout>
 
 
                 <com.lagradost.quicknovel.widget.FlowLayout

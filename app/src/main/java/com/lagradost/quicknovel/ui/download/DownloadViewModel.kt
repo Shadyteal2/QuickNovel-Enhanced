@@ -33,6 +33,7 @@ import com.lagradost.quicknovel.DOWNLOAD_EPUB_SIZE
 import com.lagradost.quicknovel.DOWNLOAD_NORMAL_SORTING_METHOD
 import com.lagradost.quicknovel.DOWNLOAD_SETTINGS
 import com.lagradost.quicknovel.DOWNLOAD_SORTING_METHOD
+import com.lagradost.quicknovel.RESULT_PINNED
 import com.lagradost.quicknovel.DownloadActionType
 import com.lagradost.quicknovel.DownloadFileWorkManager
 import com.lagradost.quicknovel.DownloadFileWorkManager.Companion.viewModel
@@ -138,8 +139,7 @@ class DownloadViewModel : ViewModel() {
     private fun getSavedCategories(): List<CategoryItem> {
         val json = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
         return try {
-            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
-                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
             val customList = mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {})
             
             val orderJson = getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
@@ -185,7 +185,7 @@ class DownloadViewModel : ViewModel() {
         _readList.value = newList
         val customList = newList.filter { !it.isSystem }
         val orderList = newList.map { it.id }
-        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
         setKey(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", mapper.writeValueAsString(customList))
         setKey(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", mapper.writeValueAsString(orderList))
         loadAllData(false)
@@ -268,6 +268,10 @@ class DownloadViewModel : ViewModel() {
     fun switchPage(position: Int) {
         setKey(DOWNLOAD_SETTINGS, CURRENT_TAB, position)
         currentTab.postValue(position)
+    }
+
+    fun isPinned(id: Int): Boolean {
+        return getKey<Boolean>(RESULT_PINNED, id.toString()) == true
     }
 
     fun refreshCard(card: DownloadFragment.DownloadDataLoaded) {
@@ -466,41 +470,38 @@ class DownloadViewModel : ViewModel() {
         return getRelevanceScore(x) > 0
     }
 
-    private fun sortArray(
-        currentArray: ArrayList<DownloadFragment.DownloadDataLoaded>,
+    private fun sortArrayInternal(
+        list: List<DownloadFragment.DownloadDataLoaded>,
+        method: Int
     ): List<DownloadFragment.DownloadDataLoaded> {
-        val newSortingMethod = getKey(DOWNLOAD_SETTINGS, DOWNLOAD_SORTING_METHOD) ?: DEFAULT_SORT
-        setKey(DOWNLOAD_SETTINGS, DOWNLOAD_SORTING_METHOD, newSortingMethod)
-
-        val filtered = currentArray.filter { matchesQuery(it.name) }.toMutableList()
-
-        when (newSortingMethod) {
+        val mutable = list.toMutableList()
+        when (method) {
             ALPHA_SORT -> {
-                filtered.sortBy { t -> t.name }
+                mutable.sortBy { t -> t.name }
             }
 
             REVERSE_ALPHA_SORT -> {
-                filtered.sortByDescending { t -> t.name }
+                mutable.sortByDescending { t -> t.name }
             }
 
             DOWNLOADSIZE_SORT -> {
-                filtered.sortByDescending { t -> t.downloadedCount }
+                mutable.sortByDescending { t -> t.downloadedCount }
             }
 
             REVERSE_DOWNLOADSIZE_SORT -> {
-                filtered.sortBy { t -> t.downloadedCount }
+                mutable.sortBy { t -> t.downloadedCount }
             }
 
             DOWNLOADPRECENTAGE_SORT -> {
-                filtered.sortByDescending { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
+                mutable.sortByDescending { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
             }
 
             REVERSE_DOWNLOADPRECENTAGE_SORT -> {
-                filtered.sortBy { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
+                mutable.sortBy { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
             }
 
             REVERSE_LAST_ACCES_SORT -> {
-                filtered.sortBy { t ->
+                mutable.sortBy { t ->
                     (getKey<Long>(
                         DOWNLOAD_EPUB_LAST_ACCESS,
                         t.id.toString(),
@@ -510,8 +511,8 @@ class DownloadViewModel : ViewModel() {
             }
 
             LAST_UPDATED_SORT -> {
-                if (filtered.any { it.lastDownloaded == null }) {
-                    filtered.sortByDescending { t ->
+                if (mutable.any { it.lastDownloaded == null }) {
+                    mutable.sortByDescending { t ->
                         (getKey<Long>(
                             DOWNLOAD_EPUB_LAST_ACCESS,
                             t.id.toString(),
@@ -519,12 +520,12 @@ class DownloadViewModel : ViewModel() {
                         )!!)
                     }
                 }
-                filtered.sortByDescending { it.lastDownloaded ?: 0L }
+                mutable.sortByDescending { it.lastDownloaded ?: 0L }
             }
 
             REVERSE_LAST_UPDATED_SORT -> {
-                if (filtered.any { it.lastDownloaded == null }) {
-                    filtered.sortByDescending { t ->
+                if (mutable.any { it.lastDownloaded == null }) {
+                    mutable.sortByDescending { t ->
                         (getKey<Long>(
                             DOWNLOAD_EPUB_LAST_ACCESS,
                             t.id.toString(),
@@ -532,11 +533,11 @@ class DownloadViewModel : ViewModel() {
                         )!!)
                     }
                 }
-                filtered.sortBy { it.lastDownloaded ?: 0L }
+                mutable.sortBy { it.lastDownloaded ?: 0L }
             }
             //DEFAULT_SORT, LAST_ACCES_SORT
             else -> {
-                filtered.sortByDescending { t ->
+                mutable.sortByDescending { t ->
                     (getKey<Long>(
                         DOWNLOAD_EPUB_LAST_ACCESS,
                         t.id.toString(),
@@ -545,34 +546,47 @@ class DownloadViewModel : ViewModel() {
                 }
             }
         }
+        return mutable
+    }
+
+    private fun sortArray(
+        currentArray: ArrayList<DownloadFragment.DownloadDataLoaded>,
+    ): List<DownloadFragment.DownloadDataLoaded> {
+        val newSortingMethod = getKey(DOWNLOAD_SETTINGS, DOWNLOAD_SORTING_METHOD) ?: DEFAULT_SORT
+        setKey(DOWNLOAD_SETTINGS, DOWNLOAD_SORTING_METHOD, newSortingMethod)
+
+        val filtered = currentArray.filter { matchesQuery(it.name) }
+        val pinned = filtered.filter { isPinned(it.id) }
+        val unpinned = filtered.filter { !isPinned(it.id) }
+
+        val sortedPinned = sortArrayInternal(pinned, newSortingMethod)
+        val sortedUnpinned = sortArrayInternal(unpinned, newSortingMethod)
+
+        val result = sortedPinned + sortedUnpinned
 
         return if (activeQuery.isNotBlank()) {
-            filtered.sortedByDescending { getRelevanceScore(it.name) }
+            result.sortedByDescending { getRelevanceScore(it.name) }
         } else {
-            filtered
+            result
         }
     }
 
-    private fun sortNormalArray(
-        currentArray: ArrayList<ResultCached>,
+    private fun sortNormalArrayInternal(
+        list: List<ResultCached>,
+        method: Int
     ): List<ResultCached> {
-        val newSortingMethod =
-            getKey(DOWNLOAD_SETTINGS, DOWNLOAD_NORMAL_SORTING_METHOD) ?: DEFAULT_SORT
-        setKey(DOWNLOAD_SETTINGS, DOWNLOAD_NORMAL_SORTING_METHOD, newSortingMethod)
-
-        val filtered = currentArray.filter { matchesQuery(it.name) }.toMutableList()
-
-        when (newSortingMethod) {
+        val mutable = list.toMutableList()
+        when (method) {
             ALPHA_SORT -> {
-                filtered.sortBy { t -> t.name }
+                mutable.sortBy { t -> t.name }
             }
 
             REVERSE_ALPHA_SORT -> {
-                filtered.sortByDescending { t -> t.name }
+                mutable.sortByDescending { t -> t.name }
             }
 
             REVERSE_LAST_ACCES_SORT -> {
-                filtered.sortBy { t ->
+                mutable.sortBy { t ->
                     (getKey<Long>(
                         DOWNLOAD_EPUB_LAST_ACCESS,
                         t.id.toString(),
@@ -582,7 +596,7 @@ class DownloadViewModel : ViewModel() {
             }
             // DEFAULT_SORT, LAST_ACCES_SORT
             else -> {
-                filtered.sortByDescending { t ->
+                mutable.sortByDescending { t ->
                     (getKey<Long>(
                         DOWNLOAD_EPUB_LAST_ACCESS,
                         t.id.toString(),
@@ -591,11 +605,29 @@ class DownloadViewModel : ViewModel() {
                 }
             }
         }
+        return mutable
+    }
+
+    private fun sortNormalArray(
+        currentArray: ArrayList<ResultCached>,
+    ): List<ResultCached> {
+        val newSortingMethod =
+            getKey(DOWNLOAD_SETTINGS, DOWNLOAD_NORMAL_SORTING_METHOD) ?: DEFAULT_SORT
+        setKey(DOWNLOAD_SETTINGS, DOWNLOAD_NORMAL_SORTING_METHOD, newSortingMethod)
+
+        val filtered = currentArray.filter { matchesQuery(it.name) }
+        val pinned = filtered.filter { isPinned(it.id) }
+        val unpinned = filtered.filter { !isPinned(it.id) }
+
+        val sortedPinned = sortNormalArrayInternal(pinned, newSortingMethod)
+        val sortedUnpinned = sortNormalArrayInternal(unpinned, newSortingMethod)
+
+        val result = sortedPinned + sortedUnpinned
 
         return if (activeQuery.isNotBlank()) {
-            filtered.sortedByDescending { getRelevanceScore(it.name) }
+            result.sortedByDescending { getRelevanceScore(it.name) }
         } else {
-            filtered
+            result
         }
     }
 
@@ -676,7 +708,9 @@ class DownloadViewModel : ViewModel() {
             val sorted = if (activeQuery.isNotBlank()) {
                 sortNormalArray(ArrayList(unsorted))
             } else {
-                unsorted
+                val pinned = unsorted.filter { isPinned(it.id) }
+                val unpinned = unsorted.filter { !isPinned(it.id) }
+                pinned + unpinned
             }
             
             pages.add(

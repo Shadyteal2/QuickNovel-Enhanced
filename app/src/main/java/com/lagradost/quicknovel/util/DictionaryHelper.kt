@@ -41,7 +41,7 @@ data class DictionaryDefinition(
 
 object DictionaryHelper {
     private const val API_URL = "https://api.dictionaryapi.dev/api/v2/entries/en/"
-    private val mapper = jacksonObjectMapper()
+    private val mapper = AppUtils.mapper
 
     suspend fun fetchDefinition(word: String): Resource<List<DictionaryResponse>> {
         return safeApiCall {

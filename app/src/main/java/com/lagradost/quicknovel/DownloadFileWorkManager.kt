@@ -35,9 +35,7 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         const val ID_REFRESH_READINGPROGRESS = "REFRESH_READINGPROGRESS"
         const val ID_DOWNLOAD = "ID_DOWNLOAD"
 
-        private val mapper = jacksonObjectMapper().apply {
-            configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        }
+        private val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
 
         private var _viewModel: WeakReference<DownloadViewModel> = WeakReference(null)
         var viewModel: DownloadViewModel?

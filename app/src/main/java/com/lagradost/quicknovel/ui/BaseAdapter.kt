@@ -205,12 +205,12 @@ abstract class BaseAdapter<
         }
     }
 
-    final override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
         recyclerView.addOnAttachStateChangeListener(attachListener)
         super.onAttachedToRecyclerView(recyclerView)
     }
 
-    final override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
         recyclerView.removeOnAttachStateChangeListener(attachListener)
         super.onDetachedFromRecyclerView(recyclerView)
     }

@@ -46,4 +46,14 @@
         android:icon="@drawable/ic_baseline_warning_24"
         app:layout="@layout/setting_tile" />
 
+    <Preference
+        android:title="Custom Parallel Downloads"
+        android:key="custom_parallel_downloads"
+        android:defaultValue="5" />
+
+    <Preference
+        android:title="Custom Rate Limit"
+        android:key="custom_rate_limit"
+        android:defaultValue="0" />
+
 </PreferenceScreen>

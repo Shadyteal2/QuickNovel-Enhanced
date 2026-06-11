@@ -187,7 +187,7 @@ class SubSettingsFragment : Fragment() {
                     val destJson  = File(pluginsDir, "$destFileName.json")
 
                     // Legacy cleanup
-                    val mapper = jacksonObjectMapper()
+                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
                     pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
                         try {
                             val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
@@ -260,7 +260,7 @@ class SubSettingsFragment : Fragment() {
                         url           = "local://$bundleId",
                         isManualImport = true
                     )
-                    destJson.writeText(jacksonObjectMapper().writeValueAsString(meta))
+                    destJson.writeText(com.lagradost.quicknovel.util.AppUtils.mapper.writeValueAsString(meta))
 
                     PluginManager.loadAllPlugins(ctx)
                     activity?.runOnUiThread {

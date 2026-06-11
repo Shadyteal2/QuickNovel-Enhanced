@@ -8,11 +8,13 @@ import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.databinding.SearchResultGridBinding
 import com.lagradost.quicknovel.ui.BaseDiffCallback
 import com.lagradost.quicknovel.ui.NoStateAdapter
+import com.lagradost.quicknovel.ui.UiImage
 import com.lagradost.quicknovel.ui.ViewHolderState
 import com.lagradost.quicknovel.ui.newSharedPool
 import com.lagradost.quicknovel.util.UIHelper.hideKeyboard
 import com.lagradost.quicknovel.util.UIHelper.setImage
 import com.lagradost.quicknovel.widget.AutofitRecyclerView
+import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.roundToInt
 
 class SearchAdapter(
@@ -24,6 +26,50 @@ class SearchAdapter(
     }, contentSame = { a, b ->
         a == b
     })) {
+
+    private var scrollListener: RecyclerView.OnScrollListener? = null
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        val context = recyclerView.context
+        val imageLoader = coil3.SingletonImageLoader.get(context)
+        
+        scrollListener = object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    val layoutManager = recyclerView.layoutManager as? androidx.recyclerview.widget.GridLayoutManager
+                        ?: recyclerView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                        ?: return
+                    
+                    val lastVisible = layoutManager.findLastVisibleItemPosition()
+                    val totalItems = itemCount
+                    
+                    // Preload next 10 items
+                    for (i in (lastVisible + 1)..(lastVisible + 10)) {
+                        if (i in 0 until totalItems) {
+                            val item = getItemOrNull(i) ?: continue
+                            val img = item.image ?: continue
+                            if (img is UiImage.Image && img.url.isNotBlank()) {
+                                val request = coil3.request.ImageRequest.Builder(context)
+                                    .data(img.url)
+                                    .build()
+                                imageLoader.enqueue(request)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        recyclerView.addOnScrollListener(scrollListener!!)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        scrollListener?.let {
+            recyclerView.removeOnScrollListener(it)
+        }
+        scrollListener = null
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
 
     companion object {
         val sharedPool =
