@@ -72,6 +72,8 @@ import com.lagradost.quicknovel.util.Event
 import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
 import com.lagradost.quicknovel.util.pmap
+import com.lagradost.quicknovel.util.apmap
+import com.lagradost.quicknovel.mvvm.safeApiCall
 import com.lagradost.safefile.SafeFile
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -96,6 +98,7 @@ import me.ag2s.epublib.domain.Resource
 import me.ag2s.epublib.epub.EpubReader
 import me.ag2s.epublib.epub.EpubWriter
 import me.ag2s.epublib.util.zip.AndroidZipFile
+import org.jsoup.Jsoup
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -162,6 +165,13 @@ data class QuickStreamData(
     val meta: QuickStreamMetaData,
     val poster: String?,
     val data: MutableList<ChapterData>,
+)
+
+data class EpubChapterData(
+    val chapterResource: Resource,
+    val imageResources: List<Resource>,
+    val index: Int,
+    val title: String
 )
 
 object BookDownloader2Helper {
@@ -787,8 +797,7 @@ object BookDownloader2Helper {
                     fileName.nameWithoutExtension.toIntOrNull() ?: return@mapNotNull null
                 }?.filter { x -> x >= start }?.sorted()
 
-                chapters?.pmap { threadIndex ->
-
+                chapters?.apmap { threadIndex ->
                     val filepath =
                         head + getFilename(
                             sApiName,
@@ -797,28 +806,68 @@ object BookDownloader2Helper {
                             threadIndex
                         )
                     val chap = getChapter(filepath, threadIndex, stripHtml, stripAuthorNotes)
-                        ?: return@pmap null
-                    Triple(
-                        Resource(
+                        ?: return@apmap null
+
+                    val imageResources = mutableListOf<Resource>()
+                    var finalHtml = chap.html
+
+                    if (chap.html.contains("<img", ignoreCase = true)) {
+                        try {
+                            val doc = Jsoup.parse(chap.html)
+                            doc.outputSettings().prettyPrint(false)
+
+                            val imgTags = doc.select("img")
+                            imgTags.forEach { img ->
+                                val src = img.attr("src")
+                                if (!src.isNullOrEmpty()) {
+                                    val extension = src.substringAfterLast(".", "jpg").substringBefore("?").substringBefore("#")
+                                    val sanitisedExtension = if (extension.length in 3..4 && extension.all { it.isLetter() }) extension else "jpg"
+                                    val uniqueId = src.hashCode().let { if (it < 0) -it else it }
+                                    val imageName = "img_${threadIndex}_${uniqueId}.$sanitisedExtension"
+                                    val imageHref = "images/$imageName"
+
+                                    val downloadResult = safeApiCall {
+                                        MainActivity.app.get(src, headers = mapOf("Accept" to "image/*"))
+                                    }
+                                    if (downloadResult is com.lagradost.quicknovel.mvvm.Resource.Success<*>) {
+                                        val response = downloadResult.value as? com.lagradost.nicehttp.NiceResponse
+                                        if (response != null) {
+                                            val bytes = response.okhttpResponse.body.bytes()
+                                            imageResources.add(Resource(bytes as ByteArray, imageHref))
+                                            img.attr("src", imageHref)
+                                        }
+                                    }
+                                }
+                            }
+                            finalHtml = doc.html()
+                        } catch (t: Throwable) {
+                            logError(t)
+                        }
+                    }
+
+                    EpubChapterData(
+                        chapterResource = Resource(
                             "id$threadIndex",
-                            chap.html.toByteArray(),
+                            finalHtml.toByteArray(),
                             "chapter$threadIndex.html",
                             MediaTypes.XHTML
                         ),
-                        threadIndex,
-                        chap.title
+                        imageResources = imageResources,
+                        index = threadIndex,
+                        title = chap.title
                     )
                 }?.sortedBy {
-                    it?.second
+                    it?.index
                 }?.also { list ->
                     if (list.isEmpty()) {
                         throw ErrorLoadingException("Unable to create an empty book")
                     }
-                }?.forEach { chapter ->
-                    if (chapter == null) {
-                        return@forEach
+                }?.forEach { chapterData ->
+                    if (chapterData == null) return@forEach
+                    chapterData.imageResources.forEach { imgRes ->
+                        book.addResource(imgRes)
                     }
-                    book.addSection(chapter.third, chapter.first)
+                    book.addSection(chapterData.title, chapterData.chapterResource)
                 }
 
                 val largestChapter = chapters?.maxOrNull()?.plus(1) ?: 0
@@ -2726,31 +2775,52 @@ object BookDownloader2 {
         filesDir: File
     ) {
         try {
-            if (load.posterUrl != null) {
-                val filepath = BookDownloader2Helper.getFilenameIMG(sApiName, sAuthor, sName)
-                val posterFilepath =
-                    filesDir.toString() + filepath
-                val pFile = File(posterFilepath)
+            val posterUrl = load.posterUrl ?: return
+            val id = generateId(sApiName, sAuthor, sName)
+            val pFile = File(filesDir, "covers/$id.jpg")
+            val localUri = "file://${pFile.absolutePath}"
+            val cacheKey = "covers/$id.jpg"
 
-                val posterUrl = load.posterUrl
-                // don't need to redownload the image every time
-                if ((!pFile.exists() || getKey<String>(
-                        filepath,
-                        posterUrl
-                    ) != posterUrl) && posterUrl != null
-                ) {
-                    setKey(filepath, load.posterUrl)
-                    val get =
-                        MainActivity.app.get(posterUrl, headers = load.posterHeaders ?: mapOf())
-                    val bytes = get.okhttpResponse.body.bytes()
+            // don't need to redownload the image every time
+            if (!pFile.exists() || getKey<String>(cacheKey, posterUrl) != posterUrl) {
+                val getResult = safeApiCall {
+                    MainActivity.app.get(posterUrl, headers = (load.posterHeaders ?: mapOf()) + mapOf("Accept" to "image/*"))
+                }
+                if (getResult is com.lagradost.quicknovel.mvvm.Resource.Success<*>) {
+                    val response = getResult.value as? com.lagradost.nicehttp.NiceResponse
+                    if (response != null) {
+                        val bytes = response.okhttpResponse.body.bytes()
+                        pFile.parentFile?.mkdirs()
+                        pFile.writeBytes(bytes)
+                        setKey(cacheKey, posterUrl)
 
-                    pFile.parentFile?.mkdirs()
-                    pFile.writeBytes(bytes)
+                        // Also save to legacy path to prevent regressions in legacy views
+                        try {
+                            val filepath = BookDownloader2Helper.getFilenameIMG(sApiName, sAuthor, sName)
+                            val legacyFile = File(filesDir.toString() + filepath)
+                            legacyFile.parentFile?.mkdirs()
+                            legacyFile.writeBytes(bytes)
+                        } catch (t: Throwable) {
+                            logError(t)
+                        }
+                    }
+                }
+            }
+
+            // If local poster exists, update the Room DB
+            if (pFile.exists()) {
+                val dbCtx = context
+                if (dbCtx != null) {
+                    val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(dbCtx)
+                    val dao = db.novelDao()
+                    val oldNovel = dao.getById(id)
+                    if (oldNovel != null && oldNovel.posterUrl != localUri) {
+                        dao.insert(oldNovel.copy(posterUrl = localUri))
+                    }
                 }
             }
         } catch (t: Throwable) {
             logError(t)
-            //delay(1000)
         }
     }
 

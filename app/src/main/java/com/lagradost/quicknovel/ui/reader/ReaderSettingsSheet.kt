@@ -49,7 +49,8 @@ fun ReaderSettingsSheet(
     onApplyTranslationClick: () -> Unit,
     onMlInfoClick: () -> Unit,
     onColorCustomClick: () -> Unit,
-    onColorSelect: (bgColor: Int, txtColor: Int) -> Unit
+    onColorSelect: (bgColor: Int, txtColor: Int) -> Unit,
+    onDismiss: () -> Unit = {}
 ) {
     var scrollWithVolume by remember { mutableStateOf(viewModel.scrollWithVolume) }
     var ttsLock by remember { mutableStateOf(viewModel.ttsLock) }
@@ -60,6 +61,10 @@ fun ReaderSettingsSheet(
     var keepScreenActive by remember { mutableStateOf(viewModel.screenAwake) }
     var authorNotes by remember { mutableStateOf(viewModel.authorNotes) }
     var showProgress by remember { mutableStateOf(viewModel.showReaderProgress) }
+    var paginatedSwipeEnabled by remember { mutableStateOf(viewModel.paginatedSwipeEnabled) }
+    var dynamicLuminanceEnabled by remember { mutableStateOf(viewModel.dynamicLuminanceEnabled) }
+    var autoScroll by remember { mutableStateOf(viewModel.autoScroll) }
+    var autoScrollSpeed by remember { mutableStateOf(viewModel.autoScrollSpeed.toFloat()) }
     
     var textSize by remember { mutableStateOf(viewModel.textSize.toFloat()) }
     var textPadding by remember { mutableStateOf(viewModel.paddingHorizontal.toFloat()) }
@@ -79,7 +84,10 @@ fun ReaderSettingsSheet(
         // Drag handle indicator
         item {
             Box(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onDismiss() }
+                    .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -139,11 +147,32 @@ fun ReaderSettingsSheet(
                 SettingsSwitchRow(stringResource(R.string.keep_screen_active), keepScreenActive) {
                     keepScreenActive = it; viewModel.screenAwake = it
                 }
+                SettingsSwitchRow("Auto Scroll", autoScroll) {
+                    autoScroll = it; viewModel.autoScroll = it
+                }
+                if (autoScroll) {
+                    SettingsSliderRow(
+                        title = "Auto Scroll Speed",
+                        value = autoScrollSpeed,
+                        valueFrom = 1f,
+                        valueTo = 20f,
+                        stepSize = 1f,
+                        leftIcon = R.drawable.pace_24px,
+                        rightIcon = R.drawable.acute_24px,
+                        onValueChange = { autoScrollSpeed = it; viewModel.autoScrollSpeed = it.roundToInt() }
+                    )
+                }
                 SettingsSwitchRow(stringResource(R.string.show_authors_notes), authorNotes) {
                     authorNotes = it; viewModel.authorNotes = it; viewModel.refreshChapters()
                 }
                 SettingsSwitchRow(stringResource(R.string.show_reading_progress), showProgress) {
                     showProgress = it; viewModel.showReaderProgress = it
+                }
+                SettingsSwitchRow("Paginated Swipe Mode", paginatedSwipeEnabled) {
+                    paginatedSwipeEnabled = it; viewModel.paginatedSwipeEnabled = it
+                }
+                SettingsSwitchRow("Auto-Fix Bright Backgrounds", dynamicLuminanceEnabled) {
+                    dynamicLuminanceEnabled = it; viewModel.dynamicLuminanceEnabled = it
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

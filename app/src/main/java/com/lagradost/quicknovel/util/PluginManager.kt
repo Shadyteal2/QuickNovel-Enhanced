@@ -96,15 +96,32 @@ object PluginManager {
     private fun getSignatureHash(context: Context, path: String): String? {
         return try {
             val packageManager = context.packageManager
+
+            // ── Android 9 / 10 (API 28–29) workaround ────────────────────────────────
+            // getPackageArchiveInfo() on API 28–29 silently fails to populate
+            // PackageInfo.signingInfo when *only* GET_SIGNING_CERTIFICATES is passed.
+            // This is a confirmed Android OS bug (b/159537841). The fix is to always
+            // OR-in the legacy GET_SIGNATURES flag so the internal parser satisfies its
+            // own preconditions. We still prefer the modern signingInfo path below, and
+            // fall back to the legacy array only if signingInfo is unexpectedly null.
             val packageInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                packageManager.getPackageArchiveInfo(path, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+                @Suppress("DEPRECATION")
+                packageManager.getPackageArchiveInfo(
+                    path,
+                    android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES or
+                        android.content.pm.PackageManager.GET_SIGNATURES
+                )
             } else {
                 @Suppress("DEPRECATION")
                 packageManager.getPackageArchiveInfo(path, android.content.pm.PackageManager.GET_SIGNATURES)
             }
 
             val signatures = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                packageInfo?.signingInfo?.apkContentsSigners
+                // Prefer the modern signingInfo path; fall back to legacy field in case
+                // the platform bug leaves signingInfo null even with both flags (seen on
+                // certain Android 9 OEM builds).
+                @Suppress("DEPRECATION")
+                packageInfo?.signingInfo?.apkContentsSigners ?: packageInfo?.signatures
             } else {
                 @Suppress("DEPRECATION")
                 packageInfo?.signatures

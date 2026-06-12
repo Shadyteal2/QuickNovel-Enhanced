@@ -760,12 +760,7 @@ fun DownloadScreen(
                                             onDeleteClick = onDeleteClick,
                                             isSelectionMode = isSelectionMode,
                                             isSelected = isSelected,
-                                            modifier = Modifier.animateItemPlacement(
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow
-                                                )
-                                            )
+                                            modifier = Modifier.animateItem()
                                         )
                                     }
                                     // Bottom Import item inside downloads page
@@ -900,12 +895,7 @@ fun DownloadScreen(
                                             onLongClick = currentOnLongClick,
                                             isSelectionMode = isSelectionMode,
                                             isSelected = isSelected,
-                                            modifier = Modifier.animateItemPlacement(
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow
-                                                )
-                                            )
+                                            modifier = Modifier.animateItem()
                                         )
                                     }
                                     if (isDownloadsPage) {

@@ -27,6 +27,7 @@ import com.lagradost.quicknovel.ReadActivityViewModel
 import com.lagradost.quicknovel.SpanDisplay
 import com.lagradost.quicknovel.TTSHelper
 import com.lagradost.quicknovel.TextSpan
+import com.lagradost.quicknovel.hasNonLatinAlpha
 import com.lagradost.quicknovel.databinding.SingleFailedBinding
 import com.lagradost.quicknovel.databinding.SingleFinishedChapterBinding
 import com.lagradost.quicknovel.databinding.SingleImageBinding
@@ -187,6 +188,7 @@ data class TextConfig(
     val isTextSelectable: Boolean,
     /** Vertical text padding in dp */
     val verticalPadding: Float,
+    val isContrastCompromised: Boolean = false,
 ) {
     private val fontFile: File? by lazy {
         if (textFont == "") null else {
@@ -206,7 +208,12 @@ data class TextConfig(
     }
 
     private fun setTextFont(textView: TextView, flags: Int) {
-        textView.setTypeface(cachedFont, flags)
+        val hasNonLatin = textView.text?.toString()?.hasNonLatinAlpha() == true
+        if (hasNonLatin) {
+            textView.setTypeface(defaultFont, flags)
+        } else {
+            textView.setTypeface(cachedFont, flags)
+        }
     }
     /*private fun setTextFont(textView: TextView) {
         if (cachedFont != null) textView.typeface = cachedFont
@@ -319,6 +326,12 @@ class TextAdapter(
     fun changeBackgroundColor(color: Int): Boolean {
         if (config.backgroundColor == color) return false
         config = config.copy(backgroundColor = color)
+        return true
+    }
+
+    fun changeContrastCompromised(to: Boolean): Boolean {
+        if (config.isContrastCompromised == to) return false
+        config = config.copy(isContrastCompromised = to)
         return true
     }
 
@@ -749,6 +762,11 @@ class TextAdapter(
                     binding.root,
                     CONFIG_SIZE or CONFIG_COLOR or CONFIG_FONT or CONFIG_PADDING
                 )
+                if (config.isContrastCompromised) {
+                    binding.root.setShadowLayer(4f, 0f, 0f, android.graphics.Color.BLACK)
+                } else {
+                    binding.root.setShadowLayer(0f, 0f, 0f, 0)
+                }
             }
 
             is SingleSeparatorBinding -> {

@@ -87,9 +87,19 @@ class GoogleMLKitEngine : TranslationEngine {
                 currentTranslator = Translation.getClient(options)
                 currentFrom = fromLang
                 currentTo = toLang
-                
-                // Ensure model is downloaded (this handles both source and target)
-                currentTranslator?.downloadModelIfNeeded()?.await()
+
+                // ── Ensure model is downloaded before translating. ──
+                // If the model hasn't been downloaded yet (e.g., first-time use or
+                // after a cache clear), surface a clear, user-friendly failure rather
+                // than propagating a cryptic MLKitException through the call chain.
+                try {
+                    currentTranslator?.downloadModelIfNeeded()?.await()
+                } catch (e: Exception) {
+                    val msg = "ML Kit model not ready: ${e.message ?: "Download required"}. " +
+                        "Open Translation settings and tap Apply to download the model."
+                    Log.e(TAG, msg, e)
+                    return Resource.Failure(e, msg)
+                }
             }
 
             val result = currentTranslator?.translate(request.text)?.await()

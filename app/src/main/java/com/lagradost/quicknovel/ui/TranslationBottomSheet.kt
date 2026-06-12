@@ -13,6 +13,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.applyGlassStyle
 import com.lagradost.quicknovel.util.UIHelper.clipboardHelper
 import com.lagradost.quicknovel.util.UIHelper.dismissSafe
 
@@ -32,7 +33,8 @@ class TranslationBottomSheet(private val originalText: String, private val backg
                         onCopy = { translated ->
                             clipboardHelper(txt(R.string.translation), translated)
                             this@TranslationBottomSheet.dialog.dismissSafe(activity)
-                        }
+                        },
+                        onDismiss = { dismiss() }
                     )
                 }
             }
@@ -54,8 +56,11 @@ class TranslationBottomSheet(private val originalText: String, private val backg
         val backgroundView = activity?.findViewById<View>(bgId) ?: return
         
         val dialog = dialog as? com.google.android.material.bottomsheet.BottomSheetDialog ?: return
+        dialog.applyGlassStyle()
         val behavior = dialog.behavior
         
+        DrawerHelper.applyScalingAnimation(backgroundView, 1f)
+
         behavior.addBottomSheetCallback(object : com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
                 if (newState == com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN ||

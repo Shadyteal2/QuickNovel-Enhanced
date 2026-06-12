@@ -274,6 +274,12 @@
 
             </androidx.recyclerview.widget.RecyclerView>
 
+            <androidx.compose.ui.platform.ComposeView
+                    android:id="@+id/paginated_text_compose"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
             <View
                     android:id="@+id/read_bottom_item"
                     android:layout_width="match_parent"

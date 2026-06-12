@@ -32,6 +32,7 @@ import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.applyGlassStyle
 import kotlinx.coroutines.launch
 
 class ChapterListBottomSheet : BottomSheetDialogFragment() {
@@ -79,7 +80,8 @@ class ChapterListBottomSheet : BottomSheetDialogFragment() {
                         onChapterSelected = { index ->
                             onChapterSelectedListener?.invoke(index)
                             dismiss()
-                        }
+                        },
+                        onDismiss = { dismiss() }
                     )
                 }
             }
@@ -101,7 +103,10 @@ class ChapterListBottomSheet : BottomSheetDialogFragment() {
         val backgroundView = activity?.findViewById<View>(bgId) ?: return
 
         val dialog = dialog as? BottomSheetDialog ?: return
+        dialog.applyGlassStyle()
         val behavior = dialog.behavior
+
+        DrawerHelper.applyScalingAnimation(backgroundView, 1f)
 
         behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
@@ -133,7 +138,8 @@ class ChapterListBottomSheet : BottomSheetDialogFragment() {
 fun ChapterSelectionCompose(
     titles: List<String>,
     currentIndex: Int,
-    onChapterSelected: (Int) -> Unit
+    onChapterSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val filteredChapters = remember(searchQuery, titles) {
@@ -165,11 +171,18 @@ fun ChapterSelectionCompose(
         // Drag handle indicator
         Box(
             modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .align(Alignment.CenterHorizontally)
-                .glassCard(shape = RoundedCornerShape(2.dp))
-        )
+                .fillMaxWidth()
+                .clickable { onDismiss() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .height(4.dp)
+                    .glassCard(shape = RoundedCornerShape(2.dp))
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         // Header & Search

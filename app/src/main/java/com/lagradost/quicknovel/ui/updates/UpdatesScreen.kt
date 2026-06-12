@@ -14,14 +14,13 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,21 +53,8 @@ fun UpdatesScreen(
     val groupedUpdates by viewModel.groupedUpdates.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
+    // New PullToRefreshBox API (Material3 1.3+ / BOM 2025.x)
     val pullToRefreshState = rememberPullToRefreshState()
-    
-    LaunchedEffect(isRefreshing) {
-        if (isRefreshing) {
-            pullToRefreshState.startRefresh()
-        } else {
-            pullToRefreshState.endRefresh()
-        }
-    }
-    
-    LaunchedEffect(pullToRefreshState.isRefreshing) {
-        if (pullToRefreshState.isRefreshing && !isRefreshing) {
-            viewModel.refreshUpdates()
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -122,11 +108,14 @@ fun UpdatesScreen(
         },
         containerColor = containerColor
     ) { paddingValues ->
-        Box(
+        // PullToRefreshBox replaces the old PullToRefreshContainer + nestedScrollConnection pattern
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refreshUpdates() },
+            state = pullToRefreshState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .nestedScroll(pullToRefreshState.nestedScrollConnection)
         ) {
             if (groupedUpdates.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -171,13 +160,6 @@ fun UpdatesScreen(
                     }
                 }
             }
-
-            PullToRefreshContainer(
-                state = pullToRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter),
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }

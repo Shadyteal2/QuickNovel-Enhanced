@@ -80,3 +80,20 @@ fun Uri.Builder.add(vararg query: Pair<String, Any>) =
 
 fun Uri.Builder.add(key: String, value: Any): Uri.Builder =
     appendQueryParameter(key, value.toString())
+
+fun String.hasNonLatinAlpha(): Boolean {
+    for (i in 0 until length) {
+        val codePoint = codePointAt(i)
+        if (Character.isLetter(codePoint)) {
+            // Non-Latin letters start above Latin-IPA Extensions (0x02AF).
+            // Greek (0x0370-0x03FF) is flagged.
+            // Hebrew, Arabic, Syriac, Thaana, Devanagari, Bengali, and all CJK scripts start at 0x0530.
+            if (codePoint in 0x0370..0x03FF || codePoint >= 0x0530) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+fun CharSequence.hasNonLatinAlpha(): Boolean = this.toString().hasNonLatinAlpha()

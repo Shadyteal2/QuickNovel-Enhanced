@@ -17,6 +17,11 @@ import com.lagradost.quicknovel.ui.download.DownloadFragment
 import com.lagradost.quicknovel.ui.download.DownloadViewModel
 import com.lagradost.quicknovel.util.Apis
 import java.lang.ref.WeakReference
+import android.os.Build
+import android.content.pm.ServiceInfo
+import android.os.PowerManager
+import androidx.core.app.NotificationCompat
+import androidx.work.ForegroundInfo
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -158,68 +163,110 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         val indices: List<Int>
     )
 
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        val notificationId = 1337
+        val notification = NotificationCompat.Builder(context, "epubdownloader.general")
+            .setSmallIcon(R.drawable.rdload)
+            .setContentTitle("Downloading Novel")
+            .setContentText("Download in progress...")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+            
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(
+                notificationId,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            ForegroundInfo(notificationId, notification)
+        }
+    }
+
     @WorkerThread
     override suspend fun doWork(): Result {
-        val id = this.workerParams.inputData.getString(ID)
-        when (id) {
-            ID_DOWNLOAD -> {
-                val jsonData = this.workerParams.inputData.getString(JSON_DATA)
-                val typeData = this.workerParams.inputData.getString(TYPE_DATA)
-                
-                val data: Any? = if (jsonData != null && typeData != null) {
-                    try {
-                        when (typeData) {
-                            DownloadBatch::class.java.name -> mapper.readValue<DownloadBatch>(jsonData)
-                            StreamResponse::class.java.name -> mapper.readValue<StreamResponse>(jsonData)
-                            EpubResponse::class.java.name -> mapper.readValue<EpubResponse>(jsonData)
-                            DownloadFragment.DownloadDataLoaded::class.java.name -> mapper.readValue<DownloadFragment.DownloadDataLoaded>(jsonData)
-                            else -> popWork(this.workerParams.inputData.getInt(DATA, -1))
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "QuickNovel:DownloadWakeLock"
+        )
+        
+        try {
+            // Promote to foreground service to prevent network/background throttling
+            try {
+                setForeground(getForegroundInfo())
+            } catch (e: Exception) {
+                Log.e("DownloadWork", "Failed to set worker to foreground", e)
+            }
+            
+            // Acquire wake lock to keep CPU active when screen turns off (30 mins max)
+            wakeLock.acquire(30 * 60 * 1000L)
+            
+            val id = this.workerParams.inputData.getString(ID)
+            when (id) {
+                ID_DOWNLOAD -> {
+                    val jsonData = this.workerParams.inputData.getString(JSON_DATA)
+                    val typeData = this.workerParams.inputData.getString(TYPE_DATA)
+                    
+                    val data: Any? = if (jsonData != null && typeData != null) {
+                        try {
+                            when (typeData) {
+                                DownloadBatch::class.java.name -> mapper.readValue<DownloadBatch>(jsonData)
+                                StreamResponse::class.java.name -> mapper.readValue<StreamResponse>(jsonData)
+                                EpubResponse::class.java.name -> mapper.readValue<EpubResponse>(jsonData)
+                                DownloadFragment.DownloadDataLoaded::class.java.name -> mapper.readValue<DownloadFragment.DownloadDataLoaded>(jsonData)
+                                else -> popWork(this.workerParams.inputData.getInt(DATA, -1))
+                            }
+                        } catch (e: Exception) {
+                            Log.e("DownloadWork", "Failed to deserialize work data", e)
+                            popWork(this.workerParams.inputData.getInt(DATA, -1))
                         }
-                    } catch (e: Exception) {
-                        Log.e("DownloadWork", "Failed to deserialize work data", e)
+                    } else {
                         popWork(this.workerParams.inputData.getInt(DATA, -1))
                     }
-                } else {
-                    popWork(this.workerParams.inputData.getInt(DATA, -1))
+
+                    when (data) {
+                        is DownloadBatch -> {
+                            BookDownloader2.downloadWorkThread(data.load, Apis.getApiFromName(data.load.apiName), data.indices)
+                        }
+
+                        is StreamResponse -> {
+                            BookDownloader2.downloadWorkThread(data, Apis.getApiFromName(data.apiName))
+                        }
+
+                        is EpubResponse -> {
+                            BookDownloader2.downloadWorkThread(data, Apis.getApiFromName(data.apiName))
+                        }
+
+                        is DownloadFragment.DownloadDataLoaded -> {
+                            if (data.apiName == IMPORT_SOURCE_PDF)
+                                BookDownloader2.downloadPDFWorkThread(data.source.toUri(), context)
+                            else
+                                BookDownloader2.downloadWorkThread(data)
+                        }
+
+                        else -> return Result.failure()
+                    }
                 }
 
-                when (data) {
-                    is DownloadBatch -> {
-                        BookDownloader2.downloadWorkThread(data.load, Apis.getApiFromName(data.load.apiName), data.indices)
-                    }
-
-                    is StreamResponse -> {
-                        BookDownloader2.downloadWorkThread(data, Apis.getApiFromName(data.apiName))
-                    }
-
-                    is EpubResponse -> {
-                        BookDownloader2.downloadWorkThread(data, Apis.getApiFromName(data.apiName))
-                    }
-
-                    is DownloadFragment.DownloadDataLoaded -> {
-                        if (data.apiName == IMPORT_SOURCE_PDF)
-                            BookDownloader2.downloadPDFWorkThread(data.source.toUri(), context)
-                        else
-                            BookDownloader2.downloadWorkThread(data)
-                    }
-
-                    else -> return Result.failure()
+                ID_REFRESH_DOWNLOADS -> {
+                    viewModel?.refreshInternal()
                 }
-            }
 
-            ID_REFRESH_DOWNLOADS -> {
-                viewModel?.refreshInternal()
-            }
+                ID_REFRESH_READINGPROGRESS ->{
+                    val currentTab = this.workerParams.inputData.getInt(CURRENT_TAB, 1)
+                    viewModel?.setIsLoading(true, currentTab)
+                    BookDownloader2.getOldDataReadingProgress(currentTab)
+                    viewModel?.setIsLoading(false, currentTab)
+                }
 
-            ID_REFRESH_READINGPROGRESS ->{
-                val currentTab = this.workerParams.inputData.getInt(CURRENT_TAB, 1)
-                viewModel?.setIsLoading(true, currentTab)
-                BookDownloader2.getOldDataReadingProgress(currentTab)
-                viewModel?.setIsLoading(false, currentTab)
+                else -> return Result.failure()
             }
-
-            else -> return Result.failure()
+            return Result.success()
+        } finally {
+            if (wakeLock.isHeld) {
+                wakeLock.release()
+            }
         }
-        return Result.success()
     }
 }

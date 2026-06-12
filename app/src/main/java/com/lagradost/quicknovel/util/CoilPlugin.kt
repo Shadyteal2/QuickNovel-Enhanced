@@ -20,6 +20,10 @@ import io.noties.markwon.image.DrawableUtils
 import io.noties.markwon.image.ImageSpanFactory
 import org.commonmark.node.Image
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class CoilImagesPlugin : AbstractMarkwonPlugin {
     interface CoilStore {
@@ -145,9 +149,34 @@ class CoilImagesPlugin : AbstractMarkwonPlugin {
                 ) {
                     // mark
                     loaded.set(true)
-                    if (drawable.isAttached) {
-                        DrawableUtils.applyIntrinsicBoundsIfEmpty(loadedDrawable)
-                        drawable.setResult(loadedDrawable)
+                    CoroutineScope(Dispatchers.Main).launch {
+                        withContext(Dispatchers.Main) {
+                            if (drawable.isAttached) {
+                                val textView = drawable.callback as? TextView
+                                val intrinsicWidth = loadedDrawable.intrinsicWidth
+                                val intrinsicHeight = loadedDrawable.intrinsicHeight
+                                
+                                if (intrinsicWidth > 0 && intrinsicHeight > 0) {
+                                    val ratio = intrinsicHeight.toFloat() / intrinsicWidth.toFloat()
+                                    val maxWidth = if (textView != null && textView.width > 0) textView.width else context.resources.displayMetrics.widthPixels
+                                    val w = minOf(intrinsicWidth, maxWidth)
+                                    val h = (w * ratio).toInt()
+                                    
+                                    loadedDrawable.setBounds(0, 0, w, h)
+                                    drawable.setBounds(0, 0, w, h)
+                                } else {
+                                    DrawableUtils.applyIntrinsicBoundsIfEmpty(loadedDrawable)
+                                }
+                                
+                                drawable.setResult(loadedDrawable)
+                                
+                                if (textView != null) {
+                                    textView.text = textView.text
+                                    textView.requestLayout()
+                                    textView.invalidate()
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -155,18 +184,30 @@ class CoilImagesPlugin : AbstractMarkwonPlugin {
             override fun onError(error: coil3.Image?) {
                 val errorDrawable = error?.asDrawable(context.resources)
                 if (cache.remove(drawable) != null) {
-                    if (errorDrawable != null && drawable.isAttached) {
-                        DrawableUtils.applyIntrinsicBoundsIfEmpty(errorDrawable)
-                        drawable.setResult(errorDrawable)
+                    if (errorDrawable != null) {
+                        CoroutineScope(Dispatchers.Main).launch {
+                            withContext(Dispatchers.Main) {
+                                if (drawable.isAttached) {
+                                    DrawableUtils.applyIntrinsicBoundsIfEmpty(errorDrawable)
+                                    drawable.setResult(errorDrawable)
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             override fun onStart(placeholder: coil3.Image?) {
-                val placeholder = placeholder?.asDrawable(context.resources)
-                if (placeholder != null && drawable.isAttached) {
-                    DrawableUtils.applyIntrinsicBoundsIfEmpty(placeholder)
-                    drawable.setResult(placeholder)
+                val placeholderDrawable = placeholder?.asDrawable(context.resources)
+                if (placeholderDrawable != null) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        withContext(Dispatchers.Main) {
+                            if (drawable.isAttached) {
+                                DrawableUtils.applyIntrinsicBoundsIfEmpty(placeholderDrawable)
+                                drawable.setResult(placeholderDrawable)
+                            }
+                        }
+                    }
                 }
             }
         }

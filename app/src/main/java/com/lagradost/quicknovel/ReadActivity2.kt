@@ -48,6 +48,14 @@ import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.dp
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.slider.Slider
@@ -89,10 +97,17 @@ import com.lagradost.quicknovel.ui.TextConfig
 import com.lagradost.quicknovel.ui.TextVisualLine
 import com.lagradost.quicknovel.ui.DictionaryBottomSheet
 import com.lagradost.quicknovel.ui.TranslationBottomSheet
+import com.lagradost.quicknovel.ui.reader.PaginatedReaderView
 import com.lagradost.quicknovel.ui.ViewHolderState
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.SingleSelectionHelper.showDialog
 import com.lagradost.quicknovel.util.applyGlassStyle
@@ -118,6 +133,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     }
 
     private var batteryReceiver: BroadcastReceiver? = null
+    private var autoScrollJob: Job? = null
+    private var lastTouchTime: Long = 0L
 
     private fun hideSystemUI() {
         WindowInsetsControllerCompat(window, binding.readerContainer).let { controller ->
@@ -302,6 +319,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 enabled = true,
                 state = settingsManager.getBackgroundEffectState(this@ReadActivity2),
             )
+            if (viewModel.isContrastCompromised) {
+                readerBackgroundDim.alpha = maxOf(readerBackgroundDim.alpha, 0.4f)
+                readerBackgroundDim.isVisible = true
+            }
         }
     }
 
@@ -482,6 +503,22 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 img.imageAlpha = fadedAlpha
             }
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (viewModel.scrollWithVolume) {
+            val keyCode = event.keyCode
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                if (viewModel.bottomVisibility.isInitialized && viewModel.bottomVisibility.value == true) {
+                    return super.dispatchKeyEvent(event)
+                }
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    onKeyDown(keyCode, event)
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -711,8 +748,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         val isPremium = settingsManager.getBoolean(com.lagradost.quicknovel.ui.theme.VibePrefs.PREMIUM_VISUALS_ENABLED, false)
         val isInkFlow = settingsManager.getBoolean(com.lagradost.quicknovel.ui.theme.VibePrefs.READER_INK_FLOW, false)
         
+        val isAmoled = viewModel.backgroundColor == Color.BLACK
         val overlay = binding.readerInkFlowOverlay
-        if (!isPremium || !isInkFlow) {
+        if (!isPremium || !isInkFlow || isAmoled) {
             overlay.visibility = View.GONE
             return
         }
@@ -962,6 +1000,22 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
          }*/
     }
 
+    private fun startAutoScrollLoop() {
+        autoScrollJob?.cancel()
+        if (viewModel.autoScroll != true) return
+
+        autoScrollJob = lifecycleScope.launch(Dispatchers.Main) {
+            while (isActive) {
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastTouchTime > 2500) {
+                    val speed = viewModel.autoScrollSpeed
+                    binding.realText.scrollBy(0, speed)
+                }
+                delay(16)
+            }
+        }
+    }
+
     private fun postDesired(view: View) {
         val currentDesired = viewModel.desiredIndex
         view.post {
@@ -975,11 +1029,15 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         viewModel.resumedApp()
         super.onResume()
         readingSessionStartTime = android.os.SystemClock.elapsedRealtime()
+        if (viewModel.autoScroll == true) {
+            startAutoScrollLoop()
+        }
     }
 
     override fun onPause() {
         viewModel.leftApp()
         super.onPause()
+        autoScrollJob?.cancel()
         if (readingSessionStartTime != 0L) {
             val sessionTime = android.os.SystemClock.elapsedRealtime() - readingSessionStartTime
             // Safety cap: No reading session can be > 12 hours (43,200,000 ms)
@@ -1192,6 +1250,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     key == getString(R.string.reader_background_key)
                 ) {
                     updateGlobalBackground()
+                    if (key == getString(R.string.background_image_key) ||
+                        key == getString(R.string.reader_background_key)
+                    ) {
+                        viewModel.checkDynamicLuminanceContrast()
+                    }
                 }
                 if (key == getString(R.string.living_glass_key) ||
                     key == getString(R.string.aura_intensity_key) ||
@@ -1308,6 +1371,20 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
         }
 
+        observe(viewModel.autoScrollLive) { enabled ->
+            if (enabled == true) {
+                startAutoScrollLoop()
+            } else {
+                autoScrollJob?.cancel()
+            }
+        }
+
+        observe(viewModel.autoScrollSpeedLive) { _ ->
+            if (viewModel.autoScroll == true) {
+                startAutoScrollLoop()
+            }
+        }
+
         observe(viewModel.isTextSelectableLive) { isTextSelectable ->
             if (textAdapter.changeTextSelectable(isTextSelectable)) {
                 updateTextAdapterConfig()
@@ -1361,6 +1438,13 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
         }
 
+        observe(viewModel.isContrastCompromisedLive) { compromised ->
+            if (textAdapter.changeContrastCompromised(compromised)) {
+                updateTextAdapterConfig()
+            }
+            updateGlobalBackground()
+        }
+
         observe(viewModel.textFontLive) { font ->
             if (textAdapter.changeFont(font)) {
                 updateTextAdapterConfig()
@@ -1368,6 +1452,31 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         textLayoutManager = LinearLayoutManager(binding.realText.context)
+
+        binding.paginatedTextCompose.apply {
+            setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                com.lagradost.quicknovel.ui.theme.QuickNovelTheme {
+                    PaginatedReaderView(
+                        viewModel = viewModel,
+                        onToggleMenu = {
+                            viewModel.switchVisibility()
+                        }
+                    )
+                }
+            }
+        }
+
+        observe(viewModel.paginatedSwipeEnabledLive) { enabled ->
+            if (enabled == true) {
+                binding.realText.visibility = View.GONE
+                binding.paginatedTextCompose.visibility = View.VISIBLE
+            } else {
+                binding.realText.visibility = View.VISIBLE
+                binding.paginatedTextCompose.visibility = View.GONE
+                scrollToDesired()
+            }
+        }
 
         binding.ttsActionPausePlay.setOnClickListener {
             viewModel.pausePlayTTS()
@@ -1403,13 +1512,22 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 is Resource.Loading -> {
                     if (downloadProgressDialog == null) {
                         downloadProgressBinding = DialogMlDownloadBinding.inflate(layoutInflater)
+                        // ── Non-cancelable: user must press the Cancel button explicitly. ──
+                        // This prevents the dialog from being dismissed by a back-press or
+                        // outside-tap, which would orphan the download job and silently
+                        // skip auto-triggering translation after the download finishes.
                         downloadProgressDialog =
                             com.google.android.material.dialog.MaterialAlertDialogBuilder(
                                 this,
                                 R.style.AlertDialogCustom
                             )
                                 .setView(downloadProgressBinding?.root)
-                                .setCancelable(true)
+                                .setCancelable(false)
+                                .setNegativeButton(android.R.string.cancel) { dialog, _ ->
+                                    // Intentional user cancellation: stop the download job cleanly.
+                                    viewModel.stopTranslation()
+                                    dialog.dismiss()
+                                }
                                 .setOnDismissListener {
                                     com.lagradost.quicknovel.util.DrawerHelper.resetScaling(binding.readNormalLayout)
                                 }
@@ -1425,8 +1543,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     downloadProgressDialog?.dismiss()
                     downloadProgressDialog = null
 
-                    if (resource.value == "Model applied") {
-                        CommonActivity.showToast(this, "Translation model loaded successfully!")
+                    when (resource.value) {
+                        "Model applied" -> {
+                            // ── Auto-trigger: ML Kit model just finished downloading. ──
+                            // The original applyMLSettings(true) call returned after kicking
+                            // off the download; now that the model is ready we call
+                            // applyMLSettings(false) so translation starts immediately without
+                            // requiring the user to press "Apply" again.
+                            CommonActivity.showToast(this, "Translation model downloaded! Translating...")
+                            viewModel.applyMLSettings(false)
+                        }
+                        else -> { /* Normal success after a non-download translation cycle */ }
                     }
                 }
             }
@@ -1557,7 +1684,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     (binding.readSkeletonShimmer.root as? ShimmerFrameLayout)?.stopShimmer()
 
                     binding.readNormalLayout.isVisible = true
-                    binding.realText.isVisible = true
+                    val isPaginated = viewModel.paginatedSwipeEnabled
+                    binding.realText.isVisible = !isPaginated
+                    binding.paginatedTextCompose.isVisible = isPaginated
                     
                     // Force the toolbar title/subtitle refresh if needed
                     val title = viewModel.book.getChapterTitle(viewModel.currentIndex)
@@ -1584,6 +1713,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 is Resource.Loading -> {
                     binding.readFail.isVisible = false
                     binding.realText.isVisible = false
+                    binding.paginatedTextCompose.isVisible = false
 
                     val urlText = loading.url
                     val isTranslatingProgress = urlText != null && urlText.contains("/") && urlText.contains("(")
@@ -1667,6 +1797,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             itemAnimator = null
             // testing overscroll
             setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                        lastTouchTime = System.currentTimeMillis()
+                    }
+                }
                 when (event.action) {
                     MotionEvent.ACTION_MOVE -> {
                         if (event.historySize <= 1) return@setOnTouchListener false
@@ -1924,16 +2059,100 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                             onColorCustomClick = {
                                 val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ReadActivity2, R.style.AlertDialogCustom)
                                 builder.setTitle(getString(R.string.reading_color))
-                                val colorAdapter = ArrayAdapter<String>(this@ReadActivity2, R.layout.chapter_select_dialog)
-                                colorAdapter.addAll(arrayListOf(getString(R.string.background_color), getString(R.string.text_color)))
-                                builder.setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss(); updateImages() }
-                                builder.setAdapter(colorAdapter) { _, which ->
-                                    ColorPickerDialog.newBuilder()
-                                        .setDialogId(which)
-                                        .setColor(when (which) { 0 -> viewModel.backgroundColor; 1 -> viewModel.textColor; else -> 0 })
-                                        .show(this@ReadActivity2)
+                                
+                                var dialogRef: android.content.DialogInterface? = null
+                                val composeView = androidx.compose.ui.platform.ComposeView(this@ReadActivity2).apply {
+                                    setContent {
+                                        com.lagradost.quicknovel.ui.theme.QuickNovelTheme {
+                                            androidx.compose.foundation.layout.Column(
+                                                modifier = androidx.compose.ui.Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(16.dp),
+                                                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                // Background Color Card
+                                                androidx.compose.material3.Card(
+                                                    modifier = androidx.compose.ui.Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable {
+                                                            dialogRef?.dismiss()
+                                                            ColorPickerDialog.newBuilder()
+                                                                .setDialogId(0)
+                                                                .setColor(viewModel.backgroundColor)
+                                                                .show(this@ReadActivity2)
+                                                        },
+                                                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                                                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+                                                    ),
+                                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                                                ) {
+                                                    androidx.compose.foundation.layout.Row(
+                                                        modifier = androidx.compose.ui.Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                                    ) {
+                                                        androidx.compose.foundation.layout.Box(
+                                                            modifier = androidx.compose.ui.Modifier
+                                                                .size(24.dp)
+                                                                .background(androidx.compose.ui.graphics.Color(viewModel.backgroundColor), androidx.compose.foundation.shape.CircleShape)
+                                                                .border(1.dp, androidx.compose.ui.graphics.Color.Gray, androidx.compose.foundation.shape.CircleShape)
+                                                        )
+                                                        androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(16.dp))
+                                                        androidx.compose.material3.Text(
+                                                            text = getString(R.string.background_color),
+                                                            style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                                                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                                
+                                                // Text Color Card
+                                                androidx.compose.material3.Card(
+                                                    modifier = androidx.compose.ui.Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable {
+                                                            dialogRef?.dismiss()
+                                                            ColorPickerDialog.newBuilder()
+                                                                .setDialogId(1)
+                                                                .setColor(viewModel.textColor)
+                                                                .show(this@ReadActivity2)
+                                                        },
+                                                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                                                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+                                                    ),
+                                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                                                ) {
+                                                    androidx.compose.foundation.layout.Row(
+                                                        modifier = androidx.compose.ui.Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                                    ) {
+                                                        androidx.compose.foundation.layout.Box(
+                                                            modifier = androidx.compose.ui.Modifier
+                                                                .size(24.dp)
+                                                                .background(androidx.compose.ui.graphics.Color(viewModel.textColor), androidx.compose.foundation.shape.CircleShape)
+                                                                .border(1.dp, androidx.compose.ui.graphics.Color.Gray, androidx.compose.foundation.shape.CircleShape)
+                                                        )
+                                                        androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(16.dp))
+                                                        androidx.compose.material3.Text(
+                                                            text = getString(R.string.text_color),
+                                                            style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                                                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                                builder.show().applyGlassStyle()
+                                
+                                builder.setView(composeView)
+                                builder.setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss(); updateImages() }
+                                val dialog = builder.show()
+                                dialogRef = dialog
+                                dialog.applyGlassStyle()
                                 updateImages()
                             },
                             onColorSelect = { bg, txt ->
@@ -1941,6 +2160,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                                 viewModel.textColor = txt
                                 updateImages()
                                 if (viewModel.premiumAnimations) this@ReadActivity2.binding.readerLivingGlass.flare()
+                            },
+                            onDismiss = {
+                                bottomSheetDialog.dismiss()
                             }
                         )
                     }
@@ -2030,29 +2252,103 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     com.lagradost.quicknovel.util.DrawerHelper.resetScaling(backgroundView)
                 }
 
-                val colorAdapter = ArrayAdapter<String>(this.context, R.layout.chapter_select_dialog)
-                colorAdapter.addAll(arrayListOf(getString(R.string.background_color), getString(R.string.text_color)))
-
+                var dialogRef: android.content.DialogInterface? = null
+                val composeView = androidx.compose.ui.platform.ComposeView(this.context).apply {
+                    setContent {
+                        com.lagradost.quicknovel.ui.theme.QuickNovelTheme {
+                            androidx.compose.foundation.layout.Column(
+                                modifier = androidx.compose.ui.Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Background Color Card
+                                androidx.compose.material3.Card(
+                                    modifier = androidx.compose.ui.Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            dialogRef?.dismiss()
+                                            ColorPickerDialog.newBuilder()
+                                                .setDialogId(0)
+                                                .setColor(viewModel.backgroundColor)
+                                                .show(this@ReadActivity2)
+                                        },
+                                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+                                    ),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                                ) {
+                                    androidx.compose.foundation.layout.Row(
+                                        modifier = androidx.compose.ui.Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                    ) {
+                                        androidx.compose.foundation.layout.Box(
+                                            modifier = androidx.compose.ui.Modifier
+                                                .size(24.dp)
+                                                .background(androidx.compose.ui.graphics.Color(viewModel.backgroundColor), androidx.compose.foundation.shape.CircleShape)
+                                                .border(1.dp, androidx.compose.ui.graphics.Color.Gray, androidx.compose.foundation.shape.CircleShape)
+                                        )
+                                        androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(16.dp))
+                                        androidx.compose.material3.Text(
+                                            text = getString(R.string.background_color),
+                                            style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                
+                                // Text Color Card
+                                androidx.compose.material3.Card(
+                                    modifier = androidx.compose.ui.Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            dialogRef?.dismiss()
+                                            ColorPickerDialog.newBuilder()
+                                                .setDialogId(1)
+                                                .setColor(viewModel.textColor)
+                                                .show(this@ReadActivity2)
+                                        },
+                                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+                                     ),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                                ) {
+                                    androidx.compose.foundation.layout.Row(
+                                        modifier = androidx.compose.ui.Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                    ) {
+                                        androidx.compose.foundation.layout.Box(
+                                            modifier = androidx.compose.ui.Modifier
+                                                .size(24.dp)
+                                                .background(androidx.compose.ui.graphics.Color(viewModel.textColor), androidx.compose.foundation.shape.CircleShape)
+                                                .border(1.dp, androidx.compose.ui.graphics.Color.Gray, androidx.compose.foundation.shape.CircleShape)
+                                        )
+                                        androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(16.dp))
+                                        androidx.compose.material3.Text(
+                                            text = getString(R.string.text_color),
+                                            style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                builder.setView(composeView)
                 builder.setPositiveButton(R.string.ok) { dialog, _ ->
                     dialog.dismiss()
                     updateImages()
                 }
 
-                builder.setAdapter(colorAdapter) { _, which ->
-                    val readActivity = this@ReadActivity2
-                    ColorPickerDialog.newBuilder()
-                        .setDialogId(which)
-                        .setColor(
-                            when (which) {
-                                0 -> viewModel.backgroundColor
-                                1 -> viewModel.textColor
-                                else -> 0
-                            }
-                        )
-                        .show(readActivity)
-                }
-
-                builder.show().applyGlassStyle()
+                val dialog = builder.show()
+                dialogRef = dialog
+                dialog.applyGlassStyle()
                 updateImages()
             }
         }

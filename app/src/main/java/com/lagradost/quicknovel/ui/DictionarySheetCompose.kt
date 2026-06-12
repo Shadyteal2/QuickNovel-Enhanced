@@ -2,6 +2,7 @@ package com.lagradost.quicknovel.ui
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,7 +27,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun DictionarySheetCompose(
-    word: String
+    word: String,
+    onDismiss: () -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
     var dictResult by remember { mutableStateOf<Resource<List<DictionaryResponse>>>(Resource.Loading()) }
@@ -51,11 +53,18 @@ fun DictionarySheetCompose(
         // Drag handle indicator
         Box(
             modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .align(Alignment.CenterHorizontally)
-                .glassCard(shape = MaterialTheme.shapes.small)
-        )
+                .fillMaxWidth()
+                .clickable { onDismiss() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .height(4.dp)
+                    .glassCard(shape = MaterialTheme.shapes.small)
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         when (val res = dictResult) {

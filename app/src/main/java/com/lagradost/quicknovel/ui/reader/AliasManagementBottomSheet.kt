@@ -39,6 +39,7 @@ import com.lagradost.quicknovel.ReadActivityViewModel
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.applyGlassStyle
 
 class AliasManagementBottomSheet : BottomSheetDialogFragment() {
     companion object {
@@ -73,7 +74,8 @@ class AliasManagementBottomSheet : BottomSheetDialogFragment() {
             setContent {
                 QuickNovelTheme {
                     AliasManagementCompose(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onDismiss = { dismiss() }
                     )
                 }
             }
@@ -95,8 +97,11 @@ class AliasManagementBottomSheet : BottomSheetDialogFragment() {
         val backgroundView = activity?.findViewById<View>(bgId) ?: return
 
         val dialog = dialog as? BottomSheetDialog ?: return
+        dialog.applyGlassStyle()
         val behavior = dialog.behavior
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
+
+        DrawerHelper.applyScalingAnimation(backgroundView, 1f)
 
         behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
@@ -126,7 +131,8 @@ class AliasManagementBottomSheet : BottomSheetDialogFragment() {
 
 @Composable
 fun AliasManagementCompose(
-    viewModel: ReadActivityViewModel
+    viewModel: ReadActivityViewModel,
+    onDismiss: () -> Unit
 ) {
     val currentAliases by viewModel.aliases.observeAsState(emptyMap())
     
@@ -158,11 +164,18 @@ fun AliasManagementCompose(
         // Drag handle indicator
         Box(
             modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .align(Alignment.CenterHorizontally)
-                .glassCard(shape = RoundedCornerShape(2.dp))
-        )
+                .fillMaxWidth()
+                .clickable { onDismiss() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .height(4.dp)
+                    .glassCard(shape = RoundedCornerShape(2.dp))
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         // Header Title and Add Button

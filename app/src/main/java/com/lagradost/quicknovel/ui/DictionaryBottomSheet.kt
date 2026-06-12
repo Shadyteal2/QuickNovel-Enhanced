@@ -15,6 +15,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.applyGlassStyle
 
 class DictionaryBottomSheet : BottomSheetDialogFragment() {
     companion object {
@@ -40,7 +41,10 @@ class DictionaryBottomSheet : BottomSheetDialogFragment() {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 QuickNovelTheme {
-                    DictionarySheetCompose(word = word)
+                    DictionarySheetCompose(
+                        word = word,
+                        onDismiss = { dismiss() }
+                    )
                 }
             }
         }.also { view ->
@@ -61,8 +65,11 @@ class DictionaryBottomSheet : BottomSheetDialogFragment() {
         val backgroundView = activity?.findViewById<View>(bgId) ?: return
         
         val dialog = dialog as? BottomSheetDialog ?: return
+        dialog.applyGlassStyle()
         val behavior = dialog.behavior
         
+        DrawerHelper.applyScalingAnimation(backgroundView, 1f)
+
         behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
                 if (newState == BottomSheetBehavior.STATE_HIDDEN || newState == BottomSheetBehavior.STATE_COLLAPSED) {

@@ -36,6 +36,7 @@ import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.applyGlassStyle
 import com.lagradost.quicknovel.util.UIHelper.parseFontFileName
 import java.io.File
 
@@ -107,7 +108,8 @@ class FontPickerBottomSheet : BottomSheetDialogFragment() {
                         onAddCustomFont = {
                             onAddCustomFontListener?.invoke()
                             dismiss()
-                        }
+                        },
+                        onDismiss = { dismiss() }
                     )
                 }
             }
@@ -129,8 +131,11 @@ class FontPickerBottomSheet : BottomSheetDialogFragment() {
         val backgroundView = activity?.findViewById<View>(bgId) ?: return
 
         val dialog = dialog as? BottomSheetDialog ?: return
+        dialog.applyGlassStyle()
         val behavior = dialog.behavior
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
+
+        DrawerHelper.applyScalingAnimation(backgroundView, 1f)
 
         behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
@@ -165,7 +170,8 @@ fun FontPickerCompose(
     checkedIndex: Int,
     onFontSelected: (FontFile) -> Unit,
     onDeleteFont: (FontFile) -> Unit,
-    onAddCustomFont: () -> Unit
+    onAddCustomFont: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -178,11 +184,18 @@ fun FontPickerCompose(
         // Drag handle indicator
         Box(
             modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .align(Alignment.CenterHorizontally)
-                .glassCard(shape = RoundedCornerShape(2.dp))
-        )
+                .fillMaxWidth()
+                .clickable { onDismiss() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .height(4.dp)
+                    .glassCard(shape = RoundedCornerShape(2.dp))
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         // Title and Add Button

@@ -13,6 +13,8 @@ import android.speech.tts.Voice
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.style.CharacterStyle
+import android.text.TextPaint
 import android.text.style.StyleSpan
 import com.lagradost.quicknovel.BaseApplication.Companion.removeKey
 import com.lagradost.quicknovel.BaseApplication.Companion.setKey
@@ -273,6 +275,12 @@ fun generateId(type: Long, index: Int, start: Int, end: Int): Long {
     return typeBits or (indexBits shl 4) or (startBits shl 20) or (endBits shl 42)
 }
 
+class BionicBoldSpan : CharacterStyle() {
+    override fun updateDrawState(tp: TextPaint) {
+        tp.isFakeBoldText = true
+    }
+}
+
 data class TextSpan(
     val text: Spanned,
     val start: Int,
@@ -283,21 +291,21 @@ data class TextSpan(
     val bionicText: Spanned by lazy {
         val wordToSpan: Spannable = SpannableString(text)
         val length = wordToSpan.length
-        Regex("([a-zà-ýA-ZÀ-ÝåäöÅÄÖ].*?)[^a-zà-ýA-ZÀ-ÝåäöÅÄÖ'’]").findAll(text).forEach { match ->
-            val range = match.groups[1]!!.range
-            // https://github.com/gBloxy/Bionic-Reader/blob/main/bionic-reader.py#L167
-            val correctLength = when (val rangeLength = range.last + 1 - range.first) {
-                0 -> return@forEach // this should never happened
+        Regex("""\p{L}+(?:['’\-]\p{L}+)*""").findAll(text).forEach { match ->
+            val range = match.range
+            val wordLength = range.last + 1 - range.first
+            val correctLength = when (wordLength) {
+                0 -> return@forEach
                 1, 2, 3 -> 1
                 4 -> 2
                 else -> {
-                    (rangeLength.toFloat() * 0.4).roundToInt()
+                    (wordLength.toFloat() * 0.4f).roundToInt()
                 }
             }
             wordToSpan.setSpan(
-                StyleSpan(Typeface.BOLD),
-                minOf(maxOf(match.range.first, 0), length),
-                minOf(maxOf(match.range.first + correctLength, 0), length),
+                BionicBoldSpan(),
+                minOf(maxOf(range.first, 0), length),
+                minOf(maxOf(range.first + correctLength, 0), length),
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }

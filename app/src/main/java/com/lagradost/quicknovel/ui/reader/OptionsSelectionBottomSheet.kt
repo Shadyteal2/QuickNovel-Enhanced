@@ -29,6 +29,7 @@ import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.applyGlassStyle
 
 class OptionsSelectionBottomSheet : BottomSheetDialogFragment() {
     companion object {
@@ -80,7 +81,8 @@ class OptionsSelectionBottomSheet : BottomSheetDialogFragment() {
                         onItemSelected = { index ->
                             onItemSelectedListener?.invoke(index)
                             dismiss()
-                        }
+                        },
+                        onDismiss = { dismiss() }
                     )
                 }
             }
@@ -102,7 +104,10 @@ class OptionsSelectionBottomSheet : BottomSheetDialogFragment() {
         val backgroundView = activity?.findViewById<View>(bgId) ?: return
 
         val dialog = dialog as? BottomSheetDialog ?: return
+        dialog.applyGlassStyle()
         val behavior = dialog.behavior
+
+        DrawerHelper.applyScalingAnimation(backgroundView, 1f)
 
         behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
@@ -135,7 +140,8 @@ fun OptionsSelectionCompose(
     title: String,
     items: List<String>,
     selectedIndex: Int,
-    onItemSelected: (Int) -> Unit
+    onItemSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -145,11 +151,18 @@ fun OptionsSelectionCompose(
         // Drag handle indicator
         Box(
             modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .align(Alignment.CenterHorizontally)
-                .glassCard(shape = RoundedCornerShape(2.dp))
-        )
+                .fillMaxWidth()
+                .clickable { onDismiss() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .height(4.dp)
+                    .glassCard(shape = RoundedCornerShape(2.dp))
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         // Title

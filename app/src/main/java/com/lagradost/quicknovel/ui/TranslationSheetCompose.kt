@@ -1,5 +1,6 @@
 package com.lagradost.quicknovel.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,7 +25,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun TranslationSheetCompose(
     originalText: String,
-    onCopy: (String) -> Unit
+    onCopy: (String) -> Unit,
+    onDismiss: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var engineName by remember { mutableStateOf("Loading...") }
@@ -51,11 +53,18 @@ fun TranslationSheetCompose(
         // Drag handle indicator
         Box(
             modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .align(Alignment.CenterHorizontally)
-                .glassCard(shape = MaterialTheme.shapes.small)
-        )
+                .fillMaxWidth()
+                .clickable { onDismiss() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .height(4.dp)
+                    .glassCard(shape = MaterialTheme.shapes.small)
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         Row(

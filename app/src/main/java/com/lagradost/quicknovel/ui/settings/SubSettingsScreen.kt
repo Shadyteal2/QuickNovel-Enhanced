@@ -55,6 +55,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.app.Activity
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.window.DialogProperties
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,6 +77,7 @@ fun SubSettingsScreen(
     // Observe SharedPreferences
     val sharedPrefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     var changeTrigger by remember { mutableStateOf(0) }
+    var showCustomRateLimitDialog by remember { mutableStateOf(false) }
 
     // Cache all preferences in memory, refreshed ONLY when changeTrigger is incremented.
     // This prevents slow disk lookups/mutex locking on sharedPrefs inside scrolling compositions!
@@ -103,6 +108,19 @@ fun SubSettingsScreen(
     }
 
     QuickNovelTheme {
+        if (showCustomRateLimitDialog) {
+            val rateLimitCurrent = getInt("custom_rate_limit", 0)
+            CustomRateLimitDialog(
+                initialValue = rateLimitCurrent,
+                onDismiss = { showCustomRateLimitDialog = false },
+                onConfirm = { value ->
+                    sharedPrefs.edit().putInt("custom_rate_limit", value).apply()
+                    onPreferenceChange("custom_rate_limit", value)
+                    changeTrigger++
+                }
+            )
+        }
+
         val imageUri = remember(cachedPrefs) { getString(context.getString(R.string.background_image_key), "") }
         val hasBackground = !imageUri.isNullOrBlank()
         val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
@@ -152,7 +170,8 @@ fun SubSettingsScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .imePadding(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -898,8 +917,16 @@ fun SubSettingsScreen(
                                 valueSuffix = "ms",
                                 iconRes = R.drawable.ic_baseline_tune_24,
                                 presets = listOf(0, 500, 1000, 1500, 2000, 3000),
-                                customValueLabel = if (rateLimitCurrent == 0) "Auto" else "$rateLimitCurrent ms",
+                                customValueLabel = when {
+                                    rateLimitCurrent == 0 -> "Auto"
+                                    rateLimitCurrent >= 1000 -> {
+                                        val secs = rateLimitCurrent / 1000.0
+                                        if (secs == secs.toLong().toDouble()) "${secs.toLong()}s" else "${secs}s"
+                                    }
+                                    else -> "$rateLimitCurrent ms"
+                                },
                                 infoDescription = "Adds a delay (in milliseconds) between chapter requests. Default: Auto/0ms (respects provider defaults). Setting a delay (e.g., 500ms or 1000ms) helps bypass strict Cloudflare checks or anti-scraping blocks on rate-limited providers, though it slows down downloads.",
+                                onCustomClick = { showCustomRateLimitDialog = true },
                                 onValueChange = { value ->
                                     sharedPrefs.edit().putInt("custom_rate_limit", value).apply()
                                     onPreferenceChange("custom_rate_limit", value)
@@ -2367,6 +2394,7 @@ fun AdvancedStepSelectorPreferenceCard(
     presets: List<Int>,
     customValueLabel: String? = null,
     infoDescription: String,
+    onCustomClick: (() -> Unit)? = null,
     onValueChange: (Int) -> Unit
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -2502,7 +2530,8 @@ fun AdvancedStepSelectorPreferenceCard(
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         presets.forEach { preset ->
                             val isSelected = value == preset
@@ -2529,6 +2558,35 @@ fun AdvancedStepSelectorPreferenceCard(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        if (onCustomClick != null) {
+                            val isCustomActive = value !in presets
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isCustomActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                        else Color.Transparent
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isCustomActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable {
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        onCustomClick()
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = if (isCustomActive) "Custom ($value$valueSuffix)" else "Custom...",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isCustomActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    fontWeight = if (isCustomActive) FontWeight.Bold else FontWeight.Medium
                                 )
                             }
                         }
@@ -2823,6 +2881,84 @@ fun ProxySettingsCard(
         }
     }
 }
+
+@Composable
+fun CustomRateLimitDialog(
+    initialValue: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    var textValue by remember { mutableStateOf(if (initialValue == 0) "" else initialValue.toString()) }
+    var isError by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = true,
+            decorFitsSystemWindows = false
+        ),
+        title = { Text(text = "Custom Rate Limit") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .imePadding()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Enter a custom delay in milliseconds between chapter requests (e.g., 15000 for 15s, 30000 for 30s). Enter 0 or leave blank for Auto.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                OutlinedTextField(
+                    value = textValue,
+                    onValueChange = { newValue ->
+                        if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
+                            textValue = newValue
+                            isError = false
+                        }
+                    },
+                    label = { Text("Delay (ms)") },
+                    isError = isError,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (isError) {
+                    Text(
+                        text = "Please enter a valid rate limit",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val parsed = textValue.toIntOrNull()
+                    if (parsed != null) {
+                        onConfirm(parsed)
+                        onDismiss()
+                    } else if (textValue.trim().isEmpty()) {
+                        onConfirm(0)
+                        onDismiss()
+                    } else {
+                        isError = true
+                    }
+                }
+            ) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
 
 
 

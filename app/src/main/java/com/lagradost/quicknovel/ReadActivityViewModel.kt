@@ -95,6 +95,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.*
 import com.lagradost.quicknovel.mvvm.launchSafe
+import com.lagradost.quicknovel.widget.TTSWidget
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -165,6 +166,7 @@ class PreferenceDelegateLiveView<T : Any>(
     init {
         cache = getKeyClass(key, klassK.java) ?: default
         _liveData.postValue(cache)
+        onChanged?.invoke(cache)
     }
 
     operator fun getValue(self: Any?, property: KProperty<*>) = cache
@@ -181,6 +183,7 @@ class PreferenceDelegateLiveView<T : Any>(
         } else {
             setKeyClass(key, t)
         }
+        onChanged?.invoke(cache)
     }
 }
 
@@ -603,12 +606,25 @@ class ReadActivityViewModel : ViewModel() {
 
     fun stopTranslation() {
         sessionTranslationCancelled = true
+        isTranslationActive = false
+        isShowingOriginalLive.postValue(true)
         activeTranslationJob?.cancel()
         synchronized(activePreloadJobs) {
             activePreloadJobs.forEach { it.cancel() }
             activePreloadJobs.clear()
         }
-        _loadingStatus.postValue(Resource.Failure(null, "Stopped"))
+        ioSafe {
+            invalidateTranslationCache()
+            updateReadArea(seekToDesired = false)
+            val hasValidChapter = chapterMutex.withLock {
+                chapterData[currentIndex] is Resource.Success
+            }
+            if (hasValidChapter) {
+                _loadingStatus.postValue(Resource.Success(""))
+            } else {
+                _loadingStatus.postValue(Resource.Failure(null, "Stopped"))
+            }
+        }
         _translationLoadingStatus.postValue(Resource.Failure(null, "Stopped"))
     }
 
@@ -1343,12 +1359,42 @@ class ReadActivityViewModel : ViewModel() {
         return false
     }
 
+    // ─── Translation Cache Invalidation ──────────────────────────────────────
+    // Reverts all cached chapter translations back to their original text.
+    // Called before switching engines to prevent stale translations from the
+    // old engine being shown while the new engine translates.
+    private suspend fun invalidateTranslationCache() {
+        chapterMutex.withLock {
+            val keys = chapterData.keys.toList()
+            for (key in keys) {
+                val entry = chapterData[key]
+                if (entry is Resource.Success) {
+                    chapterData[key] = Resource.Success(
+                        entry.value.copy(
+                            rendered = entry.value.originalRendered,
+                            spans = entry.value.originalSpans
+                        )
+                    )
+                }
+            }
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     fun applyMLSettings(allowDownload: Boolean) {
+        // ── Step 1: Cancel all in-flight translation work from the OLD engine ──
+        // Close the ML Kit translator first to release its native resources before
+        // the new engine starts — prevents interleaved translations and memory leaks.
+        val previousTranslator = mlTranslator
+        mlTranslator = null
+        previousTranslator?.closeQuietly()
+
         activeTranslationJob?.cancel()
         synchronized(activePreloadJobs) {
             activePreloadJobs.forEach { it.cancel() }
             activePreloadJobs.clear()
         }
+
         activeTranslationJob = viewModelScope.launch(Dispatchers.IO) {
             Log.d("TranslationEngine", "applyMLSettings() called with allowDownload: $allowDownload")
             try {
@@ -1356,15 +1402,18 @@ class ReadActivityViewModel : ViewModel() {
                 val isMLKit = engine?.type == com.lagradost.quicknovel.util.TranslationEngineType.GoogleMLKit
                 Log.d("TranslationEngine", "applyMLSettings: active engine is ${engine?.name ?: "None"}")
 
-                if (isMLKit) {
-                    _translationLoadingStatus.postValue(Resource.Loading("")) // Start feedback immediately
-                }
+                // ── Step 2: Immediately revert stale cached translations so the ──
+                // reader shows original text while the new engine warms up.
+                _translationLoadingStatus.postValue(Resource.Loading("Switching translation engine..."))
+                invalidateTranslationCache()
+                updateReadArea(seekToDesired = false)
+
                 currentCoroutineContext().ensureActive()
                 val settings = MLSettings(from = mlFromLanguage, to = mlToLanguage)
                 val isDownloadNeeded = if (settings.isValid() && allowDownload && isMLKit) {
                     safeAsync { requireMLDownload() } == true
                 } else false
-                
+
                 Log.d("TranslationEngine", "applyMLSettings: isTranslationActive set to ${settings.isValid()}, from: ${settings.from}, to: ${settings.to}")
                 if (isDownloadNeeded) {
                     _translationLoadingStatus.postValue(Resource.Loading(context?.getString(R.string.download_ml)))
@@ -1374,14 +1423,14 @@ class ReadActivityViewModel : ViewModel() {
                     isShowingOriginalLive.postValue(false)
                 }
                 initMLFromSettings(settings, allowDownload, isDownloadNeeded)
-                
+
                 val useMLKitStatus = isMLKit && isDownloadNeeded
                 Log.d("TranslationEngine", "applyMLSettings: calling reloadMLForAllChapters(useMLKitStatus: $useMLKitStatus)")
                 reloadMLForAllChapters(useMLKitStatus)
-                
+
                 Log.d("TranslationEngine", "applyMLSettings: calling updateReadArea")
                 updateReadArea(seekToDesired = false)
-                
+
                 if (useMLKitStatus) {
                     _translationLoadingStatus.postValue(Resource.Success(if (isDownloadNeeded) "Model applied" else ""))
                 } else {
@@ -1559,12 +1608,12 @@ class ReadActivityViewModel : ViewModel() {
 
     private suspend fun initMLFromSettings(settings: MLSettings, allowDownload: Boolean, isDownloadNeeded: Boolean = false) {
         try {
+            // mlTranslator was already closed/nulled in applyMLSettings() before this call;
+            // guard here for cases where initMLFromSettings is called directly (e.g. on app resume).
             mlTranslator?.closeQuietly()
             mlTranslator = null
 
             if (settings.isInvalid()) {
-                mlTranslator?.closeQuietly()
-                mlTranslator = null
                 mlSettings = settings
                 return
             }
@@ -1584,18 +1633,36 @@ class ReadActivityViewModel : ViewModel() {
                         translator.downloadModelIfNeeded(), 300L, TimeUnit.SECONDS
                     )
                     // Success will be posted by the caller after translation is done
+                } catch (e: ExecutionException) {
+                    // ExecutionException wraps the real cause from Tasks.await()
+                    val cause = e.cause ?: e
+                    val isNetwork = cause is java.net.UnknownHostException ||
+                        cause.message?.contains("network", ignoreCase = true) == true
+                    val friendlyMsg = if (isNetwork) {
+                        "Download failed: No internet connection"
+                    } else {
+                        "Download failed: ${cause.message ?: "Unknown error"}"
+                    }
+                    showToast(friendlyMsg)
+                    _translationLoadingStatus.postValue(Resource.Failure(cause, friendlyMsg))
+                    throw cause
                 } catch (e: Exception) {
-                    _translationLoadingStatus.postValue(Resource.Failure(null, e.message ?: "Download failed"))
+                    val friendlyMsg = "Download failed: ${e.message ?: "Unknown error"}"
+                    showToast(friendlyMsg)
+                    _translationLoadingStatus.postValue(Resource.Failure(e, friendlyMsg))
                     throw e
                 }
             }
 
             mlSettings = settings
         } catch (e: TimeoutException) {
-            _translationLoadingStatus.postValue(Resource.Failure(e, "Timeout"))
+            val msg = "Model download timed out. Check your internet connection."
+            showToast(msg)
+            _translationLoadingStatus.postValue(Resource.Failure(e, msg))
             mlTranslator?.closeQuietly()
             mlTranslator = null
         } catch (t: Throwable) {
+            if (t is CancellationException) throw t
             _translationLoadingStatus.postValue(Resource.Failure(t, t.message ?: "Error"))
             logError(t)
         }
@@ -1610,8 +1677,70 @@ class ReadActivityViewModel : ViewModel() {
         val loadedBook = safeApiCall {
             if (intent == null) throw ErrorLoadingException("No intent")
 
-            val data = intent.data ?: throw ErrorLoadingException("Empty intent")
-            val isFromEpub = intent.type != "quickstream"
+            var data = intent.data
+            var type = intent.type
+            val isFromWidget = intent.hasExtra("novelTitle")
+
+            if (data == null && isFromWidget) {
+                val title = intent.getStringExtra("novelTitle")!!
+                val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
+                val dao = db.novelDao()
+                val novel = dao.getAll().firstOrNull { it.name == title }
+                var path = novel?.filePath
+
+                if (path.isNullOrEmpty()) {
+                    val cleanTitle = title.replace("[^a-zA-Z0-9]".toRegex(), "_")
+                    val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                    val epubFile = File(downloadsDir, "Epub/${cleanTitle}.epub")
+                    if (epubFile.exists()) {
+                        path = epubFile.absolutePath
+                    }
+                }
+
+                if (!path.isNullOrEmpty() && File(path).exists()) {
+                    val file = File(path)
+                    data = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                    type = "application/epub+zip"
+                } else {
+                    val keys = with(com.lagradost.quicknovel.DataStore) {
+                        context.getKeys(com.lagradost.quicknovel.HISTORY_FOLDER)
+                    } ?: throw ErrorLoadingException("Ebook file not found")
+                    val cached = keys.mapNotNull { key ->
+                        with(com.lagradost.quicknovel.DataStore) {
+                            context.getKey<ResultCached>(key)
+                        }
+                    }.firstOrNull { it.name == title } ?: throw ErrorLoadingException("Novel not found")
+
+                    val api = com.lagradost.quicknovel.util.Apis.getApiFromName(cached.apiName)
+                    val response = api.load(cached.source)
+                    if (response is Resource.Success<*> && response.value is StreamResponse) {
+                        val streamRes = response.value as StreamResponse
+                        val quickStreamData = QuickStreamData(
+                            QuickStreamMetaData(
+                                streamRes.author,
+                                streamRes.name,
+                                cached.apiName
+                            ),
+                            streamRes.posterUrl,
+                            streamRes.data.toMutableList()
+                        )
+                        val outputDir = context.cacheDir
+                        val fileName = BookDownloader2Helper.sanitizeFilename(cached.apiName) + "_" + (if (cached.author == null) "" else BookDownloader2Helper.sanitizeFilename(cached.author)) + "_" + BookDownloader2Helper.sanitizeFilename(cached.name) + "_-1"
+                        val outputFile = File(outputDir, fileName)
+                        outputFile.parentFile?.mkdirs()
+                        outputFile.createNewFile()
+                        outputFile.writeText(DataStore.mapper.writeValueAsString(quickStreamData))
+                        data = android.net.Uri.fromFile(outputFile)
+                        type = "quickstream"
+                    } else {
+                        throw ErrorLoadingException("Failed to load stream details")
+                    }
+                }
+            }
+
+            if (data == null) throw ErrorLoadingException("Empty intent")
+
+            val isFromEpub = type != "quickstream"
 
             val epub = if (isFromEpub) {
                 val fd = context.contentResolver.openFileDescriptor(data, "r")
@@ -1626,7 +1755,7 @@ class ReadActivityViewModel : ViewModel() {
             }
 
             if (epub.size() <= 0) {
-                throw ErrorLoadingException("Empty book, failed to parse ${intent.type}")
+                throw ErrorLoadingException("Empty book, failed to parse $type")
             }
             epub
         }
@@ -1651,8 +1780,12 @@ class ReadActivityViewModel : ViewModel() {
                         loadedBook.value.getChapterTitle(it)
                             .asStringNull(context) == desiredChapterName
                     } ?: getKey<Int>(EPUB_CURRENT_POSITION, book.title()) ?: 0
-                val loadedChapterIndex =
+                val widgetChapterIndex = intent?.getIntExtra("chapterIndex", -1) ?: -1
+                val loadedChapterIndex = if (widgetChapterIndex != -1) {
+                    widgetChapterIndex
+                } else {
                     maxOf(desiredChapterIndex, 0)
+                }
 
                 // we the current loaded thing here, but because loadedChapter can be >= book.size (expand) we have to check
                 if (loadedChapterIndex < book.size()) {
@@ -1713,6 +1846,11 @@ class ReadActivityViewModel : ViewModel() {
 
             else -> throw NotImplementedError()
         }
+
+        val service = com.lagradost.quicknovel.widget.TTSForegroundService.instance
+        if (service != null && service.activeNovelName() == book.title()) {
+            service.bindViewModel(this@ReadActivityViewModel)
+        }
     }
 
     fun init(book: AbstractBook, context: Context) {
@@ -1770,11 +1908,21 @@ class ReadActivityViewModel : ViewModel() {
             .usePlugin(SoftBreakAddsNewLinePlugin.create())
             .build()
         //reducer = MarkwonReducer.directChildren()
+        checkDynamicLuminanceContrast()
     }
 
     // ========================================  TTS STUFF ========================================
 
     lateinit var ttsSession: TTSSession
+
+    fun postTTSLine(line: TTSHelper.TTSLine?) {
+        _ttsLine.postValue(line)
+    }
+
+    fun postTTSStatus(status: TTSHelper.TTSStatus) {
+        _ttsStatus.postValue(status)
+        _currentTTSStatus = status
+    }
 
     private fun initTTSSession(context: Context) {
         runOnMainThread {
@@ -1794,9 +1942,24 @@ class ReadActivityViewModel : ViewModel() {
 
             _ttsStatus.postValue(value)
             _currentTTSStatus = value
+
+            context?.let { ctx ->
+                ioSafe {
+                    TTSWidget.updateAll(ctx)
+                }
+            }
         }
 
+    private fun isStandaloneActive(): Boolean {
+        val service = com.lagradost.quicknovel.widget.TTSForegroundService.instance
+        return service != null && service.activeNovelName() == book.title()
+    }
+
     fun stopTTS() {
+        if (isStandaloneActive()) {
+            com.lagradost.quicknovel.widget.TTSForegroundService.instance?.stopStandalone()
+            return
+        }
         currentTTSStatus = TTSHelper.TTSStatus.IsStopped
     }
 
@@ -1806,6 +1969,10 @@ class ReadActivityViewModel : ViewModel() {
 
 
     fun pauseTTS() {
+        if (isStandaloneActive()) {
+            com.lagradost.quicknovel.widget.TTSForegroundService.instance?.pauseStandalone()
+            return
+        }
         if (!ttsSession.ttsInitialized()) return
         if (currentTTSStatus == TTSHelper.TTSStatus.IsRunning) {
             currentTTSStatus = TTSHelper.TTSStatus.IsPaused
@@ -1813,24 +1980,44 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun startTTS() {
+        if (isStandaloneActive()) {
+            com.lagradost.quicknovel.widget.TTSForegroundService.instance?.playStandalone()
+            return
+        }
         currentTTSStatus = TTSHelper.TTSStatus.IsRunning
     }
 
     fun forwardsTTS() {
+        if (isStandaloneActive()) {
+            com.lagradost.quicknovel.widget.TTSForegroundService.instance?.nextChapterStandalone()
+            return
+        }
         if (!ttsSession.ttsInitialized()) return
         pendingTTSSkip += 1
     }
 
     fun backwardsTTS() {
+        if (isStandaloneActive()) {
+            com.lagradost.quicknovel.widget.TTSForegroundService.instance?.previousChapterStandalone()
+            return
+        }
         if (!ttsSession.ttsInitialized()) return
         pendingTTSSkip -= 1
     }
 
     fun playTTS() {
+        if (isStandaloneActive()) {
+            com.lagradost.quicknovel.widget.TTSForegroundService.instance?.playStandalone()
+            return
+        }
         currentTTSStatus = TTSHelper.TTSStatus.IsRunning
     }
 
     fun pausePlayTTS() {
+        if (isStandaloneActive()) {
+            com.lagradost.quicknovel.widget.TTSForegroundService.instance?.togglePlayPauseStandalone()
+            return
+        }
         if (currentTTSStatus == TTSHelper.TTSStatus.IsRunning) {
             currentTTSStatus = TTSHelper.TTSStatus.IsPaused
         } else if (currentTTSStatus == TTSHelper.TTSStatus.IsPaused) {
@@ -1839,6 +2026,9 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun isTTSRunning(): Boolean {
+        if (isStandaloneActive()) {
+            return com.lagradost.quicknovel.widget.TTSForegroundService.instance?.isPlaying() == true
+        }
         return currentTTSStatus == TTSHelper.TTSStatus.IsRunning
     }
 
@@ -2099,6 +2289,7 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     private fun setScrollKeys(scrollIndex: ScrollIndex) {
+        val prevChapter = getKey<Int>(EPUB_CURRENT_POSITION, book.title()) ?: -1
         setKey(
             EPUB_CURRENT_POSITION_READ_AT,
             "${book.title()}/${scrollIndex.index}",
@@ -2111,12 +2302,17 @@ class ReadActivityViewModel : ViewModel() {
             scrollIndex.char
         )
         setKey(EPUB_CURRENT_POSITION, book.title(), scrollIndex.index)
-        context?.let {
+        context?.let { ctx ->
             setKey(
                 EPUB_CURRENT_POSITION_CHAPTER,
                 book.title(),
-                book.getChapterTitle(scrollIndex.index).asString(it)
+                book.getChapterTitle(scrollIndex.index).asString(ctx)
             )
+            if (prevChapter != scrollIndex.index) {
+                ioSafe {
+                    TTSWidget.updateAll(ctx)
+                }
+            }
         }
     }
 
@@ -2197,6 +2393,7 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     override fun onCleared() {
+        com.lagradost.quicknovel.widget.TTSForegroundService.instance?.unbindViewModel()
         lastChangeIndex?.let { setScrollKeys(it) }
         ttsSession.release()
         stopTranslation()
@@ -2281,6 +2478,22 @@ class ReadActivityViewModel : ViewModel() {
         bionicReadingLive
     )
 
+    val autoScrollLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var autoScroll by PreferenceDelegateLiveView(
+        EPUB_AUTO_SCROLL,
+        false,
+        Boolean::class,
+        autoScrollLive
+    )
+
+    val autoScrollSpeedLive: MutableLiveData<Int> = MutableLiveData(null)
+    var autoScrollSpeed by PreferenceDelegateLiveView(
+        EPUB_AUTO_SCROLL_SPEED,
+        2,
+        Int::class,
+        autoScrollSpeedLive
+    )
+
     val isTextSelectableLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var isTextSelectable by PreferenceDelegateLiveView(
         EPUB_TEXT_SELECTABLE,
@@ -2299,7 +2512,106 @@ class ReadActivityViewModel : ViewModel() {
     val textColorLive: MutableLiveData<Int> = MutableLiveData(null)
     var textColor by PreferenceDelegateLiveView(
         EPUB_TEXT_COLOR, "#cccccc".toColorInt(), Int::class, textColorLive
-    )
+    ) {
+        checkDynamicLuminanceContrast()
+    }
+
+    val dynamicLuminanceEnabledLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var dynamicLuminanceEnabled by PreferenceDelegateLiveView(
+        ReaderPrefs.DYNAMIC_LUMINANCE_ENABLED, false, Boolean::class, dynamicLuminanceEnabledLive
+    ) {
+        checkDynamicLuminanceContrast()
+    }
+
+    private var contrastCheckJob: Job? = null
+    val isContrastCompromisedLive = MutableLiveData<Boolean>(false)
+    var isContrastCompromised: Boolean
+        get() = isContrastCompromisedLive.value ?: false
+        private set(value) {
+            isContrastCompromisedLive.postValue(value)
+        }
+
+    private var cachedBgLuminance: Float? = null
+    private var lastLoadedBgUri: String? = null
+
+    fun checkDynamicLuminanceContrast() {
+        val ctx = context ?: return
+        contrastCheckJob?.cancel()
+        
+        val isEnabled = dynamicLuminanceEnabled
+        if (!isEnabled) {
+            isContrastCompromisedLive.postValue(false)
+            return
+        }
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
+        val isBackgroundEnabled = settingsManager.getBoolean("reader_background", false)
+        val imageUri = settingsManager.getString("background_image", null)
+
+        if (!isBackgroundEnabled || imageUri.isNullOrBlank()) {
+            isContrastCompromisedLive.postValue(false)
+            return
+        }
+
+        // Run computation on Dispatchers.Default
+        contrastCheckJob = viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val bgLuminance: Float
+                if (imageUri == lastLoadedBgUri && cachedBgLuminance != null) {
+                    bgLuminance = cachedBgLuminance!!
+                } else {
+                    val imageLoader = coil3.SingletonImageLoader.get(ctx)
+                    val request = coil3.request.ImageRequest.Builder(ctx)
+                        .data(imageUri)
+                        .build()
+                    val result = imageLoader.execute(request)
+                    val drawable = (result as? coil3.request.SuccessResult)?.image
+                    val rawBitmap = (drawable as? coil3.BitmapImage)?.bitmap
+                    val bitmap = if (rawBitmap != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && rawBitmap.config == android.graphics.Bitmap.Config.HARDWARE) {
+                        rawBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                    } else {
+                        rawBitmap
+                    }
+
+                    if (bitmap != null) {
+                        // High-performance color averaging by scaling to 1x1
+                        val scaled = Bitmap.createScaledBitmap(bitmap, 1, 1, true)
+                        val color = scaled.getPixel(0, 0)
+                        scaled.recycle()
+
+                        // Calculate relative luminance: L = 0.2126 * R + 0.7152 * G + 0.0722 * B
+                        val r = android.graphics.Color.red(color) / 255f
+                        val g = android.graphics.Color.green(color) / 255f
+                        val b = android.graphics.Color.blue(color) / 255f
+                        bgLuminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+
+                        cachedBgLuminance = bgLuminance
+                        lastLoadedBgUri = imageUri
+                    } else {
+                        isContrastCompromisedLive.postValue(false)
+                        return@launch
+                    }
+                }
+
+                // Get active reader text color and calculate its relative luminance
+                val textCol = textColor
+                val tr = android.graphics.Color.red(textCol) / 255f
+                val tg = android.graphics.Color.green(textCol) / 255f
+                val tb = android.graphics.Color.blue(textCol) / 255f
+                val textLuminance = 0.2126f * tr + 0.7152f * tg + 0.0722f * tb
+
+                // Calculate contrast ratio (C)
+                val l_lighter = maxOf(bgLuminance, textLuminance)
+                val l_darker = minOf(bgLuminance, textLuminance)
+                val C = (l_lighter + 0.05f) / (l_darker + 0.05f)
+
+                // Compromised if contrast ratio is below 4.5
+                isContrastCompromisedLive.postValue(C < 4.5f)
+            } catch (t: Throwable) {
+                logError(t)
+                isContrastCompromisedLive.postValue(false)
+            }
+        }
+    }
 
     val textVerticalPaddingLive: MutableLiveData<Float> = MutableLiveData(null)
     var textVerticalPadding by PreferenceDelegateLiveView(
@@ -2369,6 +2681,31 @@ class ReadActivityViewModel : ViewModel() {
     var showReaderProgress by PreferenceDelegateLiveView(
         EPUB_SHOW_READER_PROGRESS, true, Boolean::class, showReaderProgressLive
     )
+
+    val paginatedSwipeEnabledLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var paginatedSwipeEnabled by PreferenceDelegateLiveView(
+        ReaderPrefs.PAGINATED_SWIPE_ENABLED, false, Boolean::class, paginatedSwipeEnabledLive
+    )
+
+    fun getLoadedChapterSpanned(index: Int): Spanned? {
+        synchronized(chapterData) {
+            val resource = chapterData[index]
+            if (resource is Resource.Success) {
+                return if (isShowingOriginalLive.value == true) resource.value.originalRendered else resource.value.rendered
+            }
+        }
+        return null
+    }
+
+    fun getLoadedChapterSpans(index: Int): List<TextSpan> {
+        synchronized(chapterData) {
+            val resource = chapterData[index]
+            if (resource is Resource.Success) {
+                return if (isShowingOriginalLive.value == true) resource.value.originalSpans else resource.value.spans
+            }
+        }
+        return emptyList()
+    }
 
     val screenAwakeLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var screenAwake by PreferenceDelegateLiveView(
