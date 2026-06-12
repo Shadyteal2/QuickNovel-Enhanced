@@ -187,6 +187,4 @@ dependencies {
     implementation 'androidx.glance:glance-appwidget:1.1.0'
     implementation 'androidx.glance:glance-material3:1.1.0'
 
-    // LeakCanary memory leak detection
-    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.14'
 }
