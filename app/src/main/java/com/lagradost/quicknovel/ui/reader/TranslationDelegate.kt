@@ -52,10 +52,20 @@ class TranslationDelegate(
         if (to != "en") modelsToCheck.add(to)
 
         for (model in modelsToCheck) {
-            val isDownloaded = try {
-                Tasks.await(modelManager.isModelDownloaded(TranslateRemoteModel.Builder(model).build()))
+            val modelObj = TranslateRemoteModel.Builder(model).build()
+            var isDownloaded = try {
+                Tasks.await(modelManager.isModelDownloaded(modelObj))
             } catch (e: Exception) {
                 false
+            }
+            if (!isDownloaded) {
+                // Introduce a 2-second retry delay to handle ML Kit indexing delays
+                delay(2000)
+                isDownloaded = try {
+                    Tasks.await(modelManager.isModelDownloaded(modelObj))
+                } catch (e: Exception) {
+                    false
+                }
             }
             if (!isDownloaded) return true
         }

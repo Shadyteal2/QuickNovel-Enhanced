@@ -3,8 +3,15 @@ package com.lagradost.quicknovel.db
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
+import androidx.room.Index
 
-@Entity(tableName = "novel")
+@Entity(
+    tableName = "novel",
+    indices = [
+        Index(value = ["bookmarkType"]),
+        Index(value = ["downloadStatus"])
+    ]
+)
 data class NovelEntity(
     @PrimaryKey val id: Int,
     val source: String,

@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.dp
 import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.util.SettingsHelper.isModernDetailScreen
 import com.lagradost.quicknovel.util.SettingsHelper.isDefaultDetailScreen
@@ -879,19 +880,36 @@ class ResultFragment : Fragment() {
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
 
+        binding.resultSelectionComposeView.apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                QuickNovelTheme {
+                    val isInSelectionMode by viewModel.isInSelectionMode.observeAsState(false)
+                    val selectedChapters by viewModel.selectedChapters.observeAsState(emptySet())
+                    val isBatchDownloading by viewModel.isBatchDownloading.observeAsState(false)
+
+                    if (isInSelectionMode) {
+                        ChapterSelectionBar(
+                            selectedCount = selectedChapters.size,
+                            isBatchDownloading = isBatchDownloading,
+                            topCornerRadius = 24.dp,
+                            onClose = { viewModel.setSelectionMode(false) },
+                            onSelectAll = { viewModel.selectAll() },
+                            onBookmark = { viewModel.executeBatchBookmark(true) },
+                            onUnbookmark = { viewModel.executeBatchBookmark(false) },
+                            onMarkRead = { viewModel.executeBatchMarkRead(true) },
+                            onMarkUnread = { viewModel.executeBatchMarkRead(false) },
+                            onDownload = { viewModel.executeBatchDownload() }
+                        )
+                    }
+                }
+            }
+        }
+
         observe(viewModel.isInSelectionMode) { enabled ->
             backCallback.isEnabled = enabled
             val visibility = if (enabled) View.VISIBLE else View.GONE
-            val selToolbar = binding.resultSelectionToolbar
-            
-            // Add insets handling to ensure selection toolbar isn't hidden by system nav
-            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(selToolbar) { view, insets ->
-                val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-                val params = view.layoutParams as androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
-                params.bottomMargin = systemBars.bottom
-                view.layoutParams = params
-                insets
-            }
+            val selToolbar = binding.resultSelectionComposeView
 
             if (selToolbar.visibility != visibility) {
                 selToolbar.clearAnimation()
@@ -911,81 +929,7 @@ class ResultFragment : Fragment() {
         }
 
         observe(viewModel.selectedChapters) { selected ->
-            val count = selected.size
-            binding.resultSelectionCount.text = if (count == 0) getString(R.string.no_data) else "$count Selected"
             chapterAdapter?.notifyDataSetChanged()
-        }
-
-
-
-        binding.resultSelectionClose.apply {
-            setOnClickListener { 
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                viewModel.setSelectionMode(false) 
-            }
-            setOnLongClickListener {
-                com.lagradost.quicknovel.CommonActivity.showToast(getString(R.string.close))
-                true
-            }
-        }
-
-        binding.resultSelectionSelectAll.apply {
-            setOnClickListener { 
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                viewModel.selectAll() 
-            }
-            setOnLongClickListener {
-                com.lagradost.quicknovel.CommonActivity.showToast("Select All / Range")
-                true
-            }
-        }
-
-
-
-        binding.resultSelectionBookmark.apply {
-            setOnClickListener { 
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                viewModel.executeBatchBookmark(true) 
-            }
-            setOnLongClickListener {
-                com.lagradost.quicknovel.CommonActivity.showToast("Bookmark Selected")
-                true
-            }
-        }
-
-        binding.resultSelectionUnbookmark.apply {
-            setOnClickListener {
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                viewModel.executeBatchBookmark(false)
-            }
-            setOnLongClickListener {
-                com.lagradost.quicknovel.CommonActivity.showToast("Unbookmark Selected")
-                true
-            }
-        }
-
-    
-
-        binding.resultSelectionMarkRead.apply {
-            setOnClickListener {
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                viewModel.executeBatchMarkRead(true)
-            }
-            setOnLongClickListener {
-                com.lagradost.quicknovel.CommonActivity.showToast("Mark as Read")
-                true
-            }
-        }
-
-        binding.resultSelectionMarkUnread.apply {
-            setOnClickListener {
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                viewModel.executeBatchMarkRead(false)
-            }
-            setOnLongClickListener {
-                com.lagradost.quicknovel.CommonActivity.showToast("Mark as Unread")
-                true
-            }
         }
     }
 
@@ -1044,6 +988,10 @@ class ResultFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
         observe(viewModel.isInSelectionMode) { enabled ->
             backCallback.isEnabled = enabled
+            chapterAdapter?.notifyDataSetChanged()
+        }
+        observe(viewModel.selectedChapters) { _ ->
+            chapterAdapter?.notifyDataSetChanged()
         }
 
         val act = requireActivity()
@@ -1125,6 +1073,10 @@ class ResultFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
         observe(viewModel.isInSelectionMode) { enabled ->
             backCallback.isEnabled = enabled
+            chapterAdapter?.notifyDataSetChanged()
+        }
+        observe(viewModel.selectedChapters) { _ ->
+            chapterAdapter?.notifyDataSetChanged()
         }
 
         val act = requireActivity()

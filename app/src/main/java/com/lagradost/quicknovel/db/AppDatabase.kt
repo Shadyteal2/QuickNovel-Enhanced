@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [UpdateItem::class, NovelEntity::class, ImplicitInteractionEntity::class, RecommendationCandidateEntity::class], version = 7, exportSchema = false)
+@Database(entities = [UpdateItem::class, NovelEntity::class, ImplicitInteractionEntity::class, RecommendationCandidateEntity::class], version = 8, exportSchema = false)
 @androidx.room.TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun updateDao(): UpdateDao
@@ -32,6 +32,37 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val cursor = db.query("PRAGMA table_info(novel)")
+                val columns = mutableListOf<String>()
+                while (cursor.moveToNext()) {
+                    val nameIndex = cursor.getColumnIndex("name")
+                    if (nameIndex >= 0) {
+                        columns.add(cursor.getString(nameIndex))
+                    }
+                }
+                cursor.close()
+
+                if (!columns.contains("bookmarkType")) {
+                    db.execSQL("ALTER TABLE `novel` ADD COLUMN `bookmarkType` INTEGER DEFAULT NULL")
+                }
+                if (!columns.contains("downloadStatus")) {
+                    db.execSQL("ALTER TABLE `novel` ADD COLUMN `downloadStatus` INTEGER DEFAULT NULL")
+                }
+                if (!columns.contains("downloadProgress")) {
+                    db.execSQL("ALTER TABLE `novel` ADD COLUMN `downloadProgress` INTEGER DEFAULT NULL")
+                }
+                if (!columns.contains("downloadTotal")) {
+                    db.execSQL("ALTER TABLE `novel` ADD COLUMN `downloadTotal` INTEGER DEFAULT NULL")
+                }
+
+                // Add indices for novel table
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_novel_bookmarkType` ON `novel` (`bookmarkType`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_novel_downloadStatus` ON `novel` (`downloadStatus`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -39,7 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "quicknovel_database"
                 )
-                .addMigrations(MIGRATION_6_7)
+                .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
                 .fallbackToDestructiveMigration() // safe fallback
                 .build()
                 INSTANCE = instance

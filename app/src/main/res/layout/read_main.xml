@@ -51,12 +51,6 @@
         android:visibility="gone"
         android:importantForAccessibility="no" />
 
-    <com.lagradost.quicknovel.ui.custom.LivingGlassView
-        android:id="@+id/reader_living_glass"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"
-        android:importantForAccessibility="no" />
 
     <!-- Reader Ink Flow Overlay: zero cost when disabled -->
     <View

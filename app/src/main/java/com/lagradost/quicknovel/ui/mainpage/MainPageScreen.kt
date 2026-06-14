@@ -63,6 +63,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.lagradost.quicknovel.ui.theme.rememberShimmerBrush
+import kotlinx.coroutines.launch
 
 // Spring scaling press effect for high-fidelity micro-animations
 fun Modifier.springScalePress(): Modifier = composed {
@@ -101,6 +105,8 @@ fun MainPageScreen(
     onNovelLongClick: (SearchResponse) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isPullRefreshing by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -148,8 +154,21 @@ fun MainPageScreen(
                     .fillMaxSize()
                     .padding(bottom = paddingValues.calculateBottomPadding()) // Only pad bottom (for navigation bar if any)
             ) {
-                // Render list contents depending on active Resource State
-                when (val data = currentCardsState.value) {
+                val pullState = rememberPullToRefreshState()
+                PullToRefreshBox(
+                    isRefreshing = isPullRefreshing,
+                    onRefresh = {
+                        scope.launch {
+                            isPullRefreshing = true
+                            viewModel.load(0, currentMainCategory, currentOrderBy, currentTag).join()
+                            isPullRefreshing = false
+                        }
+                    },
+                    state = pullState,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Render list contents depending on active Resource State
+                    when (val data = currentCardsState.value) {
                     is Resource.Loading -> {
                         MainPageShimmerSkeleton(isLandscape = isLandscape)
                     }
@@ -338,6 +357,7 @@ fun MainPageScreen(
                         }
                     }
                 }
+            }
 
                 // ─── Floating Collapsing Header (Overlay on Top) ──────────────────
                 val collapseFraction = collapseFractionState.value
@@ -680,26 +700,7 @@ fun ProviderNovelGridCard(
 
 @Composable
 fun MainPageShimmerSkeleton(isLandscape: Boolean) {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val anim = transition.animateFloat(
-        initialValue = 0f,
-        targetValue  = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerTranslate"
-    )
-    val shimmerColors = listOf(
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-    )
-    val brush = Brush.linearGradient(
-        colors = shimmerColors,
-        start  = Offset.Zero,
-        end    = Offset(anim.value, anim.value)
-    )
+    val brush = rememberShimmerBrush()
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(if (isLandscape) 6 else 3),

@@ -243,7 +243,8 @@ class DownloadViewModel : ViewModel() {
                             filePath = novel.filePath,
                             formatType = novel.formatType,
                             hash = novel.hash,
-                            bookmarkType = novel.bookmarkType
+                            bookmarkType = novel.bookmarkType,
+                            lastChapterRead = getKey<Int>(com.lagradost.quicknovel.EPUB_CURRENT_POSITION, novel.name)?.let { it + 1 } ?: 0
                         )
                     }
                 }
@@ -689,6 +690,8 @@ class DownloadViewModel : ViewModel() {
                 totalChapters = novel.downloadTotal?.toInt() ?: 0,
                 cachedTime = novel.lastDownloaded ?: 0,
                 synopsis = novel.synopsis,
+                lastChapterReadVal = getKey<Int>(com.lagradost.quicknovel.EPUB_CURRENT_POSITION, novel.name)?.let { it + 1 } ?: 0,
+                currentTotalChaptersVal = (getKey(com.lagradost.quicknovel.RESULT_BOOKMARK, novel.id.toString()) as? ResultCached)?.totalChapters ?: (novel.downloadTotal?.toInt() ?: 0)
             )
             if (mapping.containsKey(type)) {
                 mapping[type]?.add(cached)

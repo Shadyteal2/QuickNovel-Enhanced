@@ -19,12 +19,14 @@ data class ResultCached(
     val totalChapters : Int,
     val cachedTime : Long,
     val synopsis : String? = null,
-    val isSyncEnabled : Boolean = false
+    val isSyncEnabled : Boolean = false,
+    private val lastChapterReadVal: Int? = null,
+    private val currentTotalChaptersVal: Int? = null
 ) {
     val image : UiImage? get() = img(poster)
 
-    val currentTotalChapters:Int get() = (
+    val currentTotalChapters:Int get() = currentTotalChaptersVal ?: ((
             getKey(RESULT_BOOKMARK, this.id.toString()) as? ResultCached
-            )?.totalChapters ?: totalChapters
-    val lastChapterRead:Int get() = getKey<Int>(EPUB_CURRENT_POSITION, this.name)?.let{it+1}?:0
+            )?.totalChapters ?: totalChapters)
+    val lastChapterRead:Int get() = lastChapterReadVal ?: (getKey<Int>(EPUB_CURRENT_POSITION, this.name)?.let{it+1}?:0)
 }

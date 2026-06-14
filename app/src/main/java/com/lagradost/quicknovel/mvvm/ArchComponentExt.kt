@@ -3,6 +3,8 @@ package com.lagradost.quicknovel.mvvm
 import android.util.Log
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.Flow
 import com.lagradost.quicknovel.BuildConfig
 import com.lagradost.quicknovel.ErrorLoadingException
 import com.lagradost.quicknovel.MLException
@@ -48,6 +50,18 @@ fun <T> LifecycleOwner.observe(liveData: LiveData<T>, action: (t: T) -> Unit) {
 
 fun <T> LifecycleOwner.observeNullable(liveData: LiveData<T>, action: (t: T) -> Unit) {
     liveData.observe(this) { action(it) }
+}
+
+fun <T> LifecycleOwner.observe(flow: Flow<T>, action: (t: T) -> Unit) {
+    lifecycleScope.launch {
+        flow.collect { it?.let { t -> action(t) } }
+    }
+}
+
+fun <T> LifecycleOwner.observeNullable(flow: Flow<T>, action: (t: T) -> Unit) {
+    lifecycleScope.launch {
+        flow.collect { action(it) }
+    }
 }
 
 sealed class Resource<out T> {

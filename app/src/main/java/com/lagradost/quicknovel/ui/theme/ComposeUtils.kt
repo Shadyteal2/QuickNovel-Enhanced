@@ -4,6 +4,7 @@ import android.app.Activity
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -11,12 +12,45 @@ import coil3.request.allowHardware
 import coil3.request.bitmapConfig
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material3.MaterialTheme
 import com.lagradost.quicknovel.ui.UiImage
 import com.lagradost.quicknovel.ui.img
 import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.ui.download.DownloadFragment
 import com.lagradost.quicknovel.BookDownloader2Helper
 import com.lagradost.quicknovel.BaseApplication.Companion.getActivity
+
+@Composable
+fun rememberShimmerBrush(targetValue: Float = 1000f): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translate by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = targetValue,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerTranslate"
+    )
+    val colors = listOf(
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+    )
+    return Brush.linearGradient(
+        colors = colors,
+        start = Offset.Zero,
+        end = Offset(translate, translate)
+    )
+}
 
 private val fileExistenceCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 private val fileExistenceTimestamp = java.util.concurrent.ConcurrentHashMap<String, Long>()

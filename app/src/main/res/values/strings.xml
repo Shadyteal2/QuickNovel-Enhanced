@@ -437,19 +437,11 @@
     <string name="premium_animations_desc">Enables staggered transitions, glowing progress bars, and reactive physics</string>
     <string name="premium_animations_key" translatable="false">premium_animations_key</string>
     <string name="experimental_visuals">Experimental Visuals</string>
-    <string name="living_glass">Living Glass Background</string>
-    <string name="living_glass_desc">Fluid organic gradients that morph with your interactions</string>
+
     
     <string name="vibe_aura_key" translatable="false">vibe_aura_key</string>
     <string name="experimental_visuals_key" translatable="false">experimental_visuals_key</string>
-    <string name="living_glass_key" translatable="false">living_glass_key</string>
-    <string name="aura_intensity">Aura Visibility Intensity</string>
-    <string name="aura_palette">Aura Color Palette</string>
-    <string name="aura_speed">Animation Velocity</string>
 
-    <string name="aura_intensity_key" translatable="false">aura_intensity_key</string>
-    <string name="aura_palette_key" translatable="false">aura_palette_key</string>
-    <string name="aura_speed_key" translatable="false">aura_speed_key</string>
 
     <string name="background_effect_noir">Noir</string>
     <string name="background_effect_sepia">Sepia</string>
@@ -459,11 +451,7 @@
     <string name="background_effect_dots">Dots</string>
     <string name="background_effect_dithering">Dithering</string>
     <string name="background_effect_voronoi">Voronoi</string>
-    <string name="palette_nebula">Deep Nebula (Original)</string>
-    <string name="palette_garden">Zen Garden (Relaxing)</string>
-    <string name="palette_minimal">Minimalist Earth</string>
-    <string name="palette_shady">Shady</string>
-    <string name="palette_browny">Browny</string>
+
 
     <string name="luminescent_reader">Luminescent Reader</string>
     <string name="luminescent_reader_desc">Adds a soft atmospheric glow to text and screen edges</string>

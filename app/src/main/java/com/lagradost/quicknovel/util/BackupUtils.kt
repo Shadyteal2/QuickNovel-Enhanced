@@ -418,6 +418,13 @@ object BackupUtils {
         }
     }
 
+    private fun isDeprecatedKey(key: String): Boolean {
+        return key == "living_glass_key" ||
+               key == "aura_intensity_key" ||
+               key == "aura_speed_key" ||
+               key == "aura_palette_key"
+    }
+
     private fun <T> Context.restoreMapFiltered(
         map: Map<String, T>?,
         syncBookmarks: Boolean,
@@ -428,7 +435,7 @@ object BackupUtils {
         val editor = DataStore.editor(this, isEditingAppSettings)
         map.forEach { entry ->
             val key = entry.key
-            if (!isDownloadKey(key)) {
+            if (!isDownloadKey(key) && !isDeprecatedKey(key)) {
                 val isHistory = isHistoryKey(key)
                 val isBookmark = isBookmarkKey(key)
                 val shouldRestore = when {
@@ -450,7 +457,7 @@ object BackupUtils {
     ) {
         val editor = DataStore.editor(this, isEditingAppSettings)
         map?.forEach {
-            if (!isDownloadKey(it.key)) {
+            if (!isDownloadKey(it.key) && !isDeprecatedKey(it.key)) {
                 editor.setKeyRaw(it.key, it.value)
             }
         }

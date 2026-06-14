@@ -22,6 +22,9 @@ import android.content.pm.ServiceInfo
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
+import java.io.File
+import kotlinx.coroutines.sync.withLock
+import com.lagradost.quicknovel.DownloadState
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -52,18 +55,69 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         private var workNumber: Int = 0
         private val workData: HashMap<Int, Any> = hashMapOf()
 
+        private fun isAppInForeground(context: Context): Boolean {
+            return try {
+                val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val appProcesses = activityManager.runningAppProcesses ?: return false
+                appProcesses.any { 
+                    it.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND && 
+                    it.processName == context.packageName 
+                }
+            } catch (e: Exception) {
+                false
+            }
+        }
+
         // java.lang.IllegalStateException: Data cannot occupy more than 10240 bytes when serialized
         // This stores the actual data for the WorkManager to use
-        private fun insertWork(data: Any): Int {
+        private fun insertWork(context: Context, data: Any): Int {
             synchronized(workData) {
                 workNumber += 1
+                try {
+                    val file = File(context.cacheDir, "download_work_$workNumber.json")
+                    file.writeText(mapper.writeValueAsString(data))
+                } catch (e: Exception) {
+                    Log.e("DownloadWork", "Failed to write temp work file", e)
+                }
                 workData[workNumber] = data
                 return workNumber
             }
         }
 
-        private fun popWork(key: Int): Any? {
+        private fun popWork(context: Context, key: Int, typeName: String? = null): Any? {
             synchronized(workData) {
+                val file = File(context.cacheDir, "download_work_$key.json")
+                if (file.exists()) {
+                    try {
+                        val json = file.readText()
+                        file.delete()
+                        val type = try {
+                            if (typeName != null) Class.forName(typeName) else null
+                        } catch (e: Exception) {
+                            null
+                        }
+                        return when (type) {
+                            DownloadBatch::class.java -> mapper.readValue<DownloadBatch>(json)
+                            StreamResponse::class.java -> mapper.readValue<StreamResponse>(json)
+                            EpubResponse::class.java -> mapper.readValue<EpubResponse>(json)
+                            DownloadFragment.DownloadDataLoaded::class.java -> mapper.readValue<DownloadFragment.DownloadDataLoaded>(json)
+                            else -> {
+                                // Try parsing sequentially
+                                try { mapper.readValue<DownloadBatch>(json) } catch (e: Exception) {
+                                    try { mapper.readValue<StreamResponse>(json) } catch (e: Exception) {
+                                        try { mapper.readValue<EpubResponse>(json) } catch (e: Exception) {
+                                            try { mapper.readValue<DownloadFragment.DownloadDataLoaded>(json) } catch (e: Exception) {
+                                                null
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("DownloadWork", "Failed to read temp work file", e)
+                    }
+                }
                 return workData.remove(key)
             }
         }
@@ -104,6 +158,7 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         private fun startDownload(data: Any, context: Context, novelId: Int) {
             val builder = Data.Builder()
                 .putString(ID, ID_DOWNLOAD)
+                .putInt("novelId", novelId)
 
             var serialized = false
             try {
@@ -119,8 +174,9 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
             }
 
             if (!serialized) {
-                // Fallback to in-memory if too large or fails (less reliable on restart)
-                builder.putInt(DATA, insertWork(data))
+                // Fallback to file/in-memory if too large or fails (less reliable on restart)
+                builder.putInt(DATA, insertWork(context, data))
+                builder.putString(TYPE_DATA, data::class.java.name)
             }
 
             (WorkManager.getInstance(context)).enqueueUniqueWork(
@@ -163,7 +219,22 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         val indices: List<Int>
     )
 
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Downloads"
+            val descriptionText = "The download notification channel"
+            val importance = android.app.NotificationManager.IMPORTANCE_DEFAULT
+            val channel = android.app.NotificationChannel("epubdownloader.general", name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
     override suspend fun getForegroundInfo(): ForegroundInfo {
+        createNotificationChannel()
         val notificationId = 1337
         val notification = NotificationCompat.Builder(context, "epubdownloader.general")
             .setSmallIcon(R.drawable.rdload)
@@ -183,8 +254,29 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         }
     }
 
+    private suspend fun failDownload(novelId: Int) {
+        if (novelId == -1) return
+        try {
+            BookDownloader2.downloadInfoMutex.withLock {
+                BookDownloader2.downloadProgress[novelId]?.apply {
+                    if (state == DownloadState.IsPending || state == DownloadState.IsDownloading) {
+                        state = DownloadState.IsFailed
+                        lastUpdatedMs = System.currentTimeMillis()
+                        BookDownloader2.downloadProgressChanged.invoke(novelId to this)
+                    }
+                }
+            }
+            BookDownloader2.currentDownloadsMutex.withLock {
+                BookDownloader2.currentDownloads -= novelId
+            }
+        } catch (t: Throwable) {
+            Log.e("DownloadWork", "Failed to clean up download state for $novelId", t)
+        }
+    }
+
     @WorkerThread
     override suspend fun doWork(): Result {
+        val novelId = this.workerParams.inputData.getInt("novelId", -1)
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
@@ -194,7 +286,17 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
         try {
             // Promote to foreground service to prevent network/background throttling
             try {
-                setForeground(getForegroundInfo())
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                    setForeground(getForegroundInfo())
+                } else {
+                    if (isAppInForeground(context)) {
+                        setForeground(getForegroundInfo())
+                    }
+                }
+            } catch (e: IllegalStateException) {
+                Log.e("DownloadWork", "Foreground service start not allowed", e)
+            } catch (e: SecurityException) {
+                Log.e("DownloadWork", "Foreground service security exception", e)
             } catch (e: Exception) {
                 Log.e("DownloadWork", "Failed to set worker to foreground", e)
             }
@@ -215,14 +317,19 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
                                 StreamResponse::class.java.name -> mapper.readValue<StreamResponse>(jsonData)
                                 EpubResponse::class.java.name -> mapper.readValue<EpubResponse>(jsonData)
                                 DownloadFragment.DownloadDataLoaded::class.java.name -> mapper.readValue<DownloadFragment.DownloadDataLoaded>(jsonData)
-                                else -> popWork(this.workerParams.inputData.getInt(DATA, -1))
+                                else -> popWork(context, this.workerParams.inputData.getInt(DATA, -1), typeData)
                             }
                         } catch (e: Exception) {
                             Log.e("DownloadWork", "Failed to deserialize work data", e)
-                            popWork(this.workerParams.inputData.getInt(DATA, -1))
+                            popWork(context, this.workerParams.inputData.getInt(DATA, -1), typeData)
                         }
                     } else {
-                        popWork(this.workerParams.inputData.getInt(DATA, -1))
+                        popWork(context, this.workerParams.inputData.getInt(DATA, -1), typeData)
+                    }
+
+                    if (data == null) {
+                        failDownload(novelId)
+                        return Result.failure()
                     }
 
                     when (data) {
@@ -245,7 +352,10 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
                                 BookDownloader2.downloadWorkThread(data)
                         }
 
-                        else -> return Result.failure()
+                        else -> {
+                            failDownload(novelId)
+                            return Result.failure()
+                        }
                     }
                 }
 
@@ -263,6 +373,10 @@ class DownloadFileWorkManager(val context: Context, private val workerParams: Wo
                 else -> return Result.failure()
             }
             return Result.success()
+        } catch (t: Throwable) {
+            Log.e("DownloadWork", "Error executing worker", t)
+            failDownload(novelId)
+            return Result.failure()
         } finally {
             if (wakeLock.isHeld) {
                 wakeLock.release()

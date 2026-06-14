@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -94,12 +95,13 @@ fun ResultDetailDefaultScreen(
     onScrollToLastRead: () -> Unit,
     onChapterRecyclerReady: (RecyclerView) -> Unit,
 ) {
-    val loadResponse     by viewModel.loadResponse.observeAsState()
-    val isSyncEnabled    by viewModel.isSyncEnabledDisplay.observeAsState(false)
-    val isMigrating      by viewModel.isMigrating.observeAsState(false)
-    val isSelectionMode  by viewModel.isInSelectionMode.observeAsState(false)
-    val selectedChapters by viewModel.selectedChapters.observeAsState(emptySet())
-    val chapters         by viewModel.chapters.observeAsState(emptyList())
+    val loadResponse       by viewModel.loadResponse.observeAsState()
+    val isSyncEnabled      by viewModel.isSyncEnabledDisplay.observeAsState(false)
+    val isMigrating        by viewModel.isMigrating.observeAsState(false)
+    val isSelectionMode    by viewModel.isInSelectionMode.observeAsState(false)
+    val selectedChapters   by viewModel.selectedChapters.observeAsState(emptySet())
+    val isBatchDownloading by viewModel.isBatchDownloading.observeAsState(false)
+    val chapters           by viewModel.chapters.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -118,9 +120,9 @@ fun ResultDetailDefaultScreen(
     val currentId            by viewModel.id.observeAsState(-1)
     val bookmarkState        by viewModel.bookmarkState.observeAsState(-1)
 
-    val bookmarkLabel = remember(readState, duplicateBookmark, currentId, bookmarkState) {
-        resolveBookmarkTitle(context, viewModel, currentId, readState)
-    }
+    val bookmarkLabel by viewModel.bookmarkLabel.collectAsStateWithLifecycle()
+    val continueLabel by viewModel.continueReadingLabel.collectAsStateWithLifecycle()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
     val hasBookmark = bookmarkLabel != defaultBookmarkLabel
 
     // ── Root Box fills entire screen ──────────────────────────────────────────
@@ -342,7 +344,7 @@ fun ResultDetailDefaultScreen(
                                                         // Use buildImageRequest to inherit cache path resolution & custom header logic
                                                         val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, res.image).newBuilder(context)
                                                             .allowHardware(false)
-                                                            .size(128) // tiny decode — just need dominant color
+                                                            .size(32) // tiny decode — just need dominant color
                                                             .build()
                                                         val result = loader.execute(req)
                                                         val drawable = (result as? coil3.request.SuccessResult)?.image
@@ -474,7 +476,7 @@ fun ResultDetailDefaultScreen(
                                                 )
                                                 Spacer(Modifier.width(8.dp))
                                                 Text(
-                                                    text = defaultContinueReadingLabel(res, chapters.orEmpty(), viewModel),
+                                                    text = continueLabel,
                                                     fontSize = 14.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onPrimary
@@ -518,7 +520,8 @@ fun ResultDetailDefaultScreen(
                                                 expanded = bookmarkMenuExpanded,
                                                 onDismissRequest = { bookmarkMenuExpanded = false }
                                             ) {
-                                                val categories = remember { loadDefaultBookmarkCategories(context) }
+                                                val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+                                                // categories is observed from viewModel
                                                 val currentStateId = remember(readState, currentId, bookmarkState) {
                                                     BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
                                                 }
@@ -535,6 +538,7 @@ fun ResultDetailDefaultScreen(
                                                             }
                                                         },
                                                         onClick = {
+                                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                                             viewModel.bookmark(id)
                                                             bookmarkMenuExpanded = false
                                                         }
@@ -544,6 +548,7 @@ fun ResultDetailDefaultScreen(
                                                     DropdownMenuItem(
                                                         text = { Text("Unbookmark") },
                                                         onClick = {
+                                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                                             viewModel.bookmark(-1)
                                                             bookmarkMenuExpanded = false
                                                         }
@@ -662,9 +667,8 @@ fun ResultDetailDefaultScreen(
                                                         } else {
                                                             chapterAdapter.submitList(list)
                                                         }
-                                                    } else {
-                                                        chapterAdapter.notifyDataSetChanged()
                                                     }
+                                                    chapterAdapter.updateSelectionStates(selMode ?: false, selChapters ?: emptySet())
                                                 }
                                             }
                                         )
@@ -681,14 +685,17 @@ fun ResultDetailDefaultScreen(
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                         ) {
-                            DefaultSelectionBar(
-                                selectedCount = selectedChapters.size,
-                                onClose      = { viewModel.setSelectionMode(false) },
-                                onSelectAll  = { viewModel.selectAll() },
-                                onBookmark   = { viewModel.executeBatchBookmark(true) },
-                                onUnbookmark = { viewModel.executeBatchBookmark(false) },
-                                onMarkRead   = { viewModel.executeBatchMarkRead(true) },
-                                onMarkUnread = { viewModel.executeBatchMarkRead(false) },
+                            ChapterSelectionBar(
+                                selectedCount      = selectedChapters.size,
+                                isBatchDownloading = isBatchDownloading,
+                                topCornerRadius    = 20.dp,
+                                onClose            = { viewModel.setSelectionMode(false) },
+                                onSelectAll        = { viewModel.selectAll() },
+                                onBookmark         = { viewModel.executeBatchBookmark(true) },
+                                onUnbookmark       = { viewModel.executeBatchBookmark(false) },
+                                onMarkRead         = { viewModel.executeBatchMarkRead(true) },
+                                onMarkUnread       = { viewModel.executeBatchMarkRead(false) },
+                                onDownload         = { viewModel.executeBatchDownload() },
                             )
                         }
                     }
@@ -785,54 +792,6 @@ private fun DefaultTabRow(
     }
 }
 
-// ─── Chapter selection mode bottom bar ───────────────────────────────────────
-@Composable
-private fun DefaultSelectionBar(
-    selectedCount: Int,
-    onClose: () -> Unit,
-    onSelectAll: () -> Unit,
-    onBookmark: () -> Unit,
-    onUnbookmark: () -> Unit,
-    onMarkRead: () -> Unit,
-    onMarkUnread: () -> Unit,
-) {
-    Surface(
-        tonalElevation  = 8.dp,
-        shadowElevation = 12.dp,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        color = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onClose) { Text(stringResource(R.string.close)) }
-                Text(
-                    if (selectedCount == 0) stringResource(R.string.no_data)
-                    else "$selectedCount Selected",
-                    fontWeight = FontWeight.Bold
-                )
-                TextButton(onClick = onSelectAll) { Text("All") }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                TextButton(onClick = onBookmark)   { Text("Bookmark") }
-                TextButton(onClick = onUnbookmark) { Text("Unbookmark") }
-                TextButton(onClick = onMarkRead)   { Text("Read") }
-                TextButton(onClick = onMarkUnread) { Text("Unread") }
-            }
-        }
-    }
-}
 
 // ─── Shimmer skeleton for Default layout ─────────────────────────────────────
 @Composable
@@ -918,88 +877,4 @@ private fun copyToClipboardDefault(context: Context, label: String, text: String
     com.lagradost.quicknovel.CommonActivity.showToast("$label copied")
 }
 
-// ─── Continue reading label ───────────────────────────────────────────────────
-private fun defaultContinueReadingLabel(
-    res: LoadResponse,
-    chapters: List<ChapterData>,
-    viewModel: ResultViewModel,
-): String {
-    val stream = res as? StreamResponse ?: return "Start Reading"
-    if (chapters.isEmpty()) return "Start Reading"
-    val name = stream.name
-    val lastReadIndex = chapters.indexOfLast { ch ->
-        val idx = viewModel.chapterIndex(ch) ?: -1
-        if (idx == -1) return@indexOfLast false
-        BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, "$name/$idx") != null
-    }
-    return if (lastReadIndex != -1) "Continue Ch. ${lastReadIndex + 1}" else "Start Reading"
-}
 
-// ─── Bookmark categories loader ───────────────────────────────────────────────
-private fun loadDefaultBookmarkCategories(context: Context): List<Pair<Int, String>> {
-    val json   = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-    val mapper = com.lagradost.quicknovel.DataStore.mapper
-    val customCats = try {
-        mapper.readValue(
-            json,
-            object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
-        )
-    } catch (_: Throwable) { emptyList() }
-    val orderJson = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
-    val order = try {
-        mapper.readValue(
-            orderJson,
-            object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {}
-        )
-    } catch (_: Throwable) { emptyList() }
-    val allCats = DownloadViewModel.systemCategories + customCats
-    val sorted  = if (order.isNotEmpty()) {
-        allCats.sortedBy { order.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
-    } else allCats
-    return sorted.map { cat ->
-        cat.id to (cat.stringRes?.let { context.getString(it) } ?: cat.name)
-    }
-}
-
-private fun resolveBookmarkTitle(
-    context: Context,
-    viewModel: ResultViewModel,
-    currentId: Int,
-    readState: ReadType?,
-): String {
-    val currentStateId = BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
-    if (currentStateId != -1) {
-        DownloadViewModel.systemCategories
-            .find { it.id == currentStateId }?.stringRes
-            ?.let { return context.getString(it) }
-        val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-        val mapper = com.lagradost.quicknovel.DataStore.mapper
-        val customCats = try {
-            mapper.readValue(
-                json,
-                object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
-            )
-        } catch (_: Throwable) { emptyList() }
-        customCats.find { it.id == currentStateId }?.name?.let { return it }
-    }
-    viewModel.duplicateBookmarkState.value?.let { duplicateState ->
-        val systemCat = DownloadViewModel.systemCategories.find { it.id == duplicateState }
-        if (systemCat != null) {
-            return "In Library (${context.getString(systemCat.stringRes ?: R.string.bookmark)})"
-        } else {
-            val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-            val mapper = com.lagradost.quicknovel.DataStore.mapper
-            val customCats = try {
-                mapper.readValue(
-                    json,
-                    object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
-                )
-            } catch (_: Throwable) { emptyList() }
-            val customCat = customCats.find { it.id == duplicateState }
-            if (customCat != null) {
-                return "In Library (${customCat.name})"
-            }
-        }
-    }
-    return context.getString(R.string.bookmark)
-}

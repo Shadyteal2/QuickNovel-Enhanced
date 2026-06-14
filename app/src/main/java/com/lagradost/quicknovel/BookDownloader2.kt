@@ -1131,7 +1131,7 @@ object ImageDownloader {
                 }
                 .build()
 
-            val bitmap = runBlocking {
+            val bitmap = withContext(Dispatchers.IO) {
                 val result = imageLoader.execute(request)
                 (result as? SuccessResult)?.image?.asDrawable(applicationContext.resources)
                     ?.toBitmap()

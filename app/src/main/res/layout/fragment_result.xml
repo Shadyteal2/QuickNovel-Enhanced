@@ -454,114 +454,12 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Chapter Selection Toolbar (Move to end for interactivity) -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/result_selection_toolbar"
+    <!-- Chapter Selection Compose View -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/result_selection_compose_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:layout_margin="16dp"
-        android:visibility="gone"
-        app:cardBackgroundColor="?attr/primaryGrayBackground"
-        app:cardCornerRadius="24dp"
-        app:cardElevation="20dp"
-        app:strokeColor="?attr/colorPrimary"
-        app:strokeWidth="1.5dp"
-        tools:visibility="visible">
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="8dp">
-
-                <ImageView
-                    android:id="@+id/result_selection_close"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="12dp"
-                    android:src="@drawable/ic_sharp_clear_24"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:tint="?attr/textColor" />
-
-                <TextView
-                    android:id="@+id/result_selection_count"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="@font/google_sans"
-                    android:paddingStart="8dp"
-                    android:textColor="?attr/textColor"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    tools:text="1 Selected" />
-
-                <ImageView
-                    android:id="@+id/result_selection_bookmark"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_baseline_bookmark_24"
-                    android:contentDescription="Bookmark"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:tint="?attr/colorPrimary" />
-
-                <ImageView
-                    android:id="@+id/result_selection_unbookmark"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_baseline_bookmark_border_24"
-                    android:contentDescription="Unbookmark"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:tint="?attr/colorPrimary" />
-
-                <ImageView
-                    android:id="@+id/result_selection_mark_read"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_baseline_check_24"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:tint="?attr/textColor" />
-
-                <ImageView
-                    android:id="@+id/result_selection_mark_unread"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_baseline_history_24"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:tint="?attr/colorPrimary" />
-
-                <ImageView
-                    android:id="@+id/result_selection_select_all"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_baseline_select_all_24"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:tint="?attr/textColor" />
-
-            </LinearLayout>
-        </HorizontalScrollView>
-    </com.google.android.material.card.MaterialCardView>
+        android:visibility="gone" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

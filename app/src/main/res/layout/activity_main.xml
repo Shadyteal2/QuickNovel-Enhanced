@@ -45,12 +45,6 @@
         android:alpha="0"
         android:visibility="gone" />
 
-    <!-- Global Living Glass Aura: Zero-cost when disabled (Visibility GONE) -->
-    <com.lagradost.quicknovel.ui.custom.LivingGlassView
-        android:id="@+id/app_living_glass"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone" />
 
     <FrameLayout
         android:id="@+id/main_content_wrapper"

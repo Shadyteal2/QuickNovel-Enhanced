@@ -65,10 +65,7 @@ class PreferenceKeysConsistencyTest {
 
     @Test fun `ReaderPrefs Effects LUMINESCENT matches legacy`()           = assertEquals(LUMINESCENT_READER, ReaderPrefs.Effects.LUMINESCENT)
     @Test fun `ReaderPrefs Effects LUMINESCENT_INTENSITY matches legacy`() = assertEquals(LUMINESCENT_INTENSITY, ReaderPrefs.Effects.LUMINESCENT_INTENSITY)
-    @Test fun `ReaderPrefs Effects LIVING_GLASS matches legacy`()          = assertEquals(LIVING_GLASS, ReaderPrefs.Effects.LIVING_GLASS)
-    @Test fun `ReaderPrefs Effects AURA_INTENSITY matches legacy`()        = assertEquals(AURA_INTENSITY, ReaderPrefs.Effects.AURA_INTENSITY)
-    @Test fun `ReaderPrefs Effects AURA_SPEED matches legacy`()            = assertEquals(AURA_SPEED, ReaderPrefs.Effects.AURA_SPEED)
-    @Test fun `ReaderPrefs Effects AURA_PALETTE matches legacy`()          = assertEquals(AURA_PALETTE, ReaderPrefs.Effects.AURA_PALETTE)
+
 
     // ── Result / Chapter ──────────────────────────────────────────────────────
 

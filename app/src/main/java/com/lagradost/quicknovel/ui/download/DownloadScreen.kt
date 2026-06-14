@@ -29,6 +29,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
@@ -108,6 +110,31 @@ fun DownloadScreen(
 
     val isTactileEnabledState = rememberPreferenceBoolean("library_tactile_response", true)
 
+    val onPauseClick = remember(viewModel) {
+        { card: DownloadFragment.DownloadDataLoaded ->
+            viewModel.pause(card)
+        }
+    }
+    val onResumeClick = remember(viewModel) {
+        { card: DownloadFragment.DownloadDataLoaded ->
+            viewModel.resume(card)
+        }
+    }
+    val onRefreshClick = remember(viewModel) {
+        { card: DownloadFragment.DownloadDataLoaded ->
+            viewModel.refreshCard(card)
+        }
+    }
+    val onDeleteClick = remember(viewModel) {
+        { card: Any ->
+            if (card is DownloadFragment.DownloadDataLoaded) {
+                viewModel.deleteAlert(card)
+            } else if (card is ResultCached) {
+                viewModel.deleteAlert(card)
+            }
+        }
+    }
+
     // Observe sorting, query, lists, categories
     // Observe sorting, query, lists, categories
     val cards by viewModel.cards.observeAsState(emptyList())
@@ -148,6 +175,7 @@ fun DownloadScreen(
     var showSortSheet by remember { mutableStateOf(false) }
     var isSelectionMode by remember { mutableStateOf(false) }
     val selectedNovels = remember { mutableStateListOf<Int>() }
+    var isPullRefreshing by remember { mutableStateOf(false) }
     var showMultiSelectCategorySheet by remember { mutableStateOf(false) }
     var showMultiSelectDeleteDialog by remember { mutableStateOf(false) }
 
@@ -557,12 +585,25 @@ fun DownloadScreen(
             ) { page ->
                 val list = cardsByPage[page] ?: emptyList()
                 val isDownloadsPage = page == 0
+                val pullState = rememberPullToRefreshState()
 
-                // Premium visual sliding parallax depth fade transition (100% GPU-accelerated, zero overdraw/layer overhead)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
+                PullToRefreshBox(
+                    isRefreshing = isPullRefreshing,
+                    onRefresh = {
+                        scope.launch {
+                            isPullRefreshing = true
+                            viewModel.loadAllData(true).join()
+                            isPullRefreshing = false
+                        }
+                    },
+                    state = pullState,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Premium visual sliding parallax depth fade transition (100% GPU-accelerated, zero overdraw/layer overhead)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
                             // Calculate current page position offset relative to focus point
                             val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
                             
@@ -665,11 +706,11 @@ fun DownloadScreen(
                                         items = list,
                                         key = { card ->
                                             val id = when (card) {
-                                                is ResultCached -> "cached_${card.id}"
-                                                is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
+                                                is ResultCached -> card.id
+                                                is DownloadFragment.DownloadDataLoaded -> card.id
                                                 else -> card.hashCode()
                                             }
-                                            "list_$id"
+                                            "novel_$id"
                                         },
                                         contentType = { card ->
                                             when (card) {
@@ -724,40 +765,16 @@ fun DownloadScreen(
                                                 Unit
                                             }
                                         }
-                                        val onPauseClick = remember(card, viewModel) {
-                                            {
-                                                if (card is DownloadFragment.DownloadDataLoaded) viewModel.pause(card)
-                                            }
-                                        }
-                                        val onResumeClick = remember(card, viewModel) {
-                                            {
-                                                if (card is DownloadFragment.DownloadDataLoaded) viewModel.resume(card)
-                                            }
-                                        }
-                                        val onRefreshClick = remember(card, viewModel) {
-                                            {
-                                                if (card is DownloadFragment.DownloadDataLoaded) viewModel.refreshCard(card)
-                                            }
-                                        }
-                                        val onDeleteClick = remember(card, viewModel) {
-                                            {
-                                                if (card is DownloadFragment.DownloadDataLoaded) {
-                                                    viewModel.deleteAlert(card)
-                                                } else if (card is ResultCached) {
-                                                    viewModel.deleteAlert(card)
-                                                }
-                                            }
-                                        }
 
                                         CompactCardItem(
                                             card = card,
                                             isTactileEnabled = isTactileEnabled,
                                             onClick = currentOnClick,
                                             onLongClick = currentOnLongClick,
-                                            onPauseClick = onPauseClick,
-                                            onResumeClick = onResumeClick,
-                                            onRefreshClick = onRefreshClick,
-                                            onDeleteClick = onDeleteClick,
+                                            onPauseClick = { if (card is DownloadFragment.DownloadDataLoaded) onPauseClick(card) },
+                                            onResumeClick = { if (card is DownloadFragment.DownloadDataLoaded) onResumeClick(card) },
+                                            onRefreshClick = { if (card is DownloadFragment.DownloadDataLoaded) onRefreshClick(card) },
+                                            onDeleteClick = { onDeleteClick(card) },
                                             isSelectionMode = isSelectionMode,
                                             isSelected = isSelected,
                                             modifier = Modifier.animateItem()
@@ -810,11 +827,11 @@ fun DownloadScreen(
                                         items = list,
                                         key = { _, card ->
                                             val id = when (card) {
-                                                is ResultCached -> "cached_${card.id}"
-                                                is DownloadFragment.DownloadDataLoaded -> "loaded_${card.id}"
+                                                is ResultCached -> card.id
+                                                is DownloadFragment.DownloadDataLoaded -> card.id
                                                 else -> card.hashCode()
                                             }
-                                            if (isBento3x3) "bento_$id" else "normal_$id"
+                                            if (isBento3x3) "bento_novel_$id" else "normal_novel_$id"
                                         },
                                         span = { index, _ ->
                                             val spanSize = if (isBento3x3) {
@@ -909,6 +926,7 @@ fun DownloadScreen(
                     }
                 }
             }
+        }
 
             // Clean, non-glitchy Pill Slider — only shown in Pill Drawer mode
             if (!isSwipeMode) {
@@ -1617,10 +1635,7 @@ fun GridCardItem(
 
     val diffCount = remember(card, com.lagradost.quicknovel.DataStore.mutationCounter.value) {
         if (card is DownloadFragment.DownloadDataLoaded) {
-            val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
-                com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
-                card.name
-            )?.let { it + 1 } ?: 0
+            val realReadCount = card.lastChapterRead
             (card.downloadedCount - realReadCount).coerceAtLeast(0).toInt()
         } else {
             0
@@ -1653,7 +1668,7 @@ fun GridCardItem(
                 // Use buildImageRequest to inherit local cache path resolution & custom header logic
                 val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card).newBuilder(context)
                     .allowHardware(false)
-                    .size(128) // tiny decode — just need dominant color
+                    .size(32) // tiny decode — just need dominant color
                     .build()
                 val result = loader.execute(req)
                 val drawable = (result as? coil3.request.SuccessResult)?.image
@@ -1917,10 +1932,7 @@ fun CompactCardItem(
 
     val diffCount = remember(card, com.lagradost.quicknovel.DataStore.mutationCounter.value) {
         if (card is DownloadFragment.DownloadDataLoaded) {
-            val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
-                com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
-                card.name
-            )?.let { it + 1 } ?: 0
+            val realReadCount = card.lastChapterRead
             (card.downloadedCount - realReadCount).coerceAtLeast(0).toInt()
         } else {
             0
@@ -2030,11 +2042,7 @@ fun CompactCardItem(
                         card.lastChapterRead to card.currentTotalChapters
                     }
                     is DownloadFragment.DownloadDataLoaded -> {
-                        val realReadCount = com.lagradost.quicknovel.BaseApplication.getKey<Int>(
-                            com.lagradost.quicknovel.EPUB_CURRENT_POSITION,
-                            card.name
-                        )?.let { it + 1 } ?: 0
-                        realReadCount to card.downloadedTotal.toInt()
+                        card.lastChapterRead to card.downloadedTotal.toInt()
                     }
                     else -> 0 to 0
                 }

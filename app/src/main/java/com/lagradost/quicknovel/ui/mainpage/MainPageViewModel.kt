@@ -149,7 +149,7 @@ class MainPageViewModel : ViewModel() {
         mainCategory: Int?,
         orderBy: Int?,
         tag: Int?,
-    ) {
+    ): kotlinx.coroutines.Job {
         currentTag.postValue(tag)
         currentOrderBy.postValue(orderBy)
         currentMainCategory.postValue(mainCategory)
@@ -164,7 +164,7 @@ class MainPageViewModel : ViewModel() {
         if (page != 0) {
             loadingMoreItems.postValue(true)
         }
-        viewModelScope.launch {
+        return viewModelScope.launch {
             //val copy = if (cPage == 0) ArrayList() else cards.value
             when (val res = repo.loadMainPage(cPage + 1, mainCategory, orderBy, tag)) {
                 is Resource.Success -> {

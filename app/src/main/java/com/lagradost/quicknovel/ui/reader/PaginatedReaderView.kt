@@ -134,12 +134,23 @@ fun PaginatedReaderView(
             }
         }
 
-        val customFontFamily = remember(fontFile) {
-            if (fontFile != null) {
-                try {
-                    FontFamily(androidx.compose.ui.text.font.Font(fontFile))
-                } catch (e: Exception) {
-                    FontFamily.Default
+        val customFontFamily = remember(viewModel.textFont, fontFile) {
+            if (viewModel.textFont.isNotEmpty()) {
+                val preloaded = com.lagradost.quicknovel.util.PreloadedFontsCache.get(viewModel.textFont)
+                if (preloaded != null) {
+                    try {
+                        FontFamily(preloaded)
+                    } catch (e: Exception) {
+                        FontFamily.Default
+                    }
+                } else if (fontFile != null) {
+                    try {
+                        FontFamily(Typeface.createFromFile(fontFile))
+                    } catch (e: Exception) {
+                        FontFamily.Default
+                    }
+                } else {
+                    FontFamily.Serif
                 }
             } else {
                 FontFamily.Serif
@@ -181,12 +192,15 @@ fun PaginatedReaderView(
             val paint = TextPaint().apply {
                 textSize = textSizePx
                 val hasNonLatin = spannedText.hasNonLatinAlpha()
-                val tf = if (fontFile != null && !hasNonLatin) {
-                    try {
-                        Typeface.createFromFile(fontFile)
-                    } catch (e: Exception) {
-                        Typeface.DEFAULT
-                    }
+                val tf = if (viewModel.textFont.isNotEmpty() && !hasNonLatin) {
+                    com.lagradost.quicknovel.util.PreloadedFontsCache.get(viewModel.textFont)
+                        ?: fontFile?.let {
+                            try {
+                                Typeface.createFromFile(it)
+                            } catch (e: Exception) {
+                                null
+                            }
+                        } ?: Typeface.DEFAULT
                 } else {
                     Typeface.DEFAULT
                 }
@@ -227,9 +241,9 @@ fun PaginatedReaderView(
             LaunchedEffect(currentIndex, currentResult.pages.size) {
                 if (currentResult.pages.isNotEmpty()) {
                     if (currentIndex > lastChapterIndex) {
-                        pagerState.scrollToPage(prevPageOffset)
+                        pagerState.animateScrollToPage(prevPageOffset)
                     } else if (currentIndex < lastChapterIndex) {
-                        pagerState.scrollToPage(currentResult.pages.size - 1 + prevPageOffset)
+                        pagerState.animateScrollToPage(currentResult.pages.size - 1 + prevPageOffset)
                     }
                     lastChapterIndex = currentIndex
                 }

@@ -204,7 +204,18 @@ data class TextConfig(
     }
 
     private val cachedFont: Typeface by lazy {
-        fontFile?.let { file -> Typeface.createFromFile(file) } ?: defaultFont
+        if (textFont.isNotEmpty()) {
+            com.lagradost.quicknovel.util.PreloadedFontsCache.get(textFont)
+                ?: fontFile?.let { file ->
+                    try {
+                        Typeface.createFromFile(file)
+                    } catch (e: Exception) {
+                        null
+                    }
+                } ?: defaultFont
+        } else {
+            defaultFont
+        }
     }
 
     private fun setTextFont(textView: TextView, flags: Int) {
@@ -592,6 +603,23 @@ class TextAdapter(
         binding.root.setOnClickListener {
             viewModel.switchVisibility()
         }
+
+        val url = obj.url
+        if (url != null) {
+            val progressRegex = Regex("""\((\d+)/(\d+)\)""")
+            val match = progressRegex.find(url)
+            if (match != null) {
+                val current = match.groupValues[1].toIntOrNull()
+                val total = match.groupValues[2].toIntOrNull()
+                if (current != null && total != null) {
+                    binding.loadingBar.isIndeterminate = false
+                    binding.loadingBar.max = total
+                    binding.loadingBar.progress = current
+                    return
+                }
+            }
+        }
+        binding.loadingBar.isIndeterminate = true
     }
 
     private fun bindFailed(binding: ViewBinding, obj: FailedSpanned) {

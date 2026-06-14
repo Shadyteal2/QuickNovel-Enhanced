@@ -51,6 +51,21 @@ class BaseApplication : Application(), SingletonImageLoader.Factory, Configurati
         com.lagradost.quicknovel.network.WebViewProxyHelper.syncProxy(this)
 
         appScope.launch {
+            // ── Invalidate dynamic ClassLoader cache on host app update ──────────
+            val currentApkPath = packageCodePath
+            val lastApkPath = this@BaseApplication.getKey<String>("last_known_apk_path")
+            if (currentApkPath != lastApkPath) {
+                try {
+                    codeCacheDir.listFiles()?.forEach { it.deleteRecursively() }
+                } catch (e: Exception) {
+                    android.util.Log.e("BaseApplication", "Failed to clear code_cache", e)
+                }
+                this@BaseApplication.setKey("last_known_apk_path", currentApkPath)
+            }
+
+            // Warm up system fonts listing in background to prevent UI block on first font access
+            com.lagradost.quicknovel.util.UIHelper.systemFonts
+            com.lagradost.quicknovel.util.PreloadedFontsCache.preload(this@BaseApplication)
             com.lagradost.quicknovel.util.PluginManager.loadAllPlugins(this@BaseApplication)
         }
     }

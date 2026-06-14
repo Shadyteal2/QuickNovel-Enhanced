@@ -92,10 +92,6 @@ object ReaderPrefs {
     object Effects {
         const val LUMINESCENT           = "luminescent_reader"
         const val LUMINESCENT_INTENSITY = "luminescent_intensity"
-        const val LIVING_GLASS          = "living_glass_key"
-        const val AURA_INTENSITY        = "aura_intensity_key"
-        const val AURA_SPEED            = "aura_speed_key"
-        const val AURA_PALETTE          = "aura_palette_key"
         const val PREMIUM_ANIMATIONS    = "premium_animations_key"
     }
 }

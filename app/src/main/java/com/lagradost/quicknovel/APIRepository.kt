@@ -47,9 +47,8 @@ class APIRepository(val api: MainAPI) {
             val hash: Pair<String, String>
         )
 
-        private val cache = threadSafeListOf<SavedLoadResponse>()
-        private var cacheIndex: Int = 0
         const val cacheSize = 20
+        private val cache = android.util.LruCache<Pair<String, String>, SavedLoadResponse>(cacheSize)
 
         // 10min cache time should be plenty per session without fucking up anything for the user with outdated data
         const val cacheTimeSec: Int = 60 * 10
@@ -85,13 +84,9 @@ class APIRepository(val api: MainAPI) {
                 val lookingForHash = api.name to fixedUrl
 
                 if (allowCache) {
-                    synchronized(cache) {
-                        for (item in cache) {
-                            // 10 min save
-                            if (item.hash == lookingForHash && (unixTime - item.unixTime) < cacheTimeSec) {
-                                return@safeApiCall item.response
-                            }
-                        }
+                    val cached = cache.get(lookingForHash)
+                    if (cached != null && (unixTime - cached.unixTime) < cacheTimeSec) {
+                        return@safeApiCall cached.response
                     }
                 }
 
@@ -99,14 +94,7 @@ class APIRepository(val api: MainAPI) {
                     // Remove all blank tags as early as possible
                     val add = SavedLoadResponse(unixTime, response, lookingForHash)
                     if (allowCache) {
-                        synchronized(cache) {
-                            if (cache.size > cacheSize) {
-                                cache[cacheIndex] = add // rolling cache
-                                cacheIndex = (cacheIndex + 1) % cacheSize
-                            } else {
-                                cache.add(add)
-                            }
-                        }
+                        cache.put(lookingForHash, add)
                     }
                 } ?: throw ErrorLoadingException("No data")
             } finally {

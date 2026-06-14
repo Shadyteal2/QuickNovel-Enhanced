@@ -298,10 +298,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 }
                 readerBackgroundImage.colorFilter = null
                 // Restore solid background ONLY if no immersive mode is active
-                val auraEnabled = settingsManager.getBoolean(LIVING_GLASS, false)
-                if (!auraEnabled) {
-                    root.setBackgroundColor(viewModel.backgroundColor)
-                }
+                root.setBackgroundColor(viewModel.backgroundColor)
                 return@apply
             }
 
@@ -328,7 +325,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
     private var haloAnimator: ObjectAnimator? = null
 
-    private fun applyLuminescenceToView(view: View, enabled: Boolean, intensity: Int, auraEnabled: Boolean) {
+    private fun applyLuminescenceToView(view: View, enabled: Boolean, intensity: Int) {
         val target = if (view is RoundedBgTextView) view else view.findViewById<RoundedBgTextView>(R.id.real_text_item) ?: return
         
         if (!enabled) {
@@ -336,27 +333,23 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             return
         }
 
-        val auraColor = if (auraEnabled) {
-            binding.readerLivingGlass.getAuraColorOpaque()
-        } else {
-            Color.parseColor("#FFE8B5") // Amber Warm
-        }
+        val glowColorBase = Color.parseColor("#FFE8B5") // Amber Warm
 
         val blurRadius = (intensity / 100f) * 15f
         val alphaFactor = (intensity / 100f) * 0.8f
 
         val glowColor = Color.argb(
             (255 * alphaFactor).toInt().coerceIn(0, 255),
-            Color.red(auraColor),
-            Color.green(auraColor),
-            Color.blue(auraColor)
+            Color.red(glowColorBase),
+            Color.green(glowColorBase),
+            Color.blue(glowColorBase)
         )
         target.setShadowLayer(blurRadius, 0f, 0f, glowColor)
     }
 
-    private fun applyTextLuminescence(enabled: Boolean, intensity: Int, auraEnabled: Boolean) {
+    private fun applyTextLuminescence(enabled: Boolean, intensity: Int) {
         binding.realText.children.forEach { view ->
-            applyLuminescenceToView(view, enabled, intensity, auraEnabled)
+            applyLuminescenceToView(view, enabled, intensity)
         }
     }
 
@@ -365,25 +358,20 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         val performanceMode = settingsManager.getBoolean("performance_mode_enabled", false)
         val lEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
         val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
-        val gEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.living_glass_key), false)
 
         binding.readerHalo.apply {
             if (lEnabled) {
                 visibility = android.view.View.VISIBLE
                 val baseAlpha = (lIntensity / 100f) * 0.5f
 
-                val auraColor = if (gEnabled) {
-                    binding.readerLivingGlass.getCurrentAuraColor()
-                } else {
-                    Color.parseColor("#FFE8B5") // Amber Warm
-                }
+                val glowColorBase = Color.parseColor("#FFE8B5") // Amber Warm
 
                 (background as? android.graphics.drawable.GradientDrawable)?.let { gd ->
                     val glowColor = Color.argb(
                         (baseAlpha * 255).toInt().coerceIn(0, 255),
-                        Color.red(auraColor),
-                        Color.green(auraColor),
-                        Color.blue(auraColor)
+                        Color.red(glowColorBase),
+                        Color.green(glowColorBase),
+                        Color.blue(glowColorBase)
                     )
                     gd.colors = intArrayOf(Color.TRANSPARENT, glowColor)
                 }
@@ -396,7 +384,6 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         interpolator = AccelerateDecelerateInterpolator()
                         start()
                     }
-                } else {
                 }
             } else {
                 visibility = android.view.View.GONE
@@ -405,48 +392,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
         }
 
-        applyTextLuminescence(lEnabled, lIntensity, gEnabled)
+        applyTextLuminescence(lEnabled, lIntensity)
     }
 
-    fun updateGlobalAura() {
-        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-        val enabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
-        val intensity = settingsManager.getSafeInt(getString(R.string.aura_intensity_key), 70)
-        val palette = settingsManager.getString(getString(R.string.aura_palette_key), "nebula") ?: "nebula"
-        val speed = settingsManager.getSafeInt(getString(R.string.aura_speed_key), 100)
 
-        binding.apply {
-            readerLivingGlass.apply {
-                if (enabled) {
-                    visibility = android.view.View.VISIBLE
-                    setAuraIntensity(intensity)
-                    setAuraPalette(palette)
-                    setAuraSpeed(speed)
-                    
-                    // Recursive structural cleaning to expose the visualizer
-                    try {
-                        AuraTransparencyHelper.forceTransparent(root)
-                        // Also clear the overlay containers specifically
-                        readNormalLayout.setBackgroundColor(Color.TRANSPARENT)
-                        readOverlay.setBackgroundColor(Color.TRANSPARENT)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                } else {
-                    visibility = android.view.View.GONE
-                    // Restore background color if Aura is OFF and no image is set
-                    val bgImageEnabled = settingsManager.getBoolean(getString(R.string.reader_background_key), false)
-                    if (!bgImageEnabled) {
-                        root.setBackgroundColor(viewModel.backgroundColor)
-                        // Reset other layouts to default (usually transparent but safety first)
-                        readNormalLayout.setBackground(null)
-                        realText.setBackground(null)
-                    }
-                }
-            }
-            updateLuminescentEffects()
-        }
-    }
 
     private fun setTextColor(color: Int) {
         viewModel.textColor = color
@@ -733,12 +682,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         
         fill.scaleX = progress
         
-        // Design Spell: Quantum Progress Trail (Color mapping based on progress)
-        if (viewModel.premiumAnimations && this@ReadActivity2.binding.readerLivingGlass.isVisible) {
-            val auraColor = this@ReadActivity2.binding.readerLivingGlass.getCurrentAuraColor()
-            val trailColor = interpolateColor(Color.GRAY, auraColor, 0.4f + progress * 0.6f)
-            fill.backgroundTintList = ColorStateList.valueOf(trailColor)
-        }
+
 
         updateReaderInkFlow(progress)
     }
@@ -1236,7 +1180,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         setContentView(binding.root)
 
         updateGlobalBackground()
-        updateGlobalAura()
+        updateLuminescentEffects()
         updateReaderInkFlow(0f)
         PreferenceManager.getDefaultSharedPreferences(this)
             .registerOnSharedPreferenceChangeListener { _, key ->
@@ -1256,14 +1200,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         viewModel.checkDynamicLuminanceContrast()
                     }
                 }
-                if (key == getString(R.string.living_glass_key) ||
-                    key == getString(R.string.aura_intensity_key) ||
-                    key == getString(R.string.aura_palette_key) ||
-                    key == getString(R.string.aura_speed_key) ||
-                    key == LUMINESCENT_READER ||
+                if (key == LUMINESCENT_READER ||
                     key == LUMINESCENT_INTENSITY
                 ) {
-                    updateGlobalAura()
+                    updateLuminescentEffects()
                 }
                 if (key == com.lagradost.quicknovel.ui.theme.VibePrefs.PREMIUM_VISUALS_ENABLED ||
                     key == com.lagradost.quicknovel.ui.theme.VibePrefs.READER_INK_FLOW
@@ -1343,9 +1283,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             val isEnabled = settingsManager.getBoolean(getString(R.string.reader_background_key), false)
             val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
 
-            val isAuraEnabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
-
-            if ((isEnabled && !imageUri.isNullOrBlank()) || isAuraEnabled) {
+            if (isEnabled && !imageUri.isNullOrBlank()) {
                 com.lagradost.quicknovel.util.AuraTransparencyHelper.forceTransparent(binding.root)
                 com.lagradost.quicknovel.util.AuraTransparencyHelper.forceTransparent(binding.readOverlay)
             } else {
@@ -1401,16 +1339,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
 
         observe(viewModel.luminescentLive) { _ ->
-            updateGlobalAura()
+            updateLuminescentEffects()
         }
 
         observe(viewModel.luminescentIntensityLive) { _ ->
-            updateGlobalAura()
-        }
-
-        observe(viewModel.auraIntensityLive) { _ ->
-            updateGlobalAura()
-            if (viewModel.premiumAnimations) binding.readerLivingGlass.flare()
+            updateLuminescentEffects()
         }
         updateOverlayVisibility()
 
@@ -1785,8 +1718,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                     val lEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
                     if (lEnabled) {
                         val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
-                        val gEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.living_glass_key), false)
-                        applyLuminescenceToView(view, lEnabled, lIntensity, gEnabled)
+                        applyLuminescenceToView(view, lEnabled, lIntensity)
                     }
                 }
 
@@ -2159,7 +2091,6 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                                 viewModel.backgroundColor = bg
                                 viewModel.textColor = txt
                                 updateImages()
-                                if (viewModel.premiumAnimations) this@ReadActivity2.binding.readerLivingGlass.flare()
                             },
                             onDismiss = {
                                 bottomSheetDialog.dismiss()
@@ -2390,7 +2321,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             hideSystemUI()
         }
 
-        updateGlobalAura()
+        updateLuminescentEffects()
     }
     private fun interpolateColor(a: Int, b: Int, proportion: Float): Int {
         val hsvA = FloatArray(3)

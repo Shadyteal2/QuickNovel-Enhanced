@@ -496,13 +496,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         ) {
             updateGlobalBackground()
         }
-        if (key == getString(R.string.living_glass_key) ||
-            key == getString(R.string.aura_intensity_key) ||
-            key == getString(R.string.aura_palette_key) ||
-            key == getString(R.string.aura_speed_key)
-        ) {
-            updateGlobalAura()
-        }
+
         if (key == "NEW_UPDATES_COUNT") {
             updateUpdatesBadge()
         }
@@ -654,7 +648,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         activity = this
         mainActivity = this
         updateGlobalBackground()
-        updateGlobalAura()
+
         val currentPos = binding?.mainViewpager?.currentItem ?: 0
         updateSwipeLock(currentPos)
     }
@@ -987,7 +981,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         }
         
         updateGlobalBackground()
-        updateGlobalAura()
+
         updateNavBarWidth()
         settingsManager.registerOnSharedPreferenceChangeListener(backgroundListener)
         updateUpdatesBadge()
@@ -1398,31 +1392,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             helper.forceTransparent(homeRoot)
         }
     }
-    fun updateGlobalAura() {
-        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-        val enabled = settingsManager.getBoolean(getString(R.string.living_glass_key), false)
-        val intensity = settingsManager.getSafeInt(getString(R.string.aura_intensity_key), 70)
-        val speed = settingsManager.getSafeInt(getString(R.string.aura_speed_key), 100)
-        val palette = settingsManager.getString(getString(R.string.aura_palette_key), "nebula") ?: "nebula"
 
-        binding?.appLivingGlass?.apply {
-            if (enabled) {
-                visibility = android.view.View.VISIBLE
-                setAuraIntensity(intensity)
-                setAuraSpeed(speed)
-                setAuraPalette(palette)
-
-                // One-time shallow transparency on top-level shell containers only.
-                // Do NOT use a persistent listener — that causes cards/bars in fragments
-                // to lose their backgrounds on every layout pass.
-                val helper = com.lagradost.quicknovel.util.AuraTransparencyHelper
-                helper.forceTransparent(binding?.mainContentWrapper)
-                helper.forceTransparent(binding?.homeRoot)
-            } else {
-                visibility = android.view.View.GONE
-            }
-        }
-    }
 
     private fun setupCustomNav() {
         val b = binding ?: return

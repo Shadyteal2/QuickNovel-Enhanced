@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,7 +52,7 @@ fun NovelTabScreen(
     val userNote by viewModel.userNote.observeAsState("")
     val downloadState by viewModel.downloadState.observeAsState()
     val isSyncEnabled by viewModel.isSyncEnabledDisplay.observeAsState(false)
-    val chapters by viewModel.chapters.observeAsState(emptyList())
+    val chapters by viewModel.chapters.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier

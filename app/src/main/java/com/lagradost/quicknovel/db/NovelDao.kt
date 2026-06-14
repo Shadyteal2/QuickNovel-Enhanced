@@ -24,6 +24,9 @@ interface NovelDao {
     @Query("SELECT * FROM novel WHERE hash = :hash LIMIT 1")
     fun getByHash(hash: String): NovelEntity?
 
+    @Query("SELECT * FROM novel WHERE name = :name LIMIT 1")
+    fun getByName(name: String): NovelEntity?
+
     @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0")
     fun getAllBookmarksAsFlow(): Flow<List<NovelEntity>>
 

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -65,6 +66,7 @@ import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 import com.lagradost.quicknovel.ui.theme.rememberAccentGradientBrush
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
+import com.lagradost.quicknovel.ui.theme.rememberShimmerBrush
 
 // ─── Hero dimensions ──────────────────────────────────────────────────────────
 private val HERO_HEIGHT  = 380.dp
@@ -90,16 +92,17 @@ fun ResultDetailModernScreen(
     onScrollToLastRead: () -> Unit,
     onChapterRecyclerReady: (RecyclerView) -> Unit,
 ) {
-    val loadResponse     by viewModel.loadResponse.observeAsState()
-    val isSyncEnabled    by viewModel.isSyncEnabledDisplay.observeAsState(false)
-    val isMigrating      by viewModel.isMigrating.observeAsState(false)
-    val isSelectionMode  by viewModel.isInSelectionMode.observeAsState(false)
-    val selectedChapters by viewModel.selectedChapters.observeAsState(emptySet())
-    val readState        by viewModel.readState.observeAsState()
-    val duplicateBookmark by viewModel.duplicateBookmarkState.observeAsState()
-    val chapters         by viewModel.chapters.observeAsState(emptyList())
-    val currentId        by viewModel.id.observeAsState(-1)
-    val bookmarkState    by viewModel.bookmarkState.observeAsState(-1)
+    val loadResponse       by viewModel.loadResponse.observeAsState()
+    val isSyncEnabled      by viewModel.isSyncEnabledDisplay.observeAsState(false)
+    val isMigrating        by viewModel.isMigrating.observeAsState(false)
+    val isSelectionMode    by viewModel.isInSelectionMode.observeAsState(false)
+    val selectedChapters   by viewModel.selectedChapters.observeAsState(emptySet())
+    val isBatchDownloading by viewModel.isBatchDownloading.observeAsState(false)
+    val readState          by viewModel.readState.observeAsState()
+    val duplicateBookmark  by viewModel.duplicateBookmarkState.observeAsState()
+    val chapters           by viewModel.chapters.collectAsStateWithLifecycle()
+    val currentId          by viewModel.id.observeAsState(-1)
+    val bookmarkState      by viewModel.bookmarkState.observeAsState(-1)
 
     var selectedTab          by remember { mutableIntStateOf(0) }
 
@@ -114,9 +117,8 @@ fun ResultDetailModernScreen(
     val context = LocalContext.current
 
     val defaultBookmarkLabel = stringResource(R.string.bookmark)
-    val bookmarkLabel = remember(currentId, readState, duplicateBookmark, bookmarkState) {
-        resolveBookmarkTitle(context, viewModel, currentId, readState)
-    }
+    val bookmarkLabel by viewModel.bookmarkLabel.collectAsStateWithLifecycle()
+    val continueLabel by viewModel.continueReadingLabel.collectAsStateWithLifecycle()
     val hasBookmark = bookmarkLabel != defaultBookmarkLabel
 
     // ── Root box fills entire screen ──────────────────────────────────────────
@@ -569,9 +571,8 @@ fun ResultDetailModernScreen(
                                                         } else {
                                                             chapterAdapter.submitList(list)
                                                         }
-                                                    } else {
-                                                        chapterAdapter.notifyDataSetChanged()
                                                     }
+                                                    chapterAdapter.updateSelectionStates(selMode ?: false, selChapters ?: emptySet())
                                                 }
                                             }
                                         )
@@ -590,25 +591,29 @@ fun ResultDetailModernScreen(
                 ) {
                     when {
                         isSelectionMode == true -> {
-                            ModernSelectionBar(
-                                selectedCount = selectedChapters.size,
-                                onClose      = { viewModel.setSelectionMode(false) },
-                                onSelectAll  = { viewModel.selectAll() },
-                                onBookmark   = { viewModel.executeBatchBookmark(true) },
-                                onUnbookmark = { viewModel.executeBatchBookmark(false) },
-                                onMarkRead   = { viewModel.executeBatchMarkRead(true) },
-                                onMarkUnread = { viewModel.executeBatchMarkRead(false) },
+                            ChapterSelectionBar(
+                                selectedCount       = selectedChapters.size,
+                                isBatchDownloading  = isBatchDownloading,
+                                topCornerRadius     = 24.dp,
+                                onClose             = { viewModel.setSelectionMode(false) },
+                                onSelectAll         = { viewModel.selectAll() },
+                                onBookmark          = { viewModel.executeBatchBookmark(true) },
+                                onUnbookmark        = { viewModel.executeBatchBookmark(false) },
+                                onMarkRead          = { viewModel.executeBatchMarkRead(true) },
+                                onMarkUnread        = { viewModel.executeBatchMarkRead(false) },
+                                onDownload          = { viewModel.executeBatchDownload() },
                             )
                         }
                         res.apiName != "OceanOfPDF" -> {
                             PremiumActionBar(
-                                continueLabel        = continueReadingLabel(res, chapters.orEmpty(), viewModel),
+                                continueLabel        = continueLabel,
                                 bookmarkLabel        = bookmarkLabel,
                                 hasBookmark          = hasBookmark,
                                 bookmarkMenuExpanded = bookmarkMenuExpanded,
                                 onBookmarkMenuChange = { bookmarkMenuExpanded = it },
                                 onContinue           = onContinueReading,
                                 onBookmarkSelect     = { id ->
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     viewModel.bookmark(id)
                                     bookmarkMenuExpanded = false
                                 },
@@ -793,7 +798,7 @@ private fun PremiumActionBar(
     viewModel: ResultViewModel,
 ) {
     val context = LocalContext.current
-    val categories    = remember { loadBookmarkCategories(context) }
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
     val currentId by viewModel.id.observeAsState(-1)
     val readState by viewModel.readState.observeAsState()
     val bookmarkState by viewModel.bookmarkState.observeAsState(-1)
@@ -901,182 +906,14 @@ private fun PremiumActionBar(
     }
 }
 
-// ─── Chapter selection mode bottom bar ───────────────────────────────────────
-@Composable
-private fun ModernSelectionBar(
-    selectedCount: Int,
-    onClose: () -> Unit,
-    onSelectAll: () -> Unit,
-    onBookmark: () -> Unit,
-    onUnbookmark: () -> Unit,
-    onMarkRead: () -> Unit,
-    onMarkUnread: () -> Unit,
-) {
-    Surface(
-        tonalElevation  = 8.dp,
-        shadowElevation = 12.dp,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        color = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onClose) { Text(stringResource(R.string.close)) }
-                Text(
-                    if (selectedCount == 0) stringResource(R.string.no_data)
-                    else "$selectedCount Selected",
-                    fontWeight = FontWeight.Bold
-                )
-                TextButton(onClick = onSelectAll) { Text("All") }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                TextButton(onClick = onBookmark)   { Text("Bookmark") }
-                TextButton(onClick = onUnbookmark) { Text("Unbookmark") }
-                TextButton(onClick = onMarkRead)   { Text("Read") }
-                TextButton(onClick = onMarkUnread) { Text("Unread") }
-            }
-        }
-    }
-}
 
 // ─── Pure helper functions (no UI, backend unchanged) ─────────────────────────
 
-private fun continueReadingLabel(
-    res: LoadResponse,
-    chapters: List<ChapterData>,
-    viewModel: ResultViewModel,
-): String {
-    val stream = res as? StreamResponse ?: return "Start Reading"
-    if (chapters.isEmpty()) return "Start Reading"
-    val name = stream.name
-    val lastReadIndex = chapters.indexOfLast { ch ->
-        val idx = viewModel.chapterIndex(ch) ?: -1
-        if (idx == -1) return@indexOfLast false
-        BaseApplication.getKey<Long>(EPUB_CURRENT_POSITION_READ_AT, "$name/$idx") != null
-    }
-    return if (lastReadIndex != -1) "Continue Ch. ${lastReadIndex + 1}" else "Start Reading"
-}
 
-private fun resolveBookmarkTitle(
-    context: Context,
-    viewModel: ResultViewModel,
-    currentId: Int,
-    readState: ReadType?,
-): String {
-    val currentStateId = BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
-    if (currentStateId != -1) {
-        DownloadViewModel.systemCategories
-            .find { it.id == currentStateId }?.stringRes
-            ?.let { return context.getString(it) }
-        val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-        val mapper = com.lagradost.quicknovel.DataStore.mapper
-        val customCats = try {
-            mapper.readValue(
-                json,
-                object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
-            )
-        } catch (_: Throwable) { emptyList() }
-        customCats.find { it.id == currentStateId }?.name?.let { return it }
-    }
-    viewModel.duplicateBookmarkState.value?.let { duplicateState ->
-        val systemCat = DownloadViewModel.systemCategories.find { it.id == duplicateState }
-        if (systemCat != null) {
-            return "In Library (${context.getString(systemCat.stringRes ?: R.string.bookmark)})"
-        } else {
-            val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-            val mapper = com.lagradost.quicknovel.DataStore.mapper
-            val customCats = try {
-                mapper.readValue(
-                    json,
-                    object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
-                )
-            } catch (_: Throwable) { emptyList() }
-            val customCat = customCats.find { it.id == duplicateState }
-            if (customCat != null) {
-                return "In Library (${customCat.name})"
-            }
-        }
-    }
-    return context.getString(R.string.bookmark)
-}
-
-private fun loadBookmarkCategories(context: Context): List<Pair<Int, String>> {
-    val json   = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
-    val mapper = com.lagradost.quicknovel.DataStore.mapper
-    val customCats = try {
-        mapper.readValue(
-            json,
-            object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
-        )
-    } catch (_: Throwable) { emptyList() }
-    val orderJson = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
-    val order = try {
-        mapper.readValue(
-            orderJson,
-            object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {}
-        )
-    } catch (_: Throwable) { emptyList() }
-    val allCats = DownloadViewModel.systemCategories + customCats
-    val sorted  = if (order.isNotEmpty()) {
-        allCats.sortedBy { order.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
-    } else allCats
-    return sorted.map { cat ->
-        cat.id to (cat.stringRes?.let { context.getString(it) } ?: cat.name)
-    }
-}
-
-// ─── Shimmer / Skeleton Loading Component ─────────────────────────────────────
-@Composable
-private fun shimmerBrush(
-    showShimmer: Boolean = true,
-    targetValue: Float = 1000f
-): Brush {
-    return if (showShimmer) {
-        val shimmerColors = listOf(
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        )
-
-        val transition = rememberInfiniteTransition(label = "shimmer")
-        val translateAnimation = transition.animateFloat(
-            initialValue = 0f,
-            targetValue = targetValue,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "shimmerTranslate"
-        )
-
-        Brush.linearGradient(
-            colors = shimmerColors,
-            start = Offset.Zero,
-            end = Offset(x = translateAnimation.value, y = translateAnimation.value)
-        )
-    } else {
-        Brush.linearGradient(
-            colors = listOf(Color.Transparent, Color.Transparent),
-            start = Offset.Zero,
-            end = Offset.Zero
-        )
-    }
-}
 
 @Composable
 private fun ShimmerSkeletonScreen() {
-    val brush = shimmerBrush()
+    val brush = rememberShimmerBrush()
     Column(modifier = Modifier.fillMaxSize()) {
         // Hero skeleton matching exactly the novel cover rounded corners
         Box(

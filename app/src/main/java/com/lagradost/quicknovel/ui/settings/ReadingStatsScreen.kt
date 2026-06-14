@@ -434,9 +434,21 @@ fun ReadingStatsScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.Bottom
                                 ) {
+                                    var animationPlayed by remember { mutableStateOf(false) }
+                                    LaunchedEffect(Unit) {
+                                        animationPlayed = true
+                                    }
                                     val maxTime = stats.weekHeights.maxOrNull()?.coerceAtLeast(1L) ?: 1L
                                     stats.weekHeights.zip(stats.weekLabels).forEachIndexed { idx, (heightVal, label) ->
                                         val barHeightPercent = (heightVal.toFloat() / maxTime.toFloat()).coerceAtLeast(0.05f)
+                                        val animatedHeightPercent by animateFloatAsState(
+                                            targetValue = if (animationPlayed) barHeightPercent else 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMediumLow
+                                            ),
+                                            label = "barHeight"
+                                        )
                                         val isToday = idx == stats.weekHeights.size - 1
                                         val isSelected = selectedBarIndex == idx
 
@@ -482,7 +494,7 @@ fun ReadingStatsScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .width(14.dp)
-                                                    .fillMaxHeight(barHeightPercent * 0.7f)
+                                                    .fillMaxHeight(animatedHeightPercent * 0.7f)
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
                                                         if (isSelected) MaterialTheme.colorScheme.primary

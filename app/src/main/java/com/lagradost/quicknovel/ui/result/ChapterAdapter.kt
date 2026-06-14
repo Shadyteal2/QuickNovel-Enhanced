@@ -122,4 +122,32 @@ class ChapterAdapter(val viewModel: ResultViewModel) :
             refresh(binding, item, viewModel)
         }
     }
+
+    private var lastSelectedChapters: Set<String> = emptySet()
+    private var lastSelectionMode: Boolean = false
+
+    fun updateSelectionStates(newSelectionMode: Boolean, newSelected: Set<String>) {
+        val modeChanged = newSelectionMode != lastSelectionMode
+        lastSelectionMode = newSelectionMode
+        if (modeChanged) {
+            notifyItemRangeChanged(0, itemCount)
+            lastSelectedChapters = newSelected
+            return
+        }
+        val added = newSelected - lastSelectedChapters
+        val removed = lastSelectedChapters - newSelected
+        lastSelectedChapters = newSelected
+
+        val changedCount = added.size + removed.size
+        if (changedCount > 50) {
+            notifyItemRangeChanged(0, itemCount)
+        } else {
+            val list = immutableCurrentList
+            list.forEachIndexed { index, chapter ->
+                if (added.contains(chapter.url) || removed.contains(chapter.url)) {
+                    notifyItemChanged(index)
+                }
+            }
+        }
+    }
 }

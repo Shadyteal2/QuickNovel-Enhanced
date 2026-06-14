@@ -852,13 +852,28 @@ class ReadActivityViewModel : ViewModel() {
         
         fun chapterIdxToSpanDisplayToggle(idx: Int): List<SpanDisplay> {
             synchronized(chapterData) {
-                return (chapterData[idx]?.letInner { data ->
-                    if (showOriginal) {
-                        data.originalSpans
-                    } else {
-                        data.spans
+                val res = chapterData[idx] ?: return emptyList()
+                return when (res) {
+                    is Resource.Success -> {
+                        if (showOriginal) {
+                            res.value.originalSpans
+                        } else {
+                            res.value.spans
+                        }
                     }
-                } ?: emptyList())
+                    is Resource.Loading -> {
+                        listOf(LoadingSpanned(res.url, idx))
+                    }
+                    is Resource.Failure -> {
+                        listOf(
+                            FailedSpanned(
+                                reason = res.errorString.toUiText(),
+                                index = idx,
+                                cause = res.cause
+                            )
+                        )
+                    }
+                }
             }
         }
 
@@ -1072,9 +1087,13 @@ class ReadActivityViewModel : ViewModel() {
             chapterMutex.withLock {
                 chapterData[index] = throwableToResource(t)
             }
+            if (t is CancellationException) throw t
         } finally {
             chapterMutex.withLock {
                 loading -= index
+                if (chapterData[index] is Resource.Loading) {
+                    chapterData[index] = Resource.Failure(null, "Chapter loading or translation failed")
+                }
                 if (notify) notifyChapterUpdate(index)
             }
         }
@@ -1346,12 +1365,22 @@ class ReadActivityViewModel : ViewModel() {
         for (model in arrayOf(settings.from, settings.to)) {
             if (model == "en") continue
 
-            if (!Tasks.await(
-                    modelManager.isModelDownloaded(
-                        TranslateRemoteModel.Builder(model).build()
-                    )
-                )
-            ) {
+            val modelObj = TranslateRemoteModel.Builder(model).build()
+            var isDownloaded = try {
+                Tasks.await(modelManager.isModelDownloaded(modelObj))
+            } catch (e: Exception) {
+                false
+            }
+            if (!isDownloaded) {
+                // Introduce a 2-second retry delay to handle ML Kit indexing delays
+                delay(2000)
+                isDownloaded = try {
+                    Tasks.await(modelManager.isModelDownloaded(modelObj))
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            if (!isDownloaded) {
                 return true
             }
         }
@@ -1477,7 +1506,8 @@ class ReadActivityViewModel : ViewModel() {
             // Revert to original if translation is disabled
             if (!isTranslationActive) {
                 chapterMutex.withLock {
-                    for (key in keysToTranslate) {
+                    val keys = chapterData.keys.toList()
+                    for (key in keys) {
                         val entry = chapterData[key]
                         if (entry is Resource.Success) {
                             chapterData[key] = Resource.Success(
@@ -1486,6 +1516,8 @@ class ReadActivityViewModel : ViewModel() {
                                     spans = entry.value.originalSpans
                                 )
                             )
+                        } else if (entry is Resource.Loading || entry is Resource.Failure) {
+                            chapterData.remove(key)
                         }
                     }
                 }
@@ -1685,7 +1717,7 @@ class ReadActivityViewModel : ViewModel() {
                 val title = intent.getStringExtra("novelTitle")!!
                 val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
                 val dao = db.novelDao()
-                val novel = dao.getAll().firstOrNull { it.name == title }
+                val novel = dao.getByName(title)
                 var path = novel?.filePath
 
                 if (path.isNullOrEmpty()) {
@@ -2648,15 +2680,7 @@ class ReadActivityViewModel : ViewModel() {
         LUMINESCENT_INTENSITY, 0.5f, Float::class, luminescentIntensityLive
     )
 
-    val auraIntensityLive: MutableLiveData<Float> = MutableLiveData(null)
-    var auraIntensity by PreferenceDelegateLiveView(
-        AURA_INTENSITY, 0.6f, Float::class, auraIntensityLive
-    )
 
-    val auraSpeedLive: MutableLiveData<Float> = MutableLiveData(null)
-    var auraSpeed by PreferenceDelegateLiveView(
-        AURA_SPEED, 1.0f, Float::class, auraSpeedLive
-    )
 
     val premiumAnimationsLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var premiumAnimations by PreferenceDelegateLiveView(

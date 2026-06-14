@@ -393,14 +393,7 @@ class SubSettingsFragment : Fragment() {
                 }
             }
 
-            "aura_palette" -> {
-                val names = listOf("Deep Nebula (Original)", "Zen Garden (Relaxing)", "Minimalist Earth", "Shady", "Browny")
-                val values = listOf("nebula", "garden", "minimal", "shady", "browny")
-                val current = sharedPrefs.getString("aura_palette_key", "nebula")
-                activity?.showBottomDialog(names, values.indexOf(current), "Aura Color Palette", false, {}) {
-                    sharedPrefs.edit().putString("aura_palette_key", values[it]).apply()
-                }
-            }
+
 
             "locale_key" -> {
                 val tempLangs = BaseSettingsFragment.appLanguages.toMutableList()

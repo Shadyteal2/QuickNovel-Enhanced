@@ -50,6 +50,9 @@ import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.download.CHAPTER_SORT
 import com.lagradost.quicknovel.ui.download.DownloadFragment
+import com.lagradost.quicknovel.ui.download.CategoryItem
+import com.lagradost.quicknovel.ui.download.DownloadViewModel
+import com.lagradost.quicknovel.DOWNLOAD_SETTINGS
 import com.lagradost.quicknovel.ui.download.LAST_ACCES_SORT
 import com.lagradost.quicknovel.ui.download.LAST_UPDATED_SORT
 import com.lagradost.quicknovel.ui.download.REVERSE_CHAPTER_SORT
@@ -66,6 +69,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import com.lagradost.quicknovel.util.BackupUtils
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
@@ -101,6 +107,13 @@ class ResultViewModel : ViewModel() {
         )
     }
 
+    val continueReadingLabel = MutableStateFlow<String>("Start Reading")
+    val bookmarkLabel = MutableStateFlow<String>("Bookmark")
+    private val _categories = MutableStateFlow<List<Pair<Int, String>>>(emptyList())
+    val categories: StateFlow<List<Pair<Int, String>>> = _categories.asStateFlow()
+
+
+
     val selectedChapters = MutableLiveData<Set<String>>(emptySet())
     val isInSelectionMode = MutableLiveData<Boolean>(false)
     val isBatchDownloading = MutableLiveData<Boolean>(false)
@@ -108,29 +121,29 @@ class ResultViewModel : ViewModel() {
     fun toggleSelection(url: String) {
         val current = selectedChapters.value ?: emptySet()
         if (current.contains(url)) {
-            selectedChapters.postValue(current - url)
+            selectedChapters.value = current - url
         } else {
-            selectedChapters.postValue(current + url)
+            selectedChapters.value = current + url
         }
     }
 
     fun selectRange(urls: List<String>) {
         val current = selectedChapters.value ?: emptySet()
-        selectedChapters.postValue(current + urls)
+        selectedChapters.value = current + urls
     }
 
     fun selectAll() {
         val streamRes = (loadResponse.value as? Resource.Success)?.value as? StreamResponse ?: return
-        selectedChapters.postValue(streamRes.data.map { it.url }.toSet())
+        selectedChapters.value = streamRes.data.map { it.url }.toSet()
     }
 
     fun clearSelection() {
-        selectedChapters.postValue(emptySet())
+        selectedChapters.value = emptySet()
     }
 
     fun setSelectionMode(enabled: Boolean) {
         if (!enabled) clearSelection()
-        isInSelectionMode.postValue(enabled)
+        isInSelectionMode.value = enabled
     }
 
     fun isChapterBookmarked(chapter: ChapterData): Boolean {
@@ -165,7 +178,9 @@ class ResultViewModel : ViewModel() {
             }
         }
         editor.apply()
-        chapters.postValue(orderChapters(streamRes.data))
+        viewModelScope.launch(Dispatchers.Default) {
+            _chapters.value = orderChapters(streamRes.data)
+        }
         setSelectionMode(false)
     }
 
@@ -183,7 +198,9 @@ class ResultViewModel : ViewModel() {
             }
         }
         editor.apply()
-        chapters.postValue(orderChapters(streamRes.data))
+        viewModelScope.launch(Dispatchers.Default) {
+            _chapters.value = orderChapters(streamRes.data)
+        }
         setSelectionMode(false)
     }
 
@@ -219,12 +236,14 @@ class ResultViewModel : ViewModel() {
     }
 
     fun reorderChapters(response: LoadResponse) {
-        when (response) {
-            is StreamResponse -> {
-                chapters.postValue(orderChapters(response.data))
-            }
+        viewModelScope.launch(Dispatchers.Default) {
+            when (response) {
+                is StreamResponse -> {
+                    _chapters.value = orderChapters(response.data)
+                }
 
-            else -> chapters.postValue(null)
+                else -> _chapters.value = null
+            }
         }
     }
 
@@ -266,7 +285,7 @@ class ResultViewModel : ViewModel() {
 
     fun clear() {
         loadResponse.postValue(null)
-        chapters.postValue(null)
+        _chapters.value = null
     }
 
     fun hasReadChapter(chapter: ChapterData): Boolean {
@@ -340,8 +359,18 @@ class ResultViewModel : ViewModel() {
     val loadResponse: MutableLiveData<Resource<LoadResponse>?> =
         MutableLiveData<Resource<LoadResponse>?>()
 
-    val chapters: MutableLiveData<List<ChapterData>?> =
-        MutableLiveData<List<ChapterData>?>()
+    private val _chapters: MutableStateFlow<List<ChapterData>?> = MutableStateFlow(null)
+    val chapters: StateFlow<List<ChapterData>?> = _chapters.asStateFlow()
+
+    init {
+        loadCategories()
+        updateBookmarkLabel()
+        viewModelScope.launch {
+            chapters.collect {
+                updateContinueReadingLabel()
+            }
+        }
+    }
 
     val reviews: MutableLiveData<Resource<ArrayList<UserReview>>> by lazy {
         MutableLiveData<Resource<ArrayList<UserReview>>>()
@@ -742,6 +771,128 @@ class ResultViewModel : ViewModel() {
     private fun checkDuplicates() {
         val novel = if (::load.isInitialized) load else ((loadResponse.value as? Resource.Success)?.value ?: return)
         duplicateBookmarkState.postValue(findDuplicateState(novel.name, novel.author))
+        updateBookmarkLabel()
+    }
+
+    fun updateContinueReadingLabel() {
+        val currentChapters = _chapters.value
+        val currentLoad = (loadResponse.value as? Resource.Success)?.value
+
+        if (currentLoad == null || currentChapters.isNullOrEmpty()) {
+            continueReadingLabel.value = "Start Reading"
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val stream = currentLoad as? StreamResponse
+            if (stream == null) {
+                continueReadingLabel.value = "Start Reading"
+                return@launch
+            }
+            val name = stream.name
+            
+            val ctx = context ?: com.lagradost.quicknovel.BaseApplication.context
+            val allReadKeys = if (ctx != null) {
+                val prefix = "$EPUB_CURRENT_POSITION_READ_AT/$name/"
+                try {
+                    val prefs = ctx.getSharedPreferences("rebuild_preference", android.content.Context.MODE_PRIVATE)
+                    prefs.all.keys
+                        .filter { it.startsWith(prefix) }
+                        .mapNotNull { key ->
+                            key.removePrefix(prefix).toIntOrNull()
+                        }
+                        .toSet()
+                } catch (e: Exception) {
+                    emptySet()
+                }
+            } else {
+                emptySet()
+            }
+
+            val lastReadIndex = currentChapters.indexOfLast { ch ->
+                val idx = chapterIndex(ch) ?: -1
+                idx != -1 && allReadKeys.contains(idx)
+            }
+            continueReadingLabel.value = if (lastReadIndex != -1) "Continue Ch. ${lastReadIndex + 1}" else "Start Reading"
+        }
+    }
+
+    fun loadCategories() {
+        val ctx = context ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val json   = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+            val mapper = com.lagradost.quicknovel.DataStore.mapper
+            val customCats = try {
+                mapper.readValue(
+                    json,
+                    object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
+                )
+            } catch (_: Throwable) { emptyList() }
+            val orderJson = getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
+            val order = try {
+                mapper.readValue(
+                    orderJson,
+                    object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {}
+                )
+            } catch (_: Throwable) { emptyList() }
+            val allCats = DownloadViewModel.systemCategories + customCats
+            val sorted  = if (order.isNotEmpty()) {
+                allCats.sortedBy { order.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
+            } else allCats
+            val mapped = sorted.map { cat ->
+                cat.id to (cat.stringRes?.let { ctx.getString(it) } ?: cat.name)
+            }
+            _categories.value = mapped
+        }
+    }
+
+    fun updateBookmarkLabel() {
+        val currentIdVal = id.value ?: -1
+        val duplicateBookmarkVal = duplicateBookmarkState.value
+        val ctx = context ?: return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentStateId = getKey<Int>(RESULT_BOOKMARK_STATE, currentIdVal.toString()) ?: -1
+            var label = ctx.getString(R.string.bookmark)
+            if (currentStateId != -1) {
+                val systemCat = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories.find { it.id == currentStateId }
+                if (systemCat != null) {
+                    label = ctx.getString(systemCat.stringRes ?: R.string.bookmark)
+                } else {
+                    val json = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+                    val mapper = com.lagradost.quicknovel.DataStore.mapper
+                    val customCats = try {
+                        mapper.readValue(
+                            json,
+                            object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
+                        )
+                    } catch (_: Throwable) { emptyList() }
+                    val customCat = customCats.find { it.id == currentStateId }
+                    if (customCat != null) {
+                        label = customCat.name
+                    }
+                }
+            } else if (duplicateBookmarkVal != null) {
+                val systemCat = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories.find { it.id == duplicateBookmarkVal }
+                if (systemCat != null) {
+                    label = "In Library (${ctx.getString(systemCat.stringRes ?: R.string.bookmark)})"
+                } else {
+                    val json = getKey<String>(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", "[]") ?: "[]"
+                    val mapper = com.lagradost.quicknovel.DataStore.mapper
+                    val customCats = try {
+                        mapper.readValue(
+                            json,
+                            object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {}
+                        )
+                    } catch (_: Throwable) { emptyList() }
+                    val customCat = customCats.find { it.id == duplicateBookmarkVal }
+                    if (customCat != null) {
+                        label = "In Library (${customCat.name})"
+                    }
+                }
+            }
+            bookmarkLabel.value = label
+        }
     }
 
     fun bookmark(state: Int) = viewModelScope.launch {
@@ -795,6 +946,7 @@ class ResultViewModel : ViewModel() {
             }
             bookmarkState.postValue(state)
             readState.postValue(ReadType.fromSpinner(state))
+            updateBookmarkLabel()
 
             // SSOT: Sync with Room Database
             val context = context ?: return@withLock
