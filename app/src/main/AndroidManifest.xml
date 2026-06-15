@@ -250,6 +250,12 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.pdfconverter.PdfToEpubActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/AppTheme"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.settings.WifiSyncActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/AppTheme"

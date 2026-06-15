@@ -99,7 +99,8 @@ fun DownloadScreen(
     onBookClickLoaded: (DownloadFragment.DownloadDataLoaded) -> Unit,
     onBookLongClick: (ResultCached) -> Unit,
     onBookLongClickLoaded: (DownloadFragment.DownloadDataLoaded) -> Unit,
-    onImportEpubClick: () -> Unit
+    onImportEpubClick: () -> Unit,
+    onPdfToEpubClick: () -> Unit
 ) {
     val context = LocalContext.current
     val activity = context as? android.app.Activity
@@ -666,6 +667,16 @@ fun DownloadScreen(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text("Import EPUB / PDF", fontWeight = FontWeight.Bold)
                                     }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = onPdfToEpubClick,
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                                    ) {
+                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("PDF to EPUB", fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
@@ -784,6 +795,13 @@ fun DownloadScreen(
                                     if (isDownloadsPage) {
                                         item(key = "import_item_column") {
                                             ImportCardItem(onClick = onImportEpubClick)
+                                        }
+                                        item(key = "pdf_to_epub_item_column") {
+                                            ImportCardItem(
+                                                title = "PDF to EPUB",
+                                                icon = Icons.Default.PictureAsPdf,
+                                                onClick = onPdfToEpubClick
+                                            )
                                         }
                                     }
                                 }
@@ -918,6 +936,13 @@ fun DownloadScreen(
                                     if (isDownloadsPage) {
                                         item(key = if (isBento3x3) "import_item_bento" else "import_item_normal", span = { GridItemSpan(3) }) {
                                             ImportCardItem(onClick = onImportEpubClick)
+                                        }
+                                        item(key = if (isBento3x3) "pdf_to_epub_item_bento" else "pdf_to_epub_item_normal", span = { GridItemSpan(3) }) {
+                                            ImportCardItem(
+                                                title = "PDF to EPUB",
+                                                icon = Icons.Default.PictureAsPdf,
+                                                onClick = onPdfToEpubClick
+                                            )
                                         }
                                     }
                                 }
@@ -2234,7 +2259,11 @@ fun CompactCardItem(
 }
 
 @Composable
-fun ImportCardItem(onClick: () -> Unit) {
+fun ImportCardItem(
+    title: String = "Import EPUB / PDF",
+    icon: ImageVector = Icons.Default.AddCircle,
+    onClick: () -> Unit
+) {
     val view = LocalView.current
 
     Box(
@@ -2258,13 +2287,13 @@ fun ImportCardItem(onClick: () -> Unit) {
             horizontalArrangement = Arrangement.Center
         ) {
             Icon(
-                imageVector = Icons.Default.AddCircle,
+                imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = "Import EPUB / PDF",
+                text = title,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.bodyLarge

@@ -71,6 +71,7 @@ import com.lagradost.quicknovel.mvvm.observeNullable
 import com.lagradost.quicknovel.mvvm.safe
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.download.DownloadFragment
+import com.lagradost.quicknovel.ui.pdfconverter.PdfToEpubActivity
 import com.lagradost.quicknovel.ui.result.ResultFragment
 import com.lagradost.quicknovel.ui.result.ResultViewModel
 import com.lagradost.quicknovel.ui.search.SearchFragment
@@ -370,6 +371,12 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         @JvmStatic
         fun importEpub() {
             mainActivity?.openEpubPicker()
+        }
+
+        @JvmStatic
+        fun openPdfToEpubConverter() {
+            val activity = mainActivity ?: return
+            activity.startActivity(Intent(activity, PdfToEpubActivity::class.java))
         }
 
         @JvmStatic

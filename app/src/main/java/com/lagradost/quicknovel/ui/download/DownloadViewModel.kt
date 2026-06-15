@@ -364,6 +364,10 @@ class DownloadViewModel : ViewModel() {
         MainActivity.importEpub()
     }
 
+    fun openPdfToEpubConverter() {
+        MainActivity.openPdfToEpubConverter()
+    }
+
     fun showMetadata(card: ResultCached) {
         MainActivity.loadPreviewPage(card)
     }

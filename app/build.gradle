@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         applicationId "com.shady.neoqn"
-        minSdkVersion 23
+        minSdkVersion 24
         targetSdkVersion 35
         versionCode 65
         versionName "2.1.5"
@@ -99,7 +99,8 @@ android {
         jvmTarget = "17"
         freeCompilerArgs += [
             "-P",
-            "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" + project.rootDir.absolutePath + "/compose_compiler_config.conf"
+            "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" + project.rootDir.absolutePath + "/compose_compiler_config.conf",
+            "-Xskip-metadata-version-check"
         ]
     }
     namespace 'com.lagradost.quicknovel'
@@ -161,6 +162,7 @@ dependencies {
     implementation 'com.google.android.flexbox:flexbox:3.0.0'
     implementation "androidx.dynamicanimation:dynamicanimation:1.0.0"
     implementation 'androidx.palette:palette-ktx:1.0.0'
+    implementation 'io.legere:pdfiumandroid:1.0.35'
 
     // Jetpack Compose
     def composeBom = platform('androidx.compose:compose-bom:2025.12.00')

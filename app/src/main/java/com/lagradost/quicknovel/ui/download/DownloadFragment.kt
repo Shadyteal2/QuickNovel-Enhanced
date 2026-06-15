@@ -137,6 +137,9 @@ class DownloadFragment : Fragment() {
                         },
                         onImportEpubClick = {
                             viewModel.importEpub()
+                        },
+                        onPdfToEpubClick = {
+                            viewModel.openPdfToEpubConverter()
                         }
                     )
                 }
