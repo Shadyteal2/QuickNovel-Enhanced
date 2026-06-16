@@ -29,6 +29,14 @@ class BaseApplication : Application(), SingletonImageLoader.Factory, Configurati
     override fun onCreate() {
         super.onCreate()
 
+        // Initialize custom crash handler as a global safety net
+        Thread.setDefaultUncaughtExceptionHandler(
+            com.lagradost.quicknovel.util.CrashHandler(
+                this,
+                Thread.getDefaultUncaughtExceptionHandler()
+            )
+        )
+
         // ── Attach OkHttp disk response cache (50 MB) ────────────────────────
         // This must happen in Application.onCreate() because we need cacheDir (Context).
         // The static `app` field was already created with a no-cache client; we swap it
@@ -41,12 +49,21 @@ class BaseApplication : Application(), SingletonImageLoader.Factory, Configurati
         )
         val dynamicProxySelector = com.lagradost.quicknovel.network.DynamicProxySelector(this)
         val proxyAuthenticator = com.lagradost.quicknovel.network.ProxyAuthenticator(dynamicProxySelector)
+        
+        // Initialize dynamic DNS helper
+        com.lagradost.quicknovel.network.DnsHelper.init(this)
+        
         MainActivity.app.baseClient = MainActivity.app.baseClient
             .newBuilder()
             .cache(okHttpDiskCache)
             .proxySelector(dynamicProxySelector)
             .proxyAuthenticator(proxyAuthenticator)
+            .dns(com.lagradost.quicknovel.network.DnsHelper.getDns())
             .build()
+
+        MainActivity.app.baseClient.connectionPool?.let { pool ->
+            com.lagradost.quicknovel.network.DnsHelper.registerConnectionPool(pool)
+        }
 
         com.lagradost.quicknovel.network.WebViewProxyHelper.syncProxy(this)
 

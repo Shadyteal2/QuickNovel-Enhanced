@@ -43,7 +43,31 @@ object ImageLoader {
 
     private const val TAG = "CoilImgLoader"
 
-    internal fun buildImageLoader(context: PlatformContext): ImageLoader = ImageLoader.Builder(context)
+    internal fun buildImageLoader(context: PlatformContext): ImageLoader {
+        val dynamicProxySelector = com.lagradost.quicknovel.network.DynamicProxySelector(context)
+        val proxyAuthenticator = com.lagradost.quicknovel.network.ProxyAuthenticator(dynamicProxySelector)
+        
+        val coilConnectionPool = okhttp3.ConnectionPool(16, 10, java.util.concurrent.TimeUnit.MINUTES)
+        com.lagradost.quicknovel.network.DnsHelper.registerConnectionPool(coilConnectionPool)
+        
+        val coilHttpClient = OkHttpClient()
+            .newBuilder()
+            .ignoreAllSSLErrors()
+            .proxySelector(dynamicProxySelector)
+            .proxyAuthenticator(proxyAuthenticator)
+            .dns(com.lagradost.quicknovel.network.DnsHelper.getDns())
+            .addInterceptor(com.lagradost.quicknovel.network.CloudflareKiller())
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("User-Agent", com.lagradost.quicknovel.USER_AGENT)
+                    .build()
+                chain.proceed(request)
+            }
+            .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
+            .connectionPool(coilConnectionPool)
+            .build()
+
+        return ImageLoader.Builder(context)
             .crossfade(200)
             .allowHardware(true) // Offload bitmap storage to GPU memory for faster scrolling
             .diskCachePolicy(CachePolicy.ENABLED)
@@ -60,31 +84,14 @@ object ImageLoader {
                     .build()
             }
             .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = {
-                    val dynamicProxySelector = com.lagradost.quicknovel.network.DynamicProxySelector(context)
-                    val proxyAuthenticator = com.lagradost.quicknovel.network.ProxyAuthenticator(dynamicProxySelector)
-                    OkHttpClient()
-                        .newBuilder()
-                        .ignoreAllSSLErrors()
-                        .proxySelector(dynamicProxySelector)
-                        .proxyAuthenticator(proxyAuthenticator)
-                        .addInterceptor(com.lagradost.quicknovel.network.CloudflareKiller())
-                        .addInterceptor { chain ->
-                            val request = chain.request().newBuilder()
-                                .header("User-Agent", com.lagradost.quicknovel.USER_AGENT)
-                                .build()
-                            chain.proceed(request)
-                        }
-                        .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
-                        .connectionPool(okhttp3.ConnectionPool(16, 10, java.util.concurrent.TimeUnit.MINUTES))
-                        .build()
-                }))
+                add(OkHttpNetworkFetcherFactory(callFactory = { coilHttpClient }))
             }
             .also { loaderBuilder ->
                 loaderBuilder.setupCoilLogger()
                 Log.d(TAG, "buildImageLoader: Setting COIL Image Loader.")
             }
             .build()
+    }
 
     /** Use DebugLogger on debug builds which won't slow down release builds & use EventListener for
     Errors on release builds. **/

@@ -48,6 +48,7 @@ import com.lagradost.quicknovel.util.BackupUtils
 import com.lagradost.quicknovel.GoogleSyncWorkHelper
 import com.lagradost.quicknovel.mvvm.safeApiCall
 import com.lagradost.quicknovel.mvvm.Resource
+import com.lagradost.quicknovel.mvvm.launchSafe
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +60,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lagradost.quicknovel.ui.theme.rememberShimmerBrush
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,6 +82,20 @@ fun SubSettingsScreen(
     val sharedPrefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     var changeTrigger by remember { mutableStateOf(0) }
     var showCustomRateLimitDialog by remember { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val settingsViewModel: SettingsViewModel = viewModel()
+    val imageCacheSize by settingsViewModel.imageCacheSize.collectAsStateWithLifecycle()
+    val networkCacheSize by settingsViewModel.networkCacheSize.collectAsStateWithLifecycle()
+    val codeCacheSize by settingsViewModel.codeCacheSize.collectAsStateWithLifecycle()
+    val crashLogSize by settingsViewModel.crashLogSize.collectAsStateWithLifecycle()
+    val chapterCacheSize by settingsViewModel.chapterCacheSize.collectAsStateWithLifecycle()
+    val webViewCacheSize by settingsViewModel.webViewCacheSize.collectAsStateWithLifecycle()
+    var cacheTrigger by remember { mutableStateOf(0) }
+
+    LaunchedEffect(cacheTrigger) {
+        settingsViewModel.loadSizes(context)
+    }
 
     // Cache all preferences in memory, refreshed ONLY when changeTrigger is incremented.
     // This prevents slow disk lookups/mutex locking on sharedPrefs inside scrolling compositions!
@@ -814,6 +832,114 @@ fun SubSettingsScreen(
                                 onClick = { onPreferenceClick("manage_data_key") }
                             )
                         }
+
+                        // ─── Cache Management ───
+                        item { PreferenceHeader("Cache Management") }
+
+                        item {
+                            CacheActionPreferenceCard(
+                                title = "Clear Poster Image Cache",
+                                size = imageCacheSize,
+                                summary = "Clears cached novel covers to free up space.",
+                                iconRes = R.drawable.ic_baseline_color_lens_24,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearImageCache(context)
+                                        cacheTrigger++
+                                        com.lagradost.quicknovel.CommonActivity.showToast("Image cache cleared!")
+                                    }
+                                }
+                            )
+                        }
+
+                        item {
+                            CacheActionPreferenceCard(
+                                title = "Clear Network Cache",
+                                size = networkCacheSize,
+                                summary = "Clears OkHttp network response cache.",
+                                iconRes = R.drawable.ic_baseline_autorenew_24,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearNetworkCache(context)
+                                        cacheTrigger++
+                                        com.lagradost.quicknovel.CommonActivity.showToast("Network cache cleared!")
+                                    }
+                                }
+                            )
+                        }
+
+                        item {
+                            CacheActionPreferenceCard(
+                                title = "Clear Provider Plugin Cache",
+                                size = codeCacheSize,
+                                summary = "Clears cached optimized DEX files for loaded extensions.",
+                                iconRes = R.drawable.ic_baseline_system_update_24,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearCodeCache(context)
+                                        cacheTrigger++
+                                        com.lagradost.quicknovel.CommonActivity.showToast("Provider plugin cache cleared!")
+                                    }
+                                }
+                            )
+                        }
+
+                        item {
+                            CacheActionPreferenceCard(
+                                title = "Clear Crash Logs",
+                                size = crashLogSize,
+                                summary = "Deletes the saved crash trace logs.",
+                                iconRes = R.drawable.baseline_description_24,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearCrashLog(context)
+                                        cacheTrigger++
+                                        com.lagradost.quicknovel.CommonActivity.showToast("Crash logs cleared!")
+                                    }
+                                }
+                            )
+                        }
+
+                        item {
+                            CacheActionPreferenceCard(
+                                title = "Clear Temporary Download Cache",
+                                size = chapterCacheSize,
+                                summary = "Deletes temporary chapter files left over from generating books.",
+                                iconRes = R.drawable.ic_baseline_delete_outline_24,
+                                onClick = {
+                                    com.google.android.material.dialog.MaterialAlertDialogBuilder(context, com.lagradost.quicknovel.R.style.AlertDialogCustom)
+                                        .setTitle("Delete Temporary Downloads?")
+                                        .setMessage("This will delete all locally cached chapter text files. Saved books in your library that haven't been compiled to EPUB will need to be downloaded again.")
+                                        .setCancelable(true)
+                                        .setPositiveButton("Delete") { dialog, _ ->
+                                            dialog.dismiss()
+                                            coroutineScope.launch {
+                                                com.lagradost.quicknovel.util.StorageCacheHelper.clearChapterCache(context)
+                                                cacheTrigger++
+                                                com.lagradost.quicknovel.CommonActivity.showToast("Temporary downloads cleared!")
+                                            }
+                                        }
+                                        .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+                                        .show()
+                                }
+                            )
+                        }
+
+                        item {
+                            CacheActionPreferenceCard(
+                                title = "Clear WebView Cache & Cookies",
+                                size = webViewCacheSize,
+                                summary = "Deletes WebView cached pages, session state, and all cookies.",
+                                iconRes = R.drawable.ic_baseline_warning_24,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearWebViewCache(context)
+                                        cacheTrigger++
+                                        com.lagradost.quicknovel.CommonActivity.showToast("WebView Cache & Cookies cleared!")
+                                    }
+                                }
+                            )
+                        }
                     }
 
                     R.xml.settings_dev -> {
@@ -822,10 +948,24 @@ fun SubSettingsScreen(
 
                         item {
                             ActionPreferenceCard(
-                                title = "Show Logcat 🐈",
-                                summary = "View and copy real-time debug output logs",
+                                title = "Share Crash Log 📋",
+                                summary = "Share the stack trace of the last fatal crash",
                                 iconRes = R.drawable.baseline_description_24,
                                 onClick = { onPreferenceClick("show_logcat_key") }
+                            )
+                        }
+
+                        item {
+                            ActionPreferenceCard(
+                                title = "Share App Logs 🐛",
+                                summary = "Export recent app activity to help developers diagnose lag or bugs",
+                                iconRes = R.drawable.baseline_description_24,
+                                onClick = {
+                                    android.widget.Toast.makeText(context, "Generating logs...", android.widget.Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launchSafe {
+                                        com.lagradost.quicknovel.util.LogcatExporter.exportAndShareLogs(context)
+                                    }
+                                }
                             )
                         }
 
@@ -876,6 +1016,23 @@ fun SubSettingsScreen(
                                 summary = "Removes all stored Cloudflare and site cookies",
                                 iconRes = R.drawable.ic_baseline_warning_24,
                                 onClick = { onPreferenceClick("clear_cookies_key") }
+                            )
+                        }
+
+                        item {
+                            ActionPreferenceCard(
+                                title = "DNS over HTTPS",
+                                summary = when (getString(com.lagradost.quicknovel.NetworkPrefs.DOH_PROVIDER, "none")) {
+                                    "cloudflare" -> "Cloudflare"
+                                    "google" -> "Google"
+                                    "adguard" -> "AdGuard (Ad-blocking)"
+                                    "quad9" -> "Quad9"
+                                    "dnspod" -> "DNSPod"
+                                    "mullvad" -> "Mullvad"
+                                    else -> "None (System default)"
+                                },
+                                iconRes = R.drawable.ic_baseline_public_24,
+                                onClick = { onPreferenceClick(com.lagradost.quicknovel.NetworkPrefs.DOH_PROVIDER) }
                             )
                         }
 
@@ -2958,6 +3115,83 @@ fun CustomRateLimitDialog(
         }
     )
 }
+
+@Composable
+fun CacheActionPreferenceCard(
+    title: String,
+    size: String,
+    summary: String,
+    iconRes: Int,
+    onClick: () -> Unit
+) {
+    val isLoading = size == "Calculating..."
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(RoundedCornerShape(20.dp))
+            .clickable(enabled = !isLoading, onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = title,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.size(24.dp)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.6f)
+                            .height(16.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(rememberShimmerBrush())
+                    )
+                } else {
+                    Text(
+                        text = "Size: $size\n$summary",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                        lineHeight = 14.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            if (!isLoading) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_baseline_arrow_forward_24),
+                    contentDescription = "Navigate icon",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    modifier = Modifier.size(16.dp)
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
+}
+
 
 
 

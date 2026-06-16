@@ -238,6 +238,22 @@ fun HistoryItemCard(
     val cardShape = if (isCompact) compactCardShape else looseCardShape
     val posterShape = if (isCompact) compactPosterShape else loosePosterShape
 
+    // Memoize Date Math & String Formats to prevent re-allocation during scrolls
+    val timeMs = item.cachedTime
+    val lastRead = item.lastChapterRead
+    val total = item.totalChapters
+
+    val formattedTime = remember(timeMs) { formatHistoryTimestamp(timeMs) }
+    val compactProgressText = remember(lastRead, total, formattedTime) {
+        "Ch. $lastRead/$total • $formattedTime"
+    }
+    val looseProgressText = remember(lastRead, total) {
+        "Chapter $lastRead of $total"
+    }
+    val looseTimeText = remember(formattedTime) {
+        "Read $formattedTime"
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -280,7 +296,7 @@ fun HistoryItemCard(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(vertical = if (isCompact) 6.dp else 12.dp),
+                .padding(vertical = if (isCompact) 4.dp else 10.dp),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
@@ -300,21 +316,34 @@ fun HistoryItemCard(
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(if (isCompact) 2.dp else 6.dp))
-            Text(
-                text = "${item.totalChapters} ${stringResource(R.string.read_action_chapters)}",
-                style = if (isCompact) {
-                    MaterialTheme.typography.bodySmall.copy(
+            Spacer(modifier = Modifier.height(if (isCompact) 2.dp else 4.dp))
+            if (isCompact) {
+                Text(
+                    text = compactProgressText,
+                    style = MaterialTheme.typography.bodySmall.copy(
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
-                    )
-                } else {
-                    MaterialTheme.typography.bodyMedium.copy(
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                )
+            } else {
+                Text(
+                    text = looseProgressText,
+                    style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Medium
-                    )
-                },
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
-            )
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = looseTimeText,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f)
+                )
+            }
         }
 
         // Controls Column
@@ -373,3 +402,31 @@ fun HistoryItemCard(
         }
     }
 }
+
+fun formatHistoryTimestamp(timeMs: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timeMs
+    return when {
+        diff < 60_000L -> "Just now"
+        diff < 3600_000L -> "${diff / 60_000L}m ago"
+        diff < 86400_000L -> "${diff / 3600_000L}h ago"
+        else -> {
+            val date = java.util.Date(timeMs)
+            val dayFormat = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
+            val today = dayFormat.format(java.util.Date(now))
+            val targetDay = dayFormat.format(date)
+            
+            if (today == targetDay) {
+                "Today at " + java.text.SimpleDateFormat("h:mm a", java.util.Locale.US).format(date)
+            } else {
+                val yesterday = dayFormat.format(java.util.Date(now - 86400_000L))
+                if (targetDay == yesterday) {
+                    "Yesterday at " + java.text.SimpleDateFormat("h:mm a", java.util.Locale.US).format(date)
+                } else {
+                    java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.US).format(date)
+                }
+            }
+        }
+    }
+}
+

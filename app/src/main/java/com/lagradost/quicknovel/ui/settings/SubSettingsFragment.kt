@@ -521,24 +521,7 @@ class SubSettingsFragment : Fragment() {
             }
 
             "show_logcat_key" -> {
-                val builder = androidx.appcompat.app.AlertDialog.Builder(context, R.style.AlertDialogCustom)
-                val binding = com.lagradost.quicknovel.databinding.LogcatBinding.inflate(layoutInflater, null, false)
-                builder.setView(binding.root)
-                val dialog = builder.create()
-                dialog.show()
-                
-                val logList = mutableListOf<String>()
-                try {
-                    val process = Runtime.getRuntime().exec("logcat -d")
-                    val reader = BufferedReader(InputStreamReader(process.inputStream))
-                    reader.lineSequence().forEach { logList.add(it) }
-                } catch (e: Exception) { com.lagradost.quicknovel.mvvm.logError(e) }
-                
-                binding.logcatRecyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(context)
-                binding.logcatRecyclerView.adapter = com.lagradost.quicknovel.ui.settings.LogcatAdapter().apply { submitList(logList) }
-                binding.copyBtt.setOnClickListener { clipboardHelper(txt("Logcat"), logList.joinToString("\n")); dialog.dismissSafe(activity) }
-                binding.clearBtt.setOnClickListener { Runtime.getRuntime().exec("logcat -c"); dialog.dismissSafe(activity) }
-                binding.closeBtt.setOnClickListener { dialog.dismissSafe(activity) }
+                com.lagradost.quicknovel.util.CrashHandler.shareLastCrashLog(context)
             }
 
             "plugin_sync_key" -> {
@@ -597,6 +580,21 @@ class SubSettingsFragment : Fragment() {
                         })
                         dialog.show(parentFragmentManager, "accent_gradient_color_picker")
                     }
+            }
+
+            "doh_provider" -> {
+                val names = listOf("None (System default)", "Cloudflare", "Google", "AdGuard (Ad-blocking)", "Quad9", "DNSPod", "Mullvad")
+                val values = listOf("none", "cloudflare", "google", "adguard", "quad9", "dnspod", "mullvad")
+                val current = sharedPrefs.getString(com.lagradost.quicknovel.NetworkPrefs.DOH_PROVIDER, "none")
+                activity?.showBottomDialog(names, values.indexOf(current).coerceAtLeast(0), "DNS over HTTPS", false, {}) { selectedIndex ->
+                    val selectedValue = values[selectedIndex]
+                    sharedPrefs.edit().putString(com.lagradost.quicknovel.NetworkPrefs.DOH_PROVIDER, selectedValue).apply()
+                    
+                    // Dynamically apply the new DoH settings and sever existing connections immediately
+                    com.lagradost.quicknovel.network.DnsHelper.updateDns(context)
+                    
+                    showToast("DNS settings updated dynamically")
+                }
             }
         }
     }

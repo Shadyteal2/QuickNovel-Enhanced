@@ -492,27 +492,9 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
-        // Logcat
+        // Logcat -> Share Crash Log
         getPref(R.string.show_logcat_key)?.setOnPreferenceClickListener { pref ->
-            // Re-using the logic from SettingsFragment (simplified here)
-            val builder = AlertDialog.Builder(pref.context, R.style.AlertDialogCustom)
-            val binding = LogcatBinding.inflate(layoutInflater, null, false)
-            builder.setView(binding.root)
-            val dialog = builder.create()
-            dialog.show()
-            
-            val logList = mutableListOf<String>()
-            try {
-                val process = Runtime.getRuntime().exec("logcat -d")
-                val reader = BufferedReader(InputStreamReader(process.inputStream))
-                reader.lineSequence().forEach { logList.add(it) }
-            } catch (e: Exception) { logError(e) }
-            
-            binding.logcatRecyclerView.layoutManager = LinearLayoutManager(pref.context)
-            binding.logcatRecyclerView.adapter = com.lagradost.quicknovel.ui.settings.LogcatAdapter().apply { submitList(logList) }
-            binding.copyBtt.setOnClickListener { clipboardHelper(txt("Logcat"), logList.joinToString("\n")); dialog.dismissSafe(activity) }
-            binding.clearBtt.setOnClickListener { Runtime.getRuntime().exec("logcat -c"); dialog.dismissSafe(activity) }
-            binding.closeBtt.setOnClickListener { dialog.dismissSafe(activity) }
+            com.lagradost.quicknovel.util.CrashHandler.shareLastCrashLog(pref.context)
             true
         }
 

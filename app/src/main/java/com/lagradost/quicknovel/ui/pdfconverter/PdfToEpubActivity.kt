@@ -3,6 +3,7 @@ package com.lagradost.quicknovel.ui.pdfconverter
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.lagradost.quicknovel.util.getBackgroundEffectState
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -83,13 +84,96 @@ import java.util.UUID
 class PdfToEpubActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(androidx.compose.ui.platform.ComposeView(this).apply {
+        
+        val context = this
+        val rootLayout = android.widget.FrameLayout(context).apply {
+            layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val imageView = android.widget.ImageView(context).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            visibility = android.view.View.GONE
+        }
+        rootLayout.addView(imageView)
+
+        val dimView = android.view.View(context).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(android.graphics.Color.BLACK)
+            alpha = 0f
+            visibility = android.view.View.GONE
+        }
+        rootLayout.addView(dimView)
+
+        val grainView = android.view.View(context).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            visibility = android.view.View.GONE
+        }
+        rootLayout.addView(grainView)
+
+        val vignetteView = android.view.View(context).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundResource(R.drawable.bg_vignette)
+            alpha = 0f
+            visibility = android.view.View.GONE
+        }
+        rootLayout.addView(vignetteView)
+
+        val lightScrimView = android.view.View(context).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(android.graphics.Color.WHITE)
+            alpha = 0f
+            visibility = android.view.View.GONE
+        }
+        rootLayout.addView(lightScrimView)
+
+        val composeView = androidx.compose.ui.platform.ComposeView(context).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
             setContent {
                 QuickNovelTheme {
                     PdfToEpubScreen(onNavigateBack = { finish() })
                 }
             }
-        })
+        }
+        rootLayout.addView(composeView)
+
+        setContentView(rootLayout)
+
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+        val imageUri = settingsManager.getString(context.getString(R.string.background_image_key), null)
+        
+        com.lagradost.quicknovel.util.bindBackgroundEffects(
+            context = context,
+            imageView = imageView,
+            dimView = dimView,
+            lightScrimView = lightScrimView,
+            grainView = grainView,
+            vignetteView = vignetteView,
+            imageUri = imageUri,
+            enabled = true,
+            state = settingsManager.getBackgroundEffectState(context),
+        )
     }
 }
 

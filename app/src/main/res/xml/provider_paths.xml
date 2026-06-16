@@ -9,6 +9,9 @@
     <cache-path
             name="cache"
             path="." />
+    <cache-path
+            name="crash_logs"
+            path="." />
     <external-cache-path
             name="external_cache"
             path="." />

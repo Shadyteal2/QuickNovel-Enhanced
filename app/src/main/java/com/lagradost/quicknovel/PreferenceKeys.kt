@@ -137,3 +137,11 @@ object BackupPrefs {
     const val AUTO_BACKUP_PATH_PREF = "auto_backup_path_pref"
 }
 
+// ─── Network ─────────────────────────────────────────────────────────────────
+
+/** All keys related to network and proxy configuration. */
+object NetworkPrefs {
+    const val DOH_PROVIDER          = "doh_provider"
+}
+
+
