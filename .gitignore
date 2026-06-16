@@ -55,3 +55,7 @@ desktop.ini
 
 # ─── Standalone TS / JS Plugin Testing ────────────────────────
 /test ts/
+
+# ─── Local Dev Files & Personal Notes ─────────────────────────
+conversations .txt
+verify_providers.py
