@@ -1,5 +1,7 @@
 package com.lagradost.quicknovel.ui.result
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -648,9 +650,8 @@ fun ResultDetailModernScreen(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.padding(24.dp)
                 ) {
-                    CircularProgressIndicator(
+                    LoadingIndicator(
                         color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 4.dp,
                         modifier = Modifier.size(44.dp)
                     )
                     Spacer(modifier = Modifier.height(20.dp))
@@ -1031,7 +1032,7 @@ fun MigrationBottomSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
+                            LoadingIndicator()
                             Spacer(Modifier.height(12.dp))
                             Text("Searching alternative sources...", fontSize = 14.sp)
                         }

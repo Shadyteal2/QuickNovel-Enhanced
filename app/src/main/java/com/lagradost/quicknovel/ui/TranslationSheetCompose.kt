@@ -1,5 +1,7 @@
 package com.lagradost.quicknovel.ui
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -123,7 +125,7 @@ fun TranslationSheetCompose(
             when (val res = translationResult) {
                 null -> {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                        LoadingIndicator(modifier = Modifier.size(32.dp))
                     }
                 }
                 is Resource.Success -> {

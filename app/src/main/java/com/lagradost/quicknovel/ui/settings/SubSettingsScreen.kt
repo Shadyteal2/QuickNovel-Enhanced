@@ -1,9 +1,13 @@
 package com.lagradost.quicknovel.ui.settings
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -11,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -26,6 +31,7 @@ import com.lagradost.quicknovel.ui.theme.QuickNovelTheme
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.VibePrefs
 import com.lagradost.quicknovel.ui.theme.rememberAccentGradientBrush
+import com.lagradost.quicknovel.ui.theme.staggeredEntrance
 import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -63,6 +69,15 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lagradost.quicknovel.ui.theme.rememberShimmerBrush
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,6 +107,7 @@ fun SubSettingsScreen(
     val chapterCacheSize by settingsViewModel.chapterCacheSize.collectAsStateWithLifecycle()
     val webViewCacheSize by settingsViewModel.webViewCacheSize.collectAsStateWithLifecycle()
     var cacheTrigger by remember { mutableStateOf(0) }
+    var isCacheExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(cacheTrigger) {
         settingsViewModel.loadSizes(context)
@@ -193,8 +209,10 @@ fun SubSettingsScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Render specific section items based on xmlRes
-                when (xmlRes) {
+                val staggeredScope = StaggeredLazyListScope(this)
+                with(staggeredScope) {
+                    // Render specific section items based on xmlRes
+                    when (xmlRes) {
                     R.xml.settings_appearance -> {
                         // ─── Background Customizations Category ───
                         item { PreferenceHeader("Background & treatment") }
@@ -445,67 +463,82 @@ fun SubSettingsScreen(
                             )
                         }
 
-                        // ─ Experimental Aesthetics master gate
-                        item { PreferenceHeader("Experimental Aesthetics") }
 
-                        item {
-                            SwitchPreferenceCard(
-                                title = "Experimental Visuals",
-                                summary = "Enable premium generative visuals (Higher Power Consumption)",
-                                checked = getBoolean("experimental_visuals", false),
-                                iconRes = R.drawable.ic_baseline_star_24,
-                                onCheckedChange = { checked ->
-                                    sharedPrefs.edit().putBoolean("experimental_visuals", checked).apply()
-                                    onPreferenceChange("experimental_visuals", checked)
-                                    changeTrigger++
-                                }
-                            )
-                        }
 
                         // ─ PREMIUM VISUALS GROUP ────────────────────────────
                         item { PreferenceHeader("Premium Visuals") }
 
                         item {
-                            SwitchPreferenceCard(
-                                title = "Premium Visuals",
-                                summary = "Unlock Cover Aura Glow & Reader Ink Flow — best on high-end devices",
-                                checked = getBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, false),
-                                iconRes = R.drawable.ic_baseline_star_24,
-                                onCheckedChange = { checked ->
-                                    sharedPrefs.edit().putBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, checked).apply()
-                                    onPreferenceChange(VibePrefs.PREMIUM_VISUALS_ENABLED, checked)
-                                    changeTrigger++
+                            val isPremiumVisualsEnabled = getBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, false)
+                            NestedSettingsGroupCard {
+                                MasterSwitchPreferenceRow(
+                                    title = "Premium Visuals",
+                                    summary = "Unlock Cover Aura Glow & Reader Ink Flow — best on high-end devices",
+                                    checked = isPremiumVisualsEnabled,
+                                    iconRes = R.drawable.ic_baseline_star_24,
+                                    onCheckedChange = { checked ->
+                                        sharedPrefs.edit().putBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, checked).apply()
+                                        onPreferenceChange(VibePrefs.PREMIUM_VISUALS_ENABLED, checked)
+                                        changeTrigger++
+                                    }
+                                )
+
+                                AnimatedVisibility(
+                                    visible = isPremiumVisualsEnabled,
+                                    enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                                    exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 1.dp)
+                                        NestedSwitchRow(
+                                            title = "Cover Aura Glow",
+                                            summary = "Each book cover radiates its own unique dominant color glow",
+                                            checked = getBoolean(VibePrefs.COVER_AURA_GLOW, false),
+                                            iconRes = R.drawable.ic_baseline_color_lens_24,
+                                            onCheckedChange = { checked ->
+                                                sharedPrefs.edit().putBoolean(VibePrefs.COVER_AURA_GLOW, checked).apply()
+                                                onPreferenceChange(VibePrefs.COVER_AURA_GLOW, checked)
+                                                changeTrigger++
+                                            }
+                                        )
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                        NestedSwitchRow(
+                                            title = "Reader Ink Flow",
+                                            summary = "Reading surface shifts between cool and warm tones as you scroll",
+                                            checked = getBoolean(VibePrefs.READER_INK_FLOW, false),
+                                            iconRes = R.drawable.ic_baseline_menu_book_24,
+                                            onCheckedChange = { checked ->
+                                                sharedPrefs.edit().putBoolean(VibePrefs.READER_INK_FLOW, checked).apply()
+                                                onPreferenceChange(VibePrefs.READER_INK_FLOW, checked)
+                                                changeTrigger++
+                                            }
+                                        )
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                        NestedSwitchRow(
+                                            title = "Asymmetric & Morphing Shapes",
+                                            summary = "Give cards and covers modern asymmetric shapes and dynamic tap-morphs",
+                                            checked = getBoolean(VibePrefs.ASYMMETRIC_SHAPES_ENABLED, false),
+                                            iconRes = R.drawable.ic_baseline_grid_view_24,
+                                            onCheckedChange = { checked ->
+                                                sharedPrefs.edit().putBoolean(VibePrefs.ASYMMETRIC_SHAPES_ENABLED, checked).apply()
+                                                onPreferenceChange(VibePrefs.ASYMMETRIC_SHAPES_ENABLED, checked)
+                                                changeTrigger++
+                                            }
+                                        )
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                        NestedSwitchRow(
+                                            title = "Staggered Content Entrances",
+                                            summary = "Fade and cascade list items into layout view sequentially",
+                                            checked = getBoolean(VibePrefs.STAGGERED_ENTRANCES_ENABLED, false),
+                                            iconRes = R.drawable.ic_baseline_autorenew_24,
+                                            onCheckedChange = { checked ->
+                                                sharedPrefs.edit().putBoolean(VibePrefs.STAGGERED_ENTRANCES_ENABLED, checked).apply()
+                                                onPreferenceChange(VibePrefs.STAGGERED_ENTRANCES_ENABLED, checked)
+                                                changeTrigger++
+                                            }
+                                        )
+                                    }
                                 }
-                            )
-                        }
-
-                        if (getBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, false)) {
-                            item {
-                                SwitchPreferenceCard(
-                                    title = "Cover Aura Glow",
-                                    summary = "Each book cover radiates its own unique dominant color glow",
-                                    checked = getBoolean(VibePrefs.COVER_AURA_GLOW, false),
-                                    iconRes = R.drawable.ic_baseline_color_lens_24,
-                                    onCheckedChange = { checked ->
-                                        sharedPrefs.edit().putBoolean(VibePrefs.COVER_AURA_GLOW, checked).apply()
-                                        onPreferenceChange(VibePrefs.COVER_AURA_GLOW, checked)
-                                        changeTrigger++
-                                    }
-                                )
-                            }
-
-                            item {
-                                SwitchPreferenceCard(
-                                    title = "Reader Ink Flow",
-                                    summary = "Reading surface shifts between cool and warm tones as you scroll",
-                                    checked = getBoolean(VibePrefs.READER_INK_FLOW, false),
-                                    iconRes = R.drawable.ic_baseline_menu_book_24,
-                                    onCheckedChange = { checked ->
-                                        sharedPrefs.edit().putBoolean(VibePrefs.READER_INK_FLOW, checked).apply()
-                                        onPreferenceChange(VibePrefs.READER_INK_FLOW, checked)
-                                        changeTrigger++
-                                    }
-                                )
                             }
                         }
 
@@ -513,114 +546,141 @@ fun SubSettingsScreen(
                         item { PreferenceHeader("Aesthetic Personalization") }
 
                         item {
-                            SwitchPreferenceCard(
-                                title = "Aesthetic Personalization",
-                                summary = "Glass Opacity, Card Border Style & Noise Texture surface controls",
-                                checked = getBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, false),
-                                iconRes = R.drawable.ic_baseline_tune_24,
-                                onCheckedChange = { checked ->
-                                    sharedPrefs.edit().putBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, checked).apply()
-                                    onPreferenceChange(VibePrefs.AESTHETIC_PERSONA_ENABLED, checked)
-                                    changeTrigger++
-                                }
-                            )
-                        }
-
-                        if (getBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, false)) {
-                            // Glass Opacity
-                            item {
-                                SwitchPreferenceCard(
-                                    title = "Glass Opacity Control",
-                                    summary = "Tune the transparency depth of all glass surfaces",
-                                    checked = getBoolean(VibePrefs.GLASS_OPACITY + "_enabled", false),
+                            val isAestheticPersonaEnabled = getBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, false)
+                            NestedSettingsGroupCard {
+                                MasterSwitchPreferenceRow(
+                                    title = "Aesthetic Personalization",
+                                    summary = "Glass Opacity, Card Border Style & Noise Texture surface controls",
+                                    checked = isAestheticPersonaEnabled,
                                     iconRes = R.drawable.ic_baseline_tune_24,
                                     onCheckedChange = { checked ->
-                                        sharedPrefs.edit().putBoolean(VibePrefs.GLASS_OPACITY + "_enabled", checked).apply()
-                                        onPreferenceChange(VibePrefs.GLASS_OPACITY + "_enabled", checked)
+                                        sharedPrefs.edit().putBoolean(VibePrefs.AESTHETIC_PERSONA_ENABLED, checked).apply()
+                                        onPreferenceChange(VibePrefs.AESTHETIC_PERSONA_ENABLED, checked)
                                         changeTrigger++
                                     }
                                 )
-                            }
 
-                            if (getBoolean(VibePrefs.GLASS_OPACITY + "_enabled", false)) {
-                                item {
-                                    ExpressiveSliderPreferenceCard(
-                                        title = "Glass Opacity",
-                                        value = getInt(VibePrefs.GLASS_OPACITY, 80),
-                                        min = 5,
-                                        max = 95,
-                                        valueSuffix = "%",
-                                        iconRes = R.drawable.ic_baseline_tune_24,
-                                        onValueChange = { value ->
-                                            sharedPrefs.edit().putInt(VibePrefs.GLASS_OPACITY, value).apply()
-                                            onPreferenceChange(VibePrefs.GLASS_OPACITY, value)
-                                            changeTrigger++
+                                AnimatedVisibility(
+                                    visible = isAestheticPersonaEnabled,
+                                    enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                                    exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 1.dp)
+
+                                        // Glass Opacity Control
+                                        val isGlassOpacityEnabled = getBoolean(VibePrefs.GLASS_OPACITY + "_enabled", false)
+                                        NestedSwitchRow(
+                                            title = "Glass Opacity Control",
+                                            summary = "Tune the transparency depth of all glass surfaces",
+                                            checked = isGlassOpacityEnabled,
+                                            iconRes = R.drawable.ic_baseline_tune_24,
+                                            onCheckedChange = { checked ->
+                                                sharedPrefs.edit().putBoolean(VibePrefs.GLASS_OPACITY + "_enabled", checked).apply()
+                                                onPreferenceChange(VibePrefs.GLASS_OPACITY + "_enabled", checked)
+                                                changeTrigger++
+                                            }
+                                        )
+
+                                        AnimatedVisibility(
+                                            visible = isGlassOpacityEnabled,
+                                            enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                                            exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                                        ) {
+                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                                NestedSliderRow(
+                                                    title = "Glass Opacity",
+                                                    value = getInt(VibePrefs.GLASS_OPACITY, 80),
+                                                    min = 5,
+                                                    max = 95,
+                                                    valueSuffix = "%",
+                                                    iconRes = R.drawable.ic_baseline_tune_24,
+                                                    onValueChange = { value ->
+                                                        sharedPrefs.edit().putInt(VibePrefs.GLASS_OPACITY, value).apply()
+                                                        onPreferenceChange(VibePrefs.GLASS_OPACITY, value)
+                                                        changeTrigger++
+                                                    }
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                            }
                                         }
-                                    )
-                                }
-                            }
 
-                            // Card Border Style
-                            item {
-                                SwitchPreferenceCard(
-                                    title = "Card Border Style",
-                                    summary = "Add animated border accents to all glass cards",
-                                    checked = getBoolean(VibePrefs.CARD_BORDER_STYLE + "_enabled", false),
-                                    iconRes = R.drawable.ic_baseline_tune_24,
-                                    onCheckedChange = { checked ->
-                                        sharedPrefs.edit().putBoolean(VibePrefs.CARD_BORDER_STYLE + "_enabled", checked).apply()
-                                        onPreferenceChange(VibePrefs.CARD_BORDER_STYLE + "_enabled", checked)
-                                        changeTrigger++
-                                    }
-                                )
-                            }
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
 
-                            if (getBoolean(VibePrefs.CARD_BORDER_STYLE + "_enabled", false)) {
-                                item {
-                                    ActionPreferenceCard(
-                                        title = "Border Style",
-                                        summary = when (getString(VibePrefs.CARD_BORDER_STYLE, "none")) {
-                                            "glow" -> "Glow — soft accent halo"
-                                            "gradient" -> "Gradient — rotating sweep"
-                                            "neon" -> "Neon — electric pulse"
-                                            else -> "None"
-                                        },
-                                        iconRes = R.drawable.ic_baseline_color_lens_24,
-                                        onClick = { onPreferenceClick("card_border_style_picker") }
-                                    )
-                                }
-                            }
+                                        // Card Border Style
+                                        val isCardBorderEnabled = getBoolean(VibePrefs.CARD_BORDER_STYLE + "_enabled", false)
+                                        NestedSwitchRow(
+                                            title = "Card Border Style",
+                                            summary = "Add animated border accents to all glass cards",
+                                            checked = isCardBorderEnabled,
+                                            iconRes = R.drawable.ic_baseline_tune_24,
+                                            onCheckedChange = { checked ->
+                                                sharedPrefs.edit().putBoolean(VibePrefs.CARD_BORDER_STYLE + "_enabled", checked).apply()
+                                                onPreferenceChange(VibePrefs.CARD_BORDER_STYLE + "_enabled", checked)
+                                                changeTrigger++
+                                            }
+                                        )
 
-                            // Noise Texture
-                            item {
-                                SwitchPreferenceCard(
-                                    title = "Noise Texture Overlay",
-                                    summary = "Subtle paper-like grain rendered once and cached — zero frame-rate impact",
-                                    checked = getBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, false),
-                                    iconRes = R.drawable.ic_baseline_tune_24,
-                                    onCheckedChange = { checked ->
-                                        sharedPrefs.edit().putBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, checked).apply()
-                                        onPreferenceChange(VibePrefs.NOISE_TEXTURE_ENABLED, checked)
-                                        changeTrigger++
-                                    }
-                                )
-                            }
-
-                            if (getBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, false)) {
-                                item {
-                                    ExpressiveSliderPreferenceCard(
-                                        title = "Grain Intensity",
-                                        value = getInt(VibePrefs.NOISE_TEXTURE_INTENSITY, 30),
-                                        min = 5,
-                                        max = 80,
-                                        valueSuffix = "%",
-                                        iconRes = R.drawable.ic_baseline_tune_24,
-                                        onValueChange = { value ->
-                                            sharedPrefs.edit().putInt(VibePrefs.NOISE_TEXTURE_INTENSITY, value).apply()
-                                            onPreferenceChange(VibePrefs.NOISE_TEXTURE_INTENSITY, value)
-                                            changeTrigger++
+                                        AnimatedVisibility(
+                                            visible = isCardBorderEnabled,
+                                            enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                                            exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                                        ) {
+                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                                NestedActionRow(
+                                                    title = "Border Style",
+                                                    summary = when (getString(VibePrefs.CARD_BORDER_STYLE, "none")) {
+                                                        "glow" -> "Glow — soft accent halo"
+                                                        "gradient" -> "Gradient — rotating sweep"
+                                                        "neon" -> "Neon — electric pulse"
+                                                        else -> "None"
+                                                    },
+                                                    iconRes = R.drawable.ic_baseline_color_lens_24,
+                                                    onClick = { onPreferenceClick("card_border_style_picker") }
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                            }
                                         }
-                                    )
+
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+
+                                        // Noise Texture
+                                        val isNoiseEnabled = getBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, false)
+                                        NestedSwitchRow(
+                                            title = "Noise Texture Overlay",
+                                            summary = "Subtle paper-like grain rendered once and cached — zero frame-rate impact",
+                                            checked = isNoiseEnabled,
+                                            iconRes = R.drawable.ic_baseline_tune_24,
+                                            onCheckedChange = { checked ->
+                                                sharedPrefs.edit().putBoolean(VibePrefs.NOISE_TEXTURE_ENABLED, checked).apply()
+                                                onPreferenceChange(VibePrefs.NOISE_TEXTURE_ENABLED, checked)
+                                                changeTrigger++
+                                            }
+                                        )
+
+                                        AnimatedVisibility(
+                                            visible = isNoiseEnabled,
+                                            enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                                            exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                                        ) {
+                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                                NestedSliderRow(
+                                                    title = "Grain Intensity",
+                                                    value = getInt(VibePrefs.NOISE_TEXTURE_INTENSITY, 30),
+                                                    min = 5,
+                                                    max = 80,
+                                                    valueSuffix = "%",
+                                                    iconRes = R.drawable.ic_baseline_tune_24,
+                                                    onValueChange = { value ->
+                                                        sharedPrefs.edit().putInt(VibePrefs.NOISE_TEXTURE_INTENSITY, value).apply()
+                                                        onPreferenceChange(VibePrefs.NOISE_TEXTURE_INTENSITY, value)
+                                                        changeTrigger++
+                                                    }
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -837,108 +897,173 @@ fun SubSettingsScreen(
                         item { PreferenceHeader("Cache Management") }
 
                         item {
-                            CacheActionPreferenceCard(
-                                title = "Clear Poster Image Cache",
-                                size = imageCacheSize,
-                                summary = "Clears cached novel covers to free up space.",
-                                iconRes = R.drawable.ic_baseline_color_lens_24,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearImageCache(context)
-                                        cacheTrigger++
-                                        com.lagradost.quicknovel.CommonActivity.showToast("Image cache cleared!")
-                                    }
-                                }
-                            )
-                        }
-
-                        item {
-                            CacheActionPreferenceCard(
-                                title = "Clear Network Cache",
-                                size = networkCacheSize,
-                                summary = "Clears OkHttp network response cache.",
-                                iconRes = R.drawable.ic_baseline_autorenew_24,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearNetworkCache(context)
-                                        cacheTrigger++
-                                        com.lagradost.quicknovel.CommonActivity.showToast("Network cache cleared!")
-                                    }
-                                }
-                            )
-                        }
-
-                        item {
-                            CacheActionPreferenceCard(
-                                title = "Clear Provider Plugin Cache",
-                                size = codeCacheSize,
-                                summary = "Clears cached optimized DEX files for loaded extensions.",
-                                iconRes = R.drawable.ic_baseline_system_update_24,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearCodeCache(context)
-                                        cacheTrigger++
-                                        com.lagradost.quicknovel.CommonActivity.showToast("Provider plugin cache cleared!")
-                                    }
-                                }
-                            )
-                        }
-
-                        item {
-                            CacheActionPreferenceCard(
-                                title = "Clear Crash Logs",
-                                size = crashLogSize,
-                                summary = "Deletes the saved crash trace logs.",
-                                iconRes = R.drawable.baseline_description_24,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearCrashLog(context)
-                                        cacheTrigger++
-                                        com.lagradost.quicknovel.CommonActivity.showToast("Crash logs cleared!")
-                                    }
-                                }
-                            )
-                        }
-
-                        item {
-                            CacheActionPreferenceCard(
-                                title = "Clear Temporary Download Cache",
-                                size = chapterCacheSize,
-                                summary = "Deletes temporary chapter files left over from generating books.",
-                                iconRes = R.drawable.ic_baseline_delete_outline_24,
-                                onClick = {
-                                    com.google.android.material.dialog.MaterialAlertDialogBuilder(context, com.lagradost.quicknovel.R.style.AlertDialogCustom)
-                                        .setTitle("Delete Temporary Downloads?")
-                                        .setMessage("This will delete all locally cached chapter text files. Saved books in your library that haven't been compiled to EPUB will need to be downloaded again.")
-                                        .setCancelable(true)
-                                        .setPositiveButton("Delete") { dialog, _ ->
-                                            dialog.dismiss()
-                                            coroutineScope.launch {
-                                                com.lagradost.quicknovel.util.StorageCacheHelper.clearChapterCache(context)
-                                                cacheTrigger++
-                                                com.lagradost.quicknovel.CommonActivity.showToast("Temporary downloads cleared!")
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .glassCard(shape = RoundedCornerShape(20.dp))
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .animateContentSize()
+                                ) {
+                                    val animatedRotation by animateFloatAsState(
+                                        targetValue = if (isCacheExpanded) 180f else 0f,
+                                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+                                        label = "chevron_rotate"
+                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { isCacheExpanded = !isCacheExpanded }
+                                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.ic_baseline_delete_outline_24),
+                                                contentDescription = "Cache Management",
+                                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Column {
+                                                Text(
+                                                    text = "Cache Management",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "Covers, network, plugins, logs, chapter & WebView cache",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                                                )
                                             }
                                         }
-                                        .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-                                        .show()
-                                }
-                            )
-                        }
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                                            contentDescription = if (isCacheExpanded) "Collapse" else "Expand",
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .rotate(animatedRotation)
+                                        )
+                                    }
 
-                        item {
-                            CacheActionPreferenceCard(
-                                title = "Clear WebView Cache & Cookies",
-                                size = webViewCacheSize,
-                                summary = "Deletes WebView cached pages, session state, and all cookies.",
-                                iconRes = R.drawable.ic_baseline_warning_24,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearWebViewCache(context)
-                                        cacheTrigger++
-                                        com.lagradost.quicknovel.CommonActivity.showToast("WebView Cache & Cookies cleared!")
+                                    AnimatedVisibility(
+                                        visible = isCacheExpanded,
+                                        enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                                        exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                                    ) {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 1.dp)
+                                            
+                                            NestedCacheActionRow(
+                                                title = "Clear Poster Image Cache",
+                                                size = imageCacheSize,
+                                                summary = "Clears cached novel covers to free up space.",
+                                                iconRes = R.drawable.ic_baseline_color_lens_24,
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearImageCache(context)
+                                                        cacheTrigger++
+                                                        com.lagradost.quicknovel.CommonActivity.showToast("Image cache cleared!")
+                                                    }
+                                                }
+                                            )
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                            
+                                            NestedCacheActionRow(
+                                                title = "Clear Network Cache",
+                                                size = networkCacheSize,
+                                                summary = "Clears OkHttp network response cache.",
+                                                iconRes = R.drawable.ic_baseline_autorenew_24,
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearNetworkCache(context)
+                                                        cacheTrigger++
+                                                        com.lagradost.quicknovel.CommonActivity.showToast("Network cache cleared!")
+                                                    }
+                                                }
+                                            )
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                            
+                                            NestedCacheActionRow(
+                                                title = "Clear Provider Plugin Cache",
+                                                size = codeCacheSize,
+                                                summary = "Clears cached optimized DEX files for loaded extensions.",
+                                                iconRes = R.drawable.ic_baseline_system_update_24,
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearCodeCache(context)
+                                                        cacheTrigger++
+                                                        com.lagradost.quicknovel.CommonActivity.showToast("Provider plugin cache cleared!")
+                                                    }
+                                                }
+                                            )
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                            
+                                            NestedCacheActionRow(
+                                                title = "Clear Crash Logs",
+                                                size = crashLogSize,
+                                                summary = "Deletes the saved crash trace logs.",
+                                                iconRes = R.drawable.baseline_description_24,
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearCrashLog(context)
+                                                        cacheTrigger++
+                                                        com.lagradost.quicknovel.CommonActivity.showToast("Crash logs cleared!")
+                                                    }
+                                                }
+                                            )
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                            
+                                            NestedCacheActionRow(
+                                                title = "Clear Temporary Download Cache",
+                                                size = chapterCacheSize,
+                                                summary = "Deletes temporary chapter files left over from generating books.",
+                                                iconRes = R.drawable.ic_baseline_delete_outline_24,
+                                                onClick = {
+                                                    com.google.android.material.dialog.MaterialAlertDialogBuilder(context, com.lagradost.quicknovel.R.style.AlertDialogCustom)
+                                                        .setTitle("Delete Temporary Downloads?")
+                                                        .setMessage("This will delete all locally cached chapter text files. Saved books in your library that haven't been compiled to EPUB will need to be downloaded again.")
+                                                        .setCancelable(true)
+                                                        .setPositiveButton("Delete") { dialog, _ ->
+                                                            dialog.dismiss()
+                                                            coroutineScope.launch {
+                                                                com.lagradost.quicknovel.util.StorageCacheHelper.clearChapterCache(context)
+                                                                cacheTrigger++
+                                                                com.lagradost.quicknovel.CommonActivity.showToast("Temporary downloads cleared!")
+                                                            }
+                                                        }
+                                                        .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+                                                        .show()
+                                                }
+                                            )
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                            
+                                            NestedCacheActionRow(
+                                                title = "Clear WebView Cache & Cookies",
+                                                size = webViewCacheSize,
+                                                summary = "Deletes WebView cached pages, session state, and all cookies.",
+                                                iconRes = R.drawable.ic_baseline_warning_24,
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        com.lagradost.quicknovel.util.StorageCacheHelper.clearWebViewCache(context)
+                                                        cacheTrigger++
+                                                        com.lagradost.quicknovel.CommonActivity.showToast("WebView Cache & Cookies cleared!")
+                                                    }
+                                                }
+                                            )
+                                        }
                                     }
                                 }
-                            )
+                            }
                         }
                     }
 
@@ -1102,6 +1227,7 @@ fun SubSettingsScreen(
                         }
                     }
                 }
+            }
 
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
@@ -2250,253 +2376,363 @@ fun TranslationSettingsCard(
         mutableStateOf(sharedPrefs.getInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE, com.lagradost.quicknovel.util.CloudAITranslator.DEFAULT_BATCH_SIZE))
     }
 
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val animatedRotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+        label = "chevron_rotate"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .glassCard(shape = RoundedCornerShape(24.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        Text(
-            text = "Cloud AI Translation (BYOK)",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        // ─── AI Provider Presets segmented selector ───────────────────────
-        Text(
-            text = "AI Provider Preset",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
-
-        var dropdownExpanded by remember { mutableStateOf(false) }
-
-        Box(
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { isExpanded = !isExpanded }
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                    .clickable { dropdownExpanded = true }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
             ) {
-                val currentLabel = when (provider) {
-                    "gemini" -> "Gemini"
-                    "openrouter" -> "OpenRouter"
-                    "nvidia" -> "NVIDIA"
-                    else -> "Custom"
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .glassCard(
+                            shape = RoundedCornerShape(12.dp),
+                            backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_baseline_language_24),
+                        contentDescription = "Cloud AI Translation (BYOK)",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
-                Text(
-                    text = currentLabel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium
-                )
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
-                    contentDescription = "Select Provider",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.rotate(if (dropdownExpanded) 180f else 0f)
-                )
-            }
-            DropdownMenu(
-                expanded = dropdownExpanded,
-                onDismissRequest = { dropdownExpanded = false },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-            ) {
-                val options = listOf(
-                    "gemini" to "Gemini",
-                    "openrouter" to "OpenRouter",
-                    "nvidia" to "NVIDIA",
-                    "custom" to "Custom"
-                )
-                options.forEach { (key, label) ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (provider == key) FontWeight.Bold else FontWeight.Normal,
-                                color = if (provider == key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        },
-                        onClick = {
-                            provider = key
-                            sharedPrefs.edit().putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, key).apply()
-                            
-                            // Auto-populate defaults
-                            when (key) {
-                                "gemini" -> {
-                                    apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-                                    apiModel = "gemini-2.0-flash"
-                                    maxParallel = 1
-                                    delayMs = 5000
-                                    batchSize = 0 // Auto
-                                }
-                                "openrouter" -> {
-                                    apiUrl = "https://openrouter.ai/api/v1/chat/completions"
-                                    apiModel = "openrouter/auto"
-                                    maxParallel = 2
-                                    delayMs = 2000
-                                    batchSize = 0 // Auto
-                                }
-                                "nvidia" -> {
-                                    apiUrl = "https://integrate.api.nvidia.com/v1/chat/completions"
-                                    apiModel = "meta/llama-3.1-8b-instruct"
-                                    maxParallel = 2
-                                    delayMs = 2000
-                                    batchSize = 0 // Auto
-                                }
+                Column {
+                    Text(
+                        text = "Cloud AI Translation (BYOK)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    val summaryText = remember(provider, apiModel, apiKey) {
+                        if (apiKey.isBlank()) {
+                            "API Setup required — configure custom translation endpoints"
+                        } else {
+                            val keyLabel = when (provider) {
+                                "gemini" -> "Gemini"
+                                "openrouter" -> "OpenRouter"
+                                "nvidia" -> "NVIDIA"
+                                else -> "Custom"
                             }
-                            sharedPrefs.edit().apply {
-                                putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_URL, apiUrl)
-                                putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_MODEL, apiModel)
-                                putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_MAX_PARALLEL, maxParallel)
-                                putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_DELAY_MS, delayMs)
-                                putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE, batchSize)
-                            }.apply()
-                            onChanged()
-                            dropdownExpanded = false
+                            "$keyLabel — $apiModel"
                         }
+                    }
+                    Text(
+                        text = summaryText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
+            Icon(
+                painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(24.dp)
+                    .rotate(animatedRotation)
+            )
         }
 
-        OutlinedTextField(
-            value = apiUrl,
-            onValueChange = {
-                apiUrl = it
-                provider = "custom"
-                sharedPrefs.edit()
-                    .putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_URL, it)
-                    .putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, "custom")
-                    .apply()
-                onChanged()
-            },
-            label = { Text("API URL") },
-            placeholder = { Text("e.g. Gemini or OpenRouter endpoint") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-            )
-        )
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+            exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), modifier = Modifier.padding(bottom = 4.dp))
 
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = {
-                apiKey = it
-                sharedPrefs.edit().putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_KEY, it).apply()
-                onChanged()
-            },
-            label = { Text("API Key") },
-            placeholder = { Text("Enter your API Key") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-            )
-        )
+                // ─── AI Provider Presets segmented selector ───────────────────────
+                Text(
+                    text = "AI Provider Preset",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
 
-        OutlinedTextField(
-            value = apiModel,
-            onValueChange = {
-                apiModel = it
-                provider = "custom"
-                sharedPrefs.edit()
-                    .putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_MODEL, it)
-                    .putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, "custom")
-                    .apply()
-                onChanged()
-            },
-            label = { Text("Model Name (Optional)") },
-            placeholder = { Text("e.g. gemini-2.0-flash or google/gemini-2.5-flash") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-            )
-        )
+                var dropdownExpanded by remember { mutableStateOf(false) }
 
-        // ─── Rate-limit & throughput tuning ───────────────────────────────────
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                            .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable { dropdownExpanded = true }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val currentLabel = when (provider) {
+                            "gemini" -> "Gemini"
+                            "openrouter" -> "OpenRouter"
+                            "nvidia" -> "NVIDIA"
+                            else -> "Custom"
+                        }
+                        Text(
+                            text = currentLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                            contentDescription = "Select Provider",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.rotate(if (dropdownExpanded) 180f else 0f)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                RoundedCornerShape(8.dp)
+                            )
+                    ) {
+                        val options = listOf(
+                            "gemini" to "Gemini",
+                            "openrouter" to "OpenRouter",
+                            "nvidia" to "NVIDIA",
+                            "custom" to "Custom"
+                        )
+                        options.forEach { (key, label) ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (provider == key) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (provider == key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                onClick = {
+                                    provider = key
+                                    sharedPrefs.edit()
+                                        .putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, key).apply()
 
-        Text(
-            text = "Rate Limit Tuning",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-        )
-        Text(
-            text = "Adjust these to match your API plan. Free-tier Gemini: keep Parallel=1, Delay≥2000ms.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-        )
+                                    // Auto-populate defaults
+                                    when (key) {
+                                        "gemini" -> {
+                                            apiUrl =
+                                                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+                                            apiModel = "gemini-2.0-flash"
+                                            maxParallel = 1
+                                            delayMs = 5000
+                                            batchSize = 0 // Auto
+                                        }
 
-        StepSelectorPreferenceCard(
-            title = "Parallel Requests",
-            value = maxParallel,
-            min = 1,
-            max = 5,
-            step = 1,
-            valueSuffix = "",
-            iconRes = R.drawable.ic_baseline_tune_24,
-            presets = listOf(1, 2, 3, 5),
-            onValueChange = { v ->
-                maxParallel = v
-                sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_MAX_PARALLEL, v).apply()
-                onChanged()
+                                        "openrouter" -> {
+                                            apiUrl = "https://openrouter.ai/api/v1/chat/completions"
+                                            apiModel = "openrouter/auto"
+                                            maxParallel = 2
+                                            delayMs = 2000
+                                            batchSize = 0 // Auto
+                                        }
+
+                                        "nvidia" -> {
+                                            apiUrl = "https://integrate.api.nvidia.com/v1/chat/completions"
+                                            apiModel = "meta/llama-3.1-8b-instruct"
+                                            maxParallel = 2
+                                            delayMs = 2000
+                                            batchSize = 0 // Auto
+                                        }
+                                    }
+                                    sharedPrefs.edit().apply {
+                                        putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_URL, apiUrl)
+                                        putString(
+                                            com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_MODEL,
+                                            apiModel
+                                        )
+                                        putInt(
+                                            com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_MAX_PARALLEL,
+                                            maxParallel
+                                        )
+                                        putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_DELAY_MS, delayMs)
+                                        putInt(
+                                            com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE,
+                                            batchSize
+                                        )
+                                    }.apply()
+                                    onChanged()
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = apiUrl,
+                    onValueChange = {
+                        apiUrl = it
+                        provider = "custom"
+                        sharedPrefs.edit()
+                            .putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_URL, it)
+                            .putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, "custom")
+                            .apply()
+                        onChanged()
+                    },
+                    label = { Text("API URL") },
+                    placeholder = { Text("e.g. Gemini or OpenRouter endpoint") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = {
+                        apiKey = it
+                        sharedPrefs.edit().putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_KEY, it)
+                            .apply()
+                        onChanged()
+                    },
+                    label = { Text("API Key") },
+                    placeholder = { Text("Enter your API Key") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+
+                OutlinedTextField(
+                    value = apiModel,
+                    onValueChange = {
+                        apiModel = it
+                        provider = "custom"
+                        sharedPrefs.edit()
+                            .putString(com.lagradost.quicknovel.util.PrefKeys.TRANSLATION_API_MODEL, it)
+                            .putString(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_PROVIDER, "custom")
+                            .apply()
+                        onChanged()
+                    },
+                    label = { Text("Model Name (Optional)") },
+                    placeholder = { Text("e.g. gemini-2.0-flash or google/gemini-2.5-flash") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+
+                // ─── Rate-limit & throughput tuning ───────────────────────────────────
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                )
+
+                Text(
+                    text = "Rate Limit Tuning",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = "Adjust these to match your API plan. Free-tier Gemini: keep Parallel=1, Delay≥2000ms.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+
+                StepSelectorPreferenceCard(
+                    title = "Parallel Requests",
+                    value = maxParallel,
+                    min = 1,
+                    max = 5,
+                    step = 1,
+                    valueSuffix = "",
+                    iconRes = R.drawable.ic_baseline_tune_24,
+                    presets = listOf(1, 2, 3, 5),
+                    onValueChange = { v ->
+                        maxParallel = v
+                        sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_MAX_PARALLEL, v)
+                            .apply()
+                        onChanged()
+                    }
+                )
+
+                StepSelectorPreferenceCard(
+                    title = "Request Delay (ms)",
+                    value = delayMs,
+                    min = 0,
+                    max = 10000,
+                    step = 500,
+                    valueSuffix = "ms",
+                    iconRes = R.drawable.ic_baseline_tune_24,
+                    presets = listOf(0, 1000, 2000, 3000, 5000),
+                    onValueChange = { v ->
+                        delayMs = v
+                        sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_DELAY_MS, v).apply()
+                        onChanged()
+                    }
+                )
+
+                StepSelectorPreferenceCard(
+                    title = "Paragraphs per Batch",
+                    value = batchSize,
+                    min = 0,
+                    max = 20,
+                    step = 1,
+                    valueSuffix = "",
+                    iconRes = R.drawable.ic_baseline_tune_24,
+                    presets = listOf(0, 1, 5, 10, 15),
+                    customValueLabel = if (batchSize == 0) "Auto (Dynamic)" else null,
+                    onValueChange = { v ->
+                        batchSize = v
+                        sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE, v).apply()
+                        onChanged()
+                    }
+                )
             }
-        )
-
-        StepSelectorPreferenceCard(
-            title = "Request Delay (ms)",
-            value = delayMs,
-            min = 0,
-            max = 10000,
-            step = 500,
-            valueSuffix = "ms",
-            iconRes = R.drawable.ic_baseline_tune_24,
-            presets = listOf(0, 1000, 2000, 3000, 5000),
-            onValueChange = { v ->
-                delayMs = v
-                sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_DELAY_MS, v).apply()
-                onChanged()
-            }
-        )
-
-        StepSelectorPreferenceCard(
-            title = "Paragraphs per Batch",
-            value = batchSize,
-            min = 0,
-            max = 20,
-            step = 1,
-            valueSuffix = "",
-            iconRes = R.drawable.ic_baseline_tune_24,
-            presets = listOf(0, 1, 5, 10, 15),
-            customValueLabel = if (batchSize == 0) "Auto (Dynamic)" else null,
-            onValueChange = { v ->
-                batchSize = v
-                sharedPrefs.edit().putInt(com.lagradost.quicknovel.util.PrefKeys.CLOUD_AI_BATCH_SIZE, v).apply()
-                onChanged()
-            }
-        )
+        }
     }
 }
 
@@ -3024,10 +3260,9 @@ fun ProxySettingsCard(
                 enabled = !isTesting
             ) {
                 if (isTesting) {
-                    CircularProgressIndicator(
+                    LoadingIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onSecondary,
-                        strokeWidth = 2.dp
+                        color = MaterialTheme.colorScheme.onSecondary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Testing Connection...")
@@ -3182,12 +3417,374 @@ fun CacheActionPreferenceCard(
                     modifier = Modifier.size(16.dp)
                 )
             } else {
-                CircularProgressIndicator(
+                LoadingIndicator(
                     modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                 )
             }
+        }
+    }
+}
+
+private class StaggeredLazyListScope(
+    private val delegate: LazyListScope,
+    private val startIndex: Int = 0
+) : LazyListScope {
+    private var staggerIndex = startIndex
+
+    override fun item(key: Any?, contentType: Any?, content: @Composable LazyItemScope.() -> Unit) {
+        val currentIndex = staggerIndex++
+        delegate.item(key, contentType) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .staggeredEntrance(currentIndex)
+            ) {
+                content()
+            }
+        }
+    }
+
+    override fun items(
+        count: Int,
+        key: ((index: Int) -> Any)?,
+        contentType: (index: Int) -> Any?,
+        itemContent: @Composable LazyItemScope.(index: Int) -> Unit
+    ) {
+        delegate.items(
+            count = count,
+            key = key,
+            contentType = contentType
+        ) { idx ->
+            val currentIndex = this@StaggeredLazyListScope.staggerIndex++
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .staggeredEntrance(currentIndex)
+            ) {
+                itemContent(idx)
+            }
+        }
+    }
+}
+
+@Composable
+fun NestedSettingsGroupCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .glassCard(RoundedCornerShape(20.dp))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ),
+            content = content
+        )
+    }
+}
+
+@Composable
+fun MasterSwitchPreferenceRow(
+    title: String,
+    summary: String,
+    checked: Boolean,
+    iconRes: Int,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.size(24.dp)
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (summary.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    lineHeight = 14.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@Composable
+fun NestedSwitchRow(
+    title: String,
+    summary: String,
+    checked: Boolean,
+    iconRes: Int,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.size(22.dp)
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (summary.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    lineHeight = 14.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.scale(0.85f)
+        )
+    }
+}
+
+@Composable
+fun NestedSliderRow(
+    title: String,
+    value: Int,
+    min: Int,
+    max: Int,
+    valueSuffix: String,
+    step: Int = 1,
+    iconRes: Int,
+    onValueChange: (Int) -> Unit
+) {
+    var liveValue by remember(value) { mutableStateOf(value) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = title,
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            
+            Box(
+                modifier = Modifier
+                    .glassCard(
+                        shape = RoundedCornerShape(8.dp),
+                        backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        strokeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        strokeWidth = 0.5.dp
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "$liveValue$valueSuffix",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        PremiumExpressiveSlider(
+            value = value.toFloat(),
+            onValueChangeLive = { liveValue = it.roundToInt() },
+            onValueChangeFinished = { onValueChange(it.roundToInt()) },
+            valueRange = min.toFloat()..max.toFloat(),
+            step = step,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+        )
+    }
+}
+
+@Composable
+fun NestedActionRow(
+    title: String,
+    summary: String,
+    iconRes: Int,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.size(22.dp)
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (summary.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    lineHeight = 14.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Icon(
+            painter = painterResource(id = R.drawable.ic_baseline_arrow_forward_24),
+            contentDescription = "Navigate icon",
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+            modifier = Modifier.size(14.dp)
+        )
+    }
+}
+
+@Composable
+fun NestedCacheActionRow(
+    title: String,
+    size: String,
+    summary: String,
+    iconRes: Int,
+    onClick: () -> Unit
+) {
+    val isLoading = size == "Calculating..."
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !isLoading, onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.size(22.dp)
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(rememberShimmerBrush())
+                )
+            } else {
+                Text(
+                    text = "Size: $size\n$summary",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    lineHeight = 14.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        if (!isLoading) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_baseline_arrow_forward_24),
+                contentDescription = "Clear",
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                modifier = Modifier.size(14.dp)
+            )
+        } else {
+            LoadingIndicator(
+                modifier = Modifier.size(14.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            )
         }
     }
 }

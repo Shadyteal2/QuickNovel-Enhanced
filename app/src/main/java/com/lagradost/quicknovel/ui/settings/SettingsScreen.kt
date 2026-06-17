@@ -29,6 +29,7 @@ import androidx.compose.animation.*
 import androidx.activity.compose.BackHandler
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.theme.glassCard
+import com.lagradost.quicknovel.ui.theme.staggeredEntrance
 
 /**
  * Custom spring press interaction effect for modern premium micro-interactions.
@@ -88,12 +89,14 @@ fun SettingsScreen(
                 .verticalScroll(scrollState)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+            var itemIndex = 0
             
             // ─── Top Toolbar ──────────────────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(56.dp)
+                    .staggeredEntrance(itemIndex++),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -131,7 +134,8 @@ fun SettingsScreen(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.02.sp
                 ),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.staggeredEntrance(itemIndex++)
             )
             
             // ─── Hero About Card ──────────────────────────────────────────────────────
@@ -139,6 +143,7 @@ fun SettingsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .staggeredEntrance(itemIndex++)
                     .springPressEffect()
                     .glassCard(shape = RoundedCornerShape(24.dp))
                     .clickable(
@@ -199,6 +204,7 @@ fun SettingsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .staggeredEntrance(itemIndex++)
                     .springPressEffect()
                     .glassCard(shape = RoundedCornerShape(20.dp))
                     .clickable(
@@ -255,7 +261,8 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp),
+                        .height(140.dp)
+                        .staggeredEntrance(itemIndex++),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     BentoItem(
@@ -289,7 +296,8 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp),
+                        .height(140.dp)
+                        .staggeredEntrance(itemIndex++),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     BentoItem(
@@ -324,6 +332,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp)
+                        .staggeredEntrance(itemIndex++)
                 ) {
                     BentoItem(
                         modifier = Modifier.fillMaxWidth(),
@@ -346,6 +355,7 @@ fun SettingsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .staggeredEntrance(itemIndex++)
                     .glassCard(shape = RoundedCornerShape(20.dp))
             ) {
                 Row(

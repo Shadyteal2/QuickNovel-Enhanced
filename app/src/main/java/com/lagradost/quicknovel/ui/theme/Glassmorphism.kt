@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
+import androidx.compose.animation.core.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
@@ -60,6 +62,15 @@ fun Modifier.glassCard(
     val context = LocalContext.current
     val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
+    // ─── Shape Resolution ─────────────────────────────────────────────────────
+    val asymmetricEnabled = rememberAsymmetricShapesEnabled()
+
+    val resolvedShape = if (asymmetricEnabled && shape is RoundedCornerShape) {
+        ExpressiveShapes.asymmetricShape(16.dp)
+    } else {
+        shape
+    }
+
     // ─── Base glass background ────────────────────────────────────────────────
     val baseAlpha: Float = rememberGlassOpacityAlpha()
 
@@ -95,7 +106,7 @@ fun Modifier.glassCard(
     }
 
     this
-        .clip(shape)
+        .clip(resolvedShape)
         .background(resolvedBg)
-        .border(strokeWidth, finalBorderBrush, shape)
+        .border(strokeWidth, finalBorderBrush, resolvedShape)
 }

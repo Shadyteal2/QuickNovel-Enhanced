@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -20,6 +23,12 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Path
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.material3.MaterialTheme
 import com.lagradost.quicknovel.ui.UiImage
 import com.lagradost.quicknovel.ui.img
@@ -364,4 +373,77 @@ fun buildImageRequest(context: android.content.Context, data: Any?): ImageReques
         }
     }
     return builder.build()
+}
+
+@Composable
+fun LoadingIndicator(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    val transition = rememberInfiniteTransition(label = "expressive_loader")
+    
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+    
+    val scale by transition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+    
+    val morphFactor by transition.animateFloat(
+        initialValue = 0.65f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "morph"
+    )
+
+    Canvas(
+        modifier = modifier
+            .size(40.dp)
+    ) {
+        val width = size.width
+        val height = size.height
+        val center = androidx.compose.ui.geometry.Offset(width / 2f, height / 2f)
+        val outerRadius = (width.coerceAtMost(height) / 2f) * scale
+        val innerRadius = outerRadius * morphFactor
+        
+        val points = 24
+        val path = Path()
+        
+        val rotationRad = Math.toRadians(rotation.toDouble())
+        
+        for (i in 0 until points) {
+            val angle = i * (2.0 * Math.PI / points) + rotationRad
+            val r = if (i % 2 == 0) outerRadius else innerRadius
+            val x = (center.x + r * cos(angle)).toFloat()
+            val y = (center.y + r * sin(angle)).toFloat()
+            
+            if (i == 0) {
+                path.moveTo(x, y)
+            } else {
+                path.lineTo(x, y)
+            }
+        }
+        path.close()
+        
+        drawPath(
+            path = path,
+            color = color
+        )
+    }
 }

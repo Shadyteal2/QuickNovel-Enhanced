@@ -2,6 +2,8 @@ package com.lagradost.quicknovel.db
 
 import androidx.room.*
 
+import kotlinx.coroutines.flow.Flow
+
 @Entity(
     tableName = "implicit_interactions",
     indices = [
@@ -24,6 +26,9 @@ interface ImplicitInteractionDao {
 
     @Query("SELECT * FROM implicit_interactions ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getRecentInteractions(limit: Int): List<ImplicitInteractionEntity>
+
+    @Query("SELECT * FROM implicit_interactions ORDER BY timestamp DESC LIMIT :limit")
+    fun getRecentInteractionsFlow(limit: Int): Flow<List<ImplicitInteractionEntity>>
 
     @Query("SELECT * FROM implicit_interactions WHERE novelUrl = :url")
     suspend fun getInteractionsForNovel(url: String): List<ImplicitInteractionEntity>

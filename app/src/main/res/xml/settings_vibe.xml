@@ -2,17 +2,7 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory
-        android:title="Experimental Aesthetics"
-        app:allowDividerAbove="false">
 
-        <com.lagradost.quicknovel.ui.custom.ElasticSwitchPreference
-            android:defaultValue="false"
-            android:key="@string/experimental_visuals_key"
-            android:summary="Enable premium generative visuals (Higher Power Consumption)"
-            android:title="@string/experimental_visuals" />
-
-    </PreferenceCategory>
 
 
 

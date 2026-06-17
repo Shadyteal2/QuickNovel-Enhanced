@@ -598,7 +598,53 @@ fun DownloadScreen(
                         }
                     },
                     state = pullState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    indicator = {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 16.dp)
+                        ) {
+                            val progress = pullState.distanceFraction
+                            if (isPullRefreshing || progress > 0f) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .graphicsLayer {
+                                            if (!isPullRefreshing) {
+                                                alpha = progress.coerceIn(0f, 1f)
+                                                scaleX = progress.coerceIn(0f, 1f)
+                                                scaleY = progress.coerceIn(0f, 1f)
+                                            }
+                                        }
+                                        .glassCard(
+                                            shape = CircleShape,
+                                            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                            strokeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isPullRefreshing) {
+                                        com.lagradost.quicknovel.ui.theme.LoadingIndicator(
+                                            modifier = Modifier.size(22.dp),
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .graphicsLayer {
+                                                    rotationZ = progress * 360f
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 ) {
                     // Premium visual sliding parallax depth fade transition (100% GPU-accelerated, zero overdraw/layer overhead)
                     Box(
@@ -2026,6 +2072,20 @@ fun CompactCardItem(
                 modifier = Modifier.fillMaxSize()
             )
 
+            if (card is DownloadFragment.DownloadDataLoaded && (card.generating || card.state == DownloadState.IsPending)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    com.lagradost.quicknovel.ui.theme.LoadingIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White
+                    )
+                }
+            }
+
             if (diffCount > 0) {
                 Box(
                     modifier = Modifier
@@ -2212,23 +2272,36 @@ fun CompactCardItem(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Action: Pause / Resume / Refresh
-                IconButton(onClick = {
-                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                    when (realState) {
-                        DownloadState.IsDownloading -> onPauseClick()
-                        DownloadState.IsPaused -> onResumeClick()
-                        DownloadState.IsStopped -> onResumeClick()
-                        DownloadState.IsFailed -> onResumeClick()
-                        DownloadState.IsPending -> {}
-                        DownloadState.IsDone -> onRefreshClick()
-                        else -> onRefreshClick()
+                if (card.generating || realState == DownloadState.IsPending) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        com.lagradost.quicknovel.ui.theme.LoadingIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                }) {
-                    Icon(
-                        imageVector = iconRes,
-                        contentDescription = "Status action",
-                        tint = if (realState == DownloadState.IsDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-                    )
+                } else {
+                    IconButton(onClick = {
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                        when (realState) {
+                            DownloadState.IsDownloading -> onPauseClick()
+                            DownloadState.IsPaused -> onResumeClick()
+                            DownloadState.IsStopped -> onResumeClick()
+                            DownloadState.IsFailed -> onResumeClick()
+                            DownloadState.IsPending -> {}
+                            DownloadState.IsDone -> onRefreshClick()
+                            else -> onRefreshClick()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = iconRes,
+                            contentDescription = "Status action",
+                            tint = if (realState == DownloadState.IsDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                        )
+                    }
                 }
 
                 // Delete Trash Alert

@@ -1,12 +1,14 @@
 package com.lagradost.quicknovel.ui.search
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -19,17 +21,20 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.*
+import androidx.compose.material3.carousel.CarouselItemScope
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -43,10 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
-import coil3.request.crossfade
 import com.lagradost.quicknovel.HomePageList
 import com.lagradost.quicknovel.MainAPI
-import com.lagradost.quicknovel.OnGoingSearch
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.mvvm.Resource
@@ -54,6 +57,7 @@ import com.lagradost.quicknovel.ui.home.HomeViewModel
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 private val iconCache = HashMap<String, Int>()
+
 
 fun resolveIcon(context: android.content.Context, providerName: String): Int {
     return iconCache.getOrPut(providerName) {
@@ -209,10 +213,9 @@ fun PremiumSearchBar(
                 ),
                 trailingIcon = {
                     if (isLoading) {
-                        CircularProgressIndicator(
+                        LoadingIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 2.dp
+                            color = MaterialTheme.colorScheme.primary
                         )
                     } else {
                         AnimatedVisibility(
@@ -443,6 +446,7 @@ fun AdvancedSearchLayout(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProviderSearchResultsRow(
     provider: HomePageList,
@@ -450,23 +454,22 @@ fun ProviderSearchResultsRow(
     onBookLongClick: (SearchResponse) -> Unit,
     onMoreClick: () -> Unit
 ) {
-    val view = LocalView.current
     val context = LocalContext.current
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val view = LocalView.current
+    val uniqueProviderList = remember(provider.list) { provider.list.distinctBy { it.url } }
+    val carouselState = rememberCarouselState { uniqueProviderList.size }
 
-    // Prefetch cover images of the upcoming 8 novels as the user scrolls
-    LaunchedEffect(listState.firstVisibleItemIndex, provider.list) {
-        val totalItems = provider.list.size
-        val startIndex = (listState.firstVisibleItemIndex + 6).coerceAtMost(totalItems)
-        val endIndex = (startIndex + 8).coerceAtMost(totalItems)
+    // Prefetch cover images of upcoming novels as the carousel scrolls
+    LaunchedEffect(carouselState.currentItem, uniqueProviderList) {
+        val totalItems = uniqueProviderList.size
+        val startIndex = (carouselState.currentItem + 4).coerceAtMost(totalItems)
+        val endIndex = (startIndex + 6).coerceAtMost(totalItems)
         for (i in startIndex until endIndex) {
-            val card = provider.list.getOrNull(i) ?: continue
+            val card = uniqueProviderList.getOrNull(i) ?: continue
             val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, card)
             coil3.SingletonImageLoader.get(context).enqueue(req)
         }
     }
-
-    val uniqueProviderList = remember(provider.list) { provider.list.distinctBy { it.url } }
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         Row(
@@ -490,10 +493,14 @@ fun ProviderSearchResultsRow(
             )
         }
 
-        LazyRow(
-            state = listState,
+        HorizontalMultiBrowseCarousel(
+            state = carouselState,
+            preferredItemWidth = 120.dp,
+            itemSpacing = 8.dp,
+            contentPadding = PaddingValues(horizontal = 16.dp),
             modifier = Modifier
                 .fillMaxWidth()
+                .height(210.dp)
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
@@ -501,15 +508,67 @@ fun ProviderSearchResultsRow(
                             view.parent?.requestDisallowInterceptTouchEvent(true)
                         }
                     }
-                },
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                }
+        ) { index ->
+            val novel = uniqueProviderList[index]
+            SearchNovelCarouselItem(
+                novel = novel,
+                onClick = { onBookClick(novel) },
+                onLongClick = { onBookLongClick(novel) }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CarouselItemScope.SearchNovelCarouselItem(
+    novel: SearchResponse,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxHeight()
+            .maskClip(RoundedCornerShape(12.dp))
+            .glassCard(shape = RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+    ) {
+        AsyncImage(
+            model = rememberImageRequest(data = novel),
+            contentDescription = novel.name,
+            imageLoader = SingletonImageLoader.get(LocalContext.current),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Gradient scrim + title overlay at bottom
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomStart)
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))
+                    )
+                )
+                .padding(horizontal = 8.dp, vertical = 8.dp)
         ) {
-            items(uniqueProviderList, key = { it.url }) { novel ->
-                SearchNovelCard(
-                    novel = novel,
-                    onClick = { onBookClick(novel) },
-                    onLongClick = { onBookLongClick(novel) }
+            Column {
+                Text(
+                    text = novel.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = novel.apiName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

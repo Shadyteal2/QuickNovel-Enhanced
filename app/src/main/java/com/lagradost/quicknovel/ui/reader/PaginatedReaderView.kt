@@ -8,7 +8,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.CircularProgressIndicator
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -226,7 +226,7 @@ fun PaginatedReaderView(
 
         if (loadingStatus is Resource.Loading || isPaginating || currentResult == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(viewModel.textColor))
+                LoadingIndicator(color = Color(viewModel.textColor))
             }
         } else if (currentResult.pages.isNotEmpty()) {
             val prevPageOffset = if (currentIndex > 0) 1 else 0

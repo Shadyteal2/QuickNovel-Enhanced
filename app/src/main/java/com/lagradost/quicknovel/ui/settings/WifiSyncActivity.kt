@@ -1,5 +1,7 @@
 package com.lagradost.quicknovel.ui.settings
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -353,7 +355,7 @@ fun WifiSyncScreen(
                             Text(url.substringBefore("/sync"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
 
-                        CircularProgressIndicator(modifier = Modifier.size(36.dp))
+                        LoadingIndicator(modifier = Modifier.size(36.dp))
                         Text("Waiting for connection on local network...", fontSize = 14.sp)
 
                         if (syncStatusMessage.isNotEmpty()) {
@@ -440,7 +442,7 @@ fun WifiSyncScreen(
                         }
 
                         if (isSyncing) {
-                            CircularProgressIndicator(modifier = Modifier.size(36.dp))
+                            LoadingIndicator(modifier = Modifier.size(36.dp))
                             Text("Compressing & sending library payload...")
                         }
 

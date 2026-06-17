@@ -1,5 +1,7 @@
 package com.lagradost.quicknovel.ui.mainpage
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import android.content.res.Configuration
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
@@ -346,7 +348,7 @@ fun MainPageScreen(
                                                 .height(80.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            CircularProgressIndicator(
+                                            LoadingIndicator(
                                                 color = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(36.dp)
                                             )

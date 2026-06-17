@@ -1,5 +1,7 @@
 package com.lagradost.quicknovel.ui.result
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -726,9 +728,8 @@ fun ResultDetailDefaultScreen(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.padding(24.dp)
                 ) {
-                    CircularProgressIndicator(
+                    LoadingIndicator(
                         color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 4.dp,
                         modifier = Modifier.size(44.dp)
                     )
                     Spacer(modifier = Modifier.height(20.dp))

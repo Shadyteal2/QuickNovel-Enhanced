@@ -1,5 +1,7 @@
 package com.lagradost.quicknovel.ui
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import androidx.compose.foundation.clickable
@@ -70,7 +72,7 @@ fun DictionarySheetCompose(
         when (val res = dictResult) {
             is Resource.Loading -> {
                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    LoadingIndicator()
                 }
             }
             is Resource.Failure -> {

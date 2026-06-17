@@ -6,7 +6,15 @@ import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.DataStore.getKey
 import com.lagradost.quicknovel.DataStore.setKey
 import com.lagradost.quicknovel.ui.foryou.recommendation.*
+import com.lagradost.quicknovel.mvvm.launchSafe
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -14,22 +22,160 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
     private val context = application.applicationContext
     private val poolManager = RecommendationPoolManager(context)
     private val engine = RecommendationEngine()
+    private val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
 
-    private val _profile = MutableLiveData<UserTasteProfile>()
-    val profile: LiveData<UserTasteProfile> = _profile
+    private val _baseProfile = MutableStateFlow<UserTasteProfile>(UserTasteProfile.EMPTY)
 
-    private val _recommendations = MutableLiveData<List<RecommendationGroup>>()
-    val recommendations: LiveData<List<RecommendationGroup>> = _recommendations
+    // Bounded and aggregated UserTasteProfile pipeline combining bookmarks and interactions reactively
+    val profile: StateFlow<UserTasteProfile> = combine(
+        _baseProfile,
+        db.novelDao().getAllBookmarksAsFlow(),
+        db.interactionDao().getRecentInteractionsFlow(1000)
+    ) { baseProfile, allBookmarks, interactions ->
+        // Apply a bounded limit to bookmarks parsing to prevent memory exhaustion (top 200 most recently downloaded/updated/read)
+        val bookmarks = allBookmarks
+            .sortedByDescending { it.lastDownloaded ?: it.lastUpdated ?: 0L }
+            .take(200)
 
-    private val _isLoading = MutableLiveData<Boolean>()
-    val isLoading: LiveData<Boolean> = _isLoading
+        val urlToTags = mutableMapOf<String, Set<TagCategory>>()
+        
+        // Add tags from bookmarks
+        for (novel in bookmarks) {
+            urlToTags[novel.source] = TagNormalizer.normalize(novel.tags) + SynopsisTagExtractor.extractFromTitle(novel.name)
+        }
+        
+        // Query candidates directly to associate tags for interaction matching
+        val candidates = db.recommendationDao().getAllCandidates(200)
+        for (c in candidates) {
+            if (!urlToTags.containsKey(c.url)) {
+                urlToTags[c.url] = TagNormalizer.normalize(c.tags) + SynopsisTagExtractor.extractFromTitle(c.name)
+            }
+        }
 
-    private val _stats = MutableLiveData<Pair<Int, Int>>()
-    val stats: LiveData<Pair<Int, Int>> = _stats
+        val preferredMap = baseProfile.preferredTags.associateBy { it.tag }.toMutableMap()
+        val avoidedMap = baseProfile.avoidedTags.associateBy { it.tag }.toMutableMap()
+        
+        // 1. Seed from Bookmarks
+        for (novel in bookmarks) {
+            val novelTags = urlToTags[novel.source] ?: emptySet()
+            for (tag in novelTags) {
+                val current = preferredMap[tag]
+                if (current != null) {
+                    preferredMap[tag] = current.copy(
+                        score = (current.score + 0.3f).coerceAtMost(1.0f),
+                        confidence = (current.confidence + 0.3f).coerceAtMost(1.0f)
+                    )
+                } else {
+                    preferredMap[tag] = TagAffinity(tag, 0.6f, 0.6f)
+                }
+                avoidedMap.remove(tag)
+            }
+        }
+
+        // 2. Aggregate from Implicit Interactions
+        for (interaction in interactions) {
+            val novelTags = urlToTags[interaction.novelUrl] ?: emptySet()
+            if (novelTags.isEmpty()) continue
+            
+            when (interaction.interactionType) {
+                "CLICK" -> {
+                    for (tag in novelTags) {
+                        val current = preferredMap[tag]
+                        if (current != null) {
+                            preferredMap[tag] = current.copy(
+                                score = (current.score + 0.15f).coerceAtMost(1.0f),
+                                confidence = (current.confidence + 0.15f).coerceAtMost(1.0f)
+                            )
+                        } else {
+                            preferredMap[tag] = TagAffinity(tag, 0.15f, 0.15f)
+                        }
+                        avoidedMap.remove(tag)
+                    }
+                }
+                "READ" -> {
+                    for (tag in novelTags) {
+                        val current = preferredMap[tag]
+                        if (current != null) {
+                            preferredMap[tag] = current.copy(
+                                score = (current.score + 0.4f).coerceAtMost(1.0f)
+                            )
+                        } else {
+                            preferredMap[tag] = TagAffinity(tag, 0.4f, 0.5f)
+                        }
+                        avoidedMap.remove(tag)
+                    }
+                }
+                "DISMISS" -> {
+                    for (tag in novelTags) {
+                        val currentAvoided = avoidedMap[tag]
+                        if (currentAvoided != null) {
+                            avoidedMap[tag] = currentAvoided.copy(
+                                score = (currentAvoided.score + 0.3f).coerceAtMost(1.0f),
+                                confidence = (currentAvoided.confidence + 0.3f).coerceAtMost(1.0f)
+                            )
+                        } else {
+                            avoidedMap[tag] = TagAffinity(tag, 0.5f, 0.5f)
+                        }
+                        preferredMap.remove(tag)
+                    }
+                }
+            }
+        }
+
+        baseProfile.copy(
+            preferredTags = preferredMap.values.toList(),
+            avoidedTags = avoidedMap.values.toList(),
+            lastUpdated = System.currentTimeMillis()
+        )
+    }
+    .flowOn(Dispatchers.Default)
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = UserTasteProfile.EMPTY
+    )
+
+    val recommendations: StateFlow<List<RecommendationGroup>> = combine(
+        profile,
+        db.recommendationDao().getAllCandidatesFlow(200),
+        db.novelDao().getAllBookmarksAsFlow()
+    ) { updatedProfile, candidates, bookmarks ->
+        if (!updatedProfile.isWizardComplete) {
+            emptyList()
+        } else {
+            _isLoading.value = true
+            try {
+                val results = engine.generateRecommendations(updatedProfile, candidates, bookmarks)
+                
+                val recCount = results.sumOf { it.recommendations.size }
+                val indexedCount = candidates.size
+                _stats.value = recCount to indexedCount
+                
+                results
+            } catch (e: Exception) {
+                com.lagradost.quicknovel.mvvm.logError(e)
+                emptyList()
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+    .flowOn(Dispatchers.Default)
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    private val _isLoading = MutableStateFlow<Boolean>(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _stats = MutableStateFlow<Pair<Int, Int>>(Pair(0, 0))
+    val stats: StateFlow<Pair<Int, Int>> = _stats.asStateFlow()
 
     private val syncObserver = Observer<Boolean> { syncing ->
-        val currentProfile = _profile.value
-        if (!syncing && currentProfile?.isWizardComplete == true && _recommendations.value.isNullOrEmpty()) {
+        val currentProfile = profile.value
+        if (!syncing && currentProfile.isWizardComplete && recommendations.value.isEmpty()) {
             refreshRecommendations()
         }
     }
@@ -47,33 +193,26 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun loadProfile() {
-        viewModelScope.launch {
+        viewModelScope.launchSafe {
             val savedProfile = withContext(Dispatchers.IO) {
                 context.getKey<UserTasteProfile>("user_taste_profile") ?: UserTasteProfile.EMPTY
             }
-            _profile.postValue(savedProfile)
-            if (savedProfile.isWizardComplete) {
-                refreshRecommendations()
-            }
+            _baseProfile.value = savedProfile
         }
     }
 
     fun saveProfile(newProfile: UserTasteProfile) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launchSafe(Dispatchers.IO) {
             context.setKey("user_taste_profile", newProfile)
-            _profile.postValue(newProfile)
-            refreshRecommendations()
+            _baseProfile.value = newProfile
         }
     }
 
     fun refreshRecommendations() {
-        viewModelScope.launch {
-            _isLoading.postValue(true)
+        viewModelScope.launchSafe {
+            _isLoading.value = true
             try {
                 // If we have no providers and aren't syncing, trigger a one-time sync to recover.
-                // But ONLY if there are no plugin APKs on disk — if APKs exist the user has already
-                // installed providers (via manual import or prior sync) and we should not re-trigger
-                // the sync indicator just because the in-memory list hasn't populated yet.
                 val pluginsDir = com.lagradost.quicknovel.util.PluginManager.getPluginsDir(context)
                 val hasPluginsOnDisk = pluginsDir.listFiles()?.any { it.name.endsWith(".apk") } == true
                 if (com.lagradost.quicknovel.util.Apis.apis.isEmpty() &&
@@ -89,47 +228,34 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 }
 
-                // Ensure pool has some data
-                val currentCandidates = poolManager.getCandidates()
-                if (currentCandidates.isEmpty()) {
+                // Force candidates fetch
+                withContext(Dispatchers.IO) {
                     poolManager.fetchNewCandidates()
                 }
                 
-                val candidates = poolManager.getCandidates()
-                val profile = _profile.value ?: UserTasteProfile.EMPTY
-                
-                val results = withContext(Dispatchers.Default) {
-                    engine.generateRecommendations(profile, candidates)
-                }
-                _recommendations.postValue(results)
-                
-                // Update stats
-                val recCount = results.sumOf { it.recommendations.size }
-                val indexedCount = candidates.size
-                _stats.postValue(recCount to indexedCount)
+                // Force a trigger in base profile flow to refresh the combined state
+                _baseProfile.value = _baseProfile.value
             } catch (e: Exception) {
-                e.printStackTrace()
+                com.lagradost.quicknovel.mvvm.logError(e)
             } finally {
-                _isLoading.postValue(false)
+                _isLoading.value = false
             }
         }
     }
 
     fun markWizardComplete() {
-        val current = _profile.value ?: UserTasteProfile.EMPTY
+        val current = profile.value
         saveProfile(current.copy(isWizardComplete = true))
     }
 
     fun recordInteraction(novelUrl: String, type: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
+        viewModelScope.launchSafe(Dispatchers.IO) {
             db.interactionDao().insert(
                 com.lagradost.quicknovel.db.ImplicitInteractionEntity(
                     novelUrl = novelUrl,
                     interactionType = type
                 )
             )
-            // Optionally: Trigger profile update immediately or scheduled
         }
     }
 }

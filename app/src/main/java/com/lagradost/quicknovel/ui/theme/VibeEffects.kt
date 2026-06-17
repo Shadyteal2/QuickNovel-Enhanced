@@ -48,6 +48,10 @@ object VibePrefs {
     // Accent Gradient (stored in Appearance but read from here)
     const val ACCENT_GRADIENT_ENABLED    = "accent_gradient_enabled"
     const val ACCENT_GRADIENT_END_COLOR  = "accent_gradient_end_color" // ARGB int stored as Int
+
+    // Expressive Shapes & Morphing
+    const val ASYMMETRIC_SHAPES_ENABLED  = "asymmetric_shapes_enabled"
+    const val STAGGERED_ENTRANCES_ENABLED = "staggered_entrances_enabled"
 }
 
 // ─── Cover Aura Glow ─────────────────────────────────────────────────────────
@@ -134,6 +138,27 @@ fun rememberAuraEnabled(): Boolean {
     val auraEnabled by rememberPreferenceBoolean(VibePrefs.COVER_AURA_GLOW, false)
     return premiumEnabled && auraEnabled
 }
+
+@Composable
+fun rememberAsymmetricShapesEnabled(): Boolean {
+    val performanceMode by rememberPreferenceBoolean(VibePrefs.PERFORMANCE_MODE_ENABLED, false)
+    if (performanceMode) return false
+    val premiumEnabled by rememberPreferenceBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, false)
+    val shapesEnabled by rememberPreferenceBoolean(VibePrefs.ASYMMETRIC_SHAPES_ENABLED, false)
+    return premiumEnabled && shapesEnabled
+}
+
+
+
+@Composable
+fun rememberStaggeredEntrancesEnabled(): Boolean {
+    val performanceMode by rememberPreferenceBoolean(VibePrefs.PERFORMANCE_MODE_ENABLED, false)
+    if (performanceMode) return false
+    val premiumEnabled by rememberPreferenceBoolean(VibePrefs.PREMIUM_VISUALS_ENABLED, false)
+    val staggeredEnabled by rememberPreferenceBoolean(VibePrefs.STAGGERED_ENTRANCES_ENABLED, false)
+    return premiumEnabled && staggeredEnabled
+}
+
 
 /**
  * Extracts the dominant vibrant color from a Bitmap on Dispatchers.IO.

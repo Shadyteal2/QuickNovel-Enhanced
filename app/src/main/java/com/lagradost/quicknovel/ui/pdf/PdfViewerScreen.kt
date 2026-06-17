@@ -1,5 +1,7 @@
 package com.lagradost.quicknovel.ui.pdf
 
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+
 import android.app.Activity
 import android.content.Context
 import android.net.Uri
@@ -223,7 +225,7 @@ fun PdfViewerScreen(
                 .padding(paddingValues)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(
+                LoadingIndicator(
                     modifier = Modifier.align(Alignment.Center),
                     color = MaterialTheme.colorScheme.primary
                 )

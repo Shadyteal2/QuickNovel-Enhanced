@@ -41,7 +41,7 @@ data class UserTasteProfile(
      * Returns 0.0 to 1.0
      */
     fun scoreMatch(novelTags: Set<TagCategory>): Float {
-        if (novelTags.isEmpty()) return 0.5f
+        if (novelTags.isEmpty()) return 0.1f
         if (preferredTags.isEmpty()) return 0.5f
 
         var totalPositive = 0f

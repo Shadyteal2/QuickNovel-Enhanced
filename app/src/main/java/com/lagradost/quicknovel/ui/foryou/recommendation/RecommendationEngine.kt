@@ -17,7 +17,8 @@ data class Recommendation(
     val novel: NovelVector,
     val score: Float,
     val reason: String,
-    val type: RecommendationType
+    val type: RecommendationType,
+    val triggerNovel: NovelVector? = null
 )
 
 enum class RecommendationType {
@@ -37,7 +38,8 @@ class RecommendationEngine {
     
     fun generateRecommendations(
         profile: UserTasteProfile,
-        candidates: List<RecommendationCandidateEntity>
+        candidates: List<RecommendationCandidateEntity>,
+        bookmarks: List<com.lagradost.quicknovel.db.NovelEntity> = emptyList()
     ): List<RecommendationGroup> {
         val vectors = candidates.map { entity ->
             val extractedTags = SynopsisTagExtractor.extractFromTitle(entity.name)
@@ -56,13 +58,34 @@ class RecommendationEngine {
         val groups = mutableListOf<RecommendationGroup>()
         val seenUrls = mutableSetOf<String>()
 
-        // 1. FOR YOU (Personalized based on Taste Profile)
+        // 1. FOR YOU (Personalized based on Taste Profile & linked to bookmarks)
         val forYou = vectors.map { vec ->
+            val matchingBookmark = bookmarks.firstOrNull { bookmark ->
+                val bTags = TagNormalizer.normalize(bookmark.tags) + SynopsisTagExtractor.extractFromTitle(bookmark.name)
+                bTags.intersect(vec.tags).isNotEmpty()
+            }
+            val trigger = matchingBookmark?.let { b ->
+                NovelVector(
+                    url = b.source,
+                    name = b.name,
+                    tags = TagNormalizer.normalize(b.tags) + SynopsisTagExtractor.extractFromTitle(b.name),
+                    rating = b.rating,
+                    apiName = b.apiName,
+                    posterUrl = b.posterUrl
+                )
+            }
+            val reason = if (trigger != null) {
+                "Because you read ${trigger.name}"
+            } else {
+                "Matched to your interests"
+            }
+
             Recommendation(
                 novel = vec,
                 score = profile.scoreMatch(vec.tags),
-                reason = "Matched to your interests",
-                type = RecommendationType.FOR_YOU
+                reason = reason,
+                type = RecommendationType.FOR_YOU,
+                triggerNovel = trigger
             )
         }.filter { it.score > 0.4f }
          .sortedByDescending { it.score }

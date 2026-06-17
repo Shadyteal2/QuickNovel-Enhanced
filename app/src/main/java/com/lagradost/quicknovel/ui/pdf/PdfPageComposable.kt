@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.CircularProgressIndicator
+import com.lagradost.quicknovel.ui.theme.LoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -378,7 +378,7 @@ fun PdfPageComposable(
         contentAlignment = Alignment.Center
     ) {
         if (isLoading) {
-            CircularProgressIndicator(color = androidx.compose.material3.MaterialTheme.colorScheme.primary)
+            LoadingIndicator(color = androidx.compose.material3.MaterialTheme.colorScheme.primary)
         } else {
             bitmap?.let { bmp ->
                 Image(

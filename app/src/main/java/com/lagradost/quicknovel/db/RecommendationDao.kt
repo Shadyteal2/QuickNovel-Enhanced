@@ -1,6 +1,7 @@
 package com.lagradost.quicknovel.db
 
 import androidx.room.*
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RecommendationDao {
@@ -9,6 +10,9 @@ interface RecommendationDao {
 
     @Query("SELECT * FROM recommendation_candidates ORDER BY lastFetched DESC LIMIT :limit")
     suspend fun getAllCandidates(limit: Int): List<RecommendationCandidateEntity>
+
+    @Query("SELECT * FROM recommendation_candidates ORDER BY lastFetched DESC LIMIT :limit")
+    fun getAllCandidatesFlow(limit: Int): Flow<List<RecommendationCandidateEntity>>
 
     @Query("SELECT * FROM recommendation_candidates WHERE apiName = :apiName ORDER BY lastFetched DESC")
     suspend fun getCandidatesByApi(apiName: String): List<RecommendationCandidateEntity>
