@@ -738,12 +738,12 @@ class ResultViewModel : ViewModel() {
         return this.lowercase().replace(Regex("[^a-z0-9]"), "").trim()
     }
 
-    private fun findDuplicateState(name: String, author: String?): Int? {
+    private suspend fun findDuplicateState(name: String, author: String?): Int? = withContext(Dispatchers.IO) {
         val cleanName = name.normalize()
-        if (cleanName.isEmpty()) return null
+        if (cleanName.isEmpty()) return@withContext null
         val cleanAuthor = author?.normalize()
 
-        val bookmarkedKeys = getKeys(RESULT_BOOKMARK_STATE) ?: return null
+        val bookmarkedKeys = getKeys(RESULT_BOOKMARK_STATE) ?: return@withContext null
         for (key in bookmarkedKeys) {
             val idStr = key.substringAfter("/")
             if (idStr == loadId.toString()) continue // Skip current provider
@@ -761,16 +761,14 @@ class ResultViewModel : ViewModel() {
 
                 if (nameMatch && authorMatch) {
                     val state = getKey<Int>(RESULT_BOOKMARK_STATE, idStr) ?: -1
-                    if (state != -1) return state
+                    if (state != -1) return@withContext state
                 }
             }
         }
-        return null
+        return@withContext null
     }
 
     private fun checkDuplicates() {
-        val novel = if (::load.isInitialized) load else ((loadResponse.value as? Resource.Success)?.value ?: return)
-        duplicateBookmarkState.postValue(findDuplicateState(novel.name, novel.author))
         updateBookmarkLabel()
     }
 
@@ -847,12 +845,24 @@ class ResultViewModel : ViewModel() {
     }
 
     fun updateBookmarkLabel() {
-        val currentIdVal = id.value ?: -1
-        val duplicateBookmarkVal = duplicateBookmarkState.value
+        val currentIdVal = loadId
         val ctx = context ?: return
 
         viewModelScope.launch(Dispatchers.IO) {
             val currentStateId = getKey<Int>(RESULT_BOOKMARK_STATE, currentIdVal.toString()) ?: -1
+            
+            val duplicateBookmarkVal = if (::load.isInitialized) {
+                findDuplicateState(load.name, load.author)
+            } else {
+                val res = (loadResponse.value as? Resource.Success)?.value
+                if (res != null) {
+                    findDuplicateState(res.name, res.author)
+                } else {
+                    null
+                }
+            }
+            duplicateBookmarkState.postValue(duplicateBookmarkVal)
+
             var label = ctx.getString(R.string.bookmark)
             if (currentStateId != -1) {
                 val systemCat = com.lagradost.quicknovel.ui.download.DownloadViewModel.systemCategories.find { it.id == currentStateId }

@@ -137,6 +137,15 @@ object BackupPrefs {
     const val AUTO_BACKUP_PATH_PREF = "auto_backup_path_pref"
 }
 
+// ─── Telegram Cloud Backup ───────────────────────────────────────────────────
+
+/** All keys related to Telegram Cloud Backup preferences. */
+object TelegramBackupPrefs {
+    const val BOT_TOKEN = "telegram_bot_token"
+    const val CHAT_ID = "telegram_chat_id"
+    const val DELETE_AFTER_UPLOAD = "telegram_delete_after_upload"
+}
+
 // ─── Network ─────────────────────────────────────────────────────────────────
 
 /** All keys related to network and proxy configuration. */

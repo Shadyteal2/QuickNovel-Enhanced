@@ -25,6 +25,9 @@ import androidx.core.content.edit
 // ─────────────────────────────────────────────────────────────────────────────
 const val PREFERENCES_NAME: String = "rebuild_preference"
 
+const val TELEGRAM_BOT_TOKEN: String = "telegram_bot_token"
+const val TELEGRAM_CHAT_ID: String = "telegram_chat_id"
+
 const val DOWNLOAD_FOLDER: String = "downloads_data"
 const val DOWNLOAD_SIZE: String = "downloads_size"
 const val DOWNLOAD_TOTAL: String = "downloads_total"

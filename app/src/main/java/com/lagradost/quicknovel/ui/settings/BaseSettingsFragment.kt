@@ -563,21 +563,7 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
-        // Library Display Mode
-        getPref(R.string.download_format_key)?.let { pref ->
-            val names = listOf("List View", "Grid View")
-            val values = listOf("list", "grid")
-            val current = settingsManager.getString(getString(R.string.download_format_key), "list")
-            pref.summary = if (current == "list") names[0] else names[1]
-            
-            pref.setOnPreferenceClickListener {
-                activity?.showBottomDialog(names, values.indexOf(current), getString(R.string.library_display_mode), false, {}) {
-                    settingsManager.edit { putString(getString(R.string.download_format_key), values[it]) }
-                    pref.summary = names[it]
-                }
-                true
-            }
-        }
+
 
         // Book Rating Format
         getPref(R.string.rating_format_key)?.let { pref ->

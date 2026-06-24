@@ -419,19 +419,12 @@ class SubSettingsFragment : Fragment() {
                 }
             }
 
-            "download_format" -> {
-                val names = listOf("List View", "Grid View")
-                val values = listOf("list", "grid")
-                val current = sharedPrefs.getString(getString(R.string.download_format_key), "list")
-                activity?.showBottomDialog(names, values.indexOf(current), getString(R.string.library_display_mode), false, {}) {
-                    sharedPrefs.edit().putString(getString(R.string.download_format_key), values[it]).apply()
-                }
-            }
+
 
             "library_nav_style" -> {
                 val names = listOf("Pill Drawer", "Swipe View")
                 val values = listOf("0", "1")
-                val current = sharedPrefs.getString("library_nav_style", "0")
+                val current = sharedPrefs.getString("library_nav_style", "1")
                 activity?.showBottomDialog(names, values.indexOf(current), getString(R.string.library_nav_style), false, {}) {
                     sharedPrefs.edit().putString("library_nav_style", values[it]).apply()
                 }

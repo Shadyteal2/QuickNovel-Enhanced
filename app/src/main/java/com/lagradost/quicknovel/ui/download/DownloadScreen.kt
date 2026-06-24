@@ -148,7 +148,7 @@ fun DownloadScreen(
     val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     var isCompact by remember { mutableStateOf(settings.getBoolean("download_compact", false)) }
     var isBento3x3 by remember { mutableStateOf(settings.getBoolean("download_bento", false)) }
-    val navStyleState = rememberPreferenceString(context.getString(R.string.library_nav_style_key), "0")
+    val navStyleState = rememberPreferenceString(context.getString(R.string.library_nav_style_key), "1")
     val isSwipeMode = navStyleState.value == "1"
     var isSwipingPage by remember { mutableStateOf(false) }
     var isScrollingList by remember { mutableStateOf(false) }

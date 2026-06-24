@@ -3,6 +3,7 @@ package com.lagradost.quicknovel.ui.settings
 import com.lagradost.quicknovel.ui.theme.LoadingIndicator
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -78,6 +79,18 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.lagradost.quicknovel.TelegramBackupPrefs
+import com.lagradost.quicknovel.sync.TelegramBackupWorker
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,6 +109,19 @@ fun SubSettingsScreen(
     // Observe SharedPreferences
     val sharedPrefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
     var changeTrigger by remember { mutableStateOf(0) }
+
+    val listener = remember {
+        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            changeTrigger++
+        }
+    }
+
+    DisposableEffect(sharedPrefs) {
+        sharedPrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            sharedPrefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
     var showCustomRateLimitDialog by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
@@ -743,19 +769,12 @@ fun SubSettingsScreen(
                             )
                         }
 
-                        item {
-                            ActionPreferenceCard(
-                                title = "Library Display Mode",
-                                summary = if (getString("download_format", "list") == "list") "List View" else "Grid View",
-                                iconRes = R.drawable.ic_baseline_grid_view_24,
-                                onClick = { onPreferenceClick("download_format") }
-                            )
-                        }
+
 
                         item {
                             ActionPreferenceCard(
                                 title = "Library Navigation Style",
-                                summary = if (getString("library_nav_style", "0") == "0") "Pill Drawer" else "Swipe View",
+                                summary = if (getString("library_nav_style", "1") == "0") "Pill Drawer" else "Swipe View",
                                 iconRes = R.drawable.ic_baseline_edit_24,
                                 onClick = { onPreferenceClick("library_nav_style") }
                             )
@@ -821,6 +840,10 @@ fun SubSettingsScreen(
 
                         item {
                             CloudSyncPreferencesCard()
+                        }
+
+                        item {
+                            TelegramBackupPreferencesCard()
                         }
 
                         item {
@@ -3786,6 +3809,371 @@ fun NestedCacheActionRow(
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
             )
         }
+    }
+}
+
+@Composable
+fun TelegramBackupPreferencesCard() {
+    val context = LocalContext.current
+    val sharedPrefs = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
+    
+    var isExpanded by remember { mutableStateOf(false) }
+    var showTutorialDialog by remember { mutableStateOf(false) }
+    
+    var botToken by remember { mutableStateOf(sharedPrefs.getString(TelegramBackupPrefs.BOT_TOKEN, "") ?: "") }
+    var chatId by remember { mutableStateOf(sharedPrefs.getString(TelegramBackupPrefs.CHAT_ID, "") ?: "") }
+    var deleteAfterUpload by remember { mutableStateOf(sharedPrefs.getBoolean(TelegramBackupPrefs.DELETE_AFTER_UPLOAD, false)) }
+
+    // Observe WorkManager progress
+    val workInfos = remember(context) {
+        WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData("telegram_backup_work")
+    }
+    val workInfoState = workInfos.observeAsState()
+    val workInfo = workInfoState.value?.firstOrNull()
+    
+    val isWorkerRunning = workInfo?.state == WorkInfo.State.RUNNING
+    
+    val progressData = workInfo?.progress
+    val current = progressData?.getInt("progress_current", 0) ?: 0
+    val total = progressData?.getInt("progress_total", 0) ?: 0
+    val status = progressData?.getString("progress_status") ?: ""
+    val isActive = progressData?.getBoolean("is_active", false) ?: false
+    
+    val progressFraction = if (total > 0) current.toFloat() / total.toFloat() else 0f
+
+    // Micro-scale squish animation for the button
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.92f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "backup_button_squish"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassCard(shape = RoundedCornerShape(20.dp))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Header: Clickable to expand, containing Title, Setup Guide and Chevron
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { isExpanded = !isExpanded }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .glassCard(
+                                shape = RoundedCornerShape(12.dp),
+                                backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                             ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_telegram),
+                            contentDescription = "Telegram Backup",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Telegram Cloud Backup",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isWorkerRunning) "Backup in progress..." else "Back up EPUBs to Telegram",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    TextButton(
+                        onClick = { showTutorialDialog = true },
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text(
+                            text = "Setup Guide",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    
+                    IconButton(
+                        onClick = { isExpanded = !isExpanded },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.rotate(if (isExpanded) 180f else 0f)
+                        )
+                    }
+                }
+            }
+
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Reactive Bot Token Field (Plain Text)
+                OutlinedTextField(
+                    value = botToken,
+                    onValueChange = { newValue ->
+                        botToken = newValue
+                        sharedPrefs.edit().putString(TelegramBackupPrefs.BOT_TOKEN, newValue).apply()
+                    },
+                    label = { Text("Telegram Bot Token") },
+                    placeholder = { Text("123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Reactive Chat ID Field
+                OutlinedTextField(
+                    value = chatId,
+                    onValueChange = { newValue ->
+                        chatId = newValue
+                        sharedPrefs.edit().putString(TelegramBackupPrefs.CHAT_ID, newValue).apply()
+                    },
+                    label = { Text("Telegram Chat ID") },
+                    placeholder = { Text("-100123456789 or 123456789") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Delete local EPUB after upload",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Frees device storage after each successful upload. The novel stays in your library and can be re-compiled anytime.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                    Switch(
+                        checked = deleteAfterUpload,
+                        onCheckedChange = { checked ->
+                            deleteAfterUpload = checked
+                            sharedPrefs.edit().putBoolean(TelegramBackupPrefs.DELETE_AFTER_UPLOAD, checked).apply()
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Progress state representation
+                if (isWorkerRunning || isActive) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = status.ifEmpty { "Uploading documents..." },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        if (total > 0) {
+                            LinearProgressIndicator(
+                                progress = { progressFraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // Backup Now Button with Squish Animation
+                Button(
+                    onClick = {
+                        if (botToken.isNotBlank() && chatId.isNotBlank()) {
+                            val backupRequest = OneTimeWorkRequestBuilder<TelegramBackupWorker>()
+                                .addTag("telegram_backup_work")
+                                .build()
+                            WorkManager.getInstance(context).enqueueUniqueWork(
+                                "telegram_backup_work",
+                                ExistingWorkPolicy.REPLACE,
+                                backupRequest
+                            )
+                        } else {
+                            com.lagradost.quicknovel.CommonActivity.showToast("Please fill in both Token and Chat ID first!")
+                        }
+                    },
+                    enabled = !isWorkerRunning && botToken.isNotBlank() && chatId.isNotBlank(),
+                    interactionSource = interactionSource,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Text(
+                        text = if (isWorkerRunning) "Backing Up..." else "Backup Now",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+        }
+    }
+
+    // Sleek Tutorial Dialog (Grandpa-Proof Setup Guide)
+    if (showTutorialDialog) {
+        AlertDialog(
+            onDismissRequest = { showTutorialDialog = false },
+            title = {
+                Text(
+                    text = "Setup Guide 📖",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Follow these simple steps to set up your Telegram Cloud Backup:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Step 1: Get a Bot Token 🤖",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Search for @BotFather in Telegram. Send /newbot to it, follow the prompt to give it a name, and copy the long token code it replies with. Paste it into the Bot Token field here.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Step 2: Activate Your Bot ⚡",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Search for your bot's username in Telegram, or click the link provided by @BotFather. Open the chat and send any message (like 'Hello') to activate it.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Step 3: Find Your Chat ID 🆔",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Search for @getmyid_bot in Telegram. Send /start to it, and copy your personal 'Current chat ID' (make sure to include the negative sign if there is one). Paste it into the Chat ID field here.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Step 4: Prepare your EPUBs 📚",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Before your first backup, open each downloaded novel from the Library / Downloads tab and tap it once. This compiles the EPUB file on your device. Once compiled, it will appear in all future backups. You can delete the local EPUB after it is safely uploaded.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTutorialDialog = false }) {
+                    Text("Got it", fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 }
 

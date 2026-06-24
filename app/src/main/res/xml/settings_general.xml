@@ -19,19 +19,13 @@
         app:useSimpleSummaryProvider="true"
         app:layout="@layout/setting_tile" />
 
-    <Preference
-        android:icon="@drawable/ic_baseline_grid_view_24"
-        android:key="@string/download_format_key"
-        android:title="@string/library_display_mode"
-        app:defaultValue="list"
-        app:useSimpleSummaryProvider="true"
-        app:layout="@layout/setting_tile" />
+
 
     <ListPreference
         android:key="@string/library_nav_style_key"
         android:title="@string/library_nav_style"
         android:summary="@string/library_nav_style_desc"
-        app:defaultValue="0"
+        app:defaultValue="1"
         android:entries="@array/library_nav_style_entries"
         android:entryValues="@array/library_nav_style_values"
         android:icon="@drawable/ic_baseline_edit_24"

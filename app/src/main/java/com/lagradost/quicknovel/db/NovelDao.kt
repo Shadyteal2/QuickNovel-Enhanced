@@ -65,4 +65,15 @@ interface NovelDao {
 
     @Query("DELETE FROM novel WHERE id = :id")
     fun deleteById(id: Int)
+
+    @Query("SELECT id, name, author, apiName, posterUrl FROM novel WHERE downloadStatus = :doneStatus")
+    fun getDownloadedNovels(doneStatus: Int): List<NovelBackupInfo>
 }
+
+data class NovelBackupInfo(
+    val id: Int,
+    val name: String,
+    val author: String?,
+    val apiName: String,
+    val posterUrl: String?
+)
