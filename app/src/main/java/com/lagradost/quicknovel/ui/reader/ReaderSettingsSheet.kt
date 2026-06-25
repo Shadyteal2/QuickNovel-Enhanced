@@ -65,6 +65,7 @@ fun ReaderSettingsSheet(
     var dynamicLuminanceEnabled by remember { mutableStateOf(viewModel.dynamicLuminanceEnabled) }
     var autoScroll by remember { mutableStateOf(viewModel.autoScroll) }
     var autoScrollSpeed by remember { mutableStateOf(viewModel.autoScrollSpeed.toFloat()) }
+    var showReadingTimer by remember { mutableStateOf(viewModel.showReadingTimer) }
     
     var textSize by remember { mutableStateOf(viewModel.textSize.toFloat()) }
     var textPadding by remember { mutableStateOf(viewModel.paddingHorizontal.toFloat()) }
@@ -167,6 +168,9 @@ fun ReaderSettingsSheet(
                 }
                 SettingsSwitchRow(stringResource(R.string.show_reading_progress), showProgress) {
                     showProgress = it; viewModel.showReaderProgress = it
+                }
+                SettingsSwitchRow("Reading Timer Overlay", showReadingTimer) {
+                    showReadingTimer = it; viewModel.showReadingTimer = it
                 }
                 SettingsSwitchRow("Paginated Swipe Mode", paginatedSwipeEnabled) {
                     paginatedSwipeEnabled = it; viewModel.paginatedSwipeEnabled = it

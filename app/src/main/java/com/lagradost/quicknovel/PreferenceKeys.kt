@@ -61,6 +61,8 @@ object ReaderPrefs {
     const val HAS_TIME              = "reader_epub_has_time"
     const val TWELVE_HOUR_TIME      = "reader_epub_twelve_hour_time"
     const val ZEN_READING           = "reader_epub_zen_reading"
+    const val READING_TIMER_ENABLED = "reader_reading_timer_enabled"
+    const val READING_TIMER_ANCHOR  = "reader_reading_timer_anchor"
 
     // ── Chapter position tracking ─────────────────────────────────────────────
     const val CURRENT_POSITION      = "reader_epub_position"

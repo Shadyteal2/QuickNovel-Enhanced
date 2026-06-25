@@ -19,8 +19,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -29,6 +33,7 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -137,6 +142,14 @@ fun MainPageScreen(
     val currentTag by viewModel.currentTag.observeAsState(initial = null)
     val loadingMoreItems by viewModel.loadingMoreItems.observeAsState(initial = false)
     val isInSearch by viewModel.isInSearch.observeAsState(initial = false)
+    val isStale by viewModel.isStale.observeAsState(initial = false)
+    var showFilters by remember { mutableStateOf(true) }
+    var isSearchFocused by remember { mutableStateOf(false) }
+    val hasFilters = remember(viewModel.api) {
+        viewModel.api.mainCategories.isNotEmpty() ||
+        viewModel.api.tags.isNotEmpty() ||
+        viewModel.api.orderBys.isNotEmpty()
+    }
 
     var searchQuery by remember { mutableStateOf("") }
 
@@ -162,7 +175,7 @@ fun MainPageScreen(
                     onRefresh = {
                         scope.launch {
                             isPullRefreshing = true
-                            viewModel.load(0, currentMainCategory, currentOrderBy, currentTag).join()
+                            viewModel.load(0, currentMainCategory, currentOrderBy, currentTag, isUserRefresh = true).join()
                             isPullRefreshing = false
                         }
                     },
@@ -442,12 +455,14 @@ fun MainPageScreen(
                                             if (searchQuery.isNotBlank()) {
                                                 focusManager.clearFocus()
                                                 viewModel.search(searchQuery)
+                                                viewModel.addToHistory(searchQuery, apiName)
                                             }
                                         }
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(52.dp),
+                                        .height(52.dp)
+                                        .onFocusChanged { isSearchFocused = it.isFocused },
                                     decorationBox = { innerTextField ->
                                         OutlinedTextFieldDefaults.DecorationBox(
                                             value = searchQuery,
@@ -465,26 +480,47 @@ fun MainPageScreen(
                                                 )
                                             },
                                             trailingIcon = {
-                                                if (searchQuery.isNotEmpty()) {
-                                                    IconButton(
-                                                        onClick = {
-                                                            searchQuery = ""
-                                                            viewModel.switchToMain()
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                    modifier = Modifier.padding(end = 4.dp)
+                                                ) {
+                                                    if (hasFilters) {
+                                                        IconButton(
+                                                            onClick = { showFilters = !showFilters }
+                                                        ) {
+                                                            Icon(
+                                                                painter = painterResource(id = R.drawable.ic_baseline_filter_list_24),
+                                                                contentDescription = "Toggle Filters",
+                                                                tint = if (showFilters) {
+                                                                    MaterialTheme.colorScheme.primary
+                                                                } else {
+                                                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                                }
+                                                            )
                                                         }
-                                                    ) {
+                                                    }
+                                                    if (searchQuery.isNotEmpty()) {
+                                                        IconButton(
+                                                            onClick = {
+                                                                searchQuery = ""
+                                                                viewModel.switchToMain()
+                                                            }
+                                                        ) {
+                                                            Icon(
+                                                                painter = painterResource(id = R.drawable.ic_sharp_clear_24),
+                                                                contentDescription = "Clear Search",
+                                                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                            )
+                                                        }
+                                                    } else {
                                                         Icon(
-                                                            painter = painterResource(id = R.drawable.ic_sharp_clear_24),
-                                                            contentDescription = "Clear Search",
-                                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                            painter = painterResource(id = R.drawable.ic_baseline_search_24),
+                                                            contentDescription = "Search icon",
+                                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                                            modifier = Modifier.size(20.dp).padding(end = 8.dp)
                                                         )
                                                     }
-                                                } else {
-                                                    Icon(
-                                                        painter = painterResource(id = R.drawable.ic_baseline_search_24),
-                                                        contentDescription = "Search icon",
-                                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
                                                 }
                                             },
                                             colors = OutlinedTextFieldDefaults.colors(
@@ -534,8 +570,76 @@ fun MainPageScreen(
                             }
                         }
 
+                        // Search History Chips Row
+                        val historyList by viewModel.searchHistory.observeAsState(initial = emptyList())
+                        AnimatedVisibility(
+                            visible = isSearchFocused && searchQuery.isEmpty() && historyList.isNotEmpty() && collapseFraction < 0.5f,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_baseline_history_24),
+                                    contentDescription = "Search History",
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                historyList.forEach { historyQuery ->
+                                    InputChip(
+                                        selected = false,
+                                        onClick = {
+                                            searchQuery = historyQuery
+                                            viewModel.search(historyQuery)
+                                            viewModel.addToHistory(historyQuery, apiName)
+                                            focusManager.clearFocus()
+                                        },
+                                        label = {
+                                            Text(
+                                                text = historyQuery,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.ic_sharp_clear_24),
+                                                contentDescription = "Delete",
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clickable {
+                                                        viewModel.removeFromHistory(historyQuery, apiName)
+                                                    },
+                                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                            )
+                                        },
+                                        colors = InputChipDefaults.inputChipColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                            labelColor = MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        border = InputChipDefaults.inputChipBorder(
+                                            borderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                            enabled = true,
+                                            selected = false
+                                        ),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                }
+                            }
+                        }
+
                         // Collapsing Genre Filter Chips
-                        if (!isInSearch) {
+                        AnimatedVisibility(
+                            visible = showFilters,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -639,6 +743,36 @@ fun MainPageScreen(
                             }
                         }
                     }
+                }
+
+                AnimatedVisibility(
+                    visible = isStale,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 180.dp)
+                ) {
+                    SuggestionChip(
+                        onClick = { },
+                        label = { Text("Showing cached results", fontSize = 12.sp) },
+                        icon = {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_baseline_warning_24),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                        )
+                    )
                 }
             }
         }

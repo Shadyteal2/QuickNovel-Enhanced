@@ -141,6 +141,8 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         switchToMainTab(index)
     }
 
+    private val searchViewModel: com.lagradost.quicknovel.ui.search.SearchViewModel by viewModels()
+
     private var lastPillX = 0f
     private var lastPillWidth = 0
     private var hapticTickDone = false
@@ -153,6 +155,27 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     )
     
     private var lastActiveTab: Int = 0
+
+    private fun updateHomeSyncFabVisibility() {
+        val currentPos = binding?.mainViewpager?.currentItem ?: 0
+        val isDashboardVisible = binding?.mainViewpager?.isVisible == true
+        val controller = (supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as? NavHostFragment)?.navController
+        val currentDestinationId = controller?.currentDestination?.id
+        val isMainTabs = currentDestinationId == null || tabIds.contains(currentDestinationId) || currentDestinationId == R.id.navigation_dummy
+
+        val hasSearchResults = (searchViewModel.searchResponse.value != null || searchViewModel.currentSearch.value != null)
+
+        binding?.homeSyncFab?.visibility = if (
+            currentPos == 1 && 
+            isDashboardVisible && 
+            isMainTabs && 
+            !hasSearchResults
+        ) {
+            android.view.View.VISIBLE
+        } else {
+            android.view.View.GONE
+        }
+    }
 
     private val providerApkPicker =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -666,6 +689,10 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
+        val defaultTab = intent.getIntExtra("defaultTab", -1)
+        if (defaultTab != -1) {
+            switchToMainTab(defaultTab)
+        }
         if (intent.action == Intent.ACTION_SEND) {
             val extraText = try {
                 intent.getStringExtra(Intent.EXTRA_TEXT)
@@ -1038,6 +1065,13 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
         setupCustomNav()
 
+        searchViewModel.searchResponse.observe(this) {
+            updateHomeSyncFabVisibility()
+        }
+        searchViewModel.currentSearch.observe(this) {
+            updateHomeSyncFabVisibility()
+        }
+
         binding?.mainViewpager?.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             private var lastSelectedPos = -1
             
@@ -1053,8 +1087,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     lastActiveTab = position
                 }
                 
-                val isDashboardVisible = binding?.mainViewpager?.isVisible == true
-                binding?.homeSyncFab?.visibility = if (position == 1 && isDashboardVisible) android.view.View.VISIBLE else android.view.View.GONE
+                updateHomeSyncFabVisibility()
             }
 
             override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {}
@@ -1106,18 +1139,12 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         }
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            val isMainTabs = tabs.contains(destination.id) || destination.id == R.id.navigation_dummy
             val currentPos = binding?.mainViewpager?.currentItem ?: 0
             
             // Centralized visibility check
             updateNavSelection(currentPos)
 
-            val isProvidersTab = currentPos == 1
-            binding?.homeSyncFab?.visibility = if (isMainTabs && isProvidersTab && binding?.mainViewpager?.isVisible == true) {
-                android.view.View.VISIBLE
-            } else {
-                android.view.View.GONE
-            }
+            updateHomeSyncFabVisibility()
         }
 
         var syncSnackbar: com.google.android.material.snackbar.Snackbar? = null

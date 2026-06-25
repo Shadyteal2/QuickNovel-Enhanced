@@ -12,11 +12,13 @@ import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.map
 import com.lagradost.quicknovel.util.Apis
 import kotlinx.coroutines.launch
+import com.lagradost.quicknovel.util.Coroutines.ioSafe
 
 class MainPageViewModel : ViewModel() {
     lateinit var repo: MainPageRepository
     val api: APIRepository get() = repo.api
     private var hasInit = false
+    val searchHistory: MutableLiveData<List<String>> = MutableLiveData(emptyList())
 
     /*private val searchCards: MutableLiveData<ArrayList<SearchResponse>> by lazy {
         MutableLiveData<ArrayList<SearchResponse>>()
@@ -59,6 +61,10 @@ class MainPageViewModel : ViewModel() {
     }
 
     val isInSearch: MutableLiveData<Boolean> by lazy {
+        MutableLiveData<Boolean>(false)
+    }
+
+    val isStale: MutableLiveData<Boolean> by lazy {
         MutableLiveData<Boolean>(false)
     }
 
@@ -113,6 +119,52 @@ class MainPageViewModel : ViewModel() {
         isInSearch.postValue(false)
     }
 
+    fun loadHistory(apiName: String) {
+        ioSafe {
+            val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+            val json = com.lagradost.quicknovel.BaseApplication.getKey<String>("SEARCH_HISTORY", apiName, "[]") ?: "[]"
+            try {
+                val list = mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<String>>() {})
+                searchHistory.postValue(list)
+            } catch (t: Throwable) {
+                searchHistory.postValue(emptyList())
+            }
+        }
+    }
+
+    fun addToHistory(query: String, apiName: String) {
+        if (query.isBlank()) return
+        val trimmed = query.trim()
+        ioSafe {
+            val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+            val current = searchHistory.value.orEmpty().toMutableList()
+            current.remove(trimmed)
+            current.add(0, trimmed)
+            val limit = current.take(5)
+            try {
+                com.lagradost.quicknovel.BaseApplication.setKey("SEARCH_HISTORY", apiName, mapper.writeValueAsString(limit))
+                searchHistory.postValue(limit)
+            } catch (t: Throwable) {
+                // Fail silently
+            }
+        }
+    }
+
+    fun removeFromHistory(query: String, apiName: String) {
+        val trimmed = query.trim()
+        ioSafe {
+            val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+            val current = searchHistory.value.orEmpty().toMutableList()
+            current.remove(trimmed)
+            try {
+                com.lagradost.quicknovel.BaseApplication.setKey("SEARCH_HISTORY", apiName, mapper.writeValueAsString(current))
+                searchHistory.postValue(current)
+            } catch (t: Throwable) {
+                // Fail silently
+            }
+        }
+    }
+
     fun init(
         apiName: String, mainCategory: Int?,
         orderBy: Int?,
@@ -120,6 +172,7 @@ class MainPageViewModel : ViewModel() {
     ) {
         if (hasInit) return
         hasInit = true
+        loadHistory(apiName)
         repo = MainPageRepository(Apis.getApiFromName(apiName))
         load(
             0,
@@ -149,6 +202,7 @@ class MainPageViewModel : ViewModel() {
         mainCategory: Int?,
         orderBy: Int?,
         tag: Int?,
+        isUserRefresh: Boolean = false
     ): kotlinx.coroutines.Job {
         currentTag.postValue(tag)
         currentOrderBy.postValue(orderBy)
@@ -157,7 +211,10 @@ class MainPageViewModel : ViewModel() {
         val cPage = page ?: ((currentPage.value ?: 0) + 1)
         if (cPage == 0) {
             infCards.clear()
-            currentCards.postValue(Resource.Loading())
+            val canUseCache = mainCategory == null && orderBy == null && tag == null && !isUserRefresh
+            if (!canUseCache) {
+                currentCards.postValue(Resource.Loading())
+            }
         }
 
         isInSearch.postValue(false)
@@ -165,12 +222,42 @@ class MainPageViewModel : ViewModel() {
             loadingMoreItems.postValue(true)
         }
         return viewModelScope.launch {
+            val context = com.lagradost.quicknovel.BaseApplication.context
+            val canUseCache = cPage == 0 && mainCategory == null && orderBy == null && tag == null && !isUserRefresh
+            
+            if (canUseCache && context != null) {
+                val cached = com.lagradost.quicknovel.util.ProviderCacheManager.loadPage(context, repo.api.name)
+                if (cached != null) {
+                    infCards.clear()
+                    infCards.addAll(cached.items)
+                    isStale.postValue(true)
+                    currentCards.postValue(
+                        Resource.Success(
+                            SearchResponseList(
+                                infCards,
+                                1,
+                                ++searchResponseListQueries
+                            )
+                        )
+                    )
+                } else {
+                    currentCards.postValue(Resource.Loading())
+                }
+            }
+
             //val copy = if (cPage == 0) ArrayList() else cards.value
             when (val res = repo.loadMainPage(cPage + 1, mainCategory, orderBy, tag)) {
                 is Resource.Success -> {
                     val response = res.value
                     currentUrl.postValue(response.url)
+                    if (cPage == 0) {
+                        infCards.clear()
+                        if (context != null && mainCategory == null && orderBy == null && tag == null) {
+                            com.lagradost.quicknovel.util.ProviderCacheManager.savePage(context, repo.api.name, response.list)
+                        }
+                    }
                     infCards.addAll(response.list)
+                    isStale.postValue(false)
 
                     currentCards.postValue(
                         Resource.Success(
@@ -184,11 +271,16 @@ class MainPageViewModel : ViewModel() {
                 }
 
                 is Resource.Failure -> {
-                    val result: Resource<SearchResponseList> = Resource.Failure(
-                        res.cause,
-                        res.errorString
-                    )
-                    currentCards.postValue(result)
+                    if (!(cPage == 0 && infCards.isNotEmpty() && isStale.value == true)) {
+                        val result: Resource<SearchResponseList> = Resource.Failure(
+                            res.cause,
+                            res.errorString
+                        )
+                        currentCards.postValue(result)
+                    } else {
+                        com.lagradost.quicknovel.CommonActivity.showToast("Failed to refresh: ${res.errorString}")
+                        isStale.postValue(true)
+                    }
                 }
 
                 is Resource.Loading -> {

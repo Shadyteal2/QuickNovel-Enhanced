@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -167,6 +168,20 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
         initialValue = emptyList()
     )
 
+    val carouselItems: StateFlow<List<Recommendation>> = recommendations
+        .map { groups ->
+            groups.flatMap { it.recommendations }
+                .distinctBy { it.novel.url }
+                .sortedByDescending { it.score }
+                .take(8)
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     private val _isLoading = MutableStateFlow<Boolean>(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -234,7 +249,7 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 
                 // Force a trigger in base profile flow to refresh the combined state
-                _baseProfile.value = _baseProfile.value
+                _baseProfile.value = _baseProfile.value.copy(lastUpdated = System.currentTimeMillis())
             } catch (e: Exception) {
                 com.lagradost.quicknovel.mvvm.logError(e)
             } finally {
@@ -243,9 +258,9 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun markWizardComplete() {
+    fun markWizardComplete(diversityScore: Float) {
         val current = profile.value
-        saveProfile(current.copy(isWizardComplete = true))
+        saveProfile(current.copy(isWizardComplete = true, diversityScore = diversityScore))
     }
 
     fun recordInteraction(novelUrl: String, type: String) {

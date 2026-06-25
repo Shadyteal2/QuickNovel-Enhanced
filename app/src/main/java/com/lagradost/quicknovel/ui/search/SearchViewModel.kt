@@ -26,6 +26,44 @@ class SearchViewModel : ViewModel() {
     private val _currentSearch: MutableLiveData<ArrayList<OnGoingSearch>?> = MutableLiveData(null)
     val currentSearch: LiveData<ArrayList<OnGoingSearch>?> get() = _currentSearch
 
+    val searchHistory: MutableLiveData<List<String>> = MutableLiveData(emptyList())
+
+    init {
+        loadHistory()
+    }
+
+    fun loadHistory() {
+        val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+        val json = com.lagradost.quicknovel.BaseApplication.getKey<String>("GLOBAL_SEARCH_HISTORY", "history", "[]") ?: "[]"
+        try {
+            val list = mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<String>>() {})
+            searchHistory.postValue(list)
+        } catch (t: Throwable) {
+            searchHistory.postValue(emptyList())
+        }
+    }
+
+    fun addToHistory(query: String) {
+        if (query.isBlank()) return
+        val trimmed = query.trim()
+        val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+        val current = searchHistory.value.orEmpty().toMutableList()
+        current.remove(trimmed)
+        current.add(0, trimmed)
+        val limit = current.take(5)
+        com.lagradost.quicknovel.BaseApplication.setKey("GLOBAL_SEARCH_HISTORY", "history", mapper.writeValueAsString(limit))
+        searchHistory.postValue(limit)
+    }
+
+    fun removeFromHistory(query: String) {
+        val trimmed = query.trim()
+        val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+        val current = searchHistory.value.orEmpty().toMutableList()
+        current.remove(trimmed)
+        com.lagradost.quicknovel.BaseApplication.setKey("GLOBAL_SEARCH_HISTORY", "history", mapper.writeValueAsString(current))
+        searchHistory.postValue(current)
+    }
+
     @Volatile
     var searchCounter = 0
 
@@ -54,6 +92,7 @@ class SearchViewModel : ViewModel() {
             clearSearch()
             return
         }
+        addToHistory(query)
         ongoingSearchJob?.cancel()
         lastSearchQuery = query
         ongoingSearchJob = ioSafe {

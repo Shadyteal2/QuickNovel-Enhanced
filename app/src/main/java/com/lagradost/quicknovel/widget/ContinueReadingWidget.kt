@@ -15,19 +15,18 @@ import android.graphics.Matrix
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.action.actionStartActivity
-import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.updateAppWidgetState
@@ -46,8 +45,6 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.state.GlanceStateDefinition
-import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -62,10 +59,9 @@ import com.lagradost.quicknovel.DataStore.getKeys
 import com.lagradost.quicknovel.EPUB_CURRENT_POSITION
 import com.lagradost.quicknovel.EPUB_CURRENT_POSITION_CHAPTER
 import com.lagradost.quicknovel.HISTORY_FOLDER
+import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.MainActivity
 import com.lagradost.quicknovel.ReadActivity2
-import com.lagradost.quicknovel.R
-import com.lagradost.quicknovel.TTSNotificationService
 import com.lagradost.quicknovel.mvvm.safeApiCall
 import com.lagradost.quicknovel.util.ResultCached
 import kotlinx.coroutines.Dispatchers
@@ -73,27 +69,52 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-object TTSWidgetKeys {
-    val NOVEL_TITLE = stringPreferencesKey("novel_title")
-    val CHAPTER_NAME = stringPreferencesKey("chapter_name")
-    val COVER_PATH = stringPreferencesKey("cover_path")
-    val COVER_COMPOSITE_PATH = stringPreferencesKey("cover_composite_path")
-    val IS_PLAYING = booleanPreferencesKey("is_playing")
-    val NOVEL_URL = stringPreferencesKey("novel_url")
-    val CHAPTER_INDEX = intPreferencesKey("chapter_index")
-    val TOTAL_CHAPTERS = intPreferencesKey("total_chapters")
+// ─── Glance PreferencesKeys ──────────────────────────────
+
+object ContinueReadingWidgetKeys {
+    val NOVEL_TITLE = stringPreferencesKey("cr_novel_title")
+    val CHAPTER_NAME = stringPreferencesKey("cr_chapter_name")
+    val CHAPTER_INDEX = intPreferencesKey("cr_chapter_index")
+    val TOTAL_CHAPTERS = intPreferencesKey("cr_total_chapters")
+    val NOVEL_URL = stringPreferencesKey("cr_novel_url")
+    val NOVEL_SOURCE = stringPreferencesKey("cr_novel_source")
+    val COVER_PATH = stringPreferencesKey("cr_cover_path")
+    val COVER_COMPOSITE_PATH = stringPreferencesKey("cr_cover_composite_path")
 }
 
-class TTSWidget : GlanceAppWidget() {
-    override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
+// ─── Widget ────────────────────────────────────────────────
+
+class ContinueReadingWidget : GlanceAppWidget() {
 
     companion object {
-        private const val COVER_CACHE_FILE = "tts_widget_cover.jpg"
-        private const val COMPOSITE_CACHE_FILE = "tts_widget_composite.png"
+        private const val COVER_CACHE_FILE = "cr_widget_cover.jpg"
+        private const val COMPOSITE_CACHE_FILE = "cr_widget_composite.png"
 
         // Widget dimensions for composite rendering (matches 4×2 cell at ~160dpi)
         private const val WIDGET_W = 800
         private const val WIDGET_H = 300
+
+        // ─── Composite canvas renderer ────────────────────────
+        /**
+         * Renders the full widget as a single Bitmap using [Canvas] so we
+         * get precise control over the cover art quality, the scrim gradient,
+         * the progress bar and the text — all at full resolution without any
+         * Glance layout constraint hacks.
+         *
+         * This bitmap is then handed to [ImageProvider] and stretches to fill
+         * the widget exactly. No blurriness, no pixelation.
+         */
+        private fun drawFallbackGradient(canvas: Canvas) {
+            val paint = Paint()
+            val shader = android.graphics.LinearGradient(
+                0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat(),
+                intArrayOf(0xFF0F172A.toInt(), 0xFF1E293B.toInt()), // Slate 900 to Slate 800
+                null,
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            paint.shader = shader
+            canvas.drawRect(0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat(), paint)
+        }
 
         private fun ellipsizeText(text: String, paint: Paint, maxWidth: Float): String {
             if (paint.measureText(text) <= maxWidth) return text
@@ -133,70 +154,52 @@ class TTSWidget : GlanceAppWidget() {
             }
         }
 
-        // ─── Composite canvas renderer ────────────────────────
         private fun buildCompositeBitmap(
             coverBitmap: Bitmap?,
             title: String,
             chapterLabel: String,
-            isPlaying: Boolean,
+            progressFraction: Float, // 0f..1f
             chapterIndex: Int,
             totalChapters: Int,
         ): Bitmap {
             val bmp = Bitmap.createBitmap(WIDGET_W, WIDGET_H, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bmp)
 
-            // Clip the canvas to rounded corners first so all drawing is bounded
-            val clipPath = Path().apply {
-                addRoundRect(
-                    RectF(0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat()),
-                    76f, 76f, // ~28dp radius
-                    Path.Direction.CW
-                )
-            }
-            canvas.clipPath(clipPath)
-
-            // 1. Dark sleek background container (OLED black)
+            // 1. Dark sleek background container (OLED black / deep gray)
             canvas.drawColor(0xFF0C0C0E.toInt())
 
-            // 2. Soft, diffuse radial glow behind active play control button
-            val playCenterX = 612f
-            val playCenterY = 236f
+            // 2. Soft, diffuse radial glow behind the connection wire
             try {
-                val glowColor = if (isPlaying) 0x2200FF88.toInt() else 0x22FFD54F.toInt() // green or amber glow
                 val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = android.graphics.Shader.TileMode.CLAMP.let { mode ->
-                        android.graphics.RadialGradient(
-                            playCenterX, playCenterY, 200f,
-                            intArrayOf(glowColor, 0x00000000.toInt()),
-                            null,
-                            mode
-                        )
-                    }
+                    shader = android.graphics.RadialGradient(
+                        600f, 130f, 220f,
+                        intArrayOf(0x1F00FF88.toInt(), 0x00000000.toInt()), // 12% mint green glow
+                        null,
+                        android.graphics.Shader.TileMode.CLAMP
+                    )
                 }
-                canvas.drawCircle(playCenterX, playCenterY, 200f, glowPaint)
+                canvas.drawCircle(600f, 130f, 220f, glowPaint)
             } catch (_: Throwable) {}
 
-            // 3. Top-left Status Pill (Playback Mode status)
+            // 3. Top-left Status Pill (Progress level)
             val pillRect = RectF(48f, 32f, 176f, 62f)
             val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0x2600FF88.toInt() else 0x26FFD54F.toInt()
+                color = 0x2600FF88.toInt() // 15% green background
             }
             canvas.drawRoundRect(pillRect, 15f, 15f, pillBgPaint)
 
-            val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0xFF00FF88.toInt() else 0xFFFFD54F.toInt()
-                textSize = 18f
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            val fillW = pillRect.width() * progressFraction.coerceIn(0f, 1f)
+            if (fillW > 0f) {
+                canvas.save()
+                canvas.clipRect(pillRect.left, pillRect.top, pillRect.left + fillW, pillRect.bottom)
+                val pillFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xFF00FF88.toInt() // Vibrant green fill
+                }
+                canvas.drawRoundRect(pillRect, 15f, 15f, pillFillPaint)
+                canvas.restore()
             }
-            val pillText = if (isPlaying) "SPEAKING" else "PAUSED"
-            val textBoundsPill = Rect()
-            pillTextPaint.getTextBounds(pillText, 0, pillText.length, textBoundsPill)
-            val pillTextX = pillRect.left + (pillRect.width() - pillTextPaint.measureText(pillText)) / 2f
-            val pillTextY = pillRect.centerY() - textBoundsPill.exactCenterY()
-            canvas.drawText(pillText, pillTextX, pillTextY, pillTextPaint)
 
             // Progress percent text underneath status pill
-            val progressFraction = if (totalChapters > 0) chapterIndex.toFloat() / totalChapters.toFloat() else 0f
             val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFF8E8E93.toInt()
                 textSize = 21f
@@ -205,14 +208,14 @@ class TTSWidget : GlanceAppWidget() {
             val progressPercentText = "${(progressFraction * 100f).toInt()}% complete"
             canvas.drawText(progressPercentText, 48f, 90f, pctPaint)
 
-            // 4. Top-right indicator (remaining reading estimate)
+            // 4. Right-aligned Remaining Read Time (Time Left)
             val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFFE5E5EA.toInt()
                 textSize = 24f
                 typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             }
             val remainingChapters = (totalChapters - chapterIndex).coerceAtLeast(1)
-            val minutesLeft = remainingChapters * 3
+            val minutesLeft = remainingChapters * 3 // 3 mins estimated per chapter
             val timeLeftText = if (progressFraction >= 1.0f) {
                 "Finished"
             } else if (minutesLeft >= 60) {
@@ -223,7 +226,7 @@ class TTSWidget : GlanceAppWidget() {
             val timeTextW = timePaint.measureText(timeLeftText)
             canvas.drawText(timeLeftText, WIDGET_W - 48f - timeTextW, 58f, timePaint)
 
-            // 5. Left Column Text — Distributed vertically to fill space elegantly
+            // 5. Left Column Text — Title + Chapter label with proper breathing room
             val leftTextMaxW = 280f
             val titleTextSize = 27f
             val titleLineHeight = titleTextSize * 1.3f
@@ -234,6 +237,7 @@ class TTSWidget : GlanceAppWidget() {
                 typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             }
 
+            // Count lines title occupies (max 2) so chapter label never overlaps
             val titleLineCount: Int = run {
                 val buf = FloatArray(1)
                 val fit = titlePaint.breakText(title, true, leftTextMaxW, buf)
@@ -241,9 +245,9 @@ class TTSWidget : GlanceAppWidget() {
             }
             drawWrappedText(canvas, title, titlePaint, 48f, titleStartY, leftTextMaxW, 2)
 
-            // "CHAPTER" micro-label
+            // "CHAPTER" micro-label above the chapter name for visual hierarchy
             val microLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0x6600FF88.toInt() else 0x66FFD54F.toInt()
+                color = 0x6600FF88.toInt() // 40% mint
                 textSize = 16f
                 typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
                 letterSpacing = 0.12f
@@ -253,21 +257,22 @@ class TTSWidget : GlanceAppWidget() {
             canvas.drawText("CHAPTER", 48f, microLabelY, microLabelPaint)
 
             val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xCCFFFFFF.toInt()
+                color = 0xCCFFFFFF.toInt() // 80% white — more legible
                 textSize = 22f
                 typeface = android.graphics.Typeface.DEFAULT
             }
+            // 8px gap below the CHAPTER label
             val chapterLabelY = microLabelY + 8f + subPaint.textSize
             val displayChapter = ellipsizeText(chapterLabel, subPaint, leftTextMaxW)
             canvas.drawText(displayChapter, 48f, chapterLabelY, subPaint)
 
-            // 6. Glowing connection wire curving from middle-right of cover art
+            // 6. Glowing connection wire curving from the cover art to the right margin
             val linePath = Path().apply {
                 moveTo(446f, 110f)
                 cubicTo(530f, 110f, 570f, 150f, WIDGET_W - 48f, 150f)
             }
             val lineGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0x3D00FF88.toInt() else 0x3DFFD54F.toInt()
+                color = 0x3D00FF88.toInt() // 24% green glow
                 style = Paint.Style.STROKE
                 strokeWidth = 10f
                 strokeCap = Paint.Cap.ROUND
@@ -275,7 +280,7 @@ class TTSWidget : GlanceAppWidget() {
             canvas.drawPath(linePath, lineGlowPaint)
 
             val lineCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0xFF00FF88.toInt() else 0xFFFFD54F.toInt()
+                color = 0xFF00FF88.toInt() // Bright core line
                 style = Paint.Style.STROKE
                 strokeWidth = 4f
                 strokeCap = Paint.Cap.ROUND
@@ -324,6 +329,7 @@ class TTSWidget : GlanceAppWidget() {
                 }
                 canvas.drawRoundRect(cardRect, 12f, 12f, cardPaint)
 
+                // White subtle border around cover
                 val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = 0x26FFFFFF.toInt()
                     style = Paint.Style.STROKE
@@ -344,96 +350,62 @@ class TTSWidget : GlanceAppWidget() {
                 canvas.drawRoundRect(cardRect, 12f, 12f, borderPaint)
             }
 
-            // 8. Media controls shifted to bottom-right area
-            // playCenterY is 236f
-            
-            // Previous Button
-            val prevCenterX = 522f
-            val prevRadius = 32f
-            val prevBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0x1AFFFFFF.toInt()
-            }
-            val prevBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0x1AFFFFFF.toInt()
-                style = Paint.Style.STROKE
-                strokeWidth = 2f
-            }
-            canvas.drawCircle(prevCenterX, playCenterY, prevRadius, prevBgPaint)
-            canvas.drawCircle(prevCenterX, playCenterY, prevRadius, prevBorderPaint)
-            
-            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFFFFFFFF.toInt()
-                style = Paint.Style.FILL
-            }
-            val triH = 12f
-            val triW = 10f
-            canvas.drawPath(Path().apply {
-                moveTo(prevCenterX - triW, playCenterY)
-                lineTo(prevCenterX, playCenterY - triH)
-                lineTo(prevCenterX, playCenterY + triH)
-                close()
-                moveTo(prevCenterX, playCenterY)
-                lineTo(prevCenterX + triW, playCenterY - triH)
-                lineTo(prevCenterX + triW, playCenterY + triH)
-                close()
-            }, iconPaint)
+            // 8. READ NOW pill — anchored to bottom-right corner
+            val btnH = 56f
+            val btnY = 224f
+            val btnLeft = 472f   // wide pill spanning ~35% of width
+            val btnRight = 752f
+            val btnMidY = btnY + btnH / 2f
+            val b3Rect = RectF(btnLeft, btnY, btnRight, btnY + btnH)
 
-            // Play / Pause Button
-            val playBgColor = if (isPlaying) 0xFF00FF88.toInt() else 0xFFFFD54F.toInt()
-            val playBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = playBgColor
+            // Subtle warm glow shadow behind pill
+            val b3GlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = android.graphics.RadialGradient(
+                    (btnLeft + btnRight) / 2f, btnMidY, btnH * 1.4f,
+                    intArrayOf(0x55FFD54F.toInt(), 0x00000000.toInt()),
+                    null,
+                    android.graphics.Shader.TileMode.CLAMP
+                )
             }
-            val playGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = android.graphics.Shader.TileMode.CLAMP.let { mode ->
-                    android.graphics.RadialGradient(
-                        playCenterX, playCenterY, 42f * 1.5f,
-                        intArrayOf((playBgColor and 0x00FFFFFF) or 0x55000000, 0x00000000.toInt()),
-                        null,
-                        mode
-                    )
-                }
-            }
-            canvas.drawCircle(playCenterX, playCenterY, 42f * 1.5f, playGlowPaint)
-            canvas.drawCircle(playCenterX, playCenterY, 42f, playBgPaint)
+            canvas.drawRoundRect(
+                RectF(btnLeft - 12f, btnY - 4f, btnRight + 12f, btnY + btnH + 8f),
+                btnH / 2f, btnH / 2f, b3GlowPaint
+            )
 
-            val playIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            // Amber-yellow pill fill
+            val b3Bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFD54F.toInt() }
+            canvas.drawRoundRect(b3Rect, btnH / 2f, btnH / 2f, b3Bg)
+
+            // READ NOW text + play icon, centered in pill
+            val btnText = "READ NOW"
+            val btnTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFF0C0C0E.toInt()
-                style = Paint.Style.FILL
+                textSize = 25f
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             }
-            if (isPlaying) {
-                val barW = 6f
-                val barH = 18f
-                val gap = 6f
-                canvas.drawRect(playCenterX - barW - gap/2f, playCenterY - barH/2f, playCenterX - gap/2f, playCenterY + barH/2f, playIconPaint)
-                canvas.drawRect(playCenterX + gap/2f, playCenterY - barH/2f, playCenterX + barW + gap/2f, playCenterY + barH/2f, playIconPaint)
-            } else {
-                val triSize = 13f
-                canvas.drawPath(Path().apply {
-                    moveTo(playCenterX - triSize/1.5f, playCenterY - triSize)
-                    lineTo(playCenterX + triSize, playCenterY)
-                    lineTo(playCenterX - triSize/1.5f, playCenterY + triSize)
+            val iconSize = 14f
+            val textIconGap = 10f
+            val tW = btnTextPaint.measureText(btnText)
+            val totalW = tW + textIconGap + iconSize
+            val startX = (btnLeft + btnRight) / 2f - totalW / 2f
+            val textBounds = Rect()
+            btnTextPaint.getTextBounds(btnText, 0, btnText.length, textBounds)
+            val textY = btnMidY - textBounds.exactCenterY()
+            canvas.drawText(btnText, startX, textY, btnTextPaint)
+
+            val iconX = startX + tW + textIconGap
+            val iconY = btnMidY - iconSize / 2f
+            canvas.drawPath(
+                Path().apply {
+                    moveTo(iconX, iconY)
+                    lineTo(iconX + iconSize, iconY + iconSize / 2f)
+                    lineTo(iconX, iconY + iconSize)
                     close()
-                }, playIconPaint)
-            }
+                },
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF0C0C0E.toInt(); style = Paint.Style.FILL }
+            )
 
-            // Next Button
-            val nextCenterX = 702f
-            val nextRadius = 32f
-            canvas.drawCircle(nextCenterX, playCenterY, nextRadius, prevBgPaint)
-            canvas.drawCircle(nextCenterX, playCenterY, nextRadius, prevBorderPaint)
-            
-            canvas.drawPath(Path().apply {
-                moveTo(nextCenterX, playCenterY)
-                lineTo(nextCenterX - triW, playCenterY - triH)
-                lineTo(nextCenterX - triW, playCenterY + triH)
-                close()
-                moveTo(nextCenterX + triW, playCenterY)
-                lineTo(nextCenterX, playCenterY - triH)
-                lineTo(nextCenterX, playCenterY + triH)
-                close()
-            }, iconPaint)
-
-            // 9. Thin progress bar along bottom edge
+            // 9. Thin progress bar along the very bottom edge (2px strip)
             val pbH = 3f
             val pbY = WIDGET_H - pbH
             canvas.drawRect(0f, pbY, WIDGET_W.toFloat(), WIDGET_H.toFloat(),
@@ -444,36 +416,34 @@ class TTSWidget : GlanceAppWidget() {
                     Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         shader = android.graphics.LinearGradient(
                             0f, 0f, fillWidth, 0f,
-                            intArrayOf(if (isPlaying) 0xFF00C853.toInt() else 0xFFFFB300.toInt(), playBgColor),
+                            intArrayOf(0xFF00C853.toInt(), 0xFF00FF88.toInt()),
                             null,
                             android.graphics.Shader.TileMode.CLAMP
                         )
                     })
             }
 
-            // 10. Glass border
-            canvas.drawRoundRect(
-                RectF(1f, 1f, WIDGET_W.toFloat() - 1f, WIDGET_H.toFloat() - 1f),
-                75f, 75f,
+            // 10. Glass border around the widget
+            canvas.drawRect(0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat(),
                 Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = 0x1AFFFFFF.toInt()
                     style = Paint.Style.STROKE
                     strokeWidth = 2f
-                }
-            )
+                })
 
             return bmp
         }
 
-        private suspend fun fetchCoverBitmap(context: Context, url: String?): Bitmap? {
+        // ─── Fetch + cache cover at ORIGINAL resolution ────────
+        private suspend fun fetchSharpCoverBitmap(context: Context, url: String?): Bitmap? {
             if (url.isNullOrBlank()) return null
             return withContext(Dispatchers.IO) {
                 try {
                     val loader = SingletonImageLoader.get(context)
                     val request = ImageRequest.Builder(context)
                         .data(url)
-                        .allowHardware(false)
-                        .size(Size.ORIGINAL)
+                        .allowHardware(false)  // Must be software bitmap for Canvas drawing
+                        .size(Size.ORIGINAL)   // Full resolution — no upscaling artifacts
                         .build()
                     val result = loader.execute(request)
                     val drawable = (result as? SuccessResult)?.image?.asDrawable(context.resources)
@@ -484,19 +454,23 @@ class TTSWidget : GlanceAppWidget() {
             }
         }
 
+        // ─── Public update API ────────────────────────────────────
+
+        /** Called from ReadActivity2 / DownloadViewModel whenever reading state changes. */
         suspend fun updateWidgetState(
             context: Context,
             novelTitle: String,
             chapterName: String,
+            chapterIndex: Int,
+            totalChapters: Int,
             coverUrl: String?,
-            isPlaying: Boolean,
+            novelUrl: String,
+            novelSource: String,
             coverBitmap: Bitmap? = null,
-            novelUrl: String? = null,
-            chapterIndex: Int? = null,
-            totalChapters: Int? = null
         ) {
-            val rawCover = coverBitmap ?: fetchCoverBitmap(context, coverUrl)
+            val rawCover = coverBitmap ?: fetchSharpCoverBitmap(context, coverUrl)
 
+            // Cache raw cover separately (for future re-composites without re-fetching)
             val coverFile = File(context.cacheDir, COVER_CACHE_FILE)
             if (rawCover != null) {
                 safeApiCall {
@@ -506,23 +480,8 @@ class TTSWidget : GlanceAppWidget() {
                 }
             }
 
-            val actualChapterIndex = chapterIndex ?: withContext(Dispatchers.IO) {
-                context.getKey<Int>(EPUB_CURRENT_POSITION, novelTitle) ?: 0
-            }
-            val actualTotalChapters = totalChapters ?: withContext(Dispatchers.IO) {
-                val keys = context.getKeys(HISTORY_FOLDER)
-                val cached = keys?.mapNotNull { key -> context.getKey<ResultCached>(key) }
-                    ?.firstOrNull { it.name == novelTitle }
-                cached?.totalChapters ?: 100
-            }
-            val actualNovelUrl = novelUrl ?: withContext(Dispatchers.IO) {
-                val keys = context.getKeys(HISTORY_FOLDER)
-                val cached = keys?.mapNotNull { key -> context.getKey<ResultCached>(key) }
-                    ?.firstOrNull { it.name == novelTitle }
-                cached?.source ?: ""
-            }
-
-            val composite = buildCompositeBitmap(rawCover, novelTitle, chapterName, isPlaying, actualChapterIndex, actualTotalChapters)
+            val progress = if (totalChapters > 0) chapterIndex.toFloat() / totalChapters.toFloat() else 0f
+            val composite = buildCompositeBitmap(rawCover, novelTitle, chapterName, progress, chapterIndex, totalChapters)
 
             val compositeFile = File(context.cacheDir, COMPOSITE_CACHE_FILE)
             safeApiCall {
@@ -532,64 +491,66 @@ class TTSWidget : GlanceAppWidget() {
             }
 
             val manager = GlanceAppWidgetManager(context)
-            val glanceIds = manager.getGlanceIds(TTSWidget::class.java)
+            val glanceIds = manager.getGlanceIds(ContinueReadingWidget::class.java)
             for (id in glanceIds) {
                 updateAppWidgetState(context, id) { prefs ->
-                    prefs[TTSWidgetKeys.NOVEL_TITLE] = novelTitle
-                    prefs[TTSWidgetKeys.CHAPTER_NAME] = chapterName
-                    prefs[TTSWidgetKeys.IS_PLAYING] = isPlaying
-                    prefs[TTSWidgetKeys.COVER_PATH] = if (coverFile.exists()) coverFile.absolutePath else ""
-                    prefs[TTSWidgetKeys.COVER_COMPOSITE_PATH] = if (compositeFile.exists()) compositeFile.absolutePath else ""
-                    prefs[TTSWidgetKeys.NOVEL_URL] = actualNovelUrl
-                    prefs[TTSWidgetKeys.CHAPTER_INDEX] = actualChapterIndex
-                    prefs[TTSWidgetKeys.TOTAL_CHAPTERS] = actualTotalChapters
+                    prefs[ContinueReadingWidgetKeys.NOVEL_TITLE] = novelTitle
+                    prefs[ContinueReadingWidgetKeys.CHAPTER_NAME] = chapterName
+                    prefs[ContinueReadingWidgetKeys.CHAPTER_INDEX] = chapterIndex
+                    prefs[ContinueReadingWidgetKeys.TOTAL_CHAPTERS] = totalChapters
+                    prefs[ContinueReadingWidgetKeys.NOVEL_URL] = novelUrl
+                    prefs[ContinueReadingWidgetKeys.NOVEL_SOURCE] = novelSource
+                    prefs[ContinueReadingWidgetKeys.COVER_PATH] = if (coverFile.exists()) coverFile.absolutePath else ""
+                    prefs[ContinueReadingWidgetKeys.COVER_COMPOSITE_PATH] = if (compositeFile.exists()) compositeFile.absolutePath else ""
                 }
-                TTSWidget().update(context, id)
+                ContinueReadingWidget().update(context, id)
             }
         }
 
-        suspend fun updateAll(context: Context) {
+        /**
+         * Self-refresh: reads the last-opened novel from history and pushes a
+         * widget update. Called on [android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE].
+         */
+        suspend fun refreshFromHistory(context: Context) {
             withContext(Dispatchers.IO) {
                 val keys = context.getKeys(HISTORY_FOLDER) ?: return@withContext
-                val lastNovel = keys.mapNotNull { key ->
-                    context.getKey<ResultCached>(key)
-                }.maxByOrNull { it.cachedTime } ?: return@withContext
+                val lastNovel = keys.mapNotNull { key -> context.getKey<ResultCached>(key) }
+                    .maxByOrNull { it.cachedTime } ?: return@withContext
 
                 val chapterIndex = context.getKey<Int>(EPUB_CURRENT_POSITION, lastNovel.name) ?: 0
                 val chapterName = context.getKey<String>(EPUB_CURRENT_POSITION_CHAPTER, lastNovel.name)
                     ?: "Chapter ${chapterIndex + 1}"
-                
-                val isPlaying = TTSNotificationService.viewModel?.isTTSRunning() == true ||
-                        TTSForegroundService.instance?.isPlaying() == true
+                val totalChapters = lastNovel.totalChapters.coerceAtLeast(1)
 
                 updateWidgetState(
                     context = context,
                     novelTitle = lastNovel.name,
                     chapterName = chapterName,
-                    coverUrl = lastNovel.poster,
-                    isPlaying = isPlaying,
-                    coverBitmap = null,
-                    novelUrl = lastNovel.source,
                     chapterIndex = chapterIndex,
-                    totalChapters = lastNovel.totalChapters
+                    totalChapters = totalChapters,
+                    coverUrl = lastNovel.poster,
+                    novelUrl = lastNovel.source,
+                    novelSource = lastNovel.apiName,
                 )
             }
         }
     }
 
+    // ─── Glance UI ────────────────────────────────────────────
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             val prefs = currentState<Preferences>()
-            val title = prefs[TTSWidgetKeys.NOVEL_TITLE]
-            val novelUrl = prefs[TTSWidgetKeys.NOVEL_URL] ?: ""
-            val chapterIndex = prefs[TTSWidgetKeys.CHAPTER_INDEX] ?: 0
-            val compositePath = prefs[TTSWidgetKeys.COVER_COMPOSITE_PATH] ?: ""
+            val title = prefs[ContinueReadingWidgetKeys.NOVEL_TITLE]
+            val novelUrl = prefs[ContinueReadingWidgetKeys.NOVEL_URL] ?: ""
+            val chapterIndex = prefs[ContinueReadingWidgetKeys.CHAPTER_INDEX] ?: 0
+            val compositePath = prefs[ContinueReadingWidgetKeys.COVER_COMPOSITE_PATH] ?: ""
 
-            val launchIntent = Intent(context, ReadActivity2::class.java).apply {
-                putExtra("novelUrl", novelUrl)
+            // ── Intent — tapping anywhere on the widget opens the reader ──
+            val readIntent = Intent(context, ReadActivity2::class.java).apply {
                 putExtra("novelTitle", title ?: "")
                 putExtra("chapterIndex", chapterIndex)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
 
             val compositeBitmap: Bitmap? = if (compositePath.isNotEmpty()) {
@@ -597,50 +558,17 @@ class TTSWidget : GlanceAppWidget() {
             } else null
 
             if (compositeBitmap != null && title != null) {
+                // ── Single-tap target: entire widget opens the reader ─────
                 Box(
                     modifier = GlanceModifier
                         .fillMaxSize()
                         .cornerRadius(28.dp)
                         .background(ImageProvider(compositeBitmap))
-                        .clickable(actionStartActivity(launchIntent)),
+                        .clickable(actionStartActivity(readIntent)),
                     contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = GlanceModifier
-                            .fillMaxSize(),
-                        contentAlignment = Alignment.BottomEnd
-                    ) {
-                        Row(
-                            modifier = GlanceModifier
-                                .width(127.dp)
-                                .height(48.dp)
-                                .padding(end = 23.dp, bottom = 0.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Previous button target (32dp)
-                            Box(
-                                modifier = GlanceModifier
-                                    .size(32.dp)
-                                    .clickable(actionRunCallback<RewindAction>())
-                            ) {}
-
-                            // Play/Pause button target (40dp)
-                            Box(
-                                modifier = GlanceModifier
-                                    .size(40.dp)
-                                    .clickable(actionRunCallback<PlayPauseAction>())
-                            ) {}
-
-                            // Next button target (32dp)
-                            Box(
-                                modifier = GlanceModifier
-                                    .size(32.dp)
-                                    .clickable(actionRunCallback<ForwardAction>())
-                            ) {}
-                        }
-                    }
-                }
+                ) {}
             } else {
+                // ── Placeholder (no history yet) ─────────────────────
                 Box(
                     modifier = GlanceModifier
                         .fillMaxSize()

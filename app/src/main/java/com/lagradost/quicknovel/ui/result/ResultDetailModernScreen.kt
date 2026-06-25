@@ -160,6 +160,7 @@ fun ResultDetailModernScreen(
                 val chapterCount = (res as? StreamResponse)?.data?.size
 
                 var showPosterViewer by remember { mutableStateOf(false) }
+                var showShareSheet by remember { mutableStateOf(false) }
 
                 // Responsive hero height calculation based on available screen space to prevent clipping on small/folded screens
                 val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -224,8 +225,35 @@ fun ResultDetailModernScreen(
                                     tint = Color.White
                                 )
                             }
+                            FloatingActionButton(
+                                onClick = { showShareSheet = true },
+                                modifier = Modifier
+                                    .navigationBarsPadding()
+                                    .padding(24.dp)
+                                    .align(Alignment.BottomEnd),
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "Share Cover"
+                                )
+                            }
                         }
                     }
+                }
+
+                if (showShareSheet) {
+                    ShareCardBottomSheet(
+                        image = res.image,
+                        title = res.name,
+                        author = res.author,
+                        rating = res.rating,
+                        tags = res.tags,
+                        synopsis = res.synopsis,
+                        apiName = res.apiName,
+                        onDismiss = { showShareSheet = false }
+                    )
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -1078,7 +1106,7 @@ fun MigrationBottomSheet(
                                 .heightIn(max = 400.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(results) { match ->
+                            items(results, key = { it.url }) { match ->
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()

@@ -167,6 +167,8 @@ class DownloadViewModel : ViewModel() {
     val _pages: androidx.lifecycle.MutableLiveData<List<Page>?> = androidx.lifecycle.MutableLiveData(null)
     val pages: androidx.lifecycle.LiveData<List<Page>?> = _pages
     val categories: LiveData<List<CategoryItem>> = _readList.asLiveData()
+    val _neoShelfPage = MutableLiveData<List<NeoShelfEngine.NeoShelf>>(emptyList())
+    val neoShelfPage: LiveData<List<NeoShelfEngine.NeoShelf>> = _neoShelfPage
     val searchQuery: MutableLiveData<String> = MutableLiveData("")
     val cards: LiveData<List<Any>> = pages.map { pageList ->
         pageList?.flatMap { it.items }?.distinctBy { card ->
@@ -730,6 +732,15 @@ class DownloadViewModel : ViewModel() {
             )
         }
         _pages.postValue(pages)
+        val lastAccessMap = cardsDataMutex.withLock {
+            cardsData.keys.associateWith { id ->
+                getKey<Long>(DOWNLOAD_EPUB_LAST_ACCESS, id.toString(), 0L) ?: 0L
+            }
+        }
+        val computed = withContext(Dispatchers.Default) {
+            NeoShelfEngine.compute(cardsDataMutex.withLock { cardsData.values }, lastAccessMap)
+        }
+        _neoShelfPage.postValue(computed)
     }
 
     private suspend fun getDownloadedCards(): Page = cardsDataMutex.withLock {
@@ -764,6 +775,15 @@ class DownloadViewModel : ViewModel() {
             list[0] = getDownloadedCards()
         }
         _pages.postValue(list)
+        val lastAccessMap = cardsDataMutex.withLock {
+            cardsData.keys.associateWith { id ->
+                getKey<Long>(DOWNLOAD_EPUB_LAST_ACCESS, id.toString(), 0L) ?: 0L
+            }
+        }
+        val computed = withContext(Dispatchers.Default) {
+            NeoShelfEngine.compute(cardsDataMutex.withLock { cardsData.values }, lastAccessMap)
+        }
+        _neoShelfPage.postValue(computed)
     }
 
     init {

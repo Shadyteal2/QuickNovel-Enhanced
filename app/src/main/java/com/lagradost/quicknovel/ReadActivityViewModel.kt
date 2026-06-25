@@ -1713,6 +1713,12 @@ class ReadActivityViewModel : ViewModel() {
             var type = intent.type
             val isFromWidget = intent.hasExtra("novelTitle")
 
+            // Glance's actionStartActivity() injects a glance-action:// URI into intent.data.
+            // That URI is meaningless to us — clear it so the widget branch runs correctly.
+            if (isFromWidget && data?.scheme == "glance-action") {
+                data = null
+            }
+
             if (data == null && isFromWidget) {
                 val title = intent.getStringExtra("novelTitle")!!
                 val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
@@ -2343,6 +2349,7 @@ class ReadActivityViewModel : ViewModel() {
             if (prevChapter != scrollIndex.index) {
                 ioSafe {
                     TTSWidget.updateAll(ctx)
+                    com.lagradost.quicknovel.widget.ContinueReadingWidget.refreshFromHistory(ctx)
                 }
             }
         }
@@ -2663,6 +2670,16 @@ class ReadActivityViewModel : ViewModel() {
     val showTimeLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var showTime by PreferenceDelegateLiveView(
         EPUB_HAS_TIME, true, Boolean::class, showTimeLive
+    )
+
+    val showReadingTimerLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var showReadingTimer by PreferenceDelegateLiveView(
+        ReaderPrefs.READING_TIMER_ENABLED, false, Boolean::class, showReadingTimerLive
+    )
+
+    val readingTimerAnchorLive: MutableLiveData<Int> = MutableLiveData(null)
+    var readingTimerAnchor by PreferenceDelegateLiveView(
+        ReaderPrefs.READING_TIMER_ANCHOR, 0, Int::class, readingTimerAnchorLive
     )
 
     val zenModeLive: MutableLiveData<Boolean> = MutableLiveData(null)

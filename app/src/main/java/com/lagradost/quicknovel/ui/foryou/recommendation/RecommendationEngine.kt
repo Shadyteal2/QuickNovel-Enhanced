@@ -1,9 +1,11 @@
 package com.lagradost.quicknovel.ui.foryou.recommendation
 
+import androidx.compose.runtime.Immutable
 import com.lagradost.quicknovel.db.RecommendationCandidateEntity
 import com.lagradost.quicknovel.ui.foryou.recommendation.UserTasteProfile
 import kotlin.math.abs
 
+@Immutable
 data class NovelVector(
     val url: String,
     val name: String,
@@ -13,6 +15,7 @@ data class NovelVector(
     val posterUrl: String?
 )
 
+@Immutable
 data class Recommendation(
     val novel: NovelVector,
     val score: Float,
@@ -28,6 +31,7 @@ enum class RecommendationType {
     WILDCARD
 }
 
+@Immutable
 data class RecommendationGroup(
     val title: String,
     val type: RecommendationType,

@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -188,13 +189,20 @@ fun DownloadScreen(
 
     // Set up tabs list directly from pages
     val allTabs = remember(pages) {
-        pages?.map { page ->
+        val baseTabs = pages?.map { page ->
             if (page.title == com.lagradost.quicknovel.ui.ReadType.NONE.name) {
                 context.getString(R.string.title_download)
             } else {
                 page.title
             }
         } ?: emptyList()
+        if (baseTabs.isNotEmpty()) {
+            val list = baseTabs.toMutableList()
+            list.add(1, "NeoShelf")
+            list
+        } else {
+            listOf("NeoShelf")
+        }
     }
 
     // Distribute cards per page directly from pages
@@ -584,8 +592,22 @@ fun DownloadScreen(
                     ),
                 userScrollEnabled = isSwipeMode && !isScrollingList // Disable pager swipe when scrolling list
             ) { page ->
-                val list = cardsByPage[page] ?: emptyList()
-                val isDownloadsPage = page == 0
+                val neoShelfIndex = allTabs.indexOf("NeoShelf")
+                if (page == neoShelfIndex) {
+                    val shelves by viewModel.neoShelfPage.observeAsState(emptyList())
+                    NeoShelfPageContent(
+                        shelves = shelves,
+                        isCompact = isCompact,
+                        isBento3x3 = isBento3x3,
+                        bottomListPadding = bottomListPadding,
+                        onBookClickLoaded = onBookClickLoaded,
+                        onBookClick = onBookClick,
+                        onBookLongClickLoaded = onBookLongClickLoaded
+                    )
+                } else {
+                    val actualPageIndex = if (page > neoShelfIndex) page - 1 else page
+                    val list = cardsByPage[actualPageIndex] ?: emptyList()
+                val isDownloadsPage = actualPageIndex == 0
                 val pullState = rememberPullToRefreshState()
 
                 PullToRefreshBox(
@@ -996,6 +1018,7 @@ fun DownloadScreen(
                         }
                     }
                 }
+            }
             }
         }
 
@@ -1528,7 +1551,7 @@ fun DownloadScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(categories) { categoryItem ->
+                    items(categories, key = { it.id }) { categoryItem ->
                         val categoryName = if (categoryItem.isSystem && categoryItem.stringRes != null) context.getString(categoryItem.stringRes) else categoryItem.name
                         Row(
                             modifier = Modifier
@@ -2484,3 +2507,197 @@ private fun Modifier.lockGesturePriority(
         }
     }
 }
+
+@Composable
+fun NeoShelfPageContentEmpty() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Inventory,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                modifier = Modifier.size(72.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Your NeoShelf is clear!",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Read, complete, or update books to see auto-shelves.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun NeoShelfCardItem(
+    card: DownloadFragment.DownloadDataLoaded,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val title = card.name
+
+    Column(
+        modifier = modifier
+            .width(110.dp)
+            .clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .width(110.dp)
+                .height(160.dp)
+                .glassCard(shape = RoundedCornerShape(12.dp), strokeWidth = 0.5.dp)
+        ) {
+            AsyncImage(
+                model = rememberImageRequest(data = card),
+                contentDescription = title,
+                imageLoader = SingletonImageLoader.get(context),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        clip = true
+                        shape = RoundedCornerShape(12.dp)
+                    }
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontWeight = FontWeight.Medium,
+                lineHeight = 14.sp
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+    }
+}
+
+@Composable
+fun NeoShelfPageContent(
+    shelves: List<NeoShelfEngine.NeoShelf>,
+    isCompact: Boolean,
+    isBento3x3: Boolean,
+    bottomListPadding: androidx.compose.ui.unit.Dp,
+    onBookClickLoaded: (DownloadFragment.DownloadDataLoaded) -> Unit,
+    onBookClick: (ResultCached) -> Unit,
+    onBookLongClickLoaded: (DownloadFragment.DownloadDataLoaded) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (shelves.isEmpty()) {
+        NeoShelfPageContentEmpty()
+        return
+    }
+
+    // Keep track of which shelf indexes are expanded. Default to all expanded.
+    val expandedStates = remember { mutableStateMapOf<String, Boolean>().apply {
+        shelves.forEach { put(it.title, true) }
+    } }
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 8.dp, bottom = bottomListPadding),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(shelves, key = { it.title }) { shelf ->
+            val isExpanded = expandedStates[shelf.title] ?: true
+            
+            // Header Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expandedStates[shelf.title] = !isExpanded }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val icon = when (shelf.title) {
+                        "Currently Reading" -> Icons.Default.MenuBook
+                        "Almost Done" -> Icons.Default.Star
+                        "Long Abandoned" -> Icons.Default.HourglassEmpty
+                        "Completed Recently" -> Icons.Default.CheckCircle
+                        "Worth Revisiting" -> Icons.Default.History
+                        else -> Icons.Default.FolderOpen
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = shelf.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    // Count Badge
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = shelf.items.size.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(shelf.items, key = { it.id }) { card ->
+                        NeoShelfCardItem(
+                            card = card,
+                            onClick = { onBookClickLoaded(card) },
+                            onLongClick = { onBookLongClickLoaded(card) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+

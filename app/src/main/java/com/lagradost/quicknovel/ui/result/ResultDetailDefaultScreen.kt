@@ -164,6 +164,7 @@ fun ResultDetailDefaultScreen(
                 val chapterCount = (res as? StreamResponse)?.data?.size
 
                 var showPosterViewer by remember { mutableStateOf(false) }
+                var showShareSheet by remember { mutableStateOf(false) }
 
                 // Full-screen dialog viewer for the cover poster
                 if (showPosterViewer) {
@@ -217,8 +218,35 @@ fun ResultDetailDefaultScreen(
                                     tint = Color.White
                                 )
                             }
+                            FloatingActionButton(
+                                onClick = { showShareSheet = true },
+                                modifier = Modifier
+                                    .navigationBarsPadding()
+                                    .padding(24.dp)
+                                    .align(Alignment.BottomEnd),
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "Share Cover"
+                                )
+                            }
                         }
                     }
+                }
+
+                if (showShareSheet) {
+                    ShareCardBottomSheet(
+                        image = res.image,
+                        title = res.name,
+                        author = res.author,
+                        rating = res.rating,
+                        tags = res.tags,
+                        synopsis = res.synopsis,
+                        apiName = res.apiName,
+                        onDismiss = { showShareSheet = false }
+                    )
                 }
 
                 // ── Blurred full-screen ambient backdrop ──────────────────────
@@ -391,7 +419,7 @@ fun ResultDetailDefaultScreen(
                                             Column(
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .height(POSTER_HEIGHT),
+                                                    .heightIn(min = POSTER_HEIGHT),
                                                 verticalArrangement = Arrangement.Top
                                             ) {
                                                 // Provider chip badge

@@ -276,8 +276,14 @@ class ResultViewModel : ViewModel() {
         }.let { filtered ->
             when (sort) {
                 REVERSE_CHAPTER_SORT -> filtered.asReversed()
-                LAST_ACCES_SORT -> filtered.sortedByDescending { getChapterReadTime(it) ?: 0L }
-                REVERSE_LAST_ACCES_SORT -> filtered.sortedBy { getChapterReadTime(it) ?: 0L }
+                LAST_ACCES_SORT -> {
+                    val readTimes = filtered.associateWith { getChapterReadTime(it) ?: 0L }
+                    filtered.sortedByDescending { readTimes[it] ?: 0L }
+                }
+                REVERSE_LAST_ACCES_SORT -> {
+                    val readTimes = filtered.associateWith { getChapterReadTime(it) ?: 0L }
+                    filtered.sortedBy { readTimes[it] ?: 0L }
+                }
                 else -> filtered // CHAPTER_SORT
             }
         }

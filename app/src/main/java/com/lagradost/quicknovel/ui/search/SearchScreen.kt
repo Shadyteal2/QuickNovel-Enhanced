@@ -5,10 +5,14 @@ import com.lagradost.quicknovel.ui.theme.LoadingIndicator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -21,6 +25,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.*
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.carousel.CarouselItemScope
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
@@ -34,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +63,7 @@ import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.ui.home.HomeViewModel
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
+import com.lagradost.quicknovel.ui.theme.rememberShimmerBrush
 private val iconCache = HashMap<String, Int>()
 
 
@@ -88,6 +96,8 @@ fun SearchScreen(
     val searchResponse by viewModel.searchResponse.observeAsState()
     val currentSearch by viewModel.currentSearch.observeAsState()
     val homeApis by homeViewModel.homeApis.observeAsState(emptyList())
+    val focusManager = LocalFocusManager.current
+    val historyList by viewModel.searchHistory.observeAsState(initial = emptyList())
 
     val settingsManager = remember { PreferenceManager.getDefaultSharedPreferences(context) }
     val isAdvancedSearch by remember { mutableStateOf(settingsManager.getBoolean("advanced_search", true)) }
@@ -96,6 +106,7 @@ fun SearchScreen(
     var isProviderGrid by rememberSaveable { mutableStateOf(false) }
 
     val hasResults = searchResponse != null || currentSearch != null
+    var isSearchFocused by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -118,8 +129,71 @@ fun SearchScreen(
                 isLoading = searchResponse is Resource.Loading,
                 isProviderGrid = isProviderGrid,
                 onToggleProviderGrid = { isProviderGrid = !isProviderGrid },
-                showGridToggle = !hasResults
+                showGridToggle = !hasResults,
+                onFocusChanged = { isSearchFocused = it }
             )
+
+            AnimatedVisibility(
+                visible = isSearchFocused && searchQuery.isEmpty() && historyList.isNotEmpty(),
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_baseline_history_24),
+                        contentDescription = "Search History",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    historyList.forEach { historyQuery ->
+                        InputChip(
+                            selected = false,
+                            onClick = {
+                                searchQuery = historyQuery
+                                viewModel.search(historyQuery)
+                                focusManager.clearFocus()
+                            },
+                            label = {
+                                Text(
+                                    text = historyQuery,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            trailingIcon = {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_sharp_clear_24),
+                                    contentDescription = "Delete",
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clickable {
+                                            viewModel.removeFromHistory(historyQuery)
+                                        },
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            },
+                            colors = InputChipDefaults.inputChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            border = InputChipDefaults.inputChipBorder(
+                                borderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                enabled = true,
+                                selected = false
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                    }
+                }
+            }
 
             if (!hasResults) {
                 HomeProvidersGrid(
@@ -128,7 +202,9 @@ fun SearchScreen(
                     onProviderClick = onProviderClick
                 )
             } else {
-                if (isAdvancedSearch) {
+                if (searchResponse is Resource.Loading && !isAdvancedSearch) {
+                    SearchShimmerSkeleton()
+                } else if (isAdvancedSearch) {
                     currentSearch?.let { list ->
                         val validList = list.map {
                             HomePageList(
@@ -136,12 +212,16 @@ fun SearchScreen(
                                 if (it.data is Resource.Success) it.data.value else emptyList()
                             )
                         }
-                        AdvancedSearchLayout(
-                            providers = validList,
-                            onBookClick = onBookClick,
-                            onBookLongClick = onBookLongClick,
-                            onMoreClick = onAdvancedProviderMoreClick
-                        )
+                        if (validList.all { it.list.isEmpty() } && searchResponse is Resource.Loading) {
+                            SearchShimmerSkeleton()
+                        } else {
+                            AdvancedSearchLayout(
+                                providers = validList,
+                                onBookClick = onBookClick,
+                                onBookLongClick = onBookLongClick,
+                                onMoreClick = onAdvancedProviderMoreClick
+                            )
+                        }
                     }
                 } else {
                     searchResponse?.let { res ->
@@ -170,7 +250,8 @@ fun PremiumSearchBar(
     isLoading: Boolean,
     isProviderGrid: Boolean,
     onToggleProviderGrid: () -> Unit,
-    showGridToggle: Boolean
+    showGridToggle: Boolean,
+    onFocusChanged: (Boolean) -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
@@ -197,7 +278,8 @@ fun PremiumSearchBar(
                 onValueChange = onQueryChange,
                 modifier = Modifier
                     .weight(1f)
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { onFocusChanged(it.isFocused) },
                 placeholder = { Text(stringResource(id = R.string.search_hint)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -617,5 +699,46 @@ fun SearchNovelCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+fun SearchShimmerSkeleton() {
+    val brush = rememberShimmerBrush()
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(110.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 120.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        userScrollEnabled = false
+    ) {
+        items(12) {
+            Column(modifier = Modifier.width(110.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.68f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(brush)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(brush)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(brush)
+                )
+            }
+        }
     }
 }

@@ -248,7 +248,15 @@ class TTSForegroundService : Service() {
                 startForeground(STANDALONE_NOTIFICATION_ID, notification)
 
                 // Update Glance widget state
-                TTSWidget.updateWidgetState(this@TTSForegroundService, novel.name, chapterName, novel.poster, true)
+                TTSWidget.updateWidgetState(
+                    context = this@TTSForegroundService,
+                    novelTitle = novel.name,
+                    chapterName = chapterName,
+                    coverUrl = novel.poster,
+                    isPlaying = true,
+                    chapterIndex = chapterIndex,
+                    totalChapters = novel.totalChapters
+                )
 
                 // 6. Playback loop
                 while (isActive && isPlaying && ttsLineIndex < ttsLines.size) {
@@ -317,7 +325,15 @@ class TTSForegroundService : Service() {
                 stopForeground(false)
             }
 
-            TTSWidget.updateWidgetState(this@TTSForegroundService, novel.name, chapterName, novel.poster, false)
+            TTSWidget.updateWidgetState(
+                context = this@TTSForegroundService,
+                novelTitle = novel.name,
+                chapterName = chapterName,
+                coverUrl = novel.poster,
+                isPlaying = false,
+                chapterIndex = chapterIndex,
+                totalChapters = novel.totalChapters
+            )
         }
     }
 
@@ -334,7 +350,15 @@ class TTSForegroundService : Service() {
         if (novel != null) {
             val chapterName = getKey<String>(EPUB_CURRENT_POSITION_CHAPTER, novel.name) ?: "Chapter ${chapterIndex + 1}"
             serviceScope.launch {
-                TTSWidget.updateWidgetState(this@TTSForegroundService, novel.name, chapterName, novel.poster, false)
+                TTSWidget.updateWidgetState(
+                    context = this@TTSForegroundService,
+                    novelTitle = novel.name,
+                    chapterName = chapterName,
+                    coverUrl = novel.poster,
+                    isPlaying = false,
+                    chapterIndex = chapterIndex,
+                    totalChapters = novel.totalChapters
+                )
             }
         }
         
@@ -484,7 +508,9 @@ class TTSForegroundService : Service() {
             chapterName = chapterName,
             coverUrl = coverUrl,
             isPlaying = isPlaying,
-            coverBitmap = vm.book.poster()
+            coverBitmap = vm.book.poster(),
+            chapterIndex = chapterIndex,
+            totalChapters = vm.book.size()
         )
     }
 

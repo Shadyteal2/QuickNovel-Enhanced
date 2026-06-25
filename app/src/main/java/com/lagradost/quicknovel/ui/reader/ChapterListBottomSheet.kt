@@ -240,7 +240,10 @@ fun ChapterSelectionCompose(
                 .weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            itemsIndexed(filteredChapters) { _, (origIndex, title) ->
+            itemsIndexed(
+                items = filteredChapters,
+                key = { _, item -> item.first }
+            ) { _, (origIndex, title) ->
                 val isSelected = origIndex == currentIndex
                 Box(
                     modifier = Modifier

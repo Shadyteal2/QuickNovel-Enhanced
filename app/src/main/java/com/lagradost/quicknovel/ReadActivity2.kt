@@ -98,6 +98,9 @@ import com.lagradost.quicknovel.ui.TextVisualLine
 import com.lagradost.quicknovel.ui.DictionaryBottomSheet
 import com.lagradost.quicknovel.ui.TranslationBottomSheet
 import com.lagradost.quicknovel.ui.reader.PaginatedReaderView
+import com.lagradost.quicknovel.ui.reader.ReadingTimerOverlay
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.getValue
 import com.lagradost.quicknovel.ui.ViewHolderState
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
@@ -978,6 +981,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        viewModel.init(intent, this)
+    }
+
     override fun onPause() {
         viewModel.leftApp()
         super.onPause()
@@ -1397,6 +1406,38 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         }
                     )
                 }
+            }
+        }
+
+        val timerComposeView = androidx.compose.ui.platform.ComposeView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setViewTreeLifecycleOwner(this@ReadActivity2)
+            setViewTreeViewModelStoreOwner(this@ReadActivity2)
+            setViewTreeSavedStateRegistryOwner(this@ReadActivity2)
+        }
+        (binding.root as? ViewGroup)?.addView(timerComposeView)
+
+        observe(viewModel.showReadingTimerLive) { show ->
+            if (show == true) {
+                timerComposeView.visibility = View.VISIBLE
+                timerComposeView.setContent {
+                    com.lagradost.quicknovel.ui.theme.QuickNovelTheme {
+                        val anchor by viewModel.readingTimerAnchorLive.observeAsState(viewModel.readingTimerAnchor)
+                        ReadingTimerOverlay(
+                            initialAnchor = anchor,
+                            onAnchorChanged = { newAnchor ->
+                                viewModel.readingTimerAnchor = newAnchor
+                            }
+                        )
+                    }
+                }
+            } else {
+                timerComposeView.visibility = View.GONE
+                timerComposeView.setContent {}
             }
         }
 

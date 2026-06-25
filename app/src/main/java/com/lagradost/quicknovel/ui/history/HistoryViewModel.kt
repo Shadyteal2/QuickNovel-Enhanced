@@ -3,6 +3,7 @@ package com.lagradost.quicknovel.ui.history
 import android.content.DialogInterface
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.ViewModel
 import com.lagradost.quicknovel.BaseApplication.Companion.getKey
 import com.lagradost.quicknovel.BaseApplication.Companion.getKeys
@@ -55,6 +56,14 @@ class HistoryViewModel : ViewModel() {
 
     val cards: MutableLiveData<ArrayList<ResultCached>> by lazy {
         MutableLiveData<ArrayList<ResultCached>>()
+    }
+
+    val resumeCard: MediatorLiveData<ResultCached?> by lazy {
+        MediatorLiveData<ResultCached?>().apply {
+            addSource(cards) { list ->
+                value = list?.firstOrNull()
+            }
+        }
     }
 
     fun deleteAllAlert() {

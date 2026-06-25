@@ -6,12 +6,14 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -57,6 +59,7 @@ fun HistoryScreen(
 ) {
     val cardsState = viewModel.cards.observeAsState(initial = arrayListOf())
     val cards = cardsState.value
+    val resumeCard by viewModel.resumeCard.observeAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -88,7 +91,7 @@ fun HistoryScreen(
                         // Premium layout density toggle button
                         IconButton(
                             onClick = {
-                                isCompact = !isCompact
+                                	isCompact = !isCompact
                                 settings.edit().putBoolean("history_compact_view", isCompact).apply()
                             }
                         ) {
@@ -179,9 +182,22 @@ fun HistoryScreen(
                         horizontalArrangement = Arrangement.spacedBy(if (isCompact) 8.dp else 14.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        resumeCard?.let { heroItem ->
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                ResumeReadingCard(
+                                    item = heroItem,
+                                    onClick = { viewModel.open(heroItem) },
+                                    onResumeClick = { viewModel.stream(heroItem) },
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
+                        }
+
+                        val remainingCards = if (resumeCard != null) cards.drop(1) else cards
+
                         itemsIndexed(
-                            items = cards,
-                            key = { _, item -> item.id }
+                            items = remainingCards,
+                            key = { _, item: ResultCached -> item.id }
                         ) { _, item ->
                             val currentOnClick = remember(item, viewModel) { { viewModel.open(item) } }
                             val currentOnLongClick = remember(item, viewModel) { { viewModel.showMetadata(item) } }
@@ -424,6 +440,129 @@ fun formatHistoryTimestamp(timeMs: Long): String {
                     "Yesterday at " + java.text.SimpleDateFormat("h:mm a", java.util.Locale.US).format(date)
                 } else {
                     java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.US).format(date)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ResumeReadingCard(
+    item: ResultCached,
+    onClick: () -> Unit,
+    onResumeClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val formattedTime = remember(item.cachedTime) { formatHistoryTimestamp(item.cachedTime) }
+    val progress = remember(item.lastChapterRead, item.totalChapters) {
+        if (item.totalChapters > 0) {
+            item.lastChapterRead.toFloat() / item.totalChapters.toFloat()
+        } else {
+            0f
+        }
+    }
+    
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .glassCard(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left: Poster
+            Box(
+                modifier = Modifier
+                    .size(width = 82.dp, height = 130.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            ) {
+                AsyncImage(
+                    model = rememberImageRequest(data = item),
+                    contentDescription = item.name,
+                    imageLoader = SingletonImageLoader.get(LocalContext.current),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            // Right: Content Column
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Continue Reading",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                if (!item.author.isNullOrBlank()) {
+                    Text(
+                        text = item.author ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Progress Bar
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Chapter ${item.lastChapterRead} of ${item.totalChapters} • $formattedTime",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    
+                    FilledTonalButton(
+                        onClick = onResumeClick,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Resume", fontSize = 12.sp)
+                    }
                 }
             }
         }

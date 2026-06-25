@@ -1,8 +1,10 @@
 package com.lagradost.quicknovel.ui.foryou.recommendation
 
 import androidx.annotation.Keep
+import androidx.compose.runtime.Immutable
 
 @Keep
+@Immutable
 data class TagAffinity(
     val tag: TagCategory,
     val score: Float,        // 0.0 to 1.0 (magnitude of interest)
@@ -19,6 +21,7 @@ data class TagAffinity(
 }
 
 @Keep
+@Immutable
 data class UserTasteProfile(
     val preferredTags: List<TagAffinity>,
     val avoidedTags: List<TagAffinity>,

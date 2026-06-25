@@ -19,6 +19,12 @@
     <string name="search_hint">Search Novels…</string>
     <string name="synopsis">Synopsis</string>
     <string name="no_data">No Data</string>
+    <!-- Continue Reading Widget -->
+    <string name="continue_reading_widget_desc">Quickly jump back into your last novel</string>
+    <string name="widget_start_reading">Start Reading</string>
+    <string name="widget_continue">Continue</string>
+    <string name="widget_no_history">Open NeoQN to begin</string>
+    <string name="widget_chapter_progress">Ch. %1$d · %2$d%%</string>
     <string name="no_author">Author not found</string>
     <string name="no_chapters">No Chapters</string>
     <string name="error_outside_chapter">Invalid skip</string>

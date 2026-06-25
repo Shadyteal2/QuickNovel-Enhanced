@@ -24,20 +24,18 @@ class RecommendationPoolManager(private val context: Context) {
 
     suspend fun fetchNewCandidates() = withContext(Dispatchers.IO) {
         val activeProviders = apis.filter { context.getApiSettings().contains(it.name) }
-        val allCandidates = java.util.Collections.synchronizedList(mutableListOf<RecommendationCandidateEntity>())
-        
         supervisorScope {
             activeProviders.map { api ->
                 async {
                     if (!api.hasMainPage) return@async
                     
                     // Try fetching from multiple categories (Latest, Trending, Popular, Top, etc.)
-                    val categories = listOf(null, "0", "1", "2", "3", "4")
+                    val categories = listOf(null, "0", "1")
                     
                     for (cat in categories) {
                         try {
-                            // Fetch up to 2 pages per category across more categories for variety
-                            for (page in 1..2) {
+                            // Fetch page 1 of each category for the recommendation candidate pool
+                            for (page in 1..1) {
                                 val response = try { 
                                     if (api.hasRateLimit) {
                                         api.rateLimitMutex.withLock {
@@ -67,10 +65,15 @@ class RecommendationPoolManager(private val context: Context) {
                                         apiName = res.apiName
                                     )
                                 }
-                                allCandidates.addAll(candidates)
+                                
+                                if (candidates.isNotEmpty()) {
+                                    db.withTransaction {
+                                        dao.insertAll(candidates)
+                                    }
+                                }
                                 
                                 // Small throttle between pages
-                                kotlinx.coroutines.delay(500)
+                                kotlinx.coroutines.delay(100)
                             }
                         } catch (t: Throwable) {
                             logError(t)
@@ -78,12 +81,6 @@ class RecommendationPoolManager(private val context: Context) {
                     }
                 }
             }.awaitAll()
-        }
-
-        if (allCandidates.isNotEmpty()) {
-            db.withTransaction {
-                dao.insertAll(allCandidates.toList())
-            }
         }
     }
 

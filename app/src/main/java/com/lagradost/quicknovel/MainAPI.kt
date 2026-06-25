@@ -2,6 +2,7 @@ package com.lagradost.quicknovel
 
 import androidx.annotation.StringRes
 import androidx.annotation.WorkerThread
+import androidx.compose.runtime.Immutable
 import com.lagradost.nicehttp.NiceResponse
 import com.lagradost.quicknovel.CommonActivity.activity
 import com.lagradost.quicknovel.MainActivity.Companion.app
@@ -192,6 +193,7 @@ data class MainPageResponse(
     val tags: ArrayList<String>,
 )*/
 
+@Immutable
 data class SearchResponse(
     val name: String,
     val url: String,

@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.carousel.CarouselItemScope
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
@@ -65,6 +67,7 @@ fun ForYouScreen(
     val context = LocalContext.current
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
+    val carouselItems by viewModel.carouselItems.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
 
@@ -84,15 +87,19 @@ fun ForYouScreen(
                     val affinities = selected.map { TagAffinity(it, 1.0f, 1.0f) }
                     viewModel.saveProfile(profile.copy(preferredTags = affinities))
                 },
-                onComplete = { viewModel.markWizardComplete() }
+                onComplete = { diversity -> viewModel.markWizardComplete(diversity) }
             )
         } else {
             RecommendationsContent(
                 groups = recommendations,
+                carouselItems = carouselItems,
                 stats = stats,
                 isLoading = isLoading,
                 onBookClick = onBookClick,
                 onRefresh = onRefresh,
+                onEditTags = {
+                    viewModel.saveProfile(profile.copy(isWizardComplete = false))
+                },
                 onDismissClick = { url -> viewModel.recordInteraction(url, "DISMISS") }
             )
         }
@@ -106,7 +113,7 @@ fun ForYouScreen(
 fun WizardScreen(
     profile: UserTasteProfile,
     onTagsSelected: (Set<TagCategory>) -> Unit,
-    onComplete: () -> Unit
+    onComplete: (Float) -> Unit
 ) {
     var selectedTags by remember {
         mutableStateOf(profile.preferredTags.map { it.tag }.toSet())
@@ -143,7 +150,7 @@ fun WizardScreen(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        var sliderValue by remember { mutableStateOf(0.5f) }
+        var sliderValue by remember { mutableStateOf(profile.diversityScore) }
 
         GlassmorphicSlider(
             valueState = { sliderValue },
@@ -198,7 +205,7 @@ fun WizardScreen(
         }
 
         Button(
-            onClick = onComplete,
+            onClick = { onComplete(sliderValue) },
             enabled = selectedTags.size >= 3,
             modifier = Modifier
                 .fillMaxWidth()
@@ -225,49 +232,72 @@ fun WizardScreen(
 @Composable
 fun RecommendationsContent(
     groups: List<RecommendationGroup>,
+    carouselItems: List<Recommendation>,
     stats: Pair<Int, Int>,
     isLoading: Boolean,
     onBookClick: (String, String) -> Unit,
     onRefresh: () -> Unit,
+    onEditTags: () -> Unit,
     onDismissClick: (String) -> Unit
 ) {
-    val carouselItems = remember(groups) {
-        groups.flatMap { it.recommendations }
-            .distinctBy { it.novel.url }
-            .sortedByDescending { it.score }
-            .take(8)
-    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "For You",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "${stats.first} recommendations • ${stats.second} novels indexed",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "For You",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "${stats.first} recommendations • ${stats.second} novels indexed",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Edit Tags Button
+                        FilledTonalIconButton(onClick = onEditTags) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "Edit Tags",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // Refresh Button
+                        FilledTonalIconButton(onClick = onRefresh) {
+                            Text("↻")
+                        }
+                    }
                 }
 
-                // Refresh Button
-                FilledTonalIconButton(onClick = onRefresh) {
-                    Text("↻")
+                if (isLoading && groups.isNotEmpty()) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
