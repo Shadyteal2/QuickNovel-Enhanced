@@ -17,6 +17,7 @@ import androidx.core.view.isVisible
 import coil3.load
 import coil3.request.crossfade
 import coil3.request.transformations
+import coil3.request.ErrorResult
 import coil3.transform.Transformation
 import com.lagradost.quicknovel.R
 import kotlinx.coroutines.Dispatchers
@@ -119,6 +120,7 @@ fun bindBackgroundEffects(
     imageUri: String?,
     enabled: Boolean,
     state: BackgroundEffectState,
+    onError: (Throwable) -> Unit = {}
 ) {
     if (!enabled || imageUri.isNullOrBlank()) {
         imageView.isVisible = false
@@ -167,6 +169,11 @@ fun bindBackgroundEffects(
         if (requestTransformations.isNotEmpty()) {
             transformations(*requestTransformations.toTypedArray())
         }
+        listener(
+            onError = { _, result ->
+                onError(result.throwable)
+            }
+        )
     }
 
     imageView.colorFilter = null
@@ -624,3 +631,34 @@ private fun pseudoNoise(x: Int, y: Int, seed: Int): Float {
 }
 
 private fun clamp(value: Int): Int = value.coerceIn(0, 255)
+
+object GrainDrawableCache {
+    private var cachedBitmap: android.graphics.Bitmap? = null
+    private var cachedStrength: Int = -1
+
+    fun getOrCreate(context: Context, strength: Int): android.graphics.Bitmap {
+        if (cachedStrength == strength && cachedBitmap != null) {
+            return cachedBitmap!!
+        }
+        val size = 256
+        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(size * size)
+        val amount = (strength / 100f) * 45f
+        val random = java.util.Random()
+        for (i in pixels.indices) {
+            val noise = (random.nextFloat() * 2f - 1f) * amount
+            val n = noise.roundToInt()
+            val alpha = (kotlin.math.abs(n) * 2.5f).roundToInt().coerceIn(0, 255)
+            val color = if (n >= 0) {
+                android.graphics.Color.argb(alpha, 255, 255, 255)
+            } else {
+                android.graphics.Color.argb(alpha, 0, 0, 0)
+            }
+            pixels[i] = color
+        }
+        bitmap.setPixels(pixels, 0, size, 0, 0, size, size)
+        cachedBitmap = bitmap
+        cachedStrength = strength
+        return bitmap
+    }
+}

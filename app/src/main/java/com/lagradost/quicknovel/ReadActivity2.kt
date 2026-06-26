@@ -33,6 +33,7 @@ import com.facebook.shimmer.ShimmerFrameLayout
 import com.lagradost.quicknovel.ui.roundedbg.RoundedBgTextView
 import com.lagradost.quicknovel.util.UsageStatsManager
 import com.lagradost.quicknovel.util.DrawerHelper
+import com.lagradost.quicknovel.util.GrainDrawableCache
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
@@ -288,24 +289,55 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
         val isEnabled = settingsManager.getBoolean(getString(R.string.reader_background_key), false)
+        val themeColor = viewModel.backgroundColor
 
         binding.apply {
+            // ─── No custom image background ───────────────────────────
             if (!isEnabled || imageUri.isNullOrBlank()) {
                 readerBackgroundImage.isVisible = false
                 readerBackgroundDim.isVisible = false
                 readerBackgroundLightScrim.isVisible = false
-                readerBackgroundGrain.isVisible = false
                 readerBackgroundVignette.isVisible = false
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     readerBackgroundImage.setRenderEffect(null)
                 }
                 readerBackgroundImage.colorFilter = null
-                // Restore solid background ONLY if no immersive mode is active
-                root.setBackgroundColor(viewModel.backgroundColor)
+
+                // Always paint every container with the theme color first.
+                // Grain sits on top as a semi-transparent overlay — it does NOT
+                // require the background to be transparent.
+                window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(themeColor))
+                root.setBackgroundColor(themeColor)
+                readOverlay.setBackgroundColor(themeColor)
+                readNormalLayout.setBackgroundColor(themeColor)
+                readerLinContainer.setBackgroundColor(themeColor)
+                realText.setBackgroundColor(themeColor)
+                paginatedTextCompose.setBackgroundColor(themeColor)
+
+                val grainStrength = viewModel.backgroundGrain
+                if (grainStrength > 0) {
+                    // Grain view is a sibling that sits above the colored views in Z-order.
+                    // Its alpha encodes how strong the grain is (0.0 = invisible, 1.0 = full).
+                    val normalizedAlpha = (grainStrength / 100f).coerceIn(0.05f, 1.0f)
+                    val bitmap = GrainDrawableCache.getOrCreate(this@ReadActivity2, grainStrength)
+                    val drawable = android.graphics.drawable.BitmapDrawable(resources, bitmap).apply {
+                        tileModeX = android.graphics.Shader.TileMode.REPEAT
+                        tileModeY = android.graphics.Shader.TileMode.REPEAT
+                        // Use multiply blend if the grain bitmap is pre-coloured; otherwise OVERLAY
+                        // is fine. Setting paint alpha here keeps the bitmap intact.
+                    }
+                    readerBackgroundGrain.background = drawable
+                    readerBackgroundGrain.alpha = normalizedAlpha
+                    readerBackgroundGrain.isVisible = true
+                } else {
+                    readerBackgroundGrain.isVisible = false
+                }
                 return@apply
             }
 
-            // Make actual containers transparent so background shows through
+            // ─── Custom image background ───────────────────────────────
+            // Containers are transparent so the image wallpaper shows through.
             root.setBackgroundColor(Color.TRANSPARENT)
             readOverlay.setBackgroundColor(Color.TRANSPARENT)
             bindBackgroundEffects(
@@ -317,7 +349,40 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 vignetteView = readerBackgroundVignette,
                 imageUri = imageUri,
                 enabled = true,
-                state = settingsManager.getBackgroundEffectState(this@ReadActivity2),
+                state = settingsManager.getBackgroundEffectState(this@ReadActivity2).copy(
+                    grain = viewModel.backgroundGrain
+                ),
+                onError = { throwable ->
+                    com.lagradost.quicknovel.mvvm.logError(throwable)
+                    // SecurityException or load failure: fall back to solid color + grain
+                    readerBackgroundImage.isVisible = false
+                    readerBackgroundDim.isVisible = false
+                    readerBackgroundLightScrim.isVisible = false
+                    readerBackgroundVignette.isVisible = false
+
+                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(themeColor))
+                    root.setBackgroundColor(themeColor)
+                    readOverlay.setBackgroundColor(themeColor)
+                    readNormalLayout.setBackgroundColor(themeColor)
+                    readerLinContainer.setBackgroundColor(themeColor)
+                    realText.setBackgroundColor(themeColor)
+                    paginatedTextCompose.setBackgroundColor(themeColor)
+
+                    val grainStrength = viewModel.backgroundGrain
+                    if (grainStrength > 0) {
+                        val normalizedAlpha = (grainStrength / 100f).coerceIn(0.05f, 1.0f)
+                        val bitmap = GrainDrawableCache.getOrCreate(this@ReadActivity2, grainStrength)
+                        val drawable = android.graphics.drawable.BitmapDrawable(resources, bitmap).apply {
+                            tileModeX = android.graphics.Shader.TileMode.REPEAT
+                            tileModeY = android.graphics.Shader.TileMode.REPEAT
+                        }
+                        readerBackgroundGrain.background = drawable
+                        readerBackgroundGrain.alpha = normalizedAlpha
+                        readerBackgroundGrain.isVisible = true
+                    } else {
+                        readerBackgroundGrain.isVisible = false
+                    }
+                }
             )
             if (viewModel.isContrastCompromised) {
                 readerBackgroundDim.alpha = maxOf(readerBackgroundDim.alpha, 0.4f)
@@ -359,8 +424,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
     private fun updateLuminescentEffects() {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         val performanceMode = settingsManager.getBoolean("performance_mode_enabled", false)
-        val lEnabled = !performanceMode && settingsManager.getBoolean(getString(R.string.luminescent_reader_key), false)
-        val lIntensity = settingsManager.getSafeInt(getString(R.string.luminescent_intensity_key), 50)
+        val lEnabled = !performanceMode && viewModel.luminescentReader
+        val lIntensity = (viewModel.luminescentIntensity * 100).toInt().coerceIn(0, 100)
 
         binding.readerHalo.apply {
             if (lEnabled) {
@@ -1239,6 +1304,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 bionicReading = viewModel.bionicReading,
                 isTextSelectable = viewModel.isTextSelectable,
                 verticalPadding = viewModel.textVerticalPadding,
+                lineHeightMultiplier = viewModel.lineHeightMultiplier,
+                letterSpacing = viewModel.letterSpacing,
+                luminescent = viewModel.luminescentReader,
+                luminescentIntensity = viewModel.luminescentIntensity,
             ).also { config ->
                 updateOtherTextConfig(config)
             }
@@ -1288,25 +1357,22 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         //}
 
         observe(viewModel.backgroundColorLive) { color ->
-            val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-            val isEnabled = settingsManager.getBoolean(getString(R.string.reader_background_key), false)
-            val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
-
-            if (isEnabled && !imageUri.isNullOrBlank()) {
-                com.lagradost.quicknovel.util.AuraTransparencyHelper.forceTransparent(binding.root)
-                com.lagradost.quicknovel.util.AuraTransparencyHelper.forceTransparent(binding.readOverlay)
-            } else {
-                binding.root.setBackgroundColor(color)
-                binding.readOverlay.setBackgroundColor(color)
-            }
-
+            // Update the text adapter config immediately, then let updateGlobalBackground
+            // handle all view backgrounds consistently (including grain layering).
             if (textAdapter.changeBackgroundColor(color)) {
                 updateTextAdapterConfig()
             }
+            updateGlobalBackground()
         }
 
         observe(viewModel.textVerticalPaddingLive) { padding ->
             if (textAdapter.changeTextVerticalPadding(padding)) {
+                updateTextAdapterConfig()
+            }
+        }
+
+        observe(viewModel.lineHeightMultiplierLive) { multiplier ->
+            if (textAdapter.changeLineHeightMultiplier(multiplier)) {
                 updateTextAdapterConfig()
             }
         }
@@ -1346,14 +1412,20 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             updateOverlayVisibility()
         }
 
-
-        observe(viewModel.luminescentLive) { _ ->
+        observe(viewModel.luminescentLive) { enabled ->
             updateLuminescentEffects()
+            if (textAdapter.changeLuminescent(enabled)) {
+                updateTextAdapterConfig()
+            }
         }
 
-        observe(viewModel.luminescentIntensityLive) { _ ->
+        observe(viewModel.luminescentIntensityLive) { intensity ->
             updateLuminescentEffects()
+            if (textAdapter.changeLuminescentIntensity(intensity)) {
+                updateTextAdapterConfig()
+            }
         }
+
         updateOverlayVisibility()
 
         observe(viewModel.showReaderProgressLive) { show ->
@@ -1393,6 +1465,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
         }
 
+        observe(viewModel.backgroundGrainLive) {
+            updateGlobalBackground()
+        }
+
+        observe(viewModel.letterSpacingLive) { spacing ->
+            if (textAdapter.changeLetterSpacing(spacing)) {
+                updateTextAdapterConfig()
+                postDesired(binding.realText)
+            }
+        }
+ 
         textLayoutManager = LinearLayoutManager(binding.realText.context)
 
         binding.paginatedTextCompose.apply {
@@ -1556,7 +1639,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         binding.readActionColorPalette.setOnClickListener {
-            showThemePicker()
+            showReaderCustomizationDialog(initialTab = 0)
         }
 
         observeNullable(viewModel.ttsLine) { line ->
@@ -1922,7 +2005,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                                 showToast(getString(R.string.reload_chapter_format).format(""))
                                 viewModel.reloadChapter()
                             },
-                            onShowAliases = { showAliasManagementDialog() },
+                            onShowCustomization = { showReaderCustomizationDialog(initialTab = 0) },
                             onReadingTypeClick = {
                                 val items = ReadingType.entries.toTypedArray()
                                 val displayItems = ArrayList(items.map { getString(it.stringRes) })
@@ -2172,12 +2255,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
     }
 
-    private fun showAliasManagementDialog() {
-        val sheet = com.lagradost.quicknovel.ui.reader.AliasManagementBottomSheet.newInstance(
-            binding.readNormalLayout.id
-        )
+    private fun showReaderCustomizationDialog(initialTab: Int = 0) {
+        val sheet = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationSheet.newInstance(initialTab)
         sheet.setViewModel(viewModel)
-        sheet.show(supportFragmentManager, "alias_management")
+        sheet.show(supportFragmentManager, "reader_customization")
     }
 
     private fun showThemePicker() {

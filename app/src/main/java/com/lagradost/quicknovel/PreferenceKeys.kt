@@ -54,6 +54,9 @@ object ReaderPrefs {
     const val SHOW_READER_PROGRESS  = "reader_epub_show_progress"
     const val PAGINATED_SWIPE_ENABLED = "reader_paginated_swipe_enabled"
     const val DYNAMIC_LUMINANCE_ENABLED = "reader_dynamic_luminance_enabled"
+    const val LINE_HEIGHT_MULTIPLIER = "reader_line_height_multiplier"
+    const val ACTIVE_CUSTOM_THEME    = "reader_active_custom_theme"
+    const val CONTENT_RULES_ENABLED  = "reader_content_rules_enabled"
 
     // ── Status bar / overlay ──────────────────────────────────────────────────
     const val HAS_BATTERY           = "reader_epub_has_battery"

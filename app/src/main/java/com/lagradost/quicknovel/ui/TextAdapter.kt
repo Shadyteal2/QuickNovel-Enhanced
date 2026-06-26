@@ -12,6 +12,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.text.getSpans
 import androidx.core.view.isVisible
+import androidx.core.widget.TextViewCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
@@ -189,6 +190,10 @@ data class TextConfig(
     /** Vertical text padding in dp */
     val verticalPadding: Float,
     val isContrastCompromised: Boolean = false,
+    val lineHeightMultiplier: Float = 1.0f,
+    val letterSpacing: Float = 0f,
+    val luminescent: Boolean = false,
+    val luminescentIntensity: Float = 0.5f,
 ) {
     private val fontFile: File? by lazy {
         if (textFont == "") null else {
@@ -241,6 +246,17 @@ data class TextConfig(
 
     private fun setTextSize(textView: TextView) {
         textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize.toFloat())
+        textView.letterSpacing = letterSpacing
+        try {
+            val px = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP,
+                textSize.toFloat() * lineHeightMultiplier,
+                textView.resources.displayMetrics
+            ).toInt()
+            TextViewCompat.setLineHeight(textView, px)
+        } catch (t: Throwable) {
+            logError(t)
+        }
     }
 
     private fun setTextPadding(textView: TextView) {
@@ -328,6 +344,12 @@ class TextAdapter(
         return true
     }
 
+    fun changeLineHeightMultiplier(multiplier: Float): Boolean {
+        if (config.lineHeightMultiplier == multiplier) return false
+        config = config.copy(lineHeightMultiplier = multiplier)
+        return true
+    }
+
     fun changeFont(font: String): Boolean {
         if (config.textFont == font) return false
         config = config.copy(textFont = font)
@@ -349,6 +371,24 @@ class TextAdapter(
     fun changeTextSelectable(isTextSelectable: Boolean): Boolean {
         if (config.isTextSelectable == isTextSelectable) return false
         config = config.copy(isTextSelectable = isTextSelectable)
+        return true
+    }
+
+    fun changeLetterSpacing(spacing: Float): Boolean {
+        if (config.letterSpacing == spacing) return false
+        config = config.copy(letterSpacing = spacing)
+        return true
+    }
+
+    fun changeLuminescent(to: Boolean): Boolean {
+        if (config.luminescent == to) return false
+        config = config.copy(luminescent = to)
+        return true
+    }
+
+    fun changeLuminescentIntensity(intensity: Float): Boolean {
+        if (config.luminescentIntensity == intensity) return false
+        config = config.copy(luminescentIntensity = intensity)
         return true
     }
 
@@ -790,7 +830,18 @@ class TextAdapter(
                     binding.root,
                     CONFIG_SIZE or CONFIG_COLOR or CONFIG_FONT or CONFIG_PADDING
                 )
-                if (config.isContrastCompromised) {
+                if (config.luminescent) {
+                    val glowColorBase = android.graphics.Color.parseColor("#FFE8B5") // Amber Warm
+                    val blurRadius = config.luminescentIntensity * 15f
+                    val alphaFactor = config.luminescentIntensity * 0.8f
+                    val glowColor = android.graphics.Color.argb(
+                        (255 * alphaFactor).toInt().coerceIn(0, 255),
+                        android.graphics.Color.red(glowColorBase),
+                        android.graphics.Color.green(glowColorBase),
+                        android.graphics.Color.blue(glowColorBase)
+                    )
+                    binding.root.setShadowLayer(blurRadius, 0f, 0f, glowColor)
+                } else if (config.isContrastCompromised) {
                     binding.root.setShadowLayer(4f, 0f, 0f, android.graphics.Color.BLACK)
                 } else {
                     binding.root.setShadowLayer(0f, 0f, 0f, 0)

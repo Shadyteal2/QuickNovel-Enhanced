@@ -38,7 +38,7 @@ import kotlin.math.roundToInt
 fun ReaderSettingsSheet(
     viewModel: ReadActivityViewModel,
     onHardReset: () -> Unit,
-    onShowAliases: () -> Unit,
+    onShowCustomization: () -> Unit,
     onReadingTypeClick: () -> Unit,
     onShowFonts: () -> Unit,
     onLanguageClick: () -> Unit,
@@ -181,9 +181,9 @@ fun ReaderSettingsSheet(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 SettingsButton(
-                    text = stringResource(R.string.character_aliases),
-                    iconRes = R.drawable.ic_baseline_font_download_24,
-                    onClick = onShowAliases
+                    text = "Reader Customization",
+                    iconRes = R.drawable.ic_baseline_settings_24,
+                    onClick = onShowCustomization
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -539,6 +539,7 @@ fun ReaderSettingsSheet(
                 val context = androidx.compose.ui.platform.LocalContext.current
                 val bgColors = context.resources.getIntArray(R.array.readerBgColors).toList()
                 val textColors = context.resources.getIntArray(R.array.readerTextColors).toList()
+                val currentBgColor by viewModel.backgroundColorLive.observeAsState(viewModel.backgroundColor)
                 
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -547,7 +548,7 @@ fun ReaderSettingsSheet(
                     items(bgColors.indices.toList()) { index ->
                         val bgColor = bgColors[index]
                         val txtColor = textColors[index]
-                        val isSelected = viewModel.backgroundColor == bgColor
+                        val isSelected = currentBgColor == bgColor
                         
                         Box(
                             modifier = Modifier

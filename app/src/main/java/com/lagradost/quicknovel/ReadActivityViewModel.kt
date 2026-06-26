@@ -188,6 +188,10 @@ class PreferenceDelegateLiveView<T : Any>(
 }
 
 abstract class AbstractBook {
+    open fun apiName(): String? {
+        return null
+    }
+
     open fun resolveUrl(url: String): String {
         return url
     }
@@ -242,6 +246,10 @@ abstract class AbstractBook {
 }
 
 class QuickBook(val data: QuickStreamData) : AbstractBook() {
+    override fun apiName(): String? {
+        return data.meta.apiName
+    }
+
     override fun resolveUrl(url: String): String {
         return Apis.getApiFromNameNull(data.meta.apiName)?.fixUrl(url) ?: url
     }
@@ -584,6 +592,9 @@ class ReadActivityViewModel : ViewModel() {
         this.loadId = id
         this.isEpub = isEpub
         loadAliases()
+        viewModelScope.launch(Dispatchers.IO) {
+            com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.init(context)
+        }
         
         if (hasInit) return
         hasInit = true
@@ -1013,7 +1024,7 @@ class ReadActivityViewModel : ViewModel() {
             val data = safeApiCall {
                 book.getChapterData(index, reload)
             }.map { text ->
-                val rawText = applyAliases(preParseHtml(text, authorNotes))
+                val rawText = applyAliases(preParseHtml(text, authorNotes, book.apiName()))
                 // val renderedBuilder = SpannableStringBuilder()
                 // val lengths : IntArray
                 // val nodes : Array<Node>
@@ -1702,6 +1713,7 @@ class ReadActivityViewModel : ViewModel() {
 
 
     fun init(intent: Intent?, context: ReadActivity2) = ioSafe {
+        com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.init(context)
         _loadingStatus.postValue(Resource.Loading())
         initTTSSession(context)
         hasPerformedInitialSeek = false
@@ -2657,10 +2669,17 @@ class ReadActivityViewModel : ViewModel() {
         EPUB_TEXT_VERTICAL_PADDING, 7.5f, Float::class, textVerticalPaddingLive
     )
 
+    val lineHeightMultiplierLive: MutableLiveData<Float> = MutableLiveData(null)
+    var lineHeightMultiplier by PreferenceDelegateLiveView(
+        ReaderPrefs.LINE_HEIGHT_MULTIPLIER, 1.0f, Float::class, lineHeightMultiplierLive
+    )
+
     val backgroundColorLive: MutableLiveData<Int> = MutableLiveData(null)
     var backgroundColor by PreferenceDelegateLiveView(
         EPUB_BG_COLOR, "#292832".toColorInt(), Int::class, backgroundColorLive
-    )
+    ) {
+        checkDynamicLuminanceContrast()
+    }
 
     val showBatteryLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var showBattery by PreferenceDelegateLiveView(
@@ -2702,6 +2721,16 @@ class ReadActivityViewModel : ViewModel() {
     val premiumAnimationsLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var premiumAnimations by PreferenceDelegateLiveView(
         "premium_animations_key", true, Boolean::class, premiumAnimationsLive
+    )
+
+    val backgroundGrainLive: MutableLiveData<Int> = MutableLiveData(null)
+    var backgroundGrain by PreferenceDelegateLiveView(
+        "background_grain", 0, Int::class, backgroundGrainLive
+    )
+
+    val letterSpacingLive: MutableLiveData<Float> = MutableLiveData(null)
+    var letterSpacing by PreferenceDelegateLiveView(
+        "reader_epub_letter_spacing", 0f, Float::class, letterSpacingLive
     )
 
     val paddingHorizontalLive: MutableLiveData<Int> = MutableLiveData(null)

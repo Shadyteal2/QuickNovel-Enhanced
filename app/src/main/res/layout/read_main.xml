@@ -26,12 +26,7 @@
         android:visibility="gone"
         android:importantForAccessibility="no" />
 
-    <View
-        android:id="@+id/reader_background_grain"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"
-        android:importantForAccessibility="no" />
+
 
     <View
         android:id="@+id/reader_background_vignette"
@@ -387,6 +382,17 @@
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:background="@color/colorPrimary" />
+
+        <!-- Grain texture overlay: rendered above text background so it blends onto the
+             solid theme color. clickable=false so touch events pass through to RecyclerView. -->
+        <View
+            android:id="@+id/reader_background_grain"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone"
+            android:importantForAccessibility="no" />
 
         <FrameLayout
                 android:visibility="visible"

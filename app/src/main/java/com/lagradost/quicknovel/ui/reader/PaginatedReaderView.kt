@@ -52,6 +52,30 @@ fun PaginatedReaderView(
     }
 
     val isContrastCompromised by viewModel.isContrastCompromisedLive.observeAsState(false)
+    val backgroundColorVal by viewModel.backgroundColorLive.observeAsState()
+    val backgroundColor = backgroundColorVal ?: viewModel.backgroundColor
+
+    val textColorVal by viewModel.textColorLive.observeAsState()
+    val textColor = textColorVal ?: viewModel.textColor
+
+    val textSizeVal by viewModel.textSizeLive.observeAsState()
+    val textSize = textSizeVal ?: viewModel.textSize
+
+    val textFontVal by viewModel.textFontLive.observeAsState()
+    val textFont = textFontVal ?: viewModel.textFont
+
+    val paddingHorizontalVal by viewModel.paddingHorizontalLive.observeAsState()
+    val paddingHorizontal = paddingHorizontalVal ?: viewModel.paddingHorizontal
+
+    val paddingVerticalVal by viewModel.paddingVerticalLive.observeAsState()
+    val paddingVertical = paddingVerticalVal ?: viewModel.paddingVertical
+
+    val textVerticalPaddingVal by viewModel.textVerticalPaddingLive.observeAsState()
+    val textVerticalPadding = textVerticalPaddingVal ?: viewModel.textVerticalPadding
+
+    val letterSpacingVal by viewModel.letterSpacingLive.observeAsState()
+    val letterSpacing = letterSpacingVal ?: viewModel.letterSpacing
+
     val isCustomBgEnabled = remember { mutableStateOf(false) }
 
     DisposableEffect(context) {
@@ -79,7 +103,7 @@ fun PaginatedReaderView(
     } else {
         // Force full opaque ARGB — avoids bluish tint from premultiplied-alpha
         // interpretation of the stored Int on AMOLED/Black themes.
-        Modifier.fillMaxSize().background(Color(viewModel.backgroundColor).copy(alpha = 1f))
+        Modifier.fillMaxSize().background(Color(backgroundColor).copy(alpha = 1f))
     }
 
     BoxWithConstraints(
@@ -116,27 +140,27 @@ fun PaginatedReaderView(
         val showOverlay = showTime || showBattery
         val overlayHeightPx = if (showOverlay) with(density) { 25.dp.toPx() } else 0f
 
-        val topPaddingPx = topInset + with(density) { viewModel.paddingVertical.dp.toPx() }
-        val bottomPaddingPx = bottomInset + with(density) { viewModel.paddingVertical.dp.toPx() } + overlayHeightPx
-        val leftPaddingPx = leftInset + with(density) { viewModel.paddingHorizontal.dp.toPx() }
-        val rightPaddingPx = rightInset + with(density) { viewModel.paddingHorizontal.dp.toPx() }
+        val topPaddingPx = topInset + with(density) { paddingVertical.dp.toPx() }
+        val bottomPaddingPx = bottomInset + with(density) { paddingVertical.dp.toPx() } + overlayHeightPx
+        val leftPaddingPx = leftInset + with(density) { paddingHorizontal.dp.toPx() }
+        val rightPaddingPx = rightInset + with(density) { paddingHorizontal.dp.toPx() }
 
         // ─── Custom Font Resolution (Bug 1 & 4 Fix) ─────────────────────────────
         // Match TextAdapter's custom/system font loading logic exactly so that
         // StaticLayout and Compose use the identical font metrics.
-        val fontFile = remember(viewModel.textFont) {
-            if (viewModel.textFont.isBlank()) null else {
-                val found = com.lagradost.quicknovel.util.UIHelper.systemFonts.firstOrNull { it.name == viewModel.textFont }
+        val fontFile = remember(textFont) {
+            if (textFont.isBlank()) null else {
+                val found = com.lagradost.quicknovel.util.UIHelper.systemFonts.firstOrNull { it.name == textFont }
                 if (found != null) found else {
-                    val file = File(File(context.filesDir, "fonts"), viewModel.textFont)
+                    val file = File(File(context.filesDir, "fonts"), textFont)
                     if (file.exists()) file else null
                 }
             }
         }
 
-        val customFontFamily = remember(viewModel.textFont, fontFile) {
-            if (viewModel.textFont.isNotEmpty()) {
-                val preloaded = com.lagradost.quicknovel.util.PreloadedFontsCache.get(viewModel.textFont)
+        val customFontFamily = remember(textFont, fontFile) {
+            if (textFont.isNotEmpty()) {
+                val preloaded = com.lagradost.quicknovel.util.PreloadedFontsCache.get(textFont)
                 if (preloaded != null) {
                     try {
                         FontFamily(preloaded)
@@ -166,11 +190,11 @@ fun PaginatedReaderView(
             spans,
             widthPx,
             heightPx,
-            viewModel.textSize,
-            viewModel.textFont,
-            viewModel.paddingHorizontal,
-            viewModel.paddingVertical,
-            viewModel.textVerticalPadding,
+            textSize,
+            textFont,
+            paddingHorizontal,
+            paddingVertical,
+            textVerticalPadding,
             showTime,
             showBattery,
             topInset,
@@ -184,16 +208,17 @@ fun PaginatedReaderView(
             }
             isPaginating = true
 
-            val textSizePx = with(density) { viewModel.textSize.sp.toPx() }
+            val textSizePx = with(density) { textSize.sp.toPx() }
 
             val innerWidth  = (widthPx  - leftPaddingPx - rightPaddingPx).toInt().coerceAtLeast(100)
             val innerHeight = (heightPx - topPaddingPx - bottomPaddingPx).toInt().coerceAtLeast(100)
 
             val paint = TextPaint().apply {
-                textSize = textSizePx
+                this.textSize = textSizePx
+                this.letterSpacing = letterSpacing
                 val hasNonLatin = spannedText.hasNonLatinAlpha()
-                val tf = if (viewModel.textFont.isNotEmpty() && !hasNonLatin) {
-                    com.lagradost.quicknovel.util.PreloadedFontsCache.get(viewModel.textFont)
+                val tf = if (textFont.isNotEmpty() && !hasNonLatin) {
+                    com.lagradost.quicknovel.util.PreloadedFontsCache.get(textFont)
                         ?: fontFile?.let {
                             try {
                                 Typeface.createFromFile(it)
@@ -205,7 +230,7 @@ fun PaginatedReaderView(
                     Typeface.DEFAULT
                 }
                 typeface = tf
-                color = viewModel.textColor
+                color = textColor
             }
 
             val result = TextPaginator.paginate(
@@ -226,7 +251,7 @@ fun PaginatedReaderView(
 
         if (loadingStatus is Resource.Loading || isPaginating || currentResult == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingIndicator(color = Color(viewModel.textColor))
+                LoadingIndicator(color = Color(textColor))
             }
         } else if (currentResult.pages.isNotEmpty()) {
             val prevPageOffset = if (currentIndex > 0) 1 else 0
@@ -341,7 +366,7 @@ fun PaginatedReaderView(
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
                                 text = "Loading previous chapter...",
-                                color = Color(viewModel.textColor).copy(alpha = 0.6f),
+                                color = Color(textColor).copy(alpha = 0.6f),
                                 fontSize = 16.sp
                             )
                         }
@@ -349,7 +374,7 @@ fun PaginatedReaderView(
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
                                 text = "Loading next chapter...",
-                                color = Color(viewModel.textColor).copy(alpha = 0.6f),
+                                color = Color(textColor).copy(alpha = 0.6f),
                                 fontSize = 16.sp
                             )
                         }
@@ -358,14 +383,15 @@ fun PaginatedReaderView(
                         val hasNonLatin = pageText.hasNonLatinAlpha()
                         Text(
                             text = pageText,
-                            color = Color(viewModel.textColor),
-                            fontSize = viewModel.textSize.sp,
+                            color = Color(textColor),
+                            fontSize = textSize.sp,
                             fontFamily = if (hasNonLatin) FontFamily.Default else customFontFamily,
                             style = LocalTextStyle.current.copy(
                                 lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified,
                                 platformStyle = androidx.compose.ui.text.PlatformTextStyle(
                                     includeFontPadding = false
                                 ),
+                                letterSpacing = letterSpacing.sp,
                                 shadow = if (isContrastCompromised) {
                                     androidx.compose.ui.graphics.Shadow(
                                         color = Color.Black,
@@ -381,7 +407,7 @@ fun PaginatedReaderView(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "No pages found", color = Color(viewModel.textColor))
+                Text(text = "No pages found", color = Color(textColor))
             }
         }
     }

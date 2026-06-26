@@ -527,8 +527,35 @@ object TTSHelper {
         return loc
     }
 
-    fun preParseHtml(text: String, authorNotes : Boolean): String {
+    fun preParseHtml(text: String, authorNotes : Boolean, providerApiName: String? = null): String {
         val document = Jsoup.parse(text)
+
+        val context = com.lagradost.quicknovel.BaseApplication.context
+        val rulesEnabled = if (context != null) {
+            try {
+                androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+                    .getBoolean(com.lagradost.quicknovel.ReaderPrefs.CONTENT_RULES_ENABLED, true)
+            } catch (t: Throwable) {
+                true
+            }
+        } else {
+            true
+        }
+
+        val rules = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.getRulesFor(providerApiName, rulesEnabled)
+
+        // Apply Jsoup selector removals
+        for (rule in rules) {
+            for (selector in rule.selectorsToRemove) {
+                if (selector.isNotBlank()) {
+                    try {
+                        document.select(selector).remove()
+                    } catch (t: Throwable) {
+                        com.lagradost.quicknovel.mvvm.logError(t)
+                    }
+                }
+            }
+        }
 
         // REMOVE USELESS STUFF THAT WONT BE USED IN A NORMAL TXT
         document.select("style").remove()
@@ -549,7 +576,7 @@ object TTSHelper {
             document.select("div.qnauthornotecontainer").remove()
         }
 
-        return document.html()
+        var html = document.html()
             // this makes tables readable, more or less places a newline between rows
             // and space between columns
             .replace("</td>", " </td>")
@@ -566,6 +593,30 @@ object TTSHelper {
                 "<.*?Translator:.*?Editor:.*?>".toRegex(),
                 ""
             )
+
+        // Apply text replacements
+        for (rule in rules) {
+            for (replacement in rule.replacements) {
+                if (replacement.find.isNotEmpty()) {
+                    try {
+                        html = if (replacement.isRegex) {
+                            val regex = replacement.regex
+                            if (regex != null) {
+                                regex.replace(html, replacement.replace)
+                            } else {
+                                html
+                            }
+                        } else {
+                            html.replace(replacement.find, replacement.replace)
+                        }
+                    } catch (t: Throwable) {
+                        com.lagradost.quicknovel.mvvm.logError(t)
+                    }
+                }
+            }
+        }
+
+        return html
     }
 
     fun render(html: String, markwon: Markwon): Spanned {

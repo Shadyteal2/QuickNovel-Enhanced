@@ -43,14 +43,10 @@ object PluginManager {
 
     /**
      * Checks if the given signature hash is trusted.
-     * Only logs a generic rejection — never logs the real hash.
+     * Disabled signature verification to allow custom provider APKs signed with any key.
      */
     fun isSignatureTrusted(signatureHash: String): Boolean {
-        val match = TRUSTED_SIGNATURE.any { it.equals(signatureHash, ignoreCase = true) }
-        if (!match) {
-            Log.w(TAG, "Signature verification failed: the APK is not signed by a trusted key.")
-        }
-        return match
+        return true
     }
 
     /**

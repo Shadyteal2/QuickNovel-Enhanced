@@ -263,6 +263,14 @@
                     android:layout_marginTop="8dp"
                     android:text="@string/character_aliases"
                     app:icon="@drawable/ic_baseline_font_download_24" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/reader_customization_row"
+                    style="@style/BlackButton"
+                    android:layout_width="match_parent"
+                    android:layout_marginTop="8dp"
+                    android:text="Reader Customization"
+                    app:icon="@drawable/ic_baseline_settings_24" />
             </LinearLayout>
             
             <TextView

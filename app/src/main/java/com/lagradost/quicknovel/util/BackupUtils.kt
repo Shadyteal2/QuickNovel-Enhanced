@@ -134,7 +134,9 @@ object BackupUtils {
             emptyList<com.lagradost.quicknovel.db.NovelEntity>()
         }
 
-        BackupFile(allDataSorted, allSettingsSorted, novels)
+        val customThemes = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.themes.value
+        val contentRules = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.rules.value
+        BackupFile(allDataSorted, allSettingsSorted, novels, customThemes, contentRules)
     }
 
     private var restoreFileSelector: ActivityResultLauncher<Array<String>>? = null
@@ -152,7 +154,9 @@ object BackupUtils {
     data class BackupFile(
         @JsonProperty("datastore") val datastore: BackupVars,
         @JsonProperty("settings") val settings: BackupVars,
-        @JsonProperty("novels") val novels: List<com.lagradost.quicknovel.db.NovelEntity>? = null
+        @JsonProperty("novels") val novels: List<com.lagradost.quicknovel.db.NovelEntity>? = null,
+        @JsonProperty("custom_themes") val customThemes: List<com.lagradost.quicknovel.ui.reader.customization.ReaderTheme>? = null,
+        @JsonProperty("content_rules") val contentRules: List<com.lagradost.quicknovel.ui.reader.customization.ContentCleanRule>? = null
     )
 
     fun setupStream(context: Context, displayName : String, ext : String, subDir : SafeFile?) : Pair<OutputStream?, Uri?> {
@@ -250,10 +254,15 @@ object BackupUtils {
         val novels = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao().getAll()
             .filter { it.bookmarkType != null && it.bookmarkType != 0 }
 
+        val customThemes = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.themes.value
+        val contentRules = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.rules.value
+
         val backupFile = BackupFile(
             allDataSorted,
             allSettingsSorted,
-            novels
+            novels,
+            customThemes,
+            contentRules
         )
 
         val rFile = targetDir.findFile(fileName)
@@ -510,6 +519,12 @@ object BackupUtils {
                 }
             }
         }
+        backupFile.customThemes?.forEach { theme ->
+            com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.saveTheme(this@restore, theme)
+        }
+        backupFile.contentRules?.let { rules ->
+            com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.saveRules(this@restore, rules)
+        }
         DataStore.clearCache()
     }
 
@@ -550,10 +565,15 @@ object BackupUtils {
         val novels = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao().getAll()
             .filter { it.bookmarkType != null && it.bookmarkType != 0 }
 
+        val customThemes = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.themes.value
+        val contentRules = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.rules.value
+
         val backupFile = BackupFile(
             allDataSorted,
             allSettingsSorted,
-            novels
+            novels,
+            customThemes,
+            contentRules
         )
 
         file.outputStream().use { stream ->

@@ -19,6 +19,8 @@ import com.lagradost.quicknovel.util.BackupUtils
 import com.lagradost.quicknovel.util.BackupUtils.BackupFile
 import com.lagradost.quicknovel.util.BackupUtils.BackupVars
 import com.lagradost.quicknovel.util.BackupUtils.restore
+import com.lagradost.quicknovel.ui.reader.customization.ReaderTheme
+import com.lagradost.quicknovel.ui.reader.customization.ContentCleanRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -321,7 +323,35 @@ object GoogleDriveSyncManager {
             }
         }
 
-        return BackupFile(mergedDataStore, mergedSettings, mergedNovelsMap.values.toList())
+        // Merge custom themes uniquely by name
+        val localThemes = local.customThemes ?: emptyList()
+        val remoteThemes = remote.customThemes ?: emptyList()
+        val mergedThemesMap = mutableMapOf<String, ReaderTheme>()
+        for (theme in remoteThemes) {
+            mergedThemesMap[theme.name] = theme
+        }
+        for (theme in localThemes) {
+            mergedThemesMap[theme.name] = theme
+        }
+
+        // Merge content rules uniquely by id
+        val localRules = local.contentRules ?: emptyList()
+        val remoteRules = remote.contentRules ?: emptyList()
+        val mergedRulesMap = mutableMapOf<String, ContentCleanRule>()
+        for (rule in remoteRules) {
+            mergedRulesMap[rule.id] = rule
+        }
+        for (rule in localRules) {
+            mergedRulesMap[rule.id] = rule
+        }
+ 
+        return BackupFile(
+            mergedDataStore,
+            mergedSettings,
+            mergedNovelsMap.values.toList(),
+            mergedThemesMap.values.toList(),
+            mergedRulesMap.values.toList()
+        )
     }
 
     private fun <K, V> mergeMap(local: Map<K, V>?, remote: Map<K, V>?): Map<K, V>? {
