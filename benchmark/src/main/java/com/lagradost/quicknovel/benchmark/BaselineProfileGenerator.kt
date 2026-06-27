@@ -82,7 +82,29 @@ class BaselineProfileGenerator {
             libraryTab?.click()
             device.waitForIdle()
 
-            // Step 2: Scroll through the Library List / Grid (fail-safe)
+            // Step 2: Swipe horizontally to load and compile NeoShelf and NeoNexus tabs in ViewPager
+            try {
+                val viewPager = device.wait(Until.findObject(By.scrollable(true)), 5000)
+                viewPager?.let {
+                    // Swipe to NeoShelf
+                    it.swipe(Direction.LEFT, 0.8f)
+                    device.waitForIdle(2000)
+                    
+                    // Swipe to NeoNexus (Folders)
+                    it.swipe(Direction.LEFT, 0.8f)
+                    device.waitForIdle(2000)
+                    
+                    // Swipe back to primary tab
+                    it.swipe(Direction.RIGHT, 0.8f)
+                    device.waitForIdle()
+                    it.swipe(Direction.RIGHT, 0.8f)
+                    device.waitForIdle()
+                }
+            } catch (e: Exception) {
+                // Ignore pager swipe/timing failures
+            }
+
+            // Step 3: Scroll through the Library List / Grid (fail-safe)
             try {
                 val scrollableList = device.wait(Until.findObject(By.scrollable(true)), 5000)
                 scrollableList?.let {

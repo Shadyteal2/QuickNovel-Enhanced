@@ -125,6 +125,7 @@ fun ResultDetailDefaultScreen(
     val bookmarkLabel by viewModel.bookmarkLabel.collectAsStateWithLifecycle()
     val continueLabel by viewModel.continueReadingLabel.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val novelFolders by viewModel.novelFolders.collectAsStateWithLifecycle()
     val hasBookmark = bookmarkLabel != defaultBookmarkLabel
 
     // ── Root Box fills entire screen ──────────────────────────────────────────
@@ -555,11 +556,25 @@ fun ResultDetailDefaultScreen(
                                                 val currentStateId = remember(readState, currentId, bookmarkState) {
                                                     BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
                                                 }
+                                                val neoListCategoryIds = remember {
+                                                    val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "NEOLIST_CATEGORY_IDS", "[]") ?: "[]"
+                                                    try {
+                                                        com.lagradost.quicknovel.DataStore.mapper.readValue(
+                                                            json,
+                                                            object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {}
+                                                        )
+                                                    } catch (_: Throwable) { emptyList<Int>() }
+                                                }
                                                 categories.forEach { (id, label) ->
+                                                    val isChecked = if (neoListCategoryIds.contains(id)) {
+                                                        novelFolders.contains(id)
+                                                    } else {
+                                                        id == currentStateId
+                                                    }
                                                     DropdownMenuItem(
                                                         text = {
                                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                                if (id == currentStateId) {
+                                                                if (isChecked) {
                                                                     Text("✓ ",
                                                                         color = MaterialTheme.colorScheme.primary,
                                                                         fontWeight = FontWeight.Bold)

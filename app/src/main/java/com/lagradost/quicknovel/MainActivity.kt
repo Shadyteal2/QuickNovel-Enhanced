@@ -689,6 +689,39 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
+
+        // Intercept .neolist files from ACTION_VIEW or ACTION_SEND
+        val intentData = intent.data
+        if (intentData != null) {
+            val dataStr = intentData.toString()
+            val isNeoList = dataStr.endsWith(".neolist") || 
+                            intent.type == "application/json" || 
+                            intent.type == "application/octet-stream" ||
+                            intentData.path?.endsWith(".neolist") == true
+            if (isNeoList) {
+                ioSafe {
+                    val importResult = com.lagradost.quicknovel.ui.neolists.NeoListImportExportEngine.importFromUri(intentData, this@MainActivity)
+                    withContext(Dispatchers.Main) {
+                        when (importResult) {
+                            is com.lagradost.quicknovel.ui.neolists.ImportResult.Success -> {
+                                showToast("Imported NeoList: ${importResult.title}")
+                            }
+                            is com.lagradost.quicknovel.ui.neolists.ImportResult.AlreadySaved -> {
+                                showToast("NeoList '${importResult.title}' is already saved")
+                            }
+                            is com.lagradost.quicknovel.ui.neolists.ImportResult.Failure -> {
+                                showToast(importResult.reason)
+                            }
+                            else -> {}
+                        }
+                        // Switch to Downloads tab (tab 0) where NeoLists hub is integrated
+                        switchToMainTab(0)
+                    }
+                }
+                return
+            }
+        }
+
         val defaultTab = intent.getIntExtra("defaultTab", -1)
         if (defaultTab != -1) {
             switchToMainTab(defaultTab)
@@ -713,7 +746,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                 return
             }
         }
-        val data: String? = intent.data?.toString()
+        val data: String? = intentData?.toString()
         loadResultFromUrl(data)
     }
 

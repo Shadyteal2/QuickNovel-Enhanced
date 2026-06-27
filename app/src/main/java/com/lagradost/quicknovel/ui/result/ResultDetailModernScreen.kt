@@ -828,6 +828,16 @@ private fun PremiumActionBar(
 ) {
     val context = LocalContext.current
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val novelFolders by viewModel.novelFolders.collectAsStateWithLifecycle()
+    val neoListCategoryIds = remember {
+        val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "NEOLIST_CATEGORY_IDS", "[]") ?: "[]"
+        try {
+            com.lagradost.quicknovel.DataStore.mapper.readValue(
+                json,
+                object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {}
+            )
+        } catch (_: Throwable) { emptyList<Int>() }
+    }
     val currentId by viewModel.id.observeAsState(-1)
     val readState by viewModel.readState.observeAsState()
     val bookmarkState by viewModel.bookmarkState.observeAsState(-1)
@@ -884,10 +894,15 @@ private fun PremiumActionBar(
                     onDismissRequest = { onBookmarkMenuChange(false) }
                 ) {
                     categories.forEach { (id, label) ->
+                        val isChecked = if (neoListCategoryIds.contains(id)) {
+                            novelFolders.contains(id)
+                        } else {
+                            id == currentStateId
+                        }
                         DropdownMenuItem(
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (id == currentStateId) {
+                                    if (isChecked) {
                                         Text("✓ ", color = MaterialTheme.colorScheme.primary,
                                             fontWeight = FontWeight.Bold)
                                     }

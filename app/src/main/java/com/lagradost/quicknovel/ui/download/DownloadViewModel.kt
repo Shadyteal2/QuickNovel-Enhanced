@@ -98,7 +98,13 @@ data class CategoryItem(
     val id: Int,
     @StringRes val stringRes: Int? = null,
     val name: String,
-    val isSystem: Boolean = false
+    val isSystem: Boolean = false,
+    /**
+     * When true, this category is a locked NeoList folder and must NOT appear
+     * in the "Add to Bookmark" popup in ResultDetailModernScreen.
+     * Defaults to false so all existing CategoryItems (system + user custom) are unaffected.
+     */
+    val isLocked: Boolean = false
 )
 
 class DownloadViewModel : ViewModel() {
@@ -142,10 +148,18 @@ class DownloadViewModel : ViewModel() {
             val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
             val customList = mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<CategoryItem>>() {})
             
+            // Filter out custom categories that belong to NeoLists folders so they don't spawn duplicate tab pages
+            val idsJson = getKey<String>(DOWNLOAD_SETTINGS, "NEOLIST_CATEGORY_IDS", "[]") ?: "[]"
+            val neoListCategoryIds = try {
+                mapper.readValue(idsJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {})
+            } catch (_: Throwable) { emptyList<Int>() }
+            
+            val filteredCustomList = customList.filter { it.id !in neoListCategoryIds }
+
             val orderJson = getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
             val orderList = mapper.readValue(orderJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {})
 
-            val allItems = systemCategories + customList
+            val allItems = systemCategories + filteredCustomList
             if (orderList.isNotEmpty()) {
                 allItems.sortedBy { orderList.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
             } else {

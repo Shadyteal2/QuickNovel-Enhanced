@@ -674,7 +674,8 @@ class ResultFragment : Fragment() {
                 }
 
                 val menuItems = mutableListOf<Pair<Int, Any>>()
-                sortedCats.forEach { cat ->
+                // Filter locked NeoList categories — they must not appear in the bookmark dialog
+                sortedCats.filter { !it.isLocked }.forEach { cat ->
                      menuItems.add(cat.id to (cat.stringRes ?: cat.name))
                 }
 
@@ -683,6 +684,12 @@ class ResultFragment : Fragment() {
                 if (currentState != -1) {
                      menuItems.add(-1 to "Unbookmark")
                 }
+
+                val idsJson = com.lagradost.quicknovel.BaseApplication.getKey<String>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, "NEOLIST_CATEGORY_IDS", "[]") ?: "[]"
+                val neoListCategoryIds = try {
+                    com.lagradost.quicknovel.DataStore.mapper.readValue(idsJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {})
+                } catch (_: Throwable) { emptyList<Int>() }
+                val novelFolderIds = viewModel.novelFolders.value
 
                 val popup = android.widget.ListPopupWindow(context)
                 popup.anchorView = view
@@ -703,7 +710,14 @@ class ResultFragment : Fragment() {
                             v.setText(title as CharSequence)
                         }
                         
-                        if (pair.first == currentState) {
+                        val id = pair.first
+                        val isChecked = if (neoListCategoryIds.contains(id)) {
+                            novelFolderIds.contains(id)
+                        } else {
+                            id == currentState
+                        }
+                        
+                        if (isChecked) {
                              val checkIcon = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_check_24)?.mutate()?.apply {
                                  val typedValue = android.util.TypedValue()
                                  context.theme.resolveAttribute(android.R.attr.textColorPrimary, typedValue, true)

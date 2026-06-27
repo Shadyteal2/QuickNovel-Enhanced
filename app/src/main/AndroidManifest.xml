@@ -26,6 +26,7 @@
     <application
         android:name=".BaseApplication"
         android:allowBackup="true"
+        android:appCategory="news"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -130,115 +131,37 @@
                     android:host="www.reddit.com"
                     android:pathPrefix="/r/"
                     android:scheme="https" />
+            </intent-filter>
 
-                <data
-                    android:host="allnovel.org"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="annas-archive.org"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="bestlightnovel.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="freewebnovel.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="www.fanmtl.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="graycity.net"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="hiraethtranslation.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="indowebnovel.id"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="kolnovel.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="libread.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="lightnovelstranslations.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="meionovels.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="risenovel.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="mtlnovel.me"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="novelbin.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="novelfull.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="novlove.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="novelfire.net"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="novelsonline.org"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="pawread.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="readfrom.net"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="readnovelfull.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="www.royalroad.com"
-                    android:pathPrefix="/fiction"
-                    android:scheme="https" />
-                <data
-                    android:host="sakuranovel.id"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="www.scribblehub.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="wtr-lab.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
-                <data
-                    android:host="www.wuxiabox.com"
-                    android:pathPrefix="/"
-                    android:scheme="https" />
+            <!-- Intent filter to capture tapping on .neolist files in file managers or chat apps -->
+            <!-- Filter 1: Matches path-based/extension-based intents that don't supply a MIME type -->
+            <intent-filter android:label="Import NeoList" android:priority="999">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:pathPattern=".*\\.neolist" />
+                <data android:pathPattern=".*\\..*\\.neolist" />
+                <data android:pathPattern=".*\\..*\\..*\\.neolist" />
+                <data android:pathSuffix=".neolist" />
+            </intent-filter>
+
+            <!-- Filter 2: Matches intents that supply a generic or specific MIME type along with the file extension -->
+            <intent-filter android:label="Import NeoList" android:priority="999">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="*/*" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="text/plain" />
+                <data android:pathPattern=".*\\.neolist" />
+                <data android:pathPattern=".*\\..*\\.neolist" />
+                <data android:pathPattern=".*\\..*\\..*\\.neolist" />
+                <data android:pathSuffix=".neolist" />
             </intent-filter>
         </activity>
 

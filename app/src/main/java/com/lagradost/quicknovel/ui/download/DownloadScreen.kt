@@ -199,9 +199,10 @@ fun DownloadScreen(
         if (baseTabs.isNotEmpty()) {
             val list = baseTabs.toMutableList()
             list.add(1, "NeoShelf")
+            list.add(2, "NeoNexus")
             list
         } else {
-            listOf("NeoShelf")
+            listOf("NeoShelf", "NeoNexus")
         }
     }
 
@@ -544,27 +545,30 @@ fun DownloadScreen(
             }
         },
         floatingActionButton = {
-            Box(
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(bottom = if (!isSwipeMode) 156.dp else 84.dp) // Perfect safe height clearance above nav/pill sliders
-                    .size(56.dp)
-                    .glassCard(
-                        shape = RoundedCornerShape(16.dp),
-                        backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                        strokeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+            val foldersIndex = allTabs.indexOf("NeoNexus")
+            if (pagerState.currentPage != foldersIndex) {
+                Box(
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = if (!isSwipeMode) 156.dp else 84.dp) // Perfect safe height clearance above nav/pill sliders
+                        .size(56.dp)
+                        .glassCard(
+                            shape = RoundedCornerShape(16.dp),
+                            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            strokeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        )
+                        .clickable {
+                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                            showSortSheet = true
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sort,
+                        contentDescription = "Sort",
+                        tint = MaterialTheme.colorScheme.primary
                     )
-                    .clickable {
-                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                        showSortSheet = true
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Sort,
-                    contentDescription = "Sort",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                }
             }
         }
     ) { innerPadding ->
@@ -593,6 +597,7 @@ fun DownloadScreen(
                 userScrollEnabled = isSwipeMode && !isScrollingList // Disable pager swipe when scrolling list
             ) { page ->
                 val neoShelfIndex = allTabs.indexOf("NeoShelf")
+                val foldersIndex = allTabs.indexOf("NeoNexus")
                 if (page == neoShelfIndex) {
                     val shelves by viewModel.neoShelfPage.observeAsState(emptyList())
                     NeoShelfPageContent(
@@ -604,8 +609,20 @@ fun DownloadScreen(
                         onBookClick = onBookClick,
                         onBookLongClickLoaded = onBookLongClickLoaded
                     )
+                } else if (page == foldersIndex) {
+                    val neolistsViewModel: com.lagradost.quicknovel.ui.neolists.NeoListsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+                    com.lagradost.quicknovel.ui.neolists.NeoListsHubScreen(
+                        viewModel = neolistsViewModel,
+                        onFolderClick = { folderId ->
+                            val bundle = android.os.Bundle().apply {
+                                putString("listId", folderId)
+                            }
+                            activity.navigate(com.lagradost.quicknovel.R.id.navigation_neolist_detail, bundle)
+                        },
+                        isSwipeMode = isSwipeMode
+                    )
                 } else {
-                    val actualPageIndex = if (page > neoShelfIndex) page - 1 else page
+                    val actualPageIndex = if (page > foldersIndex) page - 2 else page
                     val list = cardsByPage[actualPageIndex] ?: emptyList()
                 val isDownloadsPage = actualPageIndex == 0
                 val pullState = rememberPullToRefreshState()

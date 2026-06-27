@@ -5,27 +5,45 @@
 ## Last Session Summary
 
 **Date**: 2026-06-27  
-**Task**: Fix TTS progress resetting back to the first paragraph when reopening the app.  
-**Complexity**: Medium
+**Task**: Refined NeoLists feature: rebranded tab to "NeoNexus", added folder details editor dialog for local folders, and fully decoupled folder membership from standard bookmark categories.  
+**Complexity**: High
 
 ## Files Touched
 
-- `app/src/main/java/com/lagradost/quicknovel/ReadActivityViewModel.kt`
+- `app/src/main/AndroidManifest.xml`
+- `benchmark/src/main/java/com/lagradost/quicknovel/benchmark/BaselineProfileGenerator.kt`
+- `app/src/main/java/com/lagradost/quicknovel/db/AppDatabase.kt`
+- `app/src/main/java/com/lagradost/quicknovel/db/NeoListPinMap.kt`
+- `app/src/main/java/com/lagradost/quicknovel/db/NeoListDao.kt`
+- `app/src/main/java/com/lagradost/quicknovel/ui/neolists/NeoListsViewModel.kt`
+- `app/src/main/java/com/lagradost/quicknovel/ui/neolists/NeoListsHubScreen.kt`
+- `app/src/main/java/com/lagradost/quicknovel/ui/download/DownloadScreen.kt`
+- `app/src/main/java/com/lagradost/quicknovel/ui/result/ResultViewModel.kt`
+- `app/src/main/java/com/lagradost/quicknovel/ui/result/ResultDetailModernScreen.kt`
+- `app/src/main/java/com/lagradost/quicknovel/ui/result/ResultDetailDefaultScreen.kt`
+- `app/src/main/java/com/lagradost/quicknovel/ui/result/ResultFragment.kt`
 
 ## Graph Nodes Resolved
 
-- `ReadActivityViewModel`
-- `isInApp`
-- `resumedApp`
-- `changeIndex`
-- `onScroll`
+- `NeoListPinMap`
+- `NeoListDao`
+- `AppDatabase`
+- `NeoListsViewModel`
+- `NeoListsHubScreen`
+- `DownloadScreen`
+- `ResultViewModel`
+- `ResultDetailModernScreen`
+- `ResultDetailDefaultScreen`
+- `ResultFragment`
 
 ## Key Decisions Made
 
-- Set the `isInApp = true` variable synchronously inside the main-thread context of `init()`, prior to scheduling any background IO operations.
-- Annotated `isInApp` with `@Volatile` to ensure visibility transitions are published cleanly between the main thread and the background TTS execution loop.
-- Wrapped `changeIndex()` inside a `runOnMainThread` block to serialize scroll updates and prevent concurrent thread race conflicts when updating settings keys.
+- Excluded locked NeoList categories (`isLocked = true`) from the bookmark dropdown in both Compose and legacy XML implementations.
+- Used `maxId + 1` category ID generation logic to bridge NeoList UUIDs to SharedPreferences category integers, preventing hash collision bugs.
+- Decoupled folders from library status categories (`bookmarkType`). Selecting a folder now toggles folder membership directly in `neolist_pin_map` and the folder's `novels` JSON, keeping the novel's main status category (Reading, Completed, etc.) untouched.
+- Changed the primary key of `neolist_pin_map` to a composite primary key `(novelHash, neoListId)` to allow a novel to be added to multiple folders simultaneously.
 
 ## Carry-Over Notes
 
-- Both the Telegram backup feature and TTS paragraph progress reset fixes are complete. Verify their integration via manual execution in Android Studio.
+- Compile and run project in Android Studio to verify that a novel can be bookmarked to Reading/Completed while also being pinned to multiple folders in the dropdown.
+- Check that checking/unchecking folders toggles their state in the details screen and DB.

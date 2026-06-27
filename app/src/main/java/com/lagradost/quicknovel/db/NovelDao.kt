@@ -45,6 +45,12 @@ interface NovelDao {
     @Query("SELECT * FROM novel WHERE bookmarkType IS NOT NULL AND bookmarkType != 0 AND name LIKE :queryPattern")
     fun getBookmarksFiltered(queryPattern: String): List<NovelEntity>
 
+    @Query("SELECT * FROM novel WHERE bookmarkType = :type")
+    fun getBookmarksForCategory(type: Int): List<NovelEntity>
+
+    @Query("UPDATE novel SET bookmarkType = NULL WHERE bookmarkType = :type")
+    fun removeCategoryFromNovels(type: Int)
+
     @Query("UPDATE novel SET bookmarkType = :type WHERE id = :id")
     fun updateBookmarkType(id: Int, type: Int?)
 

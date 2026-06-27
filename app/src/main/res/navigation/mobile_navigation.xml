@@ -199,4 +199,13 @@
             android:defaultValue="@string/info"
             app:argType="reference" />
     </fragment>
+    <fragment
+        android:id="@+id/navigation_neolist_detail"
+        android:name="com.lagradost.quicknovel.ui.neolists.NeoListDetailFragment"
+        android:label="NeoList Details"
+        android:layout_height="match_parent">
+        <argument
+            android:name="listId"
+            app:argType="string" />
+    </fragment>
 </navigation>

@@ -1,6 +1,11 @@
-- `app/src/main/java/com/lagradost/quicknovel/ReadActivityViewModel.kt`
-- `app/src/main/java/com/lagradost/quicknovel/PreferenceKeys.kt`
-- `app/src/main/java/com/lagradost/quicknovel/db/NovelDao.kt`
-- `app/src/main/java/com/lagradost/quicknovel/BookDownloader2.kt`
-- `app/src/main/java/com/lagradost/quicknovel/ui/settings/SubSettingsScreen.kt`
-- `app/src/main/java/com/lagradost/quicknovel/sync/TelegramBackupWorker.kt`
+- app/src/main/AndroidManifest.xml
+- app/src/main/java/com/lagradost/quicknovel/db/NeoListPinMap.kt
+- app/src/main/java/com/lagradost/quicknovel/db/NeoListDao.kt
+- app/src/main/java/com/lagradost/quicknovel/db/AppDatabase.kt
+- app/src/main/java/com/lagradost/quicknovel/ui/neolists/NeoListsViewModel.kt
+- app/src/main/java/com/lagradost/quicknovel/ui/neolists/NeoListsHubScreen.kt
+- app/src/main/java/com/lagradost/quicknovel/ui/download/DownloadScreen.kt
+- app/src/main/java/com/lagradost/quicknovel/ui/result/ResultViewModel.kt
+- app/src/main/java/com/lagradost/quicknovel/ui/result/ResultDetailModernScreen.kt
+- app/src/main/java/com/lagradost/quicknovel/ui/result/ResultDetailDefaultScreen.kt
+- app/src/main/java/com/lagradost/quicknovel/ui/result/ResultFragment.kt

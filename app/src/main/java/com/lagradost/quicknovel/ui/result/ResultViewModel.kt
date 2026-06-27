@@ -111,6 +111,8 @@ class ResultViewModel : ViewModel() {
     val bookmarkLabel = MutableStateFlow<String>("Bookmark")
     private val _categories = MutableStateFlow<List<Pair<Int, String>>>(emptyList())
     val categories: StateFlow<List<Pair<Int, String>>> = _categories.asStateFlow()
+    private val _novelFolders = MutableStateFlow<Set<Int>>(emptySet())
+    val novelFolders: StateFlow<Set<Int>> = _novelFolders.asStateFlow()
 
 
 
@@ -843,9 +845,11 @@ class ResultViewModel : ViewModel() {
             val sorted  = if (order.isNotEmpty()) {
                 allCats.sortedBy { order.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
             } else allCats
-            val mapped = sorted.map { cat ->
-                cat.id to (cat.stringRes?.let { ctx.getString(it) } ?: cat.name)
-            }
+            val mapped = sorted
+                .filter { !it.isLocked }
+                .map { cat ->
+                    cat.id to (cat.stringRes?.let { ctx.getString(it) } ?: cat.name)
+                }
             _categories.value = mapped
         }
     }
@@ -856,7 +860,25 @@ class ResultViewModel : ViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             val currentStateId = getKey<Int>(RESULT_BOOKMARK_STATE, currentIdVal.toString()) ?: -1
-            
+
+            val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(ctx)
+            val currentLoad = if (::load.isInitialized) load else (loadResponse.value as? Resource.Success<LoadResponse>)?.value
+            val novelHash = if (currentLoad != null) {
+                com.lagradost.quicknovel.BookDownloader2Helper.generateId(currentLoad, apiName).toString()
+            } else null
+
+            if (novelHash != null) {
+                val folderUuids = db.neoListDao().getListsForNovel(novelHash)
+                val mapJson = getKey<String>(DOWNLOAD_SETTINGS, "NEOLIST_ID_MAP", "{}") ?: "{}"
+                val idMap = try {
+                    com.lagradost.quicknovel.DataStore.mapper.readValue(mapJson, object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Int>>() {})
+                } catch (_: Throwable) { emptyMap<String, Int>() }
+                val folderCategoryIds = folderUuids.mapNotNull { idMap[it] }.toSet()
+                _novelFolders.value = folderCategoryIds
+            } else {
+                _novelFolders.value = emptySet()
+            }
+
             val duplicateBookmarkVal = if (::load.isInitialized) {
                 findDuplicateState(load.name, load.author)
             } else {
@@ -912,6 +934,17 @@ class ResultViewModel : ViewModel() {
     }
 
     fun bookmark(state: Int) = viewModelScope.launch {
+        val context = context ?: return@launch
+        val idsJson = getKey<String>(DOWNLOAD_SETTINGS, "NEOLIST_CATEGORY_IDS", "[]") ?: "[]"
+        val neoListCategoryIds = try {
+            com.lagradost.quicknovel.DataStore.mapper.readValue(idsJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {})
+        } catch (_: Throwable) { emptyList<Int>() }
+
+        if (state in neoListCategoryIds) {
+            toggleFolderBookmark(state, context)
+            return@launch
+        }
+
         if (state != -1) { // -1 is Unbookmark
             // 1. Check current ID (Standard flow)
             val currentState = getKey<Int>(folder = RESULT_BOOKMARK_STATE, path = loadId.toString()) ?: -1
@@ -998,6 +1031,86 @@ class ResultViewModel : ViewModel() {
             }
 
             com.lagradost.quicknovel.ui.download.DownloadViewModel.bookmarkChanged.emit(Unit)
+        }
+    }
+
+    private fun toggleFolderBookmark(categoryId: Int, context: android.content.Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val mapJson = getKey<String>(DOWNLOAD_SETTINGS, "NEOLIST_ID_MAP", "{}") ?: "{}"
+                val idMap = try {
+                    com.lagradost.quicknovel.DataStore.mapper.readValue(mapJson, object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Int>>() {})
+                } catch (_: Throwable) { emptyMap<String, Int>() }
+
+                val folderUuid = idMap.entries.find { it.value == categoryId }?.key ?: return@launch
+
+                val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
+                val folder = db.neoListDao().getById(folderUuid) ?: return@launch
+
+                val novel = (loadResponse.value as? Resource.Success<LoadResponse>)?.value ?: return@launch
+                val novelHash = com.lagradost.quicknovel.BookDownloader2Helper.generateId(apiName, novel.author, novel.name).toString()
+
+                val isPinned = folder.novels.any { it.title == novel.name && it.apiName == apiName }
+
+                val updatedNovels = if (isPinned) {
+                    folder.novels.filterNot { it.title == novel.name && it.apiName == apiName }
+                } else {
+                    folder.novels + com.lagradost.quicknovel.ui.neolists.NeoListNovelEntry(
+                        title = novel.name,
+                        author = novel.author,
+                        posterUrl = novel.posterUrl,
+                        apiName = apiName,
+                        sourceUrl = loadUrl
+                    )
+                }
+
+                db.neoListDao().insert(folder.copy(novels = updatedNovels))
+
+                if (isPinned) {
+                    db.neoListDao().deletePin(novelHash, folder.id)
+                } else {
+                    db.neoListDao().insertPins(listOf(com.lagradost.quicknovel.db.NeoListPinMap(novelHash = novelHash, neoListId = folder.id)))
+
+                    // Add novel to novel table if not present, keeping standard bookmarkType intact
+                    val existingNovel = db.novelDao().getById(loadId)
+                    val currentBookmarkState = getKey<Int>(RESULT_BOOKMARK_STATE, loadId.toString()) ?: -1
+                    if (existingNovel == null) {
+                        val defaultCategory = 1 // Reading
+                        db.novelDao().insert(
+                            com.lagradost.quicknovel.db.NovelEntity(
+                                id = loadId,
+                                source = loadUrl,
+                                name = novel.name,
+                                author = novel.author,
+                                posterUrl = novel.posterUrl,
+                                rating = novel.rating,
+                                peopleVoted = (novel as? StreamResponse)?.peopleVoted,
+                                views = (novel as? StreamResponse)?.views,
+                                synopsis = novel.synopsis,
+                                tags = novel.tags,
+                                apiName = apiName,
+                                lastUpdated = null,
+                                lastDownloaded = null,
+                                bookmarkType = defaultCategory
+                            )
+                        )
+                        setKey(RESULT_BOOKMARK_STATE, loadId.toString(), defaultCategory)
+                        bookmarkState.postValue(defaultCategory)
+                        readState.postValue(ReadType.fromSpinner(defaultCategory))
+                    } else if (existingNovel.bookmarkType == null || currentBookmarkState == -1) {
+                        val defaultCategory = 1 // Reading
+                        db.novelDao().updateBookmarkType(loadId, defaultCategory)
+                        setKey(RESULT_BOOKMARK_STATE, loadId.toString(), defaultCategory)
+                        bookmarkState.postValue(defaultCategory)
+                        readState.postValue(ReadType.fromSpinner(defaultCategory))
+                    }
+                }
+
+                com.lagradost.quicknovel.ui.download.DownloadViewModel.bookmarkChanged.emit(Unit)
+                updateBookmarkLabel()
+            } catch (t: Throwable) {
+                logError(t)
+            }
         }
     }
 
