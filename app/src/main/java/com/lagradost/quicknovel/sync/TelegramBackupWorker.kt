@@ -72,13 +72,13 @@ class TelegramBackupWorker(
         }
     }
 
-    private fun updateNotification(current: Int, total: Int, currentTitle: String) {
+    private fun updateNotification(current: Int, total: Int, contentText: String) {
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notification = NotificationCompat.Builder(context, "telegram_backup_channel")
             .setSmallIcon(R.drawable.baseline_save_as_24)
             .setContentTitle("Telegram Cloud Backup")
-            .setContentText("Uploading ($current/$total): $currentTitle")
+            .setContentText(contentText)
             .setProgress(total, current, false)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -177,6 +177,7 @@ class TelegramBackupWorker(
             val botToken = sharedPrefs.getString(TelegramBackupPrefs.BOT_TOKEN, null)
             val chatId = sharedPrefs.getString(TelegramBackupPrefs.CHAT_ID, null)
             val deleteAfterUpload = sharedPrefs.getBoolean(TelegramBackupPrefs.DELETE_AFTER_UPLOAD, false)
+            val compileDownloads = sharedPrefs.getBoolean(TelegramBackupPrefs.COMPILE_DOWNLOADS, false)
 
             if (botToken.isNullOrBlank() || chatId.isNullOrBlank()) {
                 val errorMsg = "Credentials missing. Verify Token and Chat ID under Storage settings."
@@ -205,6 +206,41 @@ class TelegramBackupWorker(
                         .build()
                 )
                 return@withContext Result.failure()
+            }
+
+            if (compileDownloads) {
+                val db = AppDatabase.getDatabase(context)
+                val downloadedNovels = db.novelDao().getFullDownloadedNovels(DownloadState.IsDone.ordinal)
+                if (downloadedNovels.isNotEmpty()) {
+                    val totalCompile = downloadedNovels.size
+                    for ((idx, novel) in downloadedNovels.withIndex()) {
+                        val currentNum = idx + 1
+                        val compileStatus = "Compiling ($currentNum/$totalCompile): ${novel.name}"
+                        
+                        updateNotification(currentNum, totalCompile, compileStatus)
+                        setProgress(
+                            Data.Builder()
+                                .putInt("progress_current", idx)
+                                .putInt("progress_total", totalCompile)
+                                .putString("progress_status", compileStatus)
+                                .putBoolean("is_active", true)
+                                .build()
+                        )
+
+                        try {
+                            BookDownloader2Helper.turnToEpub(
+                                context = context,
+                                author = novel.author,
+                                name = novel.name,
+                                apiName = novel.apiName,
+                                synopsis = novel.synopsis,
+                                isSilent = true
+                            )
+                        } catch (e: Exception) {
+                            Log.e("TelegramBackupWorker", "Failed to compile novel ${novel.name}", e)
+                        }
+                    }
+                }
             }
 
             // Recursive bottom-up search of EPUB files and sibling images using Scoped Storage safe listFiles()
@@ -289,7 +325,7 @@ class TelegramBackupWorker(
                     val matchedNovel = novelMap[nameWithoutExt]
 
                     val statusText = "Uploading ($currentNum/$totalCount): $rawName"
-                    updateNotification(currentNum, totalCount, rawName)
+                    updateNotification(currentNum, totalCount, statusText)
                     setProgress(
                         Data.Builder()
                             .putInt("progress_current", index)

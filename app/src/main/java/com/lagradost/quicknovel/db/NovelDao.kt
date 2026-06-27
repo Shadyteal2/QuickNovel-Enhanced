@@ -68,6 +68,9 @@ interface NovelDao {
 
     @Query("SELECT id, name, author, apiName, posterUrl FROM novel WHERE downloadStatus = :doneStatus")
     fun getDownloadedNovels(doneStatus: Int): List<NovelBackupInfo>
+
+    @Query("SELECT * FROM novel WHERE downloadStatus = :doneStatus")
+    fun getFullDownloadedNovels(doneStatus: Int): List<NovelEntity>
 }
 
 data class NovelBackupInfo(

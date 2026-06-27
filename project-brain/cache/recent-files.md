@@ -1,0 +1,6 @@
+- `app/src/main/java/com/lagradost/quicknovel/ReadActivityViewModel.kt`
+- `app/src/main/java/com/lagradost/quicknovel/PreferenceKeys.kt`
+- `app/src/main/java/com/lagradost/quicknovel/db/NovelDao.kt`
+- `app/src/main/java/com/lagradost/quicknovel/BookDownloader2.kt`
+- `app/src/main/java/com/lagradost/quicknovel/ui/settings/SubSettingsScreen.kt`
+- `app/src/main/java/com/lagradost/quicknovel/sync/TelegramBackupWorker.kt`

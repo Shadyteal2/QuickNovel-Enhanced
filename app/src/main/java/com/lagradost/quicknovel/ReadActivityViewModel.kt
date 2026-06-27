@@ -476,7 +476,7 @@ class ReadActivityViewModel : ViewModel() {
     private var isEpub: Boolean = false
     lateinit var book: AbstractBook
     private lateinit var markwon: Markwon
-    private var isInApp: Boolean = true
+    @kotlin.jvm.Volatile private var isInApp: Boolean = true
     private var leftAppAt: ScrollIndex? = null
     private var mlTranslator: Translator? = null
     val isShowingOriginalLive = MutableLiveData<Boolean>(false)
@@ -496,7 +496,7 @@ class ReadActivityViewModel : ViewModel() {
         val resumeAt = desiredIndex
 
         leftAppAt = null
-        isInApp = false
+        isInApp = true
 
         // if we resume the app and the desired index is different from what we are at currently
         // then we scroll to it
@@ -1712,8 +1712,10 @@ class ReadActivityViewModel : ViewModel() {
     }
 
 
-    fun init(intent: Intent?, context: ReadActivity2) = ioSafe {
-        com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.init(context)
+    fun init(intent: Intent?, context: ReadActivity2) {
+        isInApp = true
+        ioSafe {
+            com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.init(context)
         _loadingStatus.postValue(Resource.Loading())
         initTTSSession(context)
         hasPerformedInitialSeek = false
@@ -1901,6 +1903,7 @@ class ReadActivityViewModel : ViewModel() {
         if (service != null && service.activeNovelName() == book.title()) {
             service.bindViewModel(this@ReadActivityViewModel)
         }
+    }
     }
 
     fun init(book: AbstractBook, context: Context) {
@@ -2322,19 +2325,21 @@ class ReadActivityViewModel : ViewModel() {
     private var lastChangeIndex: ScrollIndex? = null
     private var lastScrollMs: Long = 0
     private fun changeIndex(scrollIndex: ScrollIndex, alsoTitle: Boolean = true) {
-        if (alsoTitle) {
-            _chapterTile.postValue(chaptersTitlesInternal[scrollIndex.index])
-        }
+        runOnMainThread {
+            if (alsoTitle) {
+                _chapterTile.value = chaptersTitlesInternal[scrollIndex.index]
+            }
 
-        desiredIndex = scrollIndex
-        currentIndex = scrollIndex.index
+            desiredIndex = scrollIndex
+            currentIndex = scrollIndex.index
 
-        // the majority of the time is spent on setKey, and because this is called from onscroll
-        // this fixes lag
-        lastChangeIndex = scrollIndex
-        if (System.currentTimeMillis() > lastScrollMs + 200L) {
-            lastScrollMs = System.currentTimeMillis()
-            setScrollKeys(scrollIndex)
+            // the majority of the time is spent on setKey, and because this is called from onscroll
+            // this fixes lag
+            lastChangeIndex = scrollIndex
+            if (System.currentTimeMillis() > lastScrollMs + 200L) {
+                lastScrollMs = System.currentTimeMillis()
+                setScrollKeys(scrollIndex)
+            }
         }
     }
 

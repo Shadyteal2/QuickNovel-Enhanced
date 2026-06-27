@@ -149,6 +149,7 @@ object TelegramBackupPrefs {
     const val BOT_TOKEN = "telegram_bot_token"
     const val CHAT_ID = "telegram_chat_id"
     const val DELETE_AFTER_UPLOAD = "telegram_delete_after_upload"
+    const val COMPILE_DOWNLOADS = "telegram_compile_downloads"
 }
 
 // ─── Network ─────────────────────────────────────────────────────────────────

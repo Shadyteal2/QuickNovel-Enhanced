@@ -3823,6 +3823,7 @@ fun TelegramBackupPreferencesCard() {
     var botToken by remember { mutableStateOf(sharedPrefs.getString(TelegramBackupPrefs.BOT_TOKEN, "") ?: "") }
     var chatId by remember { mutableStateOf(sharedPrefs.getString(TelegramBackupPrefs.CHAT_ID, "") ?: "") }
     var deleteAfterUpload by remember { mutableStateOf(sharedPrefs.getBoolean(TelegramBackupPrefs.DELETE_AFTER_UPLOAD, false)) }
+    var compileDownloads by remember { mutableStateOf(sharedPrefs.getBoolean(TelegramBackupPrefs.COMPILE_DOWNLOADS, false)) }
 
     // Observe WorkManager progress
     val workInfos = remember(context) {
@@ -4003,6 +4004,35 @@ fun TelegramBackupPreferencesCard() {
                         onCheckedChange = { checked ->
                             deleteAfterUpload = checked
                             sharedPrefs.edit().putBoolean(TelegramBackupPrefs.DELETE_AFTER_UPLOAD, checked).apply()
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Compile downloads before backup",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Automatically saves downloaded novels in your library as EPUB to your phone before uploading to Telegram.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                    Switch(
+                        checked = compileDownloads,
+                        onCheckedChange = { checked ->
+                            compileDownloads = checked
+                            sharedPrefs.edit().putBoolean(TelegramBackupPrefs.COMPILE_DOWNLOADS, checked).apply()
                         }
                     )
                 }

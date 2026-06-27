@@ -241,7 +241,7 @@ object BookDownloader2Helper {
         return generateId(apiName, load.author, load.name)
     }
 
-    fun Activity.checkWrite(): Boolean {
+    fun Context.checkWrite(): Boolean {
         // Since Android 13 (API 33), WRITE_EXTERNAL_STORAGE is deprecated and not requestable.
         // On modern Android, we rely on Scoped Storage or SAF.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return true
@@ -715,16 +715,20 @@ object BookDownloader2Helper {
     @WorkerThread
     @Throws
     fun turnToEpub(
-        activity: Activity?,
+        context: Context,
         author: String?,
         name: String,
         apiName: String,
-        synopsis: String?
+        synopsis: String?,
+        isSilent: Boolean = false
     ) {
-        if (activity == null) throw ErrorLoadingException("No activity")
-        if (!activity.checkWrite()) {
-            activity.requestRW()
-            return
+        if (context is Activity) {
+            if (!context.checkWrite()) {
+                if (!isSilent) {
+                    context.requestRW()
+                }
+                return
+            }
         }
 
         try {
@@ -733,7 +737,7 @@ object BookDownloader2Helper {
             val sName = sanitizeFilename(name)
             val id = "$sApiName$sAuthor$sName".hashCode()
 
-            val subDir = activity.getBasePath().first ?: getDefaultDir(activity)
+            val subDir = context.getBasePath().first ?: getDefaultDir(context)
             ?: throw IOException("No file")
 
             val displayName = "${sanitizeFilename(name)}.epub"
@@ -745,10 +749,12 @@ object BookDownloader2Helper {
                 // FALLBACK: If we don't have SAF permission for the chosen directory, 
                 // use the app's internal files directory so the user isn't blocked.
                 logError(e)
-                val fallbackRoot = SafeFile.fromUri(activity, File(activity.filesDir, "Fallback-Epub").apply { mkdirs() }.toUri())
+                val fallbackRoot = SafeFile.fromUri(context, File(context.filesDir, "Fallback-Epub").apply { mkdirs() }.toUri())
                 fallbackRoot?.findFile(displayName)?.delete()
-                activity.runOnUiThread {
-                    Toast.makeText(activity, "Storage inaccessible, using internal fallback", Toast.LENGTH_LONG).show()
+                if (context is Activity && !isSilent) {
+                    context.runOnUiThread {
+                        Toast.makeText(context, "Storage inaccessible, using internal fallback", Toast.LENGTH_LONG).show()
+                    }
                 }
                 val result = fallbackRoot?.createFileOrThrow(displayName)
                 if (result == null) throw IOException("Failed to create fallback file")
@@ -759,7 +765,7 @@ object BookDownloader2Helper {
                 file.openOutputStream(append = false) ?: throw IOException("No outputfile")
 
             val epubFile = File(
-                activity.filesDir.toString() + getDirectory(sApiName, sAuthor, sName),
+                context.filesDir.toString() + getDirectory(sApiName, sAuthor, sName),
                 LOCAL_EPUB
             )
             if (epubFile.exists() && epubFile.length() > LOCAL_EPUB_MIN_SIZE) {
@@ -781,15 +787,15 @@ object BookDownloader2Helper {
                 metadata.addTitle(name)
 
                 val posterFilepath =
-                    activity.filesDir.toString() + getFilenameIMG(sApiName, sAuthor, sName)
+                    context.filesDir.toString() + getFilenameIMG(sApiName, sAuthor, sName)
                 val pFile = File(posterFilepath)
                 if (pFile.exists()) {
                     book.coverImage = Resource(pFile.readBytes(), MediaType("cover", ".jpg"))
                 }
 
-                val stripHtml = activity.getStripHtml()
-                val stripAuthorNotes = activity.getStripAuthorNodes()
-                val head = activity.filesDir.toString()
+                val stripHtml = context.getStripHtml()
+                val stripAuthorNotes = context.getStripAuthorNodes()
+                val head = context.filesDir.toString()
                 val dir = File(head + getDirectory(sApiName, sAuthor, sName))
                 // do not include chapters that are stream read downloaded in partial chapter generation
                 val start = getKey<Int>(DOWNLOAD_OFFSET, id.toString()) ?: 0
@@ -1475,7 +1481,8 @@ object BookDownloader2 {
         apiName: String,
         synopsis: String?
     ) {
-        return BookDownloader2Helper.turnToEpub(activity, author, name, apiName, synopsis)
+        val ctx = activity ?: context ?: throw ErrorLoadingException("No context available")
+        return BookDownloader2Helper.turnToEpub(ctx, author, name, apiName, synopsis)
     }
 
     private fun hasEpub(name: String): Boolean {
