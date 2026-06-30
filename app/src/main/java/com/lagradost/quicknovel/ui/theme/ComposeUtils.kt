@@ -36,6 +36,9 @@ import com.lagradost.quicknovel.util.ResultCached
 import com.lagradost.quicknovel.ui.download.DownloadFragment
 import com.lagradost.quicknovel.BookDownloader2Helper
 import com.lagradost.quicknovel.BaseApplication.Companion.getActivity
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 
 @Composable
 fun rememberShimmerBrush(targetValue: Float = 1000f): Brush {
@@ -98,8 +101,24 @@ fun rememberImageRequest(data: Any?): ImageRequest {
         }
     }
 
+    val initialValue = remember(data) {
+        when (data) {
+            is ResultCached -> data.poster
+            is DownloadFragment.DownloadDataLoaded -> data.posterUrl
+            is com.lagradost.quicknovel.ui.foryou.recommendation.NovelVector -> data.posterUrl
+            is com.lagradost.quicknovel.SearchResponse -> {
+                if (data.posterHeaders != null) {
+                    UiImage.Image(data.posterUrl ?: "", data.posterHeaders)
+                } else {
+                    data.posterUrl
+                }
+            }
+            else -> data
+        }
+    }
+
     // Asynchronously resolve file existence checks on Dispatchers.IO to prevent main-thread lag
-    val resolvedDataState = androidx.compose.runtime.produceState<Any?>(initialValue = null as Any?, key1 = stableKey) {
+    val resolvedDataState = androidx.compose.runtime.produceState<Any?>(initialValue = initialValue, key1 = stableKey) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val resolved = when (data) {
                 is ResultCached -> {
@@ -176,7 +195,9 @@ fun rememberImageRequest(data: Any?): ImageRequest {
                 }
                 else -> data
             }
-            value = resolved
+            if (value != resolved) {
+                value = resolved
+            }
         }
     }
 
@@ -445,5 +466,33 @@ fun LoadingIndicator(
             path = path,
             color = color
         )
+    }
+}
+
+@Composable
+fun rememberHighQualityRequest(data: Any?, context: android.content.Context): ImageRequest {
+    val baseRequest = rememberImageRequest(data)
+    return remember(baseRequest, context) {
+        baseRequest.newBuilder(context)
+            .allowHardware(true)
+            .size(coil3.size.Size.ORIGINAL)
+            .crossfade(300)
+            .build()
+    }
+}
+
+suspend fun PointerInputScope.disallowParentIntercept(view: android.view.View) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var isDisallowed = false
+        do {
+            val event = awaitPointerEvent()
+            val dragAmountX = event.changes.sumOf { (it.position.x - it.previousPosition.x).toDouble() }
+            val dragAmountY = event.changes.sumOf { (it.position.y - it.previousPosition.y).toDouble() }
+            if (kotlin.math.abs(dragAmountX) > kotlin.math.abs(dragAmountY) && kotlin.math.abs(dragAmountX) > 2.0 && !isDisallowed) {
+                view.parent?.requestDisallowInterceptTouchEvent(true)
+                isDisallowed = true
+            }
+        } while (event.changes.any { it.pressed })
     }
 }

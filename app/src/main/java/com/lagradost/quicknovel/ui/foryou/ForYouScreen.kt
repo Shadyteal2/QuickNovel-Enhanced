@@ -1,6 +1,10 @@
 package com.lagradost.quicknovel.ui.foryou
 
 import com.lagradost.quicknovel.ui.theme.LoadingIndicator
+import com.lagradost.quicknovel.ui.theme.rememberHighQualityRequest
+import com.lagradost.quicknovel.ui.theme.disallowParentIntercept
+import androidx.compose.material3.carousel.CarouselDefaults
+import androidx.compose.runtime.key
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -361,123 +365,125 @@ fun FeaturedCarousel(
             val novel = rec.novel
             var showMenu by remember { mutableStateOf(false) }
  
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .maskClip(RoundedCornerShape(16.dp))
-                    .glassCard(
-                        shape = RoundedCornerShape(16.dp),
-                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
-                    )
-                    .combinedClickable(
-                        onClick = { onBookClick(novel.url, novel.apiName) },
-                        onLongClick = { showMenu = true }
-                    )
-            ) {
-                // Dropdown menu styled with glassCard
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false },
-                    modifier = Modifier.glassCard(shape = RoundedCornerShape(12.dp)),
-                    containerColor = Color.Transparent
+            key(novel.url) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .maskClip(RoundedCornerShape(16.dp))
+                        .glassCard(
+                            shape = RoundedCornerShape(16.dp),
+                            backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                        )
+                        .combinedClickable(
+                            onClick = { onBookClick(novel.url, novel.apiName) },
+                            onLongClick = { showMenu = true }
+                        )
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("Not Interested") },
-                        onClick = {
-                            showMenu = false
-                            onDismissClick(novel.url)
-                        }
-                    )
-                }
-
-                // Overlay of the trigger book (if present)
-                rec.triggerNovel?.let { trigger ->
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp)
-                            .size(36.dp)
-                            .glassCard(shape = RoundedCornerShape(6.dp), strokeWidth = 0.5.dp)
+                    // Dropdown menu styled with glassCard
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.glassCard(shape = RoundedCornerShape(12.dp)),
+                        containerColor = Color.Transparent
                     ) {
-                        AsyncImage(
-                            model = rememberImageRequest(data = trigger),
-                            contentDescription = trigger.name,
-                            imageLoader = SingletonImageLoader.get(context),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))
+                        DropdownMenuItem(
+                            text = { Text("Not Interested") },
+                            onClick = {
+                                showMenu = false
+                                onDismissClick(novel.url)
+                            }
                         )
                     }
-                }
 
-                // Blurred background ambiance
-                AsyncImage(
-                    model = rememberImageRequest(data = novel),
-                    contentDescription = null,
-                    imageLoader = SingletonImageLoader.get(context),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .blur(12.dp)
-                        .alpha(0.15f)
-                )
+                    // Overlay of the trigger book (if present)
+                    rec.triggerNovel?.let { trigger ->
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(8.dp)
+                                .size(36.dp)
+                                .glassCard(shape = RoundedCornerShape(6.dp), strokeWidth = 0.5.dp)
+                        ) {
+                            AsyncImage(
+                                model = rememberHighQualityRequest(data = trigger, context = context),
+                                contentDescription = trigger.name,
+                                imageLoader = SingletonImageLoader.get(context),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))
+                            )
+                        }
+                    }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                    // Blurred background ambiance
                     AsyncImage(
-                        model = rememberImageRequest(data = novel),
-                        contentDescription = novel.name,
+                        model = rememberHighQualityRequest(data = novel, context = context),
+                        contentDescription = null,
                         imageLoader = SingletonImageLoader.get(context),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(0.66f)
-                            .clip(RoundedCornerShape(8.dp))
+                            .fillMaxSize()
+                            .blur(12.dp)
+                            .alpha(0.15f)
                     )
 
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.Center
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = novel.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = novel.apiName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Box(
+                        AsyncImage(
+                            model = rememberHighQualityRequest(data = novel, context = context),
+                            contentDescription = novel.name,
+                            imageLoader = SingletonImageLoader.get(context),
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .glassCard(shape = RoundedCornerShape(6.dp), strokeWidth = 0.5.dp)
-                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                .fillMaxHeight()
+                                .aspectRatio(0.66f)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "Match ${(rec.score * 100).toInt()}%",
-                                style = MaterialTheme.typography.labelSmall,
+                                text = novel.name,
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = novel.apiName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .glassCard(shape = RoundedCornerShape(6.dp), strokeWidth = 0.5.dp)
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "Match ${(rec.score * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -504,8 +510,9 @@ fun RecommendationGroupSection(
  
     val carouselState = rememberCarouselState { uniqueRecommendations.size }
  
-    // Prefetch cover images of upcoming novels as user scrolls
+    // Prefetch cover images of upcoming novels as user scrolls (debounced to avoid queuing flood during fast flings)
     LaunchedEffect(carouselState.currentItem, uniqueRecommendations) {
+        kotlinx.coroutines.delay(100)
         val totalItems = uniqueRecommendations.size
         val startIndex = (carouselState.currentItem + 4).coerceAtMost(totalItems)
         val endIndex = (startIndex + 6).coerceAtMost(totalItems)
@@ -536,21 +543,19 @@ fun RecommendationGroupSection(
             state = carouselState,
             preferredItemWidth = 130.dp,
             itemSpacing = 8.dp,
+            flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
             contentPadding = PaddingValues(horizontal = 16.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(215.dp)
                 .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent(PointerEventPass.Initial)
-                            view.parent?.requestDisallowInterceptTouchEvent(true)
-                        }
-                    }
+                    disallowParentIntercept(view)
                 }
         ) { index ->
             val rec = uniqueRecommendations[index]
-            NovelCarouselItem(recommendation = rec, onBookClick = onBookClick, onDismissClick = onDismissClick)
+            key(rec.novel.url) {
+                NovelCarouselItem(recommendation = rec, onBookClick = onBookClick, onDismissClick = onDismissClick)
+            }
         }
     }
 }
@@ -604,7 +609,7 @@ fun CarouselItemScope.NovelCarouselItem(
                     .glassCard(shape = RoundedCornerShape(6.dp), strokeWidth = 0.5.dp)
             ) {
                 AsyncImage(
-                    model = rememberImageRequest(data = trigger),
+                    model = rememberHighQualityRequest(data = trigger, context = context),
                     contentDescription = trigger.name,
                     imageLoader = SingletonImageLoader.get(context),
                     contentScale = ContentScale.Crop,
@@ -614,7 +619,7 @@ fun CarouselItemScope.NovelCarouselItem(
         }
 
         AsyncImage(
-            model = rememberImageRequest(data = novel),
+            model = rememberHighQualityRequest(data = novel, context = context),
             contentDescription = novel.name,
             imageLoader = SingletonImageLoader.get(context),
             contentScale = ContentScale.Crop,
@@ -838,18 +843,3 @@ fun GlassmorphicSlider(
     }
 }
 
-suspend fun PointerInputScope.disallowParentIntercept(view: android.view.View) {
-    awaitEachGesture {
-        awaitFirstDown(requireUnconsumed = false)
-        var isDisallowed = false
-        do {
-            val event = awaitPointerEvent()
-            val dragAmountX = event.changes.sumOf { (it.position.x - it.previousPosition.x).toDouble() }
-            val dragAmountY = event.changes.sumOf { (it.position.y - it.previousPosition.y).toDouble() }
-            if (kotlin.math.abs(dragAmountX) > kotlin.math.abs(dragAmountY) && kotlin.math.abs(dragAmountX) > 2.0 && !isDisallowed) {
-                view.parent?.requestDisallowInterceptTouchEvent(true)
-                isDisallowed = true
-            }
-        } while (event.changes.any { it.pressed })
-    }
-}

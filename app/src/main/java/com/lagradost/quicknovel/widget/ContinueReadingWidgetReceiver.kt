@@ -22,14 +22,20 @@ class ContinueReadingWidgetReceiver : GlanceAppWidgetReceiver() {
         appWidgetIds: IntArray,
     ) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        // Refresh widget data from reading history on every system-initiated update
+        WidgetCarouselRotationManager.start(context)
         scope.launch {
             ContinueReadingWidget.refreshFromHistory(context)
         }
     }
 
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        WidgetCarouselRotationManager.start(context)
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
+        WidgetCarouselRotationManager.start(context)
         if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
             scope.launch {
                 ContinueReadingWidget.refreshFromHistory(context)

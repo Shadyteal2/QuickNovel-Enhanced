@@ -690,6 +690,13 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
 
+        val widgetNovelUrl = intent.getStringExtra("widgetNovelUrl")
+        val widgetApiName = intent.getStringExtra("widgetApiName")
+        if (widgetNovelUrl != null && widgetApiName != null) {
+            loadResult(widgetNovelUrl, widgetApiName)
+            return
+        }
+
         // Intercept .neolist files from ACTION_VIEW or ACTION_SEND
         val intentData = intent.data
         if (intentData != null) {
@@ -751,6 +758,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
     }
 
     override fun onNewIntent(intent: Intent) {
+        setIntent(intent)
         handleIntent(intent)
         super.onNewIntent(intent)
     }
@@ -767,114 +775,148 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             navBarContainer.visibility = if (isMainBar) android.view.View.VISIBLE else android.view.View.GONE
 
             val slideDistance = 400f 
-            if (isTab) {
-                // If mainViewpager is already visible and at full alpha, just ensure it's not stuck shrunken
-                if (mainViewpager.visibility == android.view.View.VISIBLE && mainViewpager.alpha >= 1f) {
+            val shouldAnimate = navBarContainer.isLaidOut && (navHost?.isLaidOut ?: true)
+
+            if (!shouldAnimate) {
+                // Apply layout states instantly on cold start to prevent layout passes from cancelling animations and leaving views invisible
+                if (isTab) {
+                    mainViewpager.visibility = android.view.View.VISIBLE
+                    mainViewpager.alpha = 1f
                     mainViewpager.scaleX = 1f
                     mainViewpager.scaleY = 1f
                     mainViewpager.translationX = 0f
-                } else {
-                    mainViewpager.animate().cancel()
-                    mainViewpager.alpha = 0f
-                    mainViewpager.scaleX = 0.95f
-                    mainViewpager.scaleY = 0.95f
-                    mainViewpager.translationX = -slideDistance 
-                    mainViewpager.visibility = android.view.View.VISIBLE
-                    
-                    // GPU Optimization: Enable hardware layer
-                    mainViewpager.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    mainViewpager.animate()
-                        .alpha(1f)
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .translationX(0f)
-                        .setDuration(400)
-                        .setInterpolator(android.view.animation.DecelerateInterpolator())
-                        .withEndAction {
-                            // GPU Optimization: Disable hardware layer
-                            mainViewpager.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-                            mainViewpager.scaleX = 1f
-                            mainViewpager.scaleY = 1f
-                            mainViewpager.translationX = 0f
-                        }
-                        .start()
-                }
 
-                if (selectedIndex != -1 && mainViewpager.currentItem != selectedIndex) {
+                    navHost?.visibility = android.view.View.INVISIBLE
+                    navHost?.alpha = 0f
+                    navHost?.scaleX = 1f
+                    navHost?.scaleY = 1f
+                    navHost?.translationX = 0f
+                } else {
+                    navHost?.visibility = android.view.View.VISIBLE
+                    navHost?.alpha = 1f
+                    navHost?.scaleX = 1f
+                    navHost?.scaleY = 1f
+                    navHost?.translationX = 0f
+
+                    mainViewpager.visibility = android.view.View.INVISIBLE
+                    mainViewpager.alpha = 0f
+                    mainViewpager.scaleX = 1f
+                    mainViewpager.scaleY = 1f
+                    mainViewpager.translationX = 0f
+                }
+                if (isTab && selectedIndex != -1 && mainViewpager.currentItem != selectedIndex) {
                     mainViewpager.setCurrentItem(selectedIndex, false)
                 }
-
-                if (navHost?.visibility == android.view.View.VISIBLE) {
-                    navHost.animate().setListener(null)
-                    navHost.animate().cancel()
-                    
-                    // GPU Optimization: Enable hardware layer
-                    navHost.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    navHost.animate()
-                        .alpha(0f)
-                        .scaleX(0.95f)
-                        .scaleY(0.95f)
-                        .translationX(slideDistance) 
-                        .setDuration(300)
-                        .setInterpolator(android.view.animation.AccelerateInterpolator())
-                        .withEndAction { 
-                            // GPU Optimization: Disable hardware layer
-                            navHost.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-                            navHost.visibility = android.view.View.INVISIBLE 
-                            navHost.translationX = 0f 
-                            navHost.scaleX = 1f
-                            navHost.scaleY = 1f
-                        }.start()
-                }
             } else {
-                if (navHost?.visibility != android.view.View.VISIBLE || navHost?.alpha ?: 0f < 1f) {
-                    navHost?.animate()?.setListener(null)
-                    navHost?.animate()?.cancel()
-                    navHost?.alpha = 0f
-                    navHost?.scaleX = 0.95f
-                    navHost?.scaleY = 0.95f
-                    navHost?.translationX = slideDistance 
-                    navHost?.visibility = android.view.View.VISIBLE
-                    
-                    // GPU Optimization: Enable hardware layer
-                    navHost?.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    navHost?.animate()
-                        ?.alpha(1f)
-                        ?.scaleX(1f)
-                        ?.scaleY(1f)
-                        ?.translationX(0f)
-                        ?.setDuration(400)
-                        ?.setInterpolator(android.view.animation.DecelerateInterpolator())
-                        ?.withEndAction {
-                             // GPU Optimization: Disable hardware layer
-                             navHost?.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-                             navHost?.scaleX = 1f
-                             navHost?.scaleY = 1f
-                             navHost?.translationX = 0f
-                        }
-                        ?.start()
-                }
-                if (mainViewpager.visibility == android.view.View.VISIBLE) {
-                    mainViewpager.animate().setListener(null)
-                    mainViewpager.animate().cancel()
-                    
-                    // GPU Optimization: Enable hardware layer
-                    mainViewpager.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    mainViewpager.animate()
-                        .alpha(0f)
-                        .scaleX(0.95f)
-                        .scaleY(0.95f)
-                        .translationX(-slideDistance) 
-                        .setDuration(300)
-                        .setInterpolator(android.view.animation.AccelerateInterpolator())
-                        .withEndAction { 
-                            // GPU Optimization: Disable hardware layer
-                            mainViewpager.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-                            mainViewpager.visibility = android.view.View.INVISIBLE 
-                            mainViewpager.translationX = 0f 
-                            mainViewpager.scaleX = 1f
-                            mainViewpager.scaleY = 1f
-                        }.start()
+                if (isTab) {
+                    // If mainViewpager is already visible and at full alpha, just ensure it's not stuck shrunken
+                    if (mainViewpager.visibility == android.view.View.VISIBLE && mainViewpager.alpha >= 1f) {
+                        mainViewpager.scaleX = 1f
+                        mainViewpager.scaleY = 1f
+                        mainViewpager.translationX = 0f
+                    } else {
+                        mainViewpager.animate().cancel()
+                        mainViewpager.alpha = 0f
+                        mainViewpager.scaleX = 0.95f
+                        mainViewpager.scaleY = 0.95f
+                        mainViewpager.translationX = -slideDistance 
+                        mainViewpager.visibility = android.view.View.VISIBLE
+                        
+                        // GPU Optimization: Enable hardware layer
+                        mainViewpager.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                        mainViewpager.animate()
+                            .alpha(1f)
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .translationX(0f)
+                            .setDuration(400)
+                            .setInterpolator(android.view.animation.DecelerateInterpolator())
+                            .withEndAction {
+                                // GPU Optimization: Disable hardware layer
+                                mainViewpager.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                mainViewpager.scaleX = 1f
+                                mainViewpager.scaleY = 1f
+                                mainViewpager.translationX = 0f
+                            }
+                            .start()
+                    }
+
+                    if (selectedIndex != -1 && mainViewpager.currentItem != selectedIndex) {
+                        mainViewpager.setCurrentItem(selectedIndex, false)
+                    }
+
+                    if (navHost?.visibility == android.view.View.VISIBLE) {
+                        navHost.animate().setListener(null)
+                        navHost.animate().cancel()
+                        
+                        // GPU Optimization: Enable hardware layer
+                        navHost.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                        navHost.animate()
+                            .alpha(0f)
+                            .scaleX(0.95f)
+                            .scaleY(0.95f)
+                            .translationX(slideDistance) 
+                            .setDuration(300)
+                            .setInterpolator(android.view.animation.AccelerateInterpolator())
+                            .withEndAction { 
+                                // GPU Optimization: Disable hardware layer
+                                navHost.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                navHost.visibility = android.view.View.INVISIBLE 
+                                navHost.translationX = 0f 
+                                navHost.scaleX = 1f
+                                navHost.scaleY = 1f
+                            }.start()
+                    }
+                } else {
+                    if (navHost?.visibility != android.view.View.VISIBLE || navHost?.alpha ?: 0f < 1f) {
+                        navHost?.animate()?.setListener(null)
+                        navHost?.animate()?.cancel()
+                        navHost?.alpha = 0f
+                        navHost?.scaleX = 0.95f
+                        navHost?.scaleY = 0.95f
+                        navHost?.translationX = slideDistance 
+                        navHost?.visibility = android.view.View.VISIBLE
+                        
+                        // GPU Optimization: Enable hardware layer
+                        navHost?.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                        navHost?.animate()
+                            ?.alpha(1f)
+                            ?.scaleX(1f)
+                            ?.scaleY(1f)
+                            ?.translationX(0f)
+                            ?.setDuration(400)
+                            ?.setInterpolator(android.view.animation.DecelerateInterpolator())
+                            ?.withEndAction {
+                                 // GPU Optimization: Disable hardware layer
+                                 navHost?.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                 navHost?.scaleX = 1f
+                                 navHost?.scaleY = 1f
+                                 navHost?.translationX = 0f
+                            }
+                            ?.start()
+                    }
+                    if (mainViewpager.visibility == android.view.View.VISIBLE) {
+                        mainViewpager.animate().setListener(null)
+                        mainViewpager.animate().cancel()
+                        
+                        // GPU Optimization: Enable hardware layer
+                        mainViewpager.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                        mainViewpager.animate()
+                            .alpha(0f)
+                            .scaleX(0.95f)
+                            .scaleY(0.95f)
+                            .translationX(-slideDistance) 
+                            .setDuration(300)
+                            .setInterpolator(android.view.animation.AccelerateInterpolator())
+                            .withEndAction { 
+                                // GPU Optimization: Disable hardware layer
+                                mainViewpager.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+                                mainViewpager.visibility = android.view.View.INVISIBLE 
+                                mainViewpager.translationX = 0f 
+                                mainViewpager.scaleX = 1f
+                                mainViewpager.scaleY = 1f
+                            }.start()
+                    }
                 }
             }
         }

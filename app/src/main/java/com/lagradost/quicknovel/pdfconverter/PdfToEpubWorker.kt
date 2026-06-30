@@ -97,7 +97,7 @@ class PdfToEpubWorker(
             }
 
             val now = System.currentTimeMillis()
-            val entityId = "$IMPORT_SOURCE$author$title".hashCode()
+            val entityId = BookDownloader2Helper.generateId(IMPORT_SOURCE, author, title)
             dao.insert(
                 NovelEntity(
                     id = entityId,

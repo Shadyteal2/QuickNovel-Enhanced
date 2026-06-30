@@ -82,6 +82,7 @@ object TTSWidgetKeys {
     val NOVEL_URL = stringPreferencesKey("novel_url")
     val CHAPTER_INDEX = intPreferencesKey("chapter_index")
     val TOTAL_CHAPTERS = intPreferencesKey("total_chapters")
+    val AUTHOR = stringPreferencesKey("author")
 }
 
 class TTSWidget : GlanceAppWidget() {
@@ -137,6 +138,7 @@ class TTSWidget : GlanceAppWidget() {
         private fun buildCompositeBitmap(
             coverBitmap: Bitmap?,
             title: String,
+            author: String?,
             chapterLabel: String,
             isPlaying: Boolean,
             chapterIndex: Int,
@@ -145,156 +147,85 @@ class TTSWidget : GlanceAppWidget() {
             val bmp = Bitmap.createBitmap(WIDGET_W, WIDGET_H, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bmp)
 
-            // Clip the canvas to rounded corners first so all drawing is bounded
+            // Clip the canvas to rounded corners first (32dp corner radius -> 80px)
             val clipPath = Path().apply {
                 addRoundRect(
                     RectF(0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat()),
-                    76f, 76f, // ~28dp radius
+                    80f, 80f,
                     Path.Direction.CW
                 )
             }
             canvas.clipPath(clipPath)
 
-            // 1. Dark sleek background container (OLED black)
-            canvas.drawColor(0xFF0C0C0E.toInt())
+            // 1. Sleek glass background (OLED black base)
+            canvas.drawColor(0xFF131313.toInt())
 
-            // 2. Soft, diffuse radial glow behind active play control button
-            val playCenterX = 612f
-            val playCenterY = 236f
-            try {
-                val glowColor = if (isPlaying) 0x2200FF88.toInt() else 0x22FFD54F.toInt() // green or amber glow
-                val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = android.graphics.Shader.TileMode.CLAMP.let { mode ->
-                        android.graphics.RadialGradient(
-                            playCenterX, playCenterY, 200f,
-                            intArrayOf(glowColor, 0x00000000.toInt()),
-                            null,
-                            mode
-                        )
-                    }
+            // 2. Draw scaled cover art as background at 20% opacity (alpha = 51)
+            if (coverBitmap != null) {
+                val matrix = Matrix()
+                val scale: Float
+                val dx: Float
+                val dy: Float
+                val bmpW = coverBitmap.width.toFloat()
+                val bmpH = coverBitmap.height.toFloat()
+
+                if (bmpW * WIDGET_H > WIDGET_W * bmpH) {
+                    scale = WIDGET_H / bmpH
+                    dx = (WIDGET_W - bmpW * scale) / 2f
+                    dy = 0f
+                } else {
+                    scale = WIDGET_W / bmpW
+                    dx = 0f
+                    dy = (WIDGET_H - bmpH * scale) / 2f
                 }
-                canvas.drawCircle(playCenterX, playCenterY, 200f, glowPaint)
-            } catch (_: Throwable) {}
 
-            // 3. Top-left Status Pill (Playback Mode status)
-            val pillRect = RectF(48f, 32f, 176f, 62f)
-            val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0x2600FF88.toInt() else 0x26FFD54F.toInt()
-            }
-            canvas.drawRoundRect(pillRect, 15f, 15f, pillBgPaint)
+                matrix.setScale(scale, scale)
+                matrix.postTranslate(dx, dy)
 
-            val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0xFF00FF88.toInt() else 0xFFFFD54F.toInt()
-                textSize = 18f
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-            }
-            val pillText = if (isPlaying) "SPEAKING" else "PAUSED"
-            val textBoundsPill = Rect()
-            pillTextPaint.getTextBounds(pillText, 0, pillText.length, textBoundsPill)
-            val pillTextX = pillRect.left + (pillRect.width() - pillTextPaint.measureText(pillText)) / 2f
-            val pillTextY = pillRect.centerY() - textBoundsPill.exactCenterY()
-            canvas.drawText(pillText, pillTextX, pillTextY, pillTextPaint)
-
-            // Progress percent text underneath status pill
-            val progressFraction = if (totalChapters > 0) chapterIndex.toFloat() / totalChapters.toFloat() else 0f
-            val pctPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFF8E8E93.toInt()
-                textSize = 21f
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-            }
-            val progressPercentText = "${(progressFraction * 100f).toInt()}% complete"
-            canvas.drawText(progressPercentText, 48f, 90f, pctPaint)
-
-            // 4. Top-right indicator (remaining reading estimate)
-            val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFFE5E5EA.toInt()
-                textSize = 24f
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-            }
-            val remainingChapters = (totalChapters - chapterIndex).coerceAtLeast(1)
-            val minutesLeft = remainingChapters * 3
-            val timeLeftText = if (progressFraction >= 1.0f) {
-                "Finished"
-            } else if (minutesLeft >= 60) {
-                "${minutesLeft / 60}h left"
-            } else {
-                "${minutesLeft}m left"
-            }
-            val timeTextW = timePaint.measureText(timeLeftText)
-            canvas.drawText(timeLeftText, WIDGET_W - 48f - timeTextW, 58f, timePaint)
-
-            // 5. Left Column Text — Distributed vertically to fill space elegantly
-            val leftTextMaxW = 280f
-            val titleTextSize = 27f
-            val titleLineHeight = titleTextSize * 1.3f
-            val titleStartY = 126f
-            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFFFFFFFF.toInt()
-                textSize = titleTextSize
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                val coverPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    alpha = 51 // 20% opacity
+                }
+                canvas.drawBitmap(coverBitmap, matrix, coverPaint)
             }
 
-            val titleLineCount: Int = run {
-                val buf = FloatArray(1)
-                val fit = titlePaint.breakText(title, true, leftTextMaxW, buf)
-                if (fit >= title.length) 1 else 2
-            }
-            drawWrappedText(canvas, title, titlePaint, 48f, titleStartY, leftTextMaxW, 2)
+            // 3. Vertical gradient to fade cover background towards the top
+            val verticalGradient = android.graphics.LinearGradient(
+                0f, WIDGET_H.toFloat(), 0f, 0f,
+                intArrayOf(
+                    0xFF131313.toInt(),
+                    0xCC131313.toInt(),
+                    0x00131313.toInt()
+                ),
+                floatArrayOf(0.0f, 0.6f, 1.0f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            canvas.drawRect(
+                0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat(),
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = verticalGradient }
+            )
 
-            // "CHAPTER" micro-label
-            val microLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0x6600FF88.toInt() else 0x66FFD54F.toInt()
-                textSize = 16f
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-                letterSpacing = 0.12f
-            }
-            val afterTitleY = titleStartY + (titleLineCount - 1) * titleLineHeight
-            val microLabelY = afterTitleY + 26f
-            canvas.drawText("CHAPTER", 48f, microLabelY, microLabelPaint)
+            // 4. Diagonal glass container gradient
+            val diagonalGradient = android.graphics.LinearGradient(
+                0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat(),
+                0xB3131313.toInt(),
+                0xE6131313.toInt(),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            canvas.drawRect(
+                0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat(),
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = diagonalGradient }
+            )
 
-            val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xCCFFFFFF.toInt()
-                textSize = 22f
-                typeface = android.graphics.Typeface.DEFAULT
-            }
-            val chapterLabelY = microLabelY + 8f + subPaint.textSize
-            val displayChapter = ellipsizeText(chapterLabel, subPaint, leftTextMaxW)
-            canvas.drawText(displayChapter, 48f, chapterLabelY, subPaint)
+            // 5. Left column - Cover Art Thumbnail
+            val thumbRect = RectF(32f, 30f, 202f, 270f)
+            val thumbRadius = 24f
 
-            // 6. Glowing connection wire curving from middle-right of cover art
-            val linePath = Path().apply {
-                moveTo(446f, 110f)
-                cubicTo(530f, 110f, 570f, 150f, WIDGET_W - 48f, 150f)
+            // Thumbnail shadow
+            val thumbShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0x66000000.toInt()
             }
-            val lineGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0x3D00FF88.toInt() else 0x3DFFD54F.toInt()
-                style = Paint.Style.STROKE
-                strokeWidth = 10f
-                strokeCap = Paint.Cap.ROUND
-            }
-            canvas.drawPath(linePath, lineGlowPaint)
-
-            val lineCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (isPlaying) 0xFF00FF88.toInt() else 0xFFFFD54F.toInt()
-                style = Paint.Style.STROKE
-                strokeWidth = 4f
-                strokeCap = Paint.Cap.ROUND
-            }
-            canvas.drawPath(linePath, lineCorePaint)
-
-            // 7. Center Floating Cover Art Card
-            val cardX = 354f
-            val cardY = 45f
-            val cardW = 92f
-            val cardH = 130f
-            val cardRect = RectF(cardX, cardY, cardX + cardW, cardY + cardH)
-
-            // Dynamic drop-shadow
-            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0x7F000000.toInt()
-            }
-            val shadowRect = RectF(cardRect.left - 4f, cardRect.top + 6f, cardRect.right + 4f, cardRect.bottom + 10f)
-            canvas.drawRoundRect(shadowRect, 14f, 14f, shadowPaint)
+            val thumbShadowRect = RectF(thumbRect.left - 2f, thumbRect.top + 4f, thumbRect.right + 2f, thumbRect.bottom + 6f)
+            canvas.drawRoundRect(thumbShadowRect, thumbRadius, thumbRadius, thumbShadowPaint)
 
             if (coverBitmap != null) {
                 val shader = BitmapShader(coverBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
@@ -304,15 +235,17 @@ class TTSWidget : GlanceAppWidget() {
                 val dy: Float
                 val bmpW = coverBitmap.width.toFloat()
                 val bmpH = coverBitmap.height.toFloat()
+                val cardW = thumbRect.width()
+                val cardH = thumbRect.height()
 
                 if (bmpW * cardH > cardW * bmpH) {
                     scale = cardH / bmpH
-                    dx = cardX + (cardW - bmpW * scale) / 2f
-                    dy = cardY
+                    dx = thumbRect.left + (cardW - bmpW * scale) / 2f
+                    dy = thumbRect.top
                 } else {
                     scale = cardW / bmpW
-                    dx = cardX
-                    dy = cardY + (cardH - bmpH * scale) / 2f
+                    dx = thumbRect.left
+                    dy = thumbRect.top + (cardH - bmpH * scale) / 2f
                 }
 
                 matrix.setScale(scale, scale)
@@ -322,144 +255,260 @@ class TTSWidget : GlanceAppWidget() {
                 val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     this.shader = shader
                 }
-                canvas.drawRoundRect(cardRect, 12f, 12f, cardPaint)
-
-                val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0x26FFFFFF.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = 2f
-                }
-                canvas.drawRoundRect(cardRect, 12f, 12f, borderPaint)
+                canvas.drawRoundRect(thumbRect, thumbRadius, thumbRadius, cardPaint)
             } else {
                 val placeholderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = 0x1AFFFFFF.toInt()
                 }
-                canvas.drawRoundRect(cardRect, 12f, 12f, placeholderPaint)
+                canvas.drawRoundRect(thumbRect, thumbRadius, thumbRadius, placeholderPaint)
 
-                val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0x1AFFFFFF.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = 2f
+                // Draw simple book outline icon in placeholder
+                val centerX = thumbRect.centerX()
+                val centerY = thumbRect.centerY()
+                val bookPath = Path().apply {
+                    val w = 24f
+                    val h = 18f
+                    moveTo(centerX, centerY + h)
+                    quadTo(centerX - w/2f, centerY + h - 5f, centerX - w, centerY + h)
+                    lineTo(centerX - w, centerY - h)
+                    quadTo(centerX - w/2f, centerY - h - 5f, centerX, centerY - h)
+                    lineTo(centerX, centerY + h)
+                    
+                    moveTo(centerX, centerY + h)
+                    quadTo(centerX + w/2f, centerY + h - 5f, centerX + w, centerY + h)
+                    lineTo(centerX + w, centerY - h)
+                    quadTo(centerX + w/2f, centerY - h - 5f, centerX, centerY - h)
+                    lineTo(centerX, centerY + h)
                 }
-                canvas.drawRoundRect(cardRect, 12f, 12f, borderPaint)
+                val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0x4DFFFFFF.toInt()
+                    style = Paint.Style.STROKE
+                    strokeWidth = 3f
+                }
+                canvas.drawPath(bookPath, iconPaint)
             }
 
-            // 8. Media controls shifted to bottom-right area
-            // playCenterY is 236f
-            
-            // Previous Button
-            val prevCenterX = 522f
-            val prevRadius = 32f
-            val prevBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0x1AFFFFFF.toInt()
-            }
-            val prevBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0x1AFFFFFF.toInt()
+            // Thumbnail border
+            val thumbBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0x26FFFFFF.toInt()
                 style = Paint.Style.STROKE
                 strokeWidth = 2f
             }
-            canvas.drawCircle(prevCenterX, playCenterY, prevRadius, prevBgPaint)
-            canvas.drawCircle(prevCenterX, playCenterY, prevRadius, prevBorderPaint)
-            
-            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            canvas.drawRoundRect(thumbRect, thumbRadius, thumbRadius, thumbBorderPaint)
+
+            // 6. Right column - Text and Progress Information
+            val pbLeft = 232f
+            val pbRight = 768f
+            val textMaxW = pbRight - pbLeft
+
+            // Title
+            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFFFFFFFF.toInt()
-                style = Paint.Style.FILL
+                textSize = 34f
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             }
-            val triH = 12f
-            val triW = 10f
-            canvas.drawPath(Path().apply {
-                moveTo(prevCenterX - triW, playCenterY)
-                lineTo(prevCenterX, playCenterY - triH)
-                lineTo(prevCenterX, playCenterY + triH)
-                close()
-                moveTo(prevCenterX, playCenterY)
-                lineTo(prevCenterX + triW, playCenterY - triH)
-                lineTo(prevCenterX + triW, playCenterY + triH)
-                close()
-            }, iconPaint)
+            val displayTitle = ellipsizeText(title, titlePaint, textMaxW)
+            canvas.drawText(displayTitle, pbLeft, 68f, titlePaint)
 
-            // Play / Pause Button
-            val playBgColor = if (isPlaying) 0xFF00FF88.toInt() else 0xFFFFD54F.toInt()
-            val playBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = playBgColor
+            // Author
+            val authorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFC4C7C8.toInt()
+                textSize = 24f
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
             }
-            val playGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = android.graphics.Shader.TileMode.CLAMP.let { mode ->
-                    android.graphics.RadialGradient(
-                        playCenterX, playCenterY, 42f * 1.5f,
-                        intArrayOf((playBgColor and 0x00FFFFFF) or 0x55000000, 0x00000000.toInt()),
-                        null,
-                        mode
-                    )
+            val displayAuthor = ellipsizeText(author ?: "", authorPaint, textMaxW)
+            canvas.drawText(displayAuthor, pbLeft, 108f, authorPaint)
+
+            // Progress Bar Track
+            val progressFraction = if (totalChapters > 0) chapterIndex.toFloat() / totalChapters.toFloat() else 0f
+            val pbY = 144f
+            val pbH = 6f
+            val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0x26FFFFFF.toInt() // 15% opacity white
+            }
+            canvas.drawRoundRect(RectF(pbLeft, pbY, pbRight, pbY + pbH), 3f, 3f, trackPaint)
+
+            // Progress Bar Fill (Sunset Orange)
+            if (progressFraction > 0f) {
+                val fillWidth = textMaxW * progressFraction.coerceIn(0f, 1f)
+                val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xFFFF571A.toInt() // Sunset Orange
                 }
+                canvas.drawRoundRect(RectF(pbLeft, pbY, pbLeft + fillWidth, pbY + pbH), 3f, 3f, fillPaint)
             }
-            canvas.drawCircle(playCenterX, playCenterY, 42f * 1.5f, playGlowPaint)
-            canvas.drawCircle(playCenterX, playCenterY, 42f, playBgPaint)
 
+            // Progress labels
+            val pctText = "${(progressFraction * 100f).toInt()}%"
+            val remainingChapters = (totalChapters - chapterIndex).coerceAtLeast(1)
+            val minutesLeft = remainingChapters * 3
+            val timeLeftText = if (progressFraction >= 1.0f) {
+                "Finished"
+            } else if (minutesLeft >= 60) {
+                "${minutesLeft / 60}h left"
+            } else {
+                "${minutesLeft}m left"
+            }
+
+            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0x99C4C7C8.toInt() // 60% opacity muted gray
+                textSize = 19f
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+            }
+            canvas.drawText(pctText, pbLeft, 184f, labelPaint)
+
+            val timeTextW = labelPaint.measureText(timeLeftText)
+            canvas.drawText(timeLeftText, pbRight - timeTextW, 184f, labelPaint)
+
+            // 7. Media Control and Reader Buttons
+            val controlCenterY = 238f
+            val prevCenterX = 272.5f
+            val playCenterX = 387.5f
+            val nextCenterX = 502.5f
+            val readerCenterX = 727.5f
+
+            // Play/Pause button background & active glow
+            val playRadius = 36f
+            if (isPlaying) {
+                try {
+                    val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        shader = android.graphics.Shader.TileMode.CLAMP.let { mode ->
+                            android.graphics.RadialGradient(
+                                playCenterX, controlCenterY, 60f,
+                                intArrayOf(0x33FF571A.toInt(), 0x00000000.toInt()),
+                                null,
+                                mode
+                            )
+                        }
+                    }
+                    canvas.drawCircle(playCenterX, controlCenterY, 60f, glowPaint)
+                } catch (_: Throwable) {}
+            }
+
+            val playBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0x1AFFFFFF.toInt() // 10% opacity white
+            }
+            canvas.drawCircle(playCenterX, controlCenterY, playRadius, playBgPaint)
+
+            val playBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0x26FFFFFF.toInt() // 15% opacity white
+                style = Paint.Style.STROKE
+                strokeWidth = 2f
+            }
+            canvas.drawCircle(playCenterX, controlCenterY, playRadius, playBorderPaint)
+
+            // Play/Pause icon (White)
             val playIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFF0C0C0E.toInt()
+                color = 0xFFFFFFFF.toInt()
                 style = Paint.Style.FILL
             }
             if (isPlaying) {
                 val barW = 6f
-                val barH = 18f
+                val barH = 20f
                 val gap = 6f
-                canvas.drawRect(playCenterX - barW - gap/2f, playCenterY - barH/2f, playCenterX - gap/2f, playCenterY + barH/2f, playIconPaint)
-                canvas.drawRect(playCenterX + gap/2f, playCenterY - barH/2f, playCenterX + barW + gap/2f, playCenterY + barH/2f, playIconPaint)
+                canvas.drawRect(playCenterX - barW - gap/2f, controlCenterY - barH/2f, playCenterX - gap/2f, controlCenterY + barH/2f, playIconPaint)
+                canvas.drawRect(playCenterX + gap/2f, controlCenterY - barH/2f, playCenterX + barW + gap/2f, controlCenterY + barH/2f, playIconPaint)
             } else {
-                val triSize = 13f
-                canvas.drawPath(Path().apply {
-                    moveTo(playCenterX - triSize/1.5f, playCenterY - triSize)
-                    lineTo(playCenterX + triSize, playCenterY)
-                    lineTo(playCenterX - triSize/1.5f, playCenterY + triSize)
+                val triSize = 12f
+                val playPath = Path().apply {
+                    moveTo(playCenterX - triSize/1.5f, controlCenterY - triSize)
+                    lineTo(playCenterX + triSize, controlCenterY)
+                    lineTo(playCenterX - triSize/1.5f, controlCenterY + triSize)
                     close()
-                }, playIconPaint)
-            }
-
-            // Next Button
-            val nextCenterX = 702f
-            val nextRadius = 32f
-            canvas.drawCircle(nextCenterX, playCenterY, nextRadius, prevBgPaint)
-            canvas.drawCircle(nextCenterX, playCenterY, nextRadius, prevBorderPaint)
-            
-            canvas.drawPath(Path().apply {
-                moveTo(nextCenterX, playCenterY)
-                lineTo(nextCenterX - triW, playCenterY - triH)
-                lineTo(nextCenterX - triW, playCenterY + triH)
-                close()
-                moveTo(nextCenterX + triW, playCenterY)
-                lineTo(nextCenterX, playCenterY - triH)
-                lineTo(nextCenterX, playCenterY + triH)
-                close()
-            }, iconPaint)
-
-            // 9. Thin progress bar along bottom edge
-            val pbH = 3f
-            val pbY = WIDGET_H - pbH
-            canvas.drawRect(0f, pbY, WIDGET_W.toFloat(), WIDGET_H.toFloat(),
-                Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AFFFFFF.toInt() })
-            if (progressFraction > 0f) {
-                val fillWidth = WIDGET_W * progressFraction.coerceIn(0f, 1f)
-                canvas.drawRect(0f, pbY, fillWidth, WIDGET_H.toFloat(),
-                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        shader = android.graphics.LinearGradient(
-                            0f, 0f, fillWidth, 0f,
-                            intArrayOf(if (isPlaying) 0xFF00C853.toInt() else 0xFFFFB300.toInt(), playBgColor),
-                            null,
-                            android.graphics.Shader.TileMode.CLAMP
-                        )
-                    })
-            }
-
-            // 10. Glass border
-            canvas.drawRoundRect(
-                RectF(1f, 1f, WIDGET_W.toFloat() - 1f, WIDGET_H.toFloat() - 1f),
-                75f, 75f,
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0x1AFFFFFF.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = 2f
                 }
+                canvas.drawPath(playPath, playIconPaint)
+            }
+
+            // Skip previous outline icon
+            val prevIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xB3FFFFFF.toInt() // 70% opacity white
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+            }
+            val prevPath = Path().apply {
+                moveTo(prevCenterX - 8f, controlCenterY - 10f)
+                lineTo(prevCenterX - 8f, controlCenterY + 10f)
+                moveTo(prevCenterX + 8f, controlCenterY - 10f)
+                lineTo(prevCenterX - 4f, controlCenterY)
+                lineTo(prevCenterX + 8f, controlCenterY + 10f)
+                close()
+            }
+            canvas.drawPath(prevPath, prevIconPaint)
+
+            // Skip next outline icon
+            val nextIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xB3FFFFFF.toInt()
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+            }
+            val nextPath = Path().apply {
+                moveTo(nextCenterX + 8f, controlCenterY - 10f)
+                lineTo(nextCenterX + 8f, controlCenterY + 10f)
+                moveTo(nextCenterX - 8f, controlCenterY - 10f)
+                lineTo(nextCenterX + 4f, controlCenterY)
+                lineTo(nextCenterX - 8f, controlCenterY + 10f)
+                close()
+            }
+            canvas.drawPath(nextPath, nextIconPaint)
+
+            // Reader Pill background
+            val pillRect = RectF(638f, 211f, 768f, 265f)
+            val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFFFFFFF.toInt()
+            }
+            canvas.drawRoundRect(pillRect, 27f, 27f, pillBgPaint)
+
+            // Reader Pill Icon (Book)
+            val pillIconCenterX = 670f
+            val bookPath = Path().apply {
+                val w = 11f
+                val h = 8f
+                moveTo(pillIconCenterX, controlCenterY + h)
+                quadTo(pillIconCenterX - w/2f, controlCenterY + h - 2f, pillIconCenterX - w, controlCenterY + h)
+                lineTo(pillIconCenterX - w, controlCenterY - h)
+                quadTo(pillIconCenterX - w/2f, controlCenterY - h - 2f, pillIconCenterX, controlCenterY - h)
+                lineTo(pillIconCenterX, controlCenterY + h)
+                
+                moveTo(pillIconCenterX, controlCenterY + h)
+                quadTo(pillIconCenterX + w/2f, controlCenterY + h - 2f, pillIconCenterX + w, controlCenterY + h)
+                lineTo(pillIconCenterX + w, controlCenterY - h)
+                quadTo(pillIconCenterX + w/2f, controlCenterY - h - 2f, pillIconCenterX, controlCenterY - h)
+                lineTo(pillIconCenterX, controlCenterY + h)
+            }
+            val pillIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFF131313.toInt()
+                style = Paint.Style.STROKE
+                strokeWidth = 2.5f
+                strokeCap = Paint.Cap.ROUND
+            }
+            canvas.drawPath(bookPath, pillIconPaint)
+
+            // Reader Pill Text ("READ")
+            val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFF131313.toInt()
+                textSize = 20f
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            }
+            canvas.drawText("READ", 698f, 245f, pillTextPaint)
+
+            // 8. Outer Rim Light Border
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 2.5f
+                shader = android.graphics.LinearGradient(
+                    0f, 0f, WIDGET_W.toFloat(), WIDGET_H.toFloat(),
+                    0x3DFFFFFF.toInt(),
+                    0x00FFFFFF.toInt(),
+                    android.graphics.Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawRoundRect(
+                RectF(1.25f, 1.25f, WIDGET_W.toFloat() - 1.25f, WIDGET_H.toFloat() - 1.25f),
+                80f, 80f,
+                borderPaint
             )
 
             return bmp
@@ -493,7 +542,8 @@ class TTSWidget : GlanceAppWidget() {
             coverBitmap: Bitmap? = null,
             novelUrl: String? = null,
             chapterIndex: Int? = null,
-            totalChapters: Int? = null
+            totalChapters: Int? = null,
+            author: String? = null
         ) {
             val rawCover = coverBitmap ?: fetchCoverBitmap(context, coverUrl)
 
@@ -521,8 +571,14 @@ class TTSWidget : GlanceAppWidget() {
                     ?.firstOrNull { it.name == novelTitle }
                 cached?.source ?: ""
             }
+            val actualAuthor = author ?: withContext(Dispatchers.IO) {
+                val keys = context.getKeys(HISTORY_FOLDER)
+                val cached = keys?.mapNotNull { key -> context.getKey<ResultCached>(key) }
+                    ?.firstOrNull { it.name == novelTitle }
+                cached?.author ?: ""
+            }
 
-            val composite = buildCompositeBitmap(rawCover, novelTitle, chapterName, isPlaying, actualChapterIndex, actualTotalChapters)
+            val composite = buildCompositeBitmap(rawCover, novelTitle, actualAuthor, chapterName, isPlaying, actualChapterIndex, actualTotalChapters)
 
             val compositeFile = File(context.cacheDir, COMPOSITE_CACHE_FILE)
             safeApiCall {
@@ -543,6 +599,7 @@ class TTSWidget : GlanceAppWidget() {
                     prefs[TTSWidgetKeys.NOVEL_URL] = actualNovelUrl
                     prefs[TTSWidgetKeys.CHAPTER_INDEX] = actualChapterIndex
                     prefs[TTSWidgetKeys.TOTAL_CHAPTERS] = actualTotalChapters
+                    prefs[TTSWidgetKeys.AUTHOR] = actualAuthor
                 }
                 TTSWidget().update(context, id)
             }
@@ -571,7 +628,8 @@ class TTSWidget : GlanceAppWidget() {
                     coverBitmap = null,
                     novelUrl = lastNovel.source,
                     chapterIndex = chapterIndex,
-                    totalChapters = lastNovel.totalChapters
+                    totalChapters = lastNovel.totalChapters,
+                    author = lastNovel.author
                 )
             }
         }
@@ -581,6 +639,7 @@ class TTSWidget : GlanceAppWidget() {
         provideContent {
             val prefs = currentState<Preferences>()
             val title = prefs[TTSWidgetKeys.NOVEL_TITLE]
+            val author = prefs[TTSWidgetKeys.AUTHOR] ?: ""
             val novelUrl = prefs[TTSWidgetKeys.NOVEL_URL] ?: ""
             val chapterIndex = prefs[TTSWidgetKeys.CHAPTER_INDEX] ?: 0
             val compositePath = prefs[TTSWidgetKeys.COVER_COMPOSITE_PATH] ?: ""
@@ -600,55 +659,61 @@ class TTSWidget : GlanceAppWidget() {
                 Box(
                     modifier = GlanceModifier
                         .fillMaxSize()
-                        .cornerRadius(28.dp)
+                        .cornerRadius(32.dp)
                         .background(ImageProvider(compositeBitmap))
                         .clickable(actionStartActivity(launchIntent)),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.BottomStart
                 ) {
-                    Box(
+                    Row(
                         modifier = GlanceModifier
-                            .fillMaxSize(),
-                        contentAlignment = Alignment.BottomEnd
+                            .padding(start = 93.dp, end = 13.dp, bottom = 7.dp)
+                            .height(36.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Controls Row
                         Row(
-                            modifier = GlanceModifier
-                                .width(127.dp)
-                                .height(48.dp)
-                                .padding(end = 23.dp, bottom = 0.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Previous button target (32dp)
                             Box(
                                 modifier = GlanceModifier
                                     .size(32.dp)
                                     .clickable(actionRunCallback<RewindAction>())
                             ) {}
-
-                            // Play/Pause button target (40dp)
+                            Spacer(modifier = GlanceModifier.width(12.dp))
                             Box(
                                 modifier = GlanceModifier
-                                    .size(40.dp)
+                                    .size(36.dp)
                                     .clickable(actionRunCallback<PlayPauseAction>())
                             ) {}
-
-                            // Next button target (32dp)
+                            Spacer(modifier = GlanceModifier.width(12.dp))
                             Box(
                                 modifier = GlanceModifier
                                     .size(32.dp)
                                     .clickable(actionRunCallback<ForwardAction>())
                             ) {}
                         }
+
+                        Spacer(modifier = GlanceModifier.defaultWeight())
+
+                        // Reader Pill click target
+                        Box(
+                            modifier = GlanceModifier
+                                .width(52.dp)
+                                .height(36.dp)
+                                .clickable(actionStartActivity(launchIntent))
+                        ) {}
                     }
                 }
             } else {
                 Box(
                     modifier = GlanceModifier
                         .fillMaxSize()
-                        .cornerRadius(28.dp)
+                        .cornerRadius(32.dp)
                         .background(
                             ColorProvider(
-                                day = androidx.compose.ui.graphics.Color(0xFF0C0C0E),
-                                night = androidx.compose.ui.graphics.Color(0xFF0C0C0E)
+                                day = androidx.compose.ui.graphics.Color(0xFF131313),
+                                night = androidx.compose.ui.graphics.Color(0xFF131313)
                             )
                         )
                         .clickable(
@@ -666,8 +731,8 @@ class TTSWidget : GlanceAppWidget() {
                             contentDescription = null,
                             colorFilter = ColorFilter.tint(
                                 ColorProvider(
-                                    day = androidx.compose.ui.graphics.Color(0xFF00FF88),
-                                    night = androidx.compose.ui.graphics.Color(0xFF00FF88)
+                                    day = androidx.compose.ui.graphics.Color(0xFFFF571A),
+                                    night = androidx.compose.ui.graphics.Color(0xFFFF571A)
                                 )
                             ),
                             modifier = GlanceModifier.size(36.dp)
@@ -677,10 +742,10 @@ class TTSWidget : GlanceAppWidget() {
                             text = context.getString(R.string.widget_no_history),
                             style = TextStyle(
                                 color = ColorProvider(
-                                    day = androidx.compose.ui.graphics.Color(0xFFCCCCCC),
-                                    night = androidx.compose.ui.graphics.Color(0xFFAAAAAA)
+                                    day = androidx.compose.ui.graphics.Color(0xFFE5E2E1),
+                                    night = androidx.compose.ui.graphics.Color(0xFFE5E2E1)
                                 ),
-                                fontSize = 13.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         )

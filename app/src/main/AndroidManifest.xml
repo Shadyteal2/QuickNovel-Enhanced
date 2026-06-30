@@ -97,6 +97,9 @@
                 android:resource="@xml/continue_reading_widget_info" />
         </receiver>
 
+
+
+
         <activity
             android:name=".SplashActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"

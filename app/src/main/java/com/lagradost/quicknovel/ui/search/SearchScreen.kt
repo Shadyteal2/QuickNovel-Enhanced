@@ -30,6 +30,9 @@ import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.carousel.CarouselItemScope
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
+import androidx.compose.material3.carousel.CarouselDefaults
+import com.lagradost.quicknovel.ui.theme.rememberHighQualityRequest
+import com.lagradost.quicknovel.ui.theme.disallowParentIntercept
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.livedata.observeAsState
@@ -385,7 +388,11 @@ fun ProviderCard(
     val context = LocalContext.current
     val iconData = remember(api) {
         if (api.pluginContext != null && api.iconId != null && api.iconId != 0) {
-            api.pluginContext!!.getDrawable(api.iconId!!) ?: R.drawable.ic_baseline_code_24
+            try {
+                api.pluginContext!!.getDrawable(api.iconId!!) ?: R.drawable.ic_baseline_code_24
+            } catch (t: Throwable) {
+                R.drawable.ic_baseline_code_24
+            }
         } else {
             val resId = resolveIcon(context, api.name)
             if (resId != 0) resId
@@ -472,8 +479,9 @@ fun StandardSearchLayout(
     val context = LocalContext.current
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
-    // Prefetch cover images of the upcoming 12 novels as the user scrolls
+    // Prefetch cover images of the upcoming 12 novels as the user scrolls (debounced to avoid queuing flood during fast flings)
     LaunchedEffect(gridState.firstVisibleItemIndex, results) {
+        kotlinx.coroutines.delay(100)
         val totalItems = results.size
         val startIndex = (gridState.firstVisibleItemIndex + 15).coerceAtMost(totalItems)
         val endIndex = (startIndex + 12).coerceAtMost(totalItems)
@@ -541,8 +549,9 @@ fun ProviderSearchResultsRow(
     val uniqueProviderList = remember(provider.list) { provider.list.distinctBy { it.url } }
     val carouselState = rememberCarouselState { uniqueProviderList.size }
 
-    // Prefetch cover images of upcoming novels as the carousel scrolls
+    // Prefetch cover images of upcoming novels as the carousel scrolls (debounced to avoid queuing flood during fast flings)
     LaunchedEffect(carouselState.currentItem, uniqueProviderList) {
+        kotlinx.coroutines.delay(100)
         val totalItems = uniqueProviderList.size
         val startIndex = (carouselState.currentItem + 4).coerceAtMost(totalItems)
         val endIndex = (startIndex + 6).coerceAtMost(totalItems)
@@ -579,25 +588,23 @@ fun ProviderSearchResultsRow(
             state = carouselState,
             preferredItemWidth = 120.dp,
             itemSpacing = 8.dp,
+            flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
             contentPadding = PaddingValues(horizontal = 16.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(210.dp)
                 .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent(PointerEventPass.Initial)
-                            view.parent?.requestDisallowInterceptTouchEvent(true)
-                        }
-                    }
+                    disallowParentIntercept(view)
                 }
         ) { index ->
             val novel = uniqueProviderList[index]
-            SearchNovelCarouselItem(
-                novel = novel,
-                onClick = { onBookClick(novel) },
-                onLongClick = { onBookLongClick(novel) }
-            )
+            key(novel.url) {
+                SearchNovelCarouselItem(
+                    novel = novel,
+                    onClick = { onBookClick(novel) },
+                    onLongClick = { onBookLongClick(novel) }
+                )
+            }
         }
     }
 }
@@ -617,7 +624,7 @@ fun CarouselItemScope.SearchNovelCarouselItem(
             .clickable { onClick() }
     ) {
         AsyncImage(
-            model = rememberImageRequest(data = novel),
+            model = rememberHighQualityRequest(data = novel, context = LocalContext.current),
             contentDescription = novel.name,
             imageLoader = SingletonImageLoader.get(LocalContext.current),
             contentScale = ContentScale.Crop,

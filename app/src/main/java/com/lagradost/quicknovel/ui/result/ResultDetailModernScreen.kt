@@ -178,7 +178,8 @@ fun ResultDetailModernScreen(
                     androidx.compose.ui.window.Dialog(
                         onDismissRequest = { showPosterViewer = false },
                         properties = androidx.compose.ui.window.DialogProperties(
-                            usePlatformDefaultWidth = false
+                            usePlatformDefaultWidth = false,
+                            decorFitsSystemWindows = false
                         )
                     ) {
                         Box(

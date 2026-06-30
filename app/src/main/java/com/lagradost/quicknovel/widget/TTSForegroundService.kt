@@ -255,7 +255,8 @@ class TTSForegroundService : Service() {
                     coverUrl = novel.poster,
                     isPlaying = true,
                     chapterIndex = chapterIndex,
-                    totalChapters = novel.totalChapters
+                    totalChapters = novel.totalChapters,
+                    author = novel.author
                 )
 
                 // 6. Playback loop
@@ -332,7 +333,8 @@ class TTSForegroundService : Service() {
                 coverUrl = novel.poster,
                 isPlaying = false,
                 chapterIndex = chapterIndex,
-                totalChapters = novel.totalChapters
+                totalChapters = novel.totalChapters,
+                author = novel.author
             )
         }
     }
@@ -357,7 +359,8 @@ class TTSForegroundService : Service() {
                     coverUrl = novel.poster,
                     isPlaying = false,
                     chapterIndex = chapterIndex,
-                    totalChapters = novel.totalChapters
+                    totalChapters = novel.totalChapters,
+                    author = novel.author
                 )
             }
         }
@@ -502,6 +505,7 @@ class TTSForegroundService : Service() {
         val isPlaying = vm.isTTSRunning()
 
         val coverUrl = (vm.book as? QuickBook)?.data?.poster
+        val author = vm.book.author()
         TTSWidget.updateWidgetState(
             context = this,
             novelTitle = title,
@@ -510,7 +514,8 @@ class TTSForegroundService : Service() {
             isPlaying = isPlaying,
             coverBitmap = vm.book.poster(),
             chapterIndex = chapterIndex,
-            totalChapters = vm.book.size()
+            totalChapters = vm.book.size(),
+            author = author
         )
     }
 

@@ -339,6 +339,7 @@ object BookDownloader2Helper {
             val sAuthor = if (author == null) "" else sanitizeFilename(author)
             val sName = sanitizeFilename(name)
             val id = generateId(apiName, author, name)
+            val rawId = "$apiName$author$name".hashCode()
 
             val dir =
                 File(
@@ -350,18 +351,40 @@ object BookDownloader2Helper {
             removeKey(DOWNLOAD_EPUB_SIZE, id.toString())
             removeKey(DOWNLOAD_OFFSET, id.toString())
             removeKey(com.lagradost.quicknovel.DOWNLOAD_FOLDER, id.toString())
+
+            if (id != rawId) {
+                removeKey(DOWNLOAD_SIZE, rawId.toString())
+                removeKey(DOWNLOAD_TOTAL, rawId.toString())
+                removeKey(DOWNLOAD_EPUB_SIZE, rawId.toString())
+                removeKey(DOWNLOAD_OFFSET, rawId.toString())
+                removeKey(com.lagradost.quicknovel.DOWNLOAD_FOLDER, rawId.toString())
+            }
+
             ioSafe {
                 val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao()
+                
                 val existing = dao.getById(id)
-                if (existing != null && existing.bookmarkType != null && existing.bookmarkType != 0) {
-                    // Novel is still bookmarked — preserve the row but clear all download state
-                    // so it vanishes from the Downloads tab while staying in its bookmark section.
-                    dao.resetDownloadData(id)
-                } else {
-                    // Not bookmarked: safe to delete the row entirely
-                    dao.deleteById(id)
-                    removeKey(RESULT_BOOKMARK, id.toString())
-                    removeKey(RESULT_BOOKMARK_STATE, id.toString())
+                if (existing != null) {
+                    if (existing.bookmarkType != null && existing.bookmarkType != 0) {
+                        dao.resetDownloadData(id)
+                    } else {
+                        dao.deleteById(id)
+                        removeKey(RESULT_BOOKMARK, id.toString())
+                        removeKey(RESULT_BOOKMARK_STATE, id.toString())
+                    }
+                }
+
+                if (id != rawId) {
+                    val existingRaw = dao.getById(rawId)
+                    if (existingRaw != null) {
+                        if (existingRaw.bookmarkType != null && existingRaw.bookmarkType != 0) {
+                            dao.resetDownloadData(rawId)
+                        } else {
+                            dao.deleteById(rawId)
+                            removeKey(RESULT_BOOKMARK, rawId.toString())
+                            removeKey(RESULT_BOOKMARK_STATE, rawId.toString())
+                        }
+                    }
                 }
             }
 
@@ -1379,13 +1402,20 @@ object BookDownloader2 {
         if (deleteNovelMutex.isLocked) return
         deleteNovelMutex.withLock {
             val id = generateId(apiName, author, name)
+            val rawId = "$apiName$author$name".hashCode()
 
             // send stop action
             addPendingActionAsync(id, DownloadActionType.Stop)
+            if (id != rawId) {
+                addPendingActionAsync(rawId, DownloadActionType.Stop)
+            }
 
             // wait until download is stopped
             while (true) {
-                if (!currentDownloadsMutex.withLock { currentDownloads.contains(id) }) {
+                val hasActive = currentDownloadsMutex.withLock {
+                    currentDownloads.contains(id) || currentDownloads.contains(rawId)
+                }
+                if (!hasActive) {
                     break
                 }
                 delay(100)
@@ -1398,10 +1428,17 @@ object BookDownloader2 {
             downloadInfoMutex.withLock {
                 downloadData -= id
                 downloadProgress -= id
+                if (id != rawId) {
+                    downloadData -= rawId
+                    downloadProgress -= rawId
+                }
             }
 
             // ping the viewmodels
             downloadRemoved.invoke(id)
+            if (id != rawId) {
+                downloadRemoved.invoke(rawId)
+            }
         }
     }
 

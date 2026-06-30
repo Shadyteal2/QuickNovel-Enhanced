@@ -180,6 +180,9 @@ fun DownloadScreen(
     var isPullRefreshing by remember { mutableStateOf(false) }
     var showMultiSelectCategorySheet by remember { mutableStateOf(false) }
     var showMultiSelectDeleteDialog by remember { mutableStateOf(false) }
+    var showBulkMigrationDialog by remember { mutableStateOf(false) }
+    val bulkMigrationNovels = remember { mutableStateListOf<com.lagradost.quicknovel.db.NovelEntity>() }
+    val migrationViewModel = androidx.lifecycle.viewmodel.compose.viewModel<BulkMigrationViewModel>()
 
     LaunchedEffect(isSelectionMode) {
         if (!isSelectionMode) {
@@ -1247,6 +1250,27 @@ fun DownloadScreen(
                             )
                         }
 
+                        // Migrate button
+                        IconButton(
+                            onClick = {
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                scope.launch {
+                                    val resolved = viewModel.getNovelsByIds(selectedNovels.toList())
+                                    bulkMigrationNovels.clear()
+                                    bulkMigrationNovels.addAll(resolved)
+                                    showBulkMigrationDialog = true
+                                }
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SwapHoriz,
+                                contentDescription = "Migrate Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
                         // Delete button
                         IconButton(
                             onClick = {
@@ -1626,6 +1650,19 @@ fun DownloadScreen(
                 TextButton(onClick = { showMultiSelectDeleteDialog = false }) {
                     Text("Cancel")
                 }
+            }
+        )
+    }
+
+    if (showBulkMigrationDialog) {
+        BulkMigrationDialog(
+            novels = bulkMigrationNovels,
+            viewModel = migrationViewModel,
+            onDismiss = { showBulkMigrationDialog = false },
+            onMigrationComplete = {
+                selectedNovels.clear()
+                isSelectionMode = false
+                viewModel.loadAllData(false)
             }
         )
     }

@@ -978,5 +978,11 @@ class DownloadViewModel : ViewModel() {
             bookmarkChanged.emit(Unit)
         }
     }
+
+    suspend fun getNovelsByIds(ids: List<Int>): List<com.lagradost.quicknovel.db.NovelEntity> {
+        return withContext(Dispatchers.IO) {
+            ids.mapNotNull { dao.getById(it) }
+        }
+    }
 }
 
