@@ -389,7 +389,7 @@ fun ProviderCard(
     val iconData = remember(api) {
         if (api.pluginContext != null && api.iconId != null && api.iconId != 0) {
             try {
-                api.pluginContext!!.getDrawable(api.iconId!!) ?: R.drawable.ic_baseline_code_24
+                api.pluginContext!!.resources.getDrawable(api.iconId!!, null) ?: R.drawable.ic_baseline_code_24
             } catch (t: Throwable) {
                 R.drawable.ic_baseline_code_24
             }

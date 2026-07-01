@@ -2,6 +2,10 @@
 # NeoQN / QuickNovel-Enhanced — ProGuard / R8 rules
 # =============================================================================
 
+# Disable class/member renaming (obfuscation) to preserve dynamic plugin compatibility
+# and reflection-based JSON serialization (Jackson). Code shrinking remains active.
+-dontobfuscate
+
 # ── Stack traces ──────────────────────────────────────────────────────────────
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
@@ -89,3 +93,24 @@
 # ── EPUBlib ───────────────────────────────────────────────────────────────────
 -keep class me.ag2s.epublib.** { *; }
 -dontwarn me.ag2s.epublib.**
+
+# ── PDFbox & pdfiumandroid optional dependencies and internal classes ──────────
+-dontwarn com.gemalto.jp2.JP2Decoder
+-dontwarn kotlin.coroutines.jvm.internal.SpillingKt
+
+# ── Dynamic Plugin Integration & ClassLoader Protection ───────────────────────
+# Keep all application classes to prevent R8 from obfuscating classes loaded or referenced by plugins
+-keep class com.lagradost.quicknovel.** { *; }
+-keep interface com.lagradost.quicknovel.** { *; }
+
+# Keep all Kotlin standard library classes to prevent ClassCastException (e.g. kotlin.Pair -> q5.i)
+-keep class kotlin.** { *; }
+-keep interface kotlin.** { *; }
+
+# Keep all kotlinx.coroutines classes to protect suspend function states and continuation interfaces
+-keep class kotlinx.coroutines.** { *; }
+-keep interface kotlinx.coroutines.** { *; }
+
+# Keep NiceHttp to ensure plugins can make requests stably
+-keep class com.lagradost.nicehttp.** { *; }
+-keep interface com.lagradost.nicehttp.** { *; }

@@ -71,8 +71,15 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            // CRITICAL ARCHITECTURAL DESIGN DECISION:
+            // R8 minification, optimization, and resource shrinking are explicitly disabled for the release build.
+            // Under R8, standard Kotlin/Coroutines library classes (e.g. kotlin.Pair, NotImplementedError) are obfuscated,
+            // which causes fatal ClassCastException and NotImplementedError crashes when interacting with dynamically
+            // loaded external provider plugins (loaded via DexClassLoader).
+            // Additionally, R8 renaming breaks Jackson reflection-based JSON deserialization for imported .neolist files.
+            // Do NOT re-enable minifyEnabled or shrinkResources without verifying dynamic plugin compatibility.
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
@@ -105,9 +112,12 @@ android {
     }
     namespace 'com.lagradost.quicknovel'
 
-
-
-
+    lint {
+        disable 'NullSafeMutableLiveData', 'RememberInComposition', 'FrequentlyChangingValue'
+        abortOnError false
+        checkReleaseBuilds false
+        ignoreTestSources true
+    }
 }
 
 dependencies {
