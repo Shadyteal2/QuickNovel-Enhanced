@@ -239,7 +239,21 @@ class TTSSession(context: Context, val event: (TTSHelper.TTSActionType) -> Boole
     fun unregister() {
         if (!isRegistered) return
         isRegistered = false
-        appContext.unregisterReceiver(myNoisyAudioStreamReceiver)
+        try {
+            appContext.unregisterReceiver(myNoisyAudioStreamReceiver)
+        } catch (e: Exception) {
+            // ignore
+        }
+        try {
+            val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                audioManager.abandonAudioFocusRequest(focusRequest!!)
+            } else {
+                audioManager.abandonAudioFocus(myAudioFocusListener)
+            }
+        } catch (e: Exception) {
+            // ignore
+        }
     }
 
 

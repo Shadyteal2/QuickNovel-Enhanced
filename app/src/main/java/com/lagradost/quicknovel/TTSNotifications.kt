@@ -28,11 +28,10 @@ object TTSNotifications {
     private var hasCreateedNotificationChannel = false
 
     private fun createNotificationChannel(context: Context) {
-        // Create the NotificationChannel, but only on API 26+ because
-        // the NotificationChannel class is new and not in the support library
+        val appContext = context.applicationContext ?: context
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = context.getString(R.string.text_to_speech)
-            val descriptionText = context.getString(R.string.text_to_speech_channel_description)
+            val name = appContext.getString(R.string.text_to_speech)
+            val descriptionText = appContext.getString(R.string.text_to_speech_channel_description)
             val importance = NotificationManager.IMPORTANCE_DEFAULT
             val channel = NotificationChannel(
                 TTS_CHANNEL_ID,
@@ -41,9 +40,8 @@ object TTSNotifications {
             ).apply {
                 description = descriptionText
             }
-            // Register the channel with the system
             val notificationManager: NotificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
     }
@@ -51,15 +49,16 @@ object TTSNotifications {
     var mediaSession: MediaSessionCompat? = null
 
     fun setMediaSession(viewModel: ReadActivityViewModel, book: AbstractBook, context: Context) {
+        val appContext = context.applicationContext ?: context
         val mbrIntent = MediaButtonReceiver.buildMediaButtonPendingIntent(
-            context,
+            appContext,
             PlaybackStateCompat.ACTION_PLAY_PAUSE
         )
 
         mediaSession = MediaSessionCompat(
-            context,
+            appContext,
             "TTS",
-            ComponentName(context, MediaButtonReceiver::class.java),
+            ComponentName(appContext, MediaButtonReceiver::class.java),
             mbrIntent
         ).apply {
             setCallback(
@@ -105,7 +104,6 @@ object TTSNotifications {
 
             val mediaMetadata = MediaMetadataCompat.Builder()
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L).apply {
-                    // https://stackoverflow.com/questions/72750099/android-mediastyle-notification-image-largeicon-is-pixilated
                     book.poster()?.let { icon ->
                         putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, icon)
                     }
@@ -115,12 +113,11 @@ object TTSNotifications {
                 }
                 .build()
             setMetadata(mediaMetadata)
-            //setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
-            //isActive = true
         }
     }
 
     fun releaseMediaSession() {
+        mediaSession?.setCallback(null)
         mediaSession?.release()
         mediaSession = null
     }
@@ -133,20 +130,21 @@ object TTSNotifications {
         context: Context?
     ): Notification? {
         if (context == null) return null
+        val appContext = context.applicationContext ?: context
 
         if (status == TTSHelper.TTSStatus.IsStopped) {
-            NotificationManagerCompat.from(context).cancel(TTS_NOTIFICATION_ID)
+            NotificationManagerCompat.from(appContext).cancel(TTS_NOTIFICATION_ID)
             return null
         }
 
         if (!hasCreateedNotificationChannel) {
             hasCreateedNotificationChannel = true
-            createNotificationChannel(context)
+            createNotificationChannel(appContext)
         }
-        val builder = NotificationCompat.Builder(context, TTS_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(appContext, TTS_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_baseline_volume_up_24)
             .setContentTitle(title)
-            .setContentText(chapter.asString(context))
+            .setContentText(chapter.asString(appContext))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
@@ -155,7 +153,7 @@ object TTSNotifications {
         if (icon != null) builder.setLargeIcon(icon)
 
         val cancelButton = MediaButtonReceiver.buildMediaButtonPendingIntent(
-            context,
+            appContext,
             PlaybackStateCompat.ACTION_STOP
         )
         val style = androidx.media.app.NotificationCompat.MediaStyle()
@@ -171,7 +169,7 @@ object TTSNotifications {
             R.drawable.ic_baseline_play_arrow_24,
             "Resume",
             MediaButtonReceiver.buildMediaButtonPendingIntent(
-                context,
+                appContext,
                 PlaybackStateCompat.ACTION_PLAY
             )
         )
@@ -180,7 +178,7 @@ object TTSNotifications {
             R.drawable.ic_baseline_stop_24,
             "Stop",
             MediaButtonReceiver.buildMediaButtonPendingIntent(
-                context,
+                appContext,
                 PlaybackStateCompat.ACTION_STOP
             )
         )
@@ -189,7 +187,7 @@ object TTSNotifications {
             R.drawable.ic_baseline_pause_24,
             "Pause",
             MediaButtonReceiver.buildMediaButtonPendingIntent(
-                context,
+                appContext,
                 PlaybackStateCompat.ACTION_PAUSE
             )
         )
@@ -198,7 +196,7 @@ object TTSNotifications {
             R.drawable.ic_baseline_fast_rewind_24,
             "Rewind",
             MediaButtonReceiver.buildMediaButtonPendingIntent(
-                context,
+                appContext,
                 PlaybackStateCompat.ACTION_REWIND
             )
         )
@@ -207,7 +205,7 @@ object TTSNotifications {
             R.drawable.ic_baseline_fast_forward_24,
             "Fast Forward",
             MediaButtonReceiver.buildMediaButtonPendingIntent(
-                context,
+                appContext,
                 PlaybackStateCompat.ACTION_FAST_FORWARD
             )
         )

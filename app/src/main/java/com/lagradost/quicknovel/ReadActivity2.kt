@@ -1218,6 +1218,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
 
     override fun onDestroy() {
+        haloAnimator?.cancel()
+        haloAnimator = null
         if (isFinishing) {
             viewModel.stopTTS()
         }
@@ -2118,6 +2120,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                                 
                                 var dialogRef: android.content.DialogInterface? = null
                                 val composeView = androidx.compose.ui.platform.ComposeView(this@ReadActivity2).apply {
+                                    setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
                                     setContent {
                                         com.lagradost.quicknovel.ui.theme.QuickNovelTheme {
                                             androidx.compose.foundation.layout.Column(
@@ -2307,6 +2310,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
                 var dialogRef: android.content.DialogInterface? = null
                 val composeView = androidx.compose.ui.platform.ComposeView(this.context).apply {
+                    setViewCompositionStrategy(androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
                     setContent {
                         com.lagradost.quicknovel.ui.theme.QuickNovelTheme {
                             androidx.compose.foundation.layout.Column(

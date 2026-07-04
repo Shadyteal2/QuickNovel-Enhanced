@@ -22,7 +22,8 @@ data class Page(
     val title: String,
     val unsortedItems: List<Any>,
     val items: List<Any>,
-    val hash: Int = (title.hashCode() * 31 + items.hashCode())
+    val hash: Int = (title.hashCode() * 31 + items.hashCode()),
+    val id: Int = 0
 )
 
 @Suppress("DEPRECATION")

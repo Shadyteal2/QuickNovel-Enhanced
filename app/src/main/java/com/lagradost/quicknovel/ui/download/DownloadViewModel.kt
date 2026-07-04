@@ -104,7 +104,8 @@ data class CategoryItem(
      * in the "Add to Bookmark" popup in ResultDetailModernScreen.
      * Defaults to false so all existing CategoryItems (system + user custom) are unaffected.
      */
-    val isLocked: Boolean = false
+    val isLocked: Boolean = false,
+    val isHidden: Boolean = false
 )
 
 class DownloadViewModel : ViewModel() {
@@ -138,6 +139,8 @@ class DownloadViewModel : ViewModel() {
             CategoryItem(ReadType.PLAN_TO_READ.prefValue, R.string.type_plan_to_read, "Plan to Read", true),
             CategoryItem(ReadType.COMPLETED.prefValue, R.string.type_completed, "Completed", true),
             CategoryItem(ReadType.DROPPED.prefValue, R.string.type_dropped, "Dropped", true),
+            CategoryItem(-1, null, "NeoShelf", true, isLocked = true),
+            CategoryItem(-2, null, "NeoNexus", true, isLocked = true),
         )
         val bookmarkChanged = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 0)
     }
@@ -159,7 +162,14 @@ class DownloadViewModel : ViewModel() {
             val orderJson = getKey<String>(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", "[]") ?: "[]"
             val orderList = mapper.readValue(orderJson, object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {})
 
-            val allItems = systemCategories + filteredCustomList
+            val hiddenJson = getKey<String>(DOWNLOAD_SETTINGS, "HIDDEN_CATEGORIES", "[]") ?: "[]"
+            val hiddenIds = try {
+                mapper.readValue(hiddenJson, object : com.fasterxml.jackson.core.type.TypeReference<Set<Int>>() {})
+            } catch (_: Throwable) { emptySet<Int>() }
+
+            val allItems = (systemCategories + filteredCustomList).map {
+                it.copy(isHidden = it.id in hiddenIds)
+            }
             if (orderList.isNotEmpty()) {
                 allItems.sortedBy { orderList.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
             } else {
@@ -199,12 +209,24 @@ class DownloadViewModel : ViewModel() {
 
     fun updateCategories(newList: List<CategoryItem>) {
         _readList.value = newList
-        val customList = newList.filter { !it.isSystem }
-        val orderList = newList.map { it.id }
-        val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
-        setKey(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", mapper.writeValueAsString(customList))
-        setKey(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", mapper.writeValueAsString(orderList))
-        loadAllData(false)
+        viewModelScope.launch(Dispatchers.IO) {
+            val customList = newList.filter { !it.isSystem }
+            val orderList = newList.map { it.id }
+            val hiddenIds = newList.filter { it.isHidden }.map { it.id }
+            val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+            setKey(DOWNLOAD_SETTINGS, "CUSTOM_CATEGORIES", mapper.writeValueAsString(customList))
+            setKey(DOWNLOAD_SETTINGS, "CATEGORIES_ORDER", mapper.writeValueAsString(orderList))
+            setKey(DOWNLOAD_SETTINGS, "HIDDEN_CATEGORIES", mapper.writeValueAsString(hiddenIds))
+            loadAllData(false)
+        }
+    }
+
+    fun toggleCategoryVisibility(id: Int) {
+        val current = readList
+        val updated = current.map {
+            if (it.id == id) it.copy(isHidden = !it.isHidden) else it
+        }
+        updateCategories(updated)
     }
 
     fun addCategory(name: String) {
@@ -215,6 +237,11 @@ class DownloadViewModel : ViewModel() {
     }
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val saved = getSavedCategories()
+            _readList.value = saved
+            loadAllData(false)
+        }
         viewModelScope.launch {
             bookmarkChanged.collect {
                 loadAllData(false)
@@ -725,6 +752,8 @@ class DownloadViewModel : ViewModel() {
         pages.add(downloadedCards)
 
         for (read in currentCategories) {
+            if (read.id == -1 || read.id == -2) continue
+
             val unsorted = mapping[read.id] ?: arrayListOf()
             // If activeQuery is not blank, we rank by relevance score in memory since the filtered list is small!
             // If activeQuery is blank, the list is already sorted natively by Room, so we skip sortNormalArray!
@@ -741,7 +770,8 @@ class DownloadViewModel : ViewModel() {
                     title = if (read.isSystem && read.stringRes != null) context?.getString(read.stringRes) ?: read.name else read.name,
                     unsortedItems = unsorted,
                     items = sorted,
-                    hash = read.id.hashCode() * 31 + sorted.hashCode()
+                    hash = read.id.hashCode() * 31 + sorted.hashCode(),
+                    id = read.id
                 )
             )
         }
@@ -769,7 +799,8 @@ class DownloadViewModel : ViewModel() {
             title = com.lagradost.quicknovel.ui.ReadType.NONE.name,
             unsortedItems = unsorted,
             items = sorted,
-            hash = com.lagradost.quicknovel.ui.ReadType.NONE.prefValue.hashCode() * 31 + sorted.hashCode()
+            hash = com.lagradost.quicknovel.ui.ReadType.NONE.prefValue.hashCode() * 31 + sorted.hashCode(),
+            id = com.lagradost.quicknovel.ui.ReadType.NONE.prefValue
         )
     }
 

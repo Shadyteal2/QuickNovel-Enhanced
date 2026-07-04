@@ -190,40 +190,45 @@ fun DownloadScreen(
         }
     }
 
-    // Set up tabs list directly from pages
-    val allTabs = remember(pages) {
-        val baseTabs = pages?.map { page ->
-            if (page.title == com.lagradost.quicknovel.ui.ReadType.NONE.name) {
-                context.getString(R.string.title_download)
-            } else {
-                page.title
-            }
-        } ?: emptyList()
-        if (baseTabs.isNotEmpty()) {
-            val list = baseTabs.toMutableList()
-            list.add(1, "NeoShelf")
-            list.add(2, "NeoNexus")
-            list
-        } else {
-            listOf("NeoShelf", "NeoNexus")
-        }
+    val visibleCategories = remember(categories) {
+        categories.filter { !it.isHidden }
     }
 
-    // Distribute cards per page directly from pages
-    val cardsByPage = remember(pages) {
-        val map = mutableMapOf<Int, List<Any>>()
-        pages?.forEachIndexed { index, page ->
-            map[index] = page.items
+    // Set up tabs list directly from visible categories
+    val allTabs = remember(visibleCategories) {
+        val list = mutableListOf<String>()
+        list.add(context.getString(R.string.title_download))
+        visibleCategories.forEach { category ->
+            val localizedName = if (category.isSystem && category.stringRes != null) {
+                context.getString(category.stringRes)
+            } else {
+                category.name
+            }
+            list.add(localizedName)
         }
-        map
+        list
     }
 
     // ViewPager / HorizontalPager state
-    val pagerState = rememberPagerState(pageCount = { allTabs.size })
+    val initialPage = remember(allTabs) {
+        val saved = com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.CURRENT_TAB, 0) ?: 0
+        if (saved in allTabs.indices) saved else 0
+    }
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { allTabs.size })
 
-    var activeTargetPage by remember { mutableStateOf(pagerState.currentPage) }
-    LaunchedEffect(pagerState.currentPage) {
-        activeTargetPage = pagerState.currentPage
+    // Safely handle reduction of pagerState.currentPage when category list contraction occurs
+    LaunchedEffect(allTabs.size) {
+        if (allTabs.isNotEmpty() && pagerState.currentPage >= allTabs.size) {
+            val targetPage = (allTabs.size - 1).coerceAtLeast(0)
+            pagerState.scrollToPage(targetPage)
+        }
+    }
+
+    var activeTargetPage by remember { mutableStateOf(pagerState.currentPage.coerceIn(0, (allTabs.size - 1).coerceAtLeast(0))) }
+    LaunchedEffect(pagerState.currentPage, allTabs.size) {
+        val coerced = pagerState.currentPage.coerceIn(0, (allTabs.size - 1).coerceAtLeast(0))
+        activeTargetPage = coerced
+        viewModel.switchPage(coerced)
     }
 
     val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
@@ -548,8 +553,11 @@ fun DownloadScreen(
             }
         },
         floatingActionButton = {
-            val foldersIndex = allTabs.indexOf("NeoNexus")
-            if (pagerState.currentPage != foldersIndex) {
+            val isFoldersPage = if (pagerState.currentPage == 0) false else {
+                val category = visibleCategories.getOrNull(pagerState.currentPage - 1)
+                category?.id == -2
+            }
+            if (!isFoldersPage) {
                 Box(
                     modifier = Modifier
                         .navigationBarsPadding()
@@ -599,9 +607,8 @@ fun DownloadScreen(
                     ),
                 userScrollEnabled = isSwipeMode && !isScrollingList // Disable pager swipe when scrolling list
             ) { page ->
-                val neoShelfIndex = allTabs.indexOf("NeoShelf")
-                val foldersIndex = allTabs.indexOf("NeoNexus")
-                if (page == neoShelfIndex) {
+                val category = if (page == 0) null else visibleCategories.getOrNull(page - 1)
+                if (category != null && category.id == -1) {
                     val shelves by viewModel.neoShelfPage.observeAsState(emptyList())
                     NeoShelfPageContent(
                         shelves = shelves,
@@ -612,7 +619,7 @@ fun DownloadScreen(
                         onBookClick = onBookClick,
                         onBookLongClickLoaded = onBookLongClickLoaded
                     )
-                } else if (page == foldersIndex) {
+                } else if (category != null && category.id == -2) {
                     val neolistsViewModel: com.lagradost.quicknovel.ui.neolists.NeoListsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
                     com.lagradost.quicknovel.ui.neolists.NeoListsHubScreen(
                         viewModel = neolistsViewModel,
@@ -625,10 +632,13 @@ fun DownloadScreen(
                         isSwipeMode = isSwipeMode
                     )
                 } else {
-                    val actualPageIndex = if (page > foldersIndex) page - 2 else page
-                    val list = cardsByPage[actualPageIndex] ?: emptyList()
-                val isDownloadsPage = actualPageIndex == 0
-                val pullState = rememberPullToRefreshState()
+                    val isDownloadsPage = page == 0
+                    val list = if (isDownloadsPage) {
+                        pages?.find { it.id == com.lagradost.quicknovel.ui.ReadType.NONE.prefValue }?.items ?: emptyList()
+                    } else {
+                        pages?.find { it.id == category?.id }?.items ?: emptyList()
+                    }
+                    val pullState = rememberPullToRefreshState()
 
                 PullToRefreshBox(
                     isRefreshing = isPullRefreshing,
@@ -1491,11 +1501,13 @@ fun DownloadScreen(
                                     text = categoryName,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onBackground,
+                                    color = if (categoryItem.isHidden) MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f) else MaterialTheme.colorScheme.onBackground,
                                     modifier = Modifier.weight(1f)
                                 )
 
-                                Row {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     // Move Up
                                     IconButton(
                                         enabled = index > 0,
@@ -1530,6 +1542,19 @@ fun DownloadScreen(
                                             imageVector = Icons.Default.ArrowDownward,
                                             contentDescription = "Move Down",
                                             tint = if (index < categories.size - 1) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
+                                        )
+                                    }
+                                    // Visibility Toggle
+                                    IconButton(
+                                        onClick = {
+                                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                            viewModel.toggleCategoryVisibility(categoryItem.id)
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = if (categoryItem.isHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            contentDescription = "Toggle Visibility",
+                                            tint = if (categoryItem.isHidden) MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f) else MaterialTheme.colorScheme.primary
                                         )
                                     }
                                     if (!isSystem) {
