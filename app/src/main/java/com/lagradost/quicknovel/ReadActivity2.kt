@@ -19,6 +19,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.ScaleGestureDetector
+import android.view.GestureDetector
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.TextView
 import android.widget.AbsListView
@@ -545,6 +547,8 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
         if ((keyCode != KeyEvent.KEYCODE_VOLUME_DOWN && keyCode != KeyEvent.KEYCODE_VOLUME_UP)) return false
 
+        viewModel.onUserInteraction()
+
         // if we have the bottom bar up then we ignore the override functionality
         if (viewModel.bottomVisibility.isInitialized && viewModel.bottomVisibility.value == true) return false
 
@@ -696,6 +700,9 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 lastHalfVisible = lines.firstOrNull {
                     it.bottom >= bottomY
                 },
+                firstVisible = lines.firstOrNull {
+                    it.bottom > topY
+                }
             )
         )
     }
@@ -825,6 +832,18 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 textLayoutManager.scrollToPositionWithOffset(adapterPosition, 1)
+
+                if (pendingFlingDirection != 0) {
+                    val dir = pendingFlingDirection
+                    pendingFlingDirection = 0
+                    binding.realText.post {
+                        if (dir == 1) {
+                            binding.realText.fling(0, 3000)
+                        } else {
+                            binding.realText.fling(0, -3000)
+                        }
+                    }
+                }
 
                 val targetInnerIndex = if (adapterPosition != -1) {
                     chapterCopy.getOrNull(adapterPosition)?.innerIndex ?: desired.innerIndex
@@ -1168,16 +1187,25 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
       }*/
 
     private var topBarHeight by Delegates.notNull<Int>()
+    private lateinit var scaleGestureDetector: ScaleGestureDetector
+    private lateinit var tapGestureDetector: GestureDetector
+    private var startTwoFingerX = 0f
+    private var startBrightness = 0f
+    private var isTwoFingerSwiping = false
+    private var lastChapterHapticIndex = -1
 
 
     private var currentOverScrollValue = 0.0f
+    private var pendingFlingDirection = 0
 
     private fun setProgressOfOverscroll(index: Int, progress: Float) {
         val id = generateId(5, index, 0, 0)
         ((binding.realText.findViewHolderForItemId(id) as? ViewHolderState<*>)?.view as? SingleOverscrollChapterBinding)?.let {
             it.progress.max = 10000
             it.progress.progress = (progress.absoluteValue * 10000.0f).toInt()
-            it.progress.alpha = if (progress.absoluteValue > 0.05f) 1.0f else 0.0f
+            val progressVal = progress.absoluteValue
+            val targetAlpha = ((progressVal - 0.15f) / 0.65f).coerceIn(0f, 1f)
+            it.overscrollCard.alpha = targetAlpha
         }
     }
 
@@ -1217,6 +1245,13 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
 
 
+    private fun updateProgressBarVisibility() {
+        val showProgress = viewModel.showReaderProgress
+        val onlyOnTap = viewModel.showProgressOnlyOnTap
+        val isMenuVisible = viewModel.bottomVisibility.value == true
+        binding.readerProgressContainer.isVisible = showProgress && (!onlyOnTap || isMenuVisible)
+    }
+
     override fun onDestroy() {
         haloAnimator?.cancel()
         haloAnimator = null
@@ -1252,6 +1287,39 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         super.onCreate(savedInstanceState)
         readActivity = this
+        scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            private var lastScaleTime = 0L
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                if (!viewModel.pinchFontEnabled) return false
+                val now = System.currentTimeMillis()
+                if (now - lastScaleTime > 150L) {
+                    val factor = detector.scaleFactor
+                    if (factor > 1.05f) {
+                        viewModel.textSize = (viewModel.textSize + 1).coerceIn(10, 50)
+                        lastScaleTime = now
+                    } else if (factor < 0.95f) {
+                        viewModel.textSize = (viewModel.textSize - 1).coerceIn(10, 50)
+                        lastScaleTime = now
+                    }
+                }
+                return true
+            }
+        })
+        tapGestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean {
+                return viewModel.tapZonesEnabled && viewModel.bottomVisibility.value != true
+            }
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (!viewModel.tapZonesEnabled) return false
+                if (viewModel.bottomVisibility.value == true) return false
+                if (viewModel.isTextSelectable) return false
+                if (viewModel.isTTSRunning() || viewModel.autoScroll == true) return false
+
+                routeTapZoneClick(e.x, e.y)
+                return true
+            }
+        })
         binding = ReadMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -1310,6 +1378,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 letterSpacing = viewModel.letterSpacing,
                 luminescent = viewModel.luminescentReader,
                 luminescentIntensity = viewModel.luminescentIntensity,
+                bionicBoldRatio = viewModel.bionicBoldRatio,
             ).also { config ->
                 updateOtherTextConfig(config)
             }
@@ -1386,6 +1455,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
         }
 
+        observe(viewModel.bionicBoldRatioLive) { ratio ->
+            if (textAdapter.changeBionicBoldRatio(ratio)) {
+                updateTextAdapterConfig()
+            }
+        }
+
         observe(viewModel.autoScrollLive) { enabled ->
             if (enabled == true) {
                 startAutoScrollLoop()
@@ -1430,8 +1505,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
         updateOverlayVisibility()
 
-        observe(viewModel.showReaderProgressLive) { show ->
-            binding.readerProgressContainer.isVisible = show == true
+        observe(viewModel.showReaderProgressLive) { _ ->
+            updateProgressBarVisibility()
+        }
+
+        observe(viewModel.showProgressOnlyOnTapLive) { _ ->
+            updateProgressBarVisibility()
         }
 
         observe(viewModel.screenAwakeLive) { awake ->
@@ -1475,6 +1554,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             if (textAdapter.changeLetterSpacing(spacing)) {
                 updateTextAdapterConfig()
                 postDesired(binding.realText)
+            }
+        }
+
+        observe(viewModel.lastReadBreadcrumbLive) { message ->
+            if (message != null) {
+                com.google.android.material.snackbar.Snackbar.make(
+                    binding.root,
+                    message,
+                    com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                ).show()
+                viewModel.lastReadBreadcrumbLive.value = null
             }
         }
  
@@ -1718,6 +1808,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         observe(viewModel.bottomVisibility) { visibility ->
+            updateProgressBarVisibility()
             if (visibility) {
                 showSystemUI()
                 // here we actually do not want to fix the tts bug, as it will cause a bad behavior
@@ -1837,6 +1928,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
 
         binding.realText.apply {
+            addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
+                override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                    if (viewModel.tapZonesEnabled && viewModel.bottomVisibility.value != true) {
+                        tapGestureDetector.onTouchEvent(e)
+                    }
+                    if (e.pointerCount >= 2 && (viewModel.pinchFontEnabled || viewModel.swipeBrightnessEnabled)) {
+                        return true
+                    }
+                    return false
+                }
+            })
             addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
                 override fun onChildViewAttachedToWindow(view: View) {
                     val settingsManager = PreferenceManager.getDefaultSharedPreferences(this@ReadActivity2)
@@ -1855,6 +1957,42 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             itemAnimator = null
             // testing overscroll
             setOnTouchListener { _, event ->
+                viewModel.onUserInteraction()
+                if (event.pointerCount >= 2 || isTwoFingerSwiping) {
+                    if (viewModel.pinchFontEnabled && event.pointerCount >= 2) {
+                        scaleGestureDetector.onTouchEvent(event)
+                    }
+                    if (viewModel.swipeBrightnessEnabled) {
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_POINTER_DOWN -> {
+                                startTwoFingerX = (event.getX(0) + event.getX(1)) / 2
+                                val lp = window.attributes
+                                startBrightness = if (lp.screenBrightness < 0f) 0.5f else lp.screenBrightness
+                                isTwoFingerSwiping = true
+                            }
+                            MotionEvent.ACTION_MOVE -> {
+                                if (event.pointerCount >= 2) {
+                                    if (!isTwoFingerSwiping) {
+                                        startTwoFingerX = (event.getX(0) + event.getX(1)) / 2
+                                        val lp = window.attributes
+                                        startBrightness = if (lp.screenBrightness < 0f) 0.5f else lp.screenBrightness
+                                        isTwoFingerSwiping = true
+                                    }
+                                    val currentX = (event.getX(0) + event.getX(1)) / 2
+                                    val dx = currentX - startTwoFingerX
+                                    val newBrightness = (startBrightness + dx / 800f).coerceIn(0.01f, 1f)
+                                    val lp = window.attributes
+                                    lp.screenBrightness = newBrightness
+                                    window.attributes = lp
+                                }
+                            }
+                            MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                isTwoFingerSwiping = false
+                            }
+                        }
+                    }
+                    return@setOnTouchListener true
+                }
                 when (event.action) {
                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
                         lastTouchTime = System.currentTimeMillis()
@@ -1903,6 +2041,23 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 RecyclerView.OnScrollListener() {
                 var updateFromCode = false
                 override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    if (recyclerView.scrollState == RecyclerView.SCROLL_STATE_SETTLING && viewModel.loadingStatus.value !is Resource.Loading) {
+                        if (dy > 0 && !recyclerView.canScrollVertically(1)) {
+                            if (viewModel.readerType == ReadingType.OVERSCROLL_SCROLL || viewModel.readerType == ReadingType.BTT_SCROLL) {
+                                if (viewModel.currentIndex + 1 < viewModel.book.size()) {
+                                    pendingFlingDirection = 1
+                                    viewModel.seekToChapter(viewModel.currentIndex + 1)
+                                }
+                            }
+                        } else if (dy < 0 && !recyclerView.canScrollVertically(-1)) {
+                            if (viewModel.readerType == ReadingType.OVERSCROLL_SCROLL || viewModel.readerType == ReadingType.BTT_SCROLL) {
+                                if (viewModel.currentIndex - 1 >= 0) {
+                                    pendingFlingDirection = -1
+                                    viewModel.seekToChapter(viewModel.currentIndex - 1)
+                                }
+                            }
+                        }
+                    }
                     if (dy != 0 && !updateFromCode) {
                         var rdy = dy
 
@@ -1959,6 +2114,12 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         observe(viewModel.chapter) { chapter ->
             cachedChapter = chapter.data
 
+            val currentIdx = viewModel.currentIndex
+            if (lastChapterHapticIndex != -1 && lastChapterHapticIndex != currentIdx) {
+                binding.realText.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+            }
+            lastChapterHapticIndex = currentIdx
+
             if (chapter.seekToDesired) {
                 textAdapter.submitIncomparableList(chapter.data) {
                     viewModel.postLoadingStatus(Resource.Success(""))
@@ -2008,6 +2169,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                                 viewModel.reloadChapter()
                             },
                             onShowCustomization = { showReaderCustomizationDialog(initialTab = 0) },
+                            onShowTapZones = { showTapZonesCustomizationDialog() },
                             onReadingTypeClick = {
                                 val items = ReadingType.entries.toTypedArray()
                                 val displayItems = ArrayList(items.map { getString(it.stringRes) })
@@ -2262,6 +2424,59 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         val sheet = com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationSheet.newInstance(initialTab)
         sheet.setViewModel(viewModel)
         sheet.show(supportFragmentManager, "reader_customization")
+    }
+
+    private fun showTapZonesCustomizationDialog() {
+        val sheet = com.lagradost.quicknovel.ui.reader.TapZoneCustomizationSheet.newInstance()
+        sheet.setViewModel(viewModel)
+        sheet.show(supportFragmentManager, "tap_zones_customization")
+    }
+
+    fun routeTapZoneClick(x: Float, y: Float) {
+        val width = binding.realText.width
+        val height = binding.realText.height
+        if (width <= 0 || height <= 0) return
+
+        val zone = when {
+            y < height * 0.2f -> viewModel.tapZoneTop
+            y > height * 0.8f -> viewModel.tapZoneBottom
+            x < width * 0.3f -> viewModel.tapZoneLeft
+            x > width * 0.7f -> viewModel.tapZoneRight
+            else -> viewModel.tapZoneCenter
+        }
+
+        executeTapZoneAction(zone)
+    }
+
+    private fun executeTapZoneAction(action: String) {
+        when (action) {
+            "Prev Chapter" -> {
+                if (viewModel.currentIndex > 0) {
+                    viewModel.seekToChapter(viewModel.currentIndex - 1)
+                }
+            }
+            "Next Chapter" -> {
+                if (viewModel.currentIndex + 1 < viewModel.book.size()) {
+                    viewModel.seekToChapter(viewModel.currentIndex + 1)
+                }
+            }
+            "Toggle UI" -> {
+                viewModel.switchVisibility()
+            }
+            "Toggle TTS" -> {
+                if (viewModel.isTTSRunning()) {
+                    viewModel.pausePlayTTS()
+                } else {
+                    viewModel.startTTS()
+                }
+            }
+            "Scroll Up" -> {
+                binding.realText.smoothScrollBy(0, -binding.realText.height / 2)
+            }
+            "Scroll Down" -> {
+                binding.realText.smoothScrollBy(0, binding.realText.height / 2)
+            }
+        }
     }
 
     private fun showThemePicker() {

@@ -186,27 +186,6 @@ class SubSettingsFragment : Fragment() {
                     val destApk   = File(pluginsDir, "$destFileName.apk")
                     val destJson  = File(pluginsDir, "$destFileName.json")
 
-                    // Legacy cleanup
-                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
-                    pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
-                        try {
-                            val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
-                            val isStale = existingMeta.pluginId == bundleId || existingMeta.mainClasses?.any { oldClass ->
-                                val newName = oldClass.split(".").last()
-                                existingMeta.pluginId.replace("_", " ").equals(newName, ignoreCase = true)
-                            } ?: false
-                            if (isStale) {
-                                val baseName = jsonFile.nameWithoutExtension
-                                val staleApk = File(pluginsDir, "$baseName.apk")
-                                val staleDex = File(pluginsDir, "$baseName.dex")
-                                PluginManager.removeCachesForPath(staleApk.absolutePath)
-                                staleApk.delete()
-                                staleDex.delete()
-                                jsonFile.delete()
-                            }
-                        } catch (_: Exception) {}
-                    }
-
                     ctx.contentResolver.openInputStream(uri)?.use { input ->
                         destApk.outputStream().use { out -> input.copyTo(out) }
                     }
@@ -249,6 +228,34 @@ class SubSettingsFragment : Fragment() {
                         destApk.delete()
                         activity?.runOnUiThread { showToast(getString(R.string.import_provider_apk_none_found)) }
                         return@ioSafe
+                    }
+
+                    // Legacy cleanup - clean up old versions with same bundleId, matching names, or overlapping classes
+                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+                    pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
+                        try {
+                            val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
+                            val hasOverlap = existingMeta.mainClasses?.any { foundClasses.contains(it) } ?: false
+                            val isStale = existingMeta.pluginId == bundleId || hasOverlap || existingMeta.mainClasses?.any { oldClass ->
+                                val newName = oldClass.split(".").last()
+                                existingMeta.pluginId.replace("_", " ").equals(newName, ignoreCase = true)
+                            } ?: false
+                            if (isStale) {
+                                val baseName = jsonFile.nameWithoutExtension
+                                val staleApk = File(pluginsDir, "$baseName.apk")
+                                val staleDex = File(pluginsDir, "$baseName.dex")
+                                
+                                // Unload old classes to clear them from active registry
+                                existingMeta.mainClasses?.forEach { className ->
+                                    PluginManager.unloadPlugin(className)
+                                }
+                                
+                                PluginManager.removeCachesForPath(staleApk.absolutePath)
+                                staleApk.delete()
+                                staleDex.delete()
+                                jsonFile.delete()
+                            }
+                        } catch (_: Exception) {}
                     }
 
                     val meta = PluginItem(
@@ -524,6 +531,29 @@ class SubSettingsFragment : Fragment() {
 
             "provider_apk_import_key" -> {
                 providerApkPicker.launch(arrayOf("application/vnd.android.package-archive", "*/*"))
+            }
+
+            "manage_hidden_providers_key" -> {
+                showManageHiddenProviders(context)
+            }
+
+            "clear_all_providers_key" -> {
+                val ctx = context ?: return
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(ctx, R.style.AlertDialogCustom)
+                    .setTitle("Clear All Providers")
+                    .setMessage("Are you sure you want to delete all imported provider APKs and metadata? This cannot be undone.")
+                    .setCancelable(true)
+                    .setPositiveButton("Clear") { dialog, _ ->
+                        dialog.dismiss()
+                        ioSafe {
+                            PluginManager.deleteAllPlugins(ctx)
+                            activity?.runOnUiThread {
+                                showToast("All providers cleared!")
+                            }
+                        }
+                    }
+                    .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+                    .show()
             }
 
             "cloudflare_resolve_manual" -> {

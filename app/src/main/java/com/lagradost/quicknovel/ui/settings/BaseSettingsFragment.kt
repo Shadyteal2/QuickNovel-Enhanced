@@ -97,15 +97,46 @@ fun showSearchProviders(context: Context?) {
             getString(R.string.search_providers),
             {}) { list ->
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-            settingsManager.edit {
-                putStringSet(
-                    getString(R.string.search_providers_list_key),
-                    list.map { apiNames[it] }.toSet()
-                )
+            // Use commit() (synchronous) instead of apply() so the pref is written
+            // before updateProvidersActive reads it back. Using apply() causes a race
+            // where the old value is returned, making the filter dialog a no-op.
+            settingsManager.edit().putStringSet(
+                getString(R.string.search_providers_list_key),
+                list.map { apiNames[it] }.toSet()
+            ).commit()
+            com.lagradost.quicknovel.util.Apis.updateProvidersActive(this)
+        }
+    }
+}
+
+fun showManageHiddenProviders(context: Context?) {
+    if (context == null) return
+    com.lagradost.quicknovel.util.Coroutines.ioSafe {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+        val hidden = settingsManager.getStringSet("hidden_providers", emptySet())?.toMutableSet() ?: mutableSetOf()
+        
+        com.lagradost.quicknovel.CommonActivity.activity?.runOnUiThread {
+            if (hidden.isEmpty()) {
+                com.lagradost.quicknovel.CommonActivity.showToast("No providers are currently hidden")
+                return@runOnUiThread
             }
-            val settings = getApiSettings()
-            providersActive.clear()
-            providersActive.addAll(settings)
+            
+            val list = hidden.toList().sorted()
+            com.lagradost.quicknovel.CommonActivity.activity?.showMultiDialog(
+                list,
+                list.mapIndexed { index, _ -> index }.toList(),
+                "Hidden Providers (Uncheck to Unhide)",
+                {}
+            ) { selectedIndices ->
+                com.lagradost.quicknovel.util.Coroutines.ioSafe {
+                    val keptHidden = selectedIndices.map { list[it] }.toSet()
+                    settingsManager.edit().putStringSet("hidden_providers", keptHidden).commit()
+                    com.lagradost.quicknovel.util.Apis.updateProvidersActive(context)
+                    com.lagradost.quicknovel.CommonActivity.activity?.runOnUiThread {
+                        com.lagradost.quicknovel.CommonActivity.showToast("Hidden providers updated!")
+                    }
+                }
+            }
         }
     }
 }
@@ -219,27 +250,109 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                              jsonUris.add(uri)
                          }
                      }
-                     
+
+                     // ── Copy APKs with stale deduplication ──────────────────────────
+                     // Before placing each new APK, scan the DEX for concrete MainAPI
+                     // subclasses and remove any existing plugin bundles that share at
+                     // least one class name. This prevents duplicate providers when a
+                     // developer re-imports an updated bundle via this picker.
+                     val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
                      apkUris.forEach { uri ->
                          val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                              val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                              cursor.moveToFirst()
                              cursor.getString(nameIndex)
                          } ?: "plugin.apk"
+
+                         // Copy to a temp file first so we can scan it safely
+                         val tempApk = File(context.cacheDir, "temp_pluginpicker_${System.currentTimeMillis()}.apk")
                          context.contentResolver.openInputStream(uri)?.use { input ->
-                             val target = File(pluginsDir, fileName)
-                             if (target.exists()) target.delete()
+                             tempApk.outputStream().use { out -> input.copyTo(out) }
+                         }
+                         tempApk.setReadOnly()
+
+                         // Scan DEX for concrete MainAPI subclasses
+                         val foundClasses = mutableSetOf<String>()
+                         try {
+                             @Suppress("DEPRECATION")
+                             val dex = dalvik.system.DexFile(tempApk.absolutePath)
+                             val loader = DexClassLoader(
+                                 tempApk.absolutePath,
+                                 context.codeCacheDir.absolutePath,
+                                 null,
+                                 context.classLoader
+                             )
+                             val entries = dex.entries()
+                             while (entries.hasMoreElements()) {
+                                 val className = entries.nextElement()
+                                 if (className.startsWith("android.") ||
+                                     className.startsWith("kotlin.") ||
+                                     className.startsWith("kotlinx.") ||
+                                     className.startsWith("java.")) continue
+                                 try {
+                                     val clazz = loader.loadClass(className)
+                                     if (com.lagradost.quicknovel.MainAPI::class.java.isAssignableFrom(clazz) &&
+                                         !java.lang.reflect.Modifier.isAbstract(clazz.modifiers) &&
+                                         !clazz.isInterface) {
+                                         foundClasses.add(className)
+                                     }
+                                 } catch (_: Throwable) { }
+                             }
+                             dex.close()
+                         } catch (e: Exception) {
+                             logError(e)
+                         }
+
+                         // Remove stale bundles whose class sets intersect with this APK
+                         if (foundClasses.isNotEmpty()) {
+                             pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
+                                 try {
+                                     val existingMeta = mapper.readValue(jsonFile.readText(), com.lagradost.quicknovel.util.PluginItem::class.java)
+                                     val existingClasses = (existingMeta.mainClasses ?: listOfNotNull(existingMeta.mainClass)).toSet()
+                                     if (foundClasses.any { it in existingClasses }) {
+                                         val base = jsonFile.nameWithoutExtension
+                                         val staleApk = File(pluginsDir, "$base.apk")
+                                         val staleDex = File(pluginsDir, "$base.dex")
+                                         PluginManager.removeCachesForPath(staleApk.absolutePath)
+                                         staleApk.delete()
+                                         staleDex.delete()
+                                         jsonFile.delete()
+                                         android.util.Log.i("PluginPicker", "Removed stale bundle: $base (replaced by $fileName)")
+                                     }
+                                 } catch (_: Exception) { }
+                             }
+                         }
+
+                         // Move temp to final destination
+                         val target = File(pluginsDir, fileName)
+                         if (!tempApk.renameTo(target)) {
+                             tempApk.copyTo(target, overwrite = true)
+                             tempApk.delete()
+                         }
+                         target.setReadOnly()
+                         PluginManager.removeCachesForPath(target.absolutePath)
+                     }
+
+                     // Copy companion JSON files (these are user-supplied metadata)
+                     jsonUris.forEach { uri ->
+                         val jsonName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                             val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                             cursor.moveToFirst()
+                             cursor.getString(nameIndex)
+                         } ?: "plugin.json"
+                         context.contentResolver.openInputStream(uri)?.use { input ->
+                             val target = File(pluginsDir, jsonName)
                              target.outputStream().use { output -> input.copyTo(output) }
                          }
                      }
-                     // Simplification: set isManualImport in JSON if provided or just load all
+
                      PluginManager.loadAllPlugins(context)
                      activity?.runOnUiThread { showToast("Plugins updated!") }
                   } catch (e: Exception) {
                      logError(e)
                  }
              }
-        }
+         }
 
     /**
      * User-facing picker: select a single provider APK from storage.
@@ -270,50 +383,20 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                         .removeSuffix(".apk").removeSuffix(".dex")
                         .replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
 
-                    val timestamp = System.currentTimeMillis()
-                    val destFileName = "${bundleId}_$timestamp"
-                    val pluginsDir = PluginManager.getPluginsDir(ctx)
-                    val destApk   = File(pluginsDir, "$destFileName.apk")
-                    val destJson  = File(pluginsDir, "$destFileName.json")
-
-                    // ── 3. Legacy cleanup — remove stale bundles for these providers ──
-                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
-                    pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
-                        try {
-                            val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
-                            val isStale = existingMeta.pluginId == bundleId || existingMeta.mainClasses?.any { oldClass ->
-                                val newName = oldClass.split(".").last()
-                                existingMeta.pluginId.replace("_", " ").equals(newName, ignoreCase = true)
-                            } ?: false
-                            if (isStale) {
-                                val baseName = jsonFile.nameWithoutExtension
-                                val staleApk = File(pluginsDir, "$baseName.apk")
-                                val staleDex = File(pluginsDir, "$baseName.dex")
-                                PluginManager.removeCachesForPath(staleApk.absolutePath)
-                                staleApk.delete()
-                                staleDex.delete()
-                                jsonFile.delete()
-                                android.util.Log.i("PluginImport", "Removed stale bundle: $baseName → replaced by $destFileName")
-                            }
-                        } catch (_: Exception) { /* corrupt json */ }
-                    }
-
-                    // ── 4. Copy APK bytes to plugins dir ─────────────────────────
+                    // ── 3. Copy APK bytes to a temp file first for safe scanning ──
+                    val tempApk = File(ctx.cacheDir, "temp_import_${System.currentTimeMillis()}.apk")
                     ctx.contentResolver.openInputStream(uri)?.use { input ->
-                        destApk.outputStream().use { out -> input.copyTo(out) }
+                        tempApk.outputStream().use { out -> input.copyTo(out) }
                     }
-                    destApk.setReadOnly() // DexClassLoader requires read-only on API 26+
+                    tempApk.setReadOnly() // DexClassLoader requires read-only on API 26+
 
-                    // Clear old classloader caches so the new file loads fresh
-                    PluginManager.removeCachesForPath(destApk.absolutePath)
-
-                    // ── 5. Scan DEX for all concrete MainAPI subclasses ───────────
+                    // ── 4. Scan DEX from temp file for all concrete MainAPI subclasses ──
                     val foundClasses = mutableListOf<String>()
                     try {
                         @Suppress("DEPRECATION")
-                        val dex = DexFile(destApk.absolutePath)
+                        val dex = DexFile(tempApk.absolutePath)
                         val loader = DexClassLoader(
-                            destApk.absolutePath,
+                            tempApk.absolutePath,
                             ctx.codeCacheDir.absolutePath,
                             null,
                             ctx.classLoader
@@ -341,28 +424,61 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                         logError(e)
                     }
 
-                    // ── 6. Abort if nothing was found ─────────────────────────────
+                    // ── 5. Abort if nothing was found ─────────────────────────────
                     if (foundClasses.isEmpty()) {
-                        destApk.delete()
+                        tempApk.delete()
                         activity?.runOnUiThread { showToast(getString(R.string.import_provider_apk_none_found)) }
                         return@ioSafe
                     }
 
-                    // ── 7. Write companion JSON  (isManualImport = true) ──────────
-                    //      Sync worker checks this flag and will SKIP auto-update for
-                    //      manually imported APKs, so the two paths never conflict.
+                    // ── 6. Stale cleanup using class names intersection ───────────
+                    val timestamp = System.currentTimeMillis()
+                    val destFileName = "${bundleId}_$timestamp"
+                    val pluginsDir = PluginManager.getPluginsDir(ctx)
+                    val destApk   = File(pluginsDir, "$destFileName.apk")
+                    val destJson  = File(pluginsDir, "$destFileName.json")
+
+                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+                    val foundClassesSet = foundClasses.toSet()
+                    pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
+                        try {
+                            val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
+                            val existingClasses = (existingMeta.mainClasses ?: listOfNotNull(existingMeta.mainClass)).toSet()
+                            val isStale = foundClassesSet.any { it in existingClasses }
+                            if (isStale) {
+                                val baseName = jsonFile.nameWithoutExtension
+                                val staleApk = File(pluginsDir, "$baseName.apk")
+                                val staleDex = File(pluginsDir, "$baseName.dex")
+                                PluginManager.removeCachesForPath(staleApk.absolutePath)
+                                staleApk.delete()
+                                staleDex.delete()
+                                jsonFile.delete()
+                                android.util.Log.i("PluginImport", "Removed stale bundle: $baseName → replaced by $destFileName")
+                            }
+                        } catch (_: Exception) { /* corrupt json */ }
+                    }
+
+                    // ── 7. Move temp APK to plugins dir and clear its old caches ──
+                    if (!tempApk.renameTo(destApk)) {
+                        tempApk.copyTo(destApk, overwrite = true)
+                        tempApk.delete()
+                    }
+                    destApk.setReadOnly()
+                    PluginManager.removeCachesForPath(destApk.absolutePath)
+
+                    // ── 8. Write companion JSON ───────────────────────────────────
                     val meta = PluginItem(
                         pluginId      = bundleId,
                         name          = bundleId,
                         version       = 1,
                         minApiVersion = API_VERSION,
                         mainClasses   = foundClasses,
-                        url           = "local://$bundleId",  // placeholder; sync skips isManualImport
+                        url           = "local://$bundleId",
                         isManualImport = true
                     )
                     destJson.writeText(com.lagradost.quicknovel.util.AppUtils.mapper.writeValueAsString(meta))
 
-                    // ── 8. Hot-reload so providers appear immediately ──────────────
+                    // ── 9. Hot-reload so providers appear immediately ──────────────
                     PluginManager.loadAllPlugins(ctx)
                     activity?.runOnUiThread {
                         showToast(getString(R.string.import_provider_apk_success_format, foundClasses.size))
@@ -632,7 +748,14 @@ abstract class BaseSettingsFragment : PreferenceFragmentCompat() {
                 .show()
             true // Allow the pref to be saved regardless
         }
+
+        // Manage Hidden Providers
+        getPref("manage_hidden_providers_key")?.setOnPreferenceClickListener {
+            showManageHiddenProviders(context)
+            true
+        }
     }
+
 
     private fun Preference.appThemeListener(settingsManager: android.content.SharedPreferences) {
         this.setOnPreferenceClickListener {

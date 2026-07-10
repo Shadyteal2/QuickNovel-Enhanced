@@ -608,6 +608,8 @@ class ReadActivityViewModel : ViewModel() {
         MutableLiveData<String>(null)
     val title: LiveData<String> = _title
 
+    val lastReadBreadcrumbLive = MutableLiveData<String?>()
+
     private val _chapterTile = MutableLiveData<UiText>()
     val chapterTile: LiveData<UiText> get() = _chapterTile
 
@@ -692,6 +694,13 @@ class ReadActivityViewModel : ViewModel() {
 
     var desiredIndex: ScrollIndex? = null
     var desiredTTSIndex: ScrollIndex? = null
+
+    @kotlin.jvm.Volatile
+    var programmaticTarget: Int? = null
+
+    fun onUserInteraction() {
+        programmaticTarget = null
+    }
 
     private fun updateChapters() {
         for (idx in chaptersTitlesInternal.size until book.size()) {
@@ -856,6 +865,9 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     fun updateReadArea(seekToDesired: Boolean = false) {
+        if (seekToDesired) {
+            programmaticTarget = currentIndex
+        }
         val showOriginal = isShowingOriginalLive.value ?: false
         val cIndex = currentIndex
         val chapters = ArrayList<SpanDisplay>()
@@ -1816,6 +1828,23 @@ class ReadActivityViewModel : ViewModel() {
             is Resource.Success -> {
                 init(loadedBook.value, context)
 
+                val lastAccessTime = getKey<Long>("reader_book_last_access_time", book.title())
+                val lastChapterName = getKey<String>(EPUB_CURRENT_POSITION_CHAPTER, book.title())
+                if (lastAccessTime != null && lastChapterName != null) {
+                    val diff = System.currentTimeMillis() - lastAccessTime
+                    if (diff > 24 * 60 * 60 * 1000L) { // > 24 hours
+                        val days = diff / (24 * 60 * 60 * 1000L)
+                        val hours = diff / (60 * 60 * 1000L)
+                        val friendlyTime = when {
+                            days >= 1 -> "$days day${if (days > 1) "s" else ""} ago"
+                            hours >= 1 -> "$hours hour${if (hours > 1) "s" else ""} ago"
+                            else -> "a while ago"
+                        }
+                        lastReadBreadcrumbLive.postValue("Last read: $lastChapterName ($friendlyTime)")
+                    }
+                }
+                setKey("reader_book_last_access_time", book.title(), System.currentTimeMillis())
+
                 // Restore translation active state based on whether mlSettings is valid
                 isTranslationActive = mlSettings.isValid()
                 if (isTranslationActive) {
@@ -2350,6 +2379,7 @@ class ReadActivityViewModel : ViewModel() {
             "${book.title()}/${scrollIndex.index}",
             System.currentTimeMillis()
         )
+        setKey("reader_book_last_access_time", book.title(), System.currentTimeMillis())
 
         setKey(
             EPUB_CURRENT_POSITION_SCROLL_CHAR,
@@ -2425,8 +2455,18 @@ class ReadActivityViewModel : ViewModel() {
         chapterPaddingTop = minOf(10, maxOf(chapterPaddingTop, (last - first) + 1))
 
         val current = currentIndex
+        val save = visibility.firstFullyVisible ?: visibility.firstVisible ?: visibility.firstInMemory
 
-        val save = visibility.firstFullyVisible ?: visibility.firstInMemory
+        // Block feedback loop: ignore scroll events if we are seeking programmatically and haven't reached the target index yet.
+        val target = programmaticTarget
+        if (target != null) {
+            if (save.index != target) {
+                return
+            } else {
+                programmaticTarget = null
+            }
+        }
+
         desiredTTSIndex = visibility.firstFullyVisibleUnderLine?.toScroll()
         changeIndex(save.toScroll())
 
@@ -2532,6 +2572,14 @@ class ReadActivityViewModel : ViewModel() {
         false,
         Boolean::class,
         bionicReadingLive
+    )
+
+    val bionicBoldRatioLive: MutableLiveData<Float> = MutableLiveData(null)
+    var bionicBoldRatio by PreferenceDelegateLiveView(
+        EPUB_TEXT_BIONIC_RATIO,
+        0.4f,
+        Float::class,
+        bionicBoldRatioLive
     )
 
     val autoScrollLive: MutableLiveData<Boolean> = MutableLiveData(null)
@@ -2757,6 +2805,11 @@ class ReadActivityViewModel : ViewModel() {
         EPUB_SHOW_READER_PROGRESS, true, Boolean::class, showReaderProgressLive
     )
 
+    val showProgressOnlyOnTapLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var showProgressOnlyOnTap by PreferenceDelegateLiveView(
+        EPUB_SHOW_PROGRESS_ONLY_ON_TAP, false, Boolean::class, showProgressOnlyOnTapLive
+    )
+
     val paginatedSwipeEnabledLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var paginatedSwipeEnabled by PreferenceDelegateLiveView(
         ReaderPrefs.PAGINATED_SWIPE_ENABLED, false, Boolean::class, paginatedSwipeEnabledLive
@@ -2781,6 +2834,46 @@ class ReadActivityViewModel : ViewModel() {
         }
         return emptyList()
     }
+
+    val pinchFontEnabledLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var pinchFontEnabled by PreferenceDelegateLiveView(
+        ReaderPrefs.PINCH_FONT_ENABLED, true, Boolean::class, pinchFontEnabledLive
+    )
+
+    val swipeBrightnessEnabledLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var swipeBrightnessEnabled by PreferenceDelegateLiveView(
+        ReaderPrefs.SWIPE_BRIGHTNESS_ENABLED, true, Boolean::class, swipeBrightnessEnabledLive
+    )
+
+    val tapZonesEnabledLive: MutableLiveData<Boolean> = MutableLiveData(null)
+    var tapZonesEnabled by PreferenceDelegateLiveView(
+        ReaderPrefs.TapZones.ENABLED, false, Boolean::class, tapZonesEnabledLive
+    )
+
+    val tapZoneLeftLive: MutableLiveData<String> = MutableLiveData(null)
+    var tapZoneLeft by PreferenceDelegateLiveView(
+        ReaderPrefs.TapZones.ZONE_LEFT, "Prev Chapter", String::class, tapZoneLeftLive
+    )
+
+    val tapZoneRightLive: MutableLiveData<String> = MutableLiveData(null)
+    var tapZoneRight by PreferenceDelegateLiveView(
+        ReaderPrefs.TapZones.ZONE_RIGHT, "Next Chapter", String::class, tapZoneRightLive
+    )
+
+    val tapZoneTopLive: MutableLiveData<String> = MutableLiveData(null)
+    var tapZoneTop by PreferenceDelegateLiveView(
+        ReaderPrefs.TapZones.ZONE_TOP, "Scroll Up", String::class, tapZoneTopLive
+    )
+
+    val tapZoneCenterLive: MutableLiveData<String> = MutableLiveData(null)
+    var tapZoneCenter by PreferenceDelegateLiveView(
+        ReaderPrefs.TapZones.ZONE_CENTER, "Toggle UI", String::class, tapZoneCenterLive
+    )
+
+    val tapZoneBottomLive: MutableLiveData<String> = MutableLiveData(null)
+    var tapZoneBottom by PreferenceDelegateLiveView(
+        ReaderPrefs.TapZones.ZONE_BOTTOM, "Scroll Down", String::class, tapZoneBottomLive
+    )
 
     val screenAwakeLive: MutableLiveData<Boolean> = MutableLiveData(null)
     var screenAwake by PreferenceDelegateLiveView(

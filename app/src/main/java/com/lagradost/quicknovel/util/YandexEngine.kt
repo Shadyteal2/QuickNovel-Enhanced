@@ -20,8 +20,6 @@ class YandexEngine : TranslationEngine {
     private var cachedSid: String? = null
     private var sidTimestamp: Long = 0L
     private val SID_EXPIRY_MS = 10 * 60 * 1000 // Cache SID for 10 minutes
-    private val SPOOFED_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
     private suspend fun getSid(): String? {
         val now = System.currentTimeMillis()
         if (cachedSid != null && (now - sidTimestamp < SID_EXPIRY_MS)) {
@@ -32,7 +30,7 @@ class YandexEngine : TranslationEngine {
             MainActivity.app.get(
                 url = "https://translate.yandex.com/",
                 headers = mapOf(
-                    "User-Agent" to SPOOFED_USER_AGENT,
+                    "User-Agent" to USER_AGENT,
                     "Accept-Language" to "en-US,en;q=0.9"
                 )
             )
@@ -81,7 +79,7 @@ class YandexEngine : TranslationEngine {
 
         val url = "https://translate.yandex.net/api/v1/tr.json/translate?id=${sid}-0-0&srv=tr-text&lang=${request.from}-${request.to}&reason=auto&format=text"
         val headers = mapOf(
-            "User-Agent" to SPOOFED_USER_AGENT,
+            "User-Agent" to USER_AGENT,
             "Referer" to "https://translate.yandex.com/",
             "Host" to "translate.yandex.net",
             "Origin" to "https://translate.yandex.com"

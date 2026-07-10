@@ -9,6 +9,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +35,8 @@ import androidx.compose.material3.carousel.CarouselDefaults
 import com.lagradost.quicknovel.ui.theme.rememberHighQualityRequest
 import com.lagradost.quicknovel.ui.theme.disallowParentIntercept
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
@@ -332,16 +335,6 @@ fun PremiumSearchBar(
                 }
             }
 
-            IconButton(
-                onClick = onFilterClick,
-                modifier = Modifier.padding(end = 4.dp)
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_baseline_tune_24),
-                    contentDescription = stringResource(id = R.string.change_providers_descript),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
         }
     }
 }
@@ -379,6 +372,7 @@ fun HomeProvidersGrid(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ProviderCard(
     api: MainAPI,
@@ -386,6 +380,14 @@ fun ProviderCard(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val settingsManager = remember { PreferenceManager.getDefaultSharedPreferences(context) }
+    
+    val pinnedSet by com.lagradost.quicknovel.util.Apis.pinnedProvidersLiveData.observeAsState(emptySet())
+    val isPinned = remember(pinnedSet, api.name) { pinnedSet.contains(api.name) }
+    
+    var showMenu by remember { mutableStateOf(false) }
+    
     val iconData = remember(api) {
         if (api.pluginContext != null && api.iconId != null && api.iconId != 0) {
             try {
@@ -401,71 +403,143 @@ fun ProviderCard(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (isGrid) Modifier.aspectRatio(1f) else Modifier.height(64.dp))
-            .glassCard(shape = RoundedCornerShape(16.dp))
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        if (isGrid) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                AsyncImage(
-                    model = rememberImageRequest(data = iconData),
-                    contentDescription = api.name,
+    Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (isGrid) Modifier.aspectRatio(1f) else Modifier.height(64.dp))
+                .glassCard(shape = RoundedCornerShape(16.dp))
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { showMenu = true }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isGrid) {
+                Column(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop,
-                    imageLoader = SingletonImageLoader.get(context)
-                )
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(contentAlignment = Alignment.TopEnd) {
+                        AsyncImage(
+                            model = rememberImageRequest(data = iconData),
+                            contentDescription = api.name,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop,
+                            imageLoader = SingletonImageLoader.get(context)
+                        )
+                        if (isPinned) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_baseline_star_24),
+                                contentDescription = "Pinned",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .offset(x = 4.dp, y = (-4).dp)
+                            )
+                        }
+                    }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = api.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = rememberImageRequest(data = iconData),
-                    contentDescription = api.name,
+                    Text(
+                        text = api.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            } else {
+                Row(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp)),
-                    contentScale = ContentScale.Crop,
-                    imageLoader = SingletonImageLoader.get(context)
-                )
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(contentAlignment = Alignment.TopEnd) {
+                        AsyncImage(
+                            model = rememberImageRequest(data = iconData),
+                            contentDescription = api.name,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp)),
+                            contentScale = ContentScale.Crop,
+                            imageLoader = SingletonImageLoader.get(context)
+                        )
+                        if (isPinned) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_baseline_star_24),
+                                contentDescription = "Pinned",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .offset(x = 2.dp, y = (-2).dp)
+                            )
+                        }
+                    }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
 
-                Text(
-                    text = api.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                    Text(
+                        text = api.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(if (isPinned) "Unpin from Top" else "Pin to Top") },
+                onClick = {
+                    showMenu = false
+                    scope.launch {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val currentPinned = settingsManager.getStringSet("pinned_providers", emptySet())?.toMutableSet() ?: mutableSetOf()
+                            if (currentPinned.contains(api.name)) {
+                                currentPinned.remove(api.name)
+                            } else {
+                                currentPinned.add(api.name)
+                            }
+                            settingsManager.edit().putStringSet("pinned_providers", currentPinned).commit()
+                            com.lagradost.quicknovel.util.Apis.updateProvidersActive(context)
+                        }
+                    }
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Hide Provider") },
+                onClick = {
+                    showMenu = false
+                    scope.launch {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val currentHidden = settingsManager.getStringSet("hidden_providers", emptySet())?.toMutableSet() ?: mutableSetOf()
+                            currentHidden.add(api.name)
+                            settingsManager.edit().putStringSet("hidden_providers", currentHidden).commit()
+                            com.lagradost.quicknovel.util.Apis.updateProvidersActive(context)
+                        }
+                        android.widget.Toast.makeText(
+                            context,
+                            "${api.name} hidden. Restore in Advanced settings.",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            )
         }
     }
 }

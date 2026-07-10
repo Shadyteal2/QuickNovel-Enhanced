@@ -259,22 +259,29 @@ class MainActivity : AppCompatActivity(), TabNavigator {
 
                     // ── 6. Legacy cleanup — remove stale bundles for these providers ──
                     // On existing installs, providers may be stored under an old filename-based
-                    // id (e.g. "Ranobes_v1"). We scan every JSON file and remove any that
-                    // cover the same provider names as the APK we are importing.
+                    // id (e.g. "Ranobes_v1") or as part of a multi-provider bundle pack.
+                    // We scan every JSON file and remove any that share any of the same
+                    // class names as the APK we are importing, or match the name/pluginId.
                     // This is the silent fix that saves users from having to clear app data.
+                    val newClassesSet = foundProviders.map { it.className }.toSet()
                     pluginsDir.listFiles { _, n -> n.endsWith(".json") }?.forEach { jsonFile ->
                         // Never delete the destination file we're about to write
                         if (jsonFile.absolutePath == destJson.absolutePath) return@forEach
                         try {
                             val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
-                            // Match: if the stored pluginId or name equals any new provider name
-                            // (accounting for underscores used in old filename-based IDs)
-                            val isStale = providerNames.any { newName ->
+                            val existingClasses = (existingMeta.mainClasses ?: listOfNotNull(existingMeta.mainClass)).toSet()
+                            
+                            // Match 1: Class name intersection (most reliable)
+                            val hasClassOverlap = newClassesSet.any { it in existingClasses }
+                            
+                            // Match 2: Stored pluginId or name equals any new provider name
+                            val isStaleNameOrId = providerNames.any { newName ->
                                 existingMeta.name.equals(newName, ignoreCase = true) ||
                                 existingMeta.pluginId.equals(newName, ignoreCase = true) ||
                                 existingMeta.pluginId.replace("_", " ").equals(newName, ignoreCase = true)
                             }
-                            if (isStale) {
+                            
+                            if (hasClassOverlap || isStaleNameOrId) {
                                 val baseName = jsonFile.nameWithoutExtension
                                 val staleApk = File(pluginsDir, "$baseName.apk")
                                 val staleDex = File(pluginsDir, "$baseName.dex")
@@ -1415,12 +1422,7 @@ class MainActivity : AppCompatActivity(), TabNavigator {
             }
         }
 
-        val apiNames = getApiSettings()
-        providersActive.clear()
-        providersActive.addAll(apiNames)
-        val edit = settingsManager.edit()
-        edit.putStringSet(getString(R.string.search_providers_list_key), providersActive)
-        edit.apply()
+        com.lagradost.quicknovel.util.Apis.updateProvidersActive(this)
 
         thread {
             val keys = getKeys(DOWNLOAD_FOLDER)

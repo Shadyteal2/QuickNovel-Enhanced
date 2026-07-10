@@ -1,0 +1,618 @@
+1) When switching between providers - 
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  HEAP ANALYSIS RESULT
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  1 APPLICATION LEAKS
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  References underlined with "~~~" are likely causes.
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Learn more at https://squ.re/leaks.
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  2103484 bytes retained by leaking objects
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Signature: 36fd00f02abd398c9bfd88b62c3df647adc034f0
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ┬───
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │ GC Root: Thread object
+2026-07-02 16:15:54.661 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.Thread instance
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: NO (the main thread always runs)
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Thread name: 'main'
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    ↓ Thread.threadLocals
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │             ~~~~~~~~~~~~
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap instance
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 16.2 kB in 117 objects
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap.table
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │                                 ~~~~~
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap$Entry[] array
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 16.2 kB in 116 objects
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap$Entry[39]
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │                                      ~~~~
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap$Entry instance
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 28 B in 1 objects
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap$Entry.value
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │                                       ~~~~~
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ├─ android.animation.AnimationHandler instance
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.1 MB in 24522 objects
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    ↓ AnimationHandler.mAnimationCallbacks
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │                       ~~~~~~~~~~~~~~~~~~~
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ├─ java.util.ArrayList instance
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.1 MB in 24512 objects
+2026-07-02 16:15:54.662 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ArrayList[0]
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │               ~~~
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ├─ android.animation.ObjectAnimator instance
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.1 MB in 24510 objects
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mListeners = null
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mPropertyName = alpha
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mProperty = null
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mInitialized = true
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mStarted = true
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mRunning = true
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mAnimationEndRequested = false
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mDuration = 5000
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mStartDelay = 0
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mRepeatCount = INFINITE (-1)
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mRepeatMode = REVERSE (2)
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ObjectAnimator.mTarget
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │                     ~~~~~~~
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ├─ android.view.View instance
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: YES (View.mContext references a destroyed activity)
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.1 MB in 24496 objects
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    View is part of a window view hierarchy
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    View.mAttachInfo is null (view detached)
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    View.mID = R.id.reader_halo
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    View.mWindowAttachCount = 1
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    mContext instance of com.lagradost.quicknovel.ReadActivity2 with mDestroyed = true
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  │    ↓ View.mContext
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ╰→ com.lagradost.quicknovel.ReadActivity2 instance
+2026-07-02 16:15:54.663 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ​     Leaking: YES (ObjectWatcher was watching this because com.lagradost.quicknovel.ReadActivity2 received
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ​     Activity#onDestroy() callback and Activity#mDestroyed is true)
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ​     Retaining 235.3 kB in 3952 objects
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ​     key = 2329e7a7-71f5-4604-9b79-dc923aad8910
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ​     watchDurationMillis = 5671
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ​     retainedDurationMillis = 670
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ​     mApplication instance of com.lagradost.quicknovel.BaseApplication
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ​     mBase instance of androidx.appcompat.view.ContextThemeWrapper
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  0 LIBRARY LEAKS
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  A Library Leak is a leak caused by a known bug in 3rd party code that you do not have control over.
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  See https://square.github.io/leakcanary/fundamentals-how-leakcanary-works/#4-categorizing-leaks
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  0 UNREACHABLE OBJECTS
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  An unreachable object is still in memory but LeakCanary could not find a strong reference path
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  from GC roots.
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  METADATA
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Please include this in bug reports and Stack Overflow questions.
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Build.VERSION.SDK_INT: 36
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Build.MANUFACTURER: Nothing
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  LeakCanary version: 2.14
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  App process name: com.shady.neoqn.debug
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Class count: 40410
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Instance count: 574407
+2026-07-02 16:15:54.664 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Primitive array count: 227500
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Object array count: 73816
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Thread count: 102
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Heap total bytes: 53036368
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Bitmap count: 109
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Bitmap total bytes: 63194775
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Large bitmap count: 3
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Large bitmap total bytes: 50392067
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Db 1: open /data/user/0/com.shady.neoqn.debug/no_backup/androidx.work.workdb
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Db 2: open /data/user/0/com.shady.neoqn.debug/databases/quicknovel_database
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Db 3: open /data/user/0/com.shady.neoqn.debug/databases/com.google.android.datatransport.events
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Stats: LruCache[maxSize=3000,hits=162577,misses=445031,hitRate=26%]
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  RandomAccess[bytes=22841147,reads=445031,travel=371494743281,range=69213400,size=78154056]
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Heap dump reason: 5 retained objects, app is visible
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Analysis duration: 32294 ms
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Heap dump file path: /storage/emulated/0/Download/leakcanary-com.shady.neoqn.debug/2026-07-02_16-15-14_462.hprof
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Heap dump timestamp: 1782989154554
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  Heap dump duration: 3648 ms
+2026-07-02 16:15:54.665 25222-26759 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:15:54.671 25222-25301 WM-WorkerWrapper        com.shady.neoqn.debug                I  Worker result SUCCESS for Work [ id=7d38da81-6023-489b-88fb-794b4e8c26b8, tags={ leakcanary.internal.HeapAnalyzerWorker } ]
+2026-07-02 16:15:54.694 25222-25222 ady.neoqn.debug         com.shady.neoqn.debug                I  hiddenapi: Accessing hidden field Landroid/app/ActivityThread;->mServices:Landroid/util/ArrayMap; (runtime_flags=0, domain=platform, api=unsupported) from Lleakcanary/ServiceWatcher$activityThreadServices$2; (domain=app, TargetSdkVersion=35) using reflection: allowed
+2026-07-02 16:15:54.694 25222-25222 LeakCanary              com.shady.neoqn.debug                D  Watching instance of androidx.work.impl.background.systemjob.SystemJobService (androidx.work.impl.background.systemjob.SystemJobService received Service#onDestroy() callback) with key 10ddba5f-a718-4a4a-82b2-b395c4d2582f
+2026-07-02 16:15:59.889 25222-25243 LeakCanary              com.shady.neoqn.debug                D  Found 1 object retained, not dumping heap yet (app is visible & < 5 threshold)
+
+
+2) TTT usage - stopped it go back to library and open a novel in a provider - 
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  HEAP ANALYSIS RESULT
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  3 APPLICATION LEAKS
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  References underlined with "~~~" are likely causes.
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Learn more at https://squ.re/leaks.
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  128 bytes retained by leaking objects
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Signature: 099e7804c1433b5477fe40e3ebca5ffce0e9dd16
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ┬───
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │ GC Root: System class
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.content.res.ResourcesImpl class
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: NO (a class is never leaking)
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ static ResourcesImpl.mAppContext
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                           ~~~~~~~~~~~
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.app.ContextImpl instance
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 5.4 kB in 47 objects
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mOuterContext instance of com.lagradost.quicknovel.TTSNotificationService
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ContextImpl.mOuterContext is an instance of com.lagradost.quicknovel.TTSNotificationService
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ContextImpl.mOuterContext
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                  ~~~~~~~~~~~~~
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ╰→ com.lagradost.quicknovel.TTSNotificationService instance
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     Leaking: YES (ObjectWatcher was watching this because com.lagradost.quicknovel.TTSNotificationService received
+2026-07-02 16:17:47.550 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     Service#onDestroy() callback and Service not held by ActivityThread)
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     Retaining 128 B in 4 objects
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     key = cc66a3de-ab89-4c7d-9730-cdf37d647f74
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     watchDurationMillis = 7995
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     retainedDurationMillis = 2995
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     mApplication instance of com.lagradost.quicknovel.BaseApplication
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     mBase instance of android.app.ContextImpl
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  545808 bytes retained by leaking objects
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Signature: 36fd00f02abd398c9bfd88b62c3df647adc034f0
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ┬───
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │ GC Root: Thread object
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.Thread instance
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: NO (the main thread always runs)
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Thread name: 'main'
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ Thread.threadLocals
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │             ~~~~~~~~~~~~
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap instance
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 16.3 kB in 120 objects
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap.table
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                                 ~~~~~
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap$Entry[] array
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 16.3 kB in 119 objects
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap$Entry[40]
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                                      ~~~~
+2026-07-02 16:17:47.551 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap$Entry instance
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 28 B in 1 objects
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap$Entry.value
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                                       ~~~~~
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.animation.AnimationHandler instance
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.7 MB in 32762 objects
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ AnimationHandler.mAnimationCallbacks
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                       ~~~~~~~~~~~~~~~~~~~
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ java.util.ArrayList instance
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.7 MB in 32751 objects
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ArrayList[0]
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │               ~~~
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.animation.ObjectAnimator instance
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 546.2 kB in 8096 objects
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mListeners = null
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mPropertyName = alpha
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mProperty = null
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mInitialized = true
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mStarted = true
+2026-07-02 16:17:47.552 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mRunning = true
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mAnimationEndRequested = false
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mDuration = 5000
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mStartDelay = 0
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mRepeatCount = INFINITE (-1)
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mRepeatMode = REVERSE (2)
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ObjectAnimator.mTarget
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                     ~~~~~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.view.View instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: YES (View.mContext references a destroyed activity)
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 545.8 kB in 8082 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    View is part of a window view hierarchy
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    View.mAttachInfo is null (view detached)
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    View.mID = R.id.reader_halo
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    View.mWindowAttachCount = 1
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mContext instance of com.lagradost.quicknovel.ReadActivity2 with mDestroyed = true
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ View.mContext
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ╰→ com.lagradost.quicknovel.ReadActivity2 instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     Leaking: YES (ObjectWatcher was watching this because com.lagradost.quicknovel.ReadActivity2 received
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     Activity#onDestroy() callback and Activity#mDestroyed is true)
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     Retaining 60.7 kB in 1052 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     key = 6494fda6-bb88-4e4a-a729-b4bf063972f3
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     watchDurationMillis = 7232
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     retainedDurationMillis = 2231
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     mApplication instance of com.lagradost.quicknovel.BaseApplication
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     mBase instance of androidx.appcompat.view.ContextThemeWrapper
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  2129779 bytes retained by leaking objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Signature: 31f079a9fead5bb19aa1600856eba38cc9197b93
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ┬───
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │ GC Root: Global variable in native code
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.media.AudioManager$2 instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 544 B in 1 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Anonymous subclass of android.media.IAudioFocusDispatcher$Stub
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ AudioManager$2.this$0
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                     ~~~~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.media.AudioManager instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 3.9 kB in 59 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    mApplicationContext instance of com.lagradost.quicknovel.BaseApplication
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ AudioManager.mAudioFocusIdListenerMap
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                   ~~~~~~~~~~~~~~~~~~~~~~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ java.util.concurrent.ConcurrentHashMap instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 283 B in 5 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ ConcurrentHashMap["android.media.AudioManager@b42b567com.lagradost.quicknovel.
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    TTSSession$$ExternalSyntheticLambda0@356cf14"]
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.media.AudioManager$FocusRequestInfo instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 16 B in 1 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ AudioManager$FocusRequestInfo.mRequest
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                                    ~~~~~~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ android.media.AudioFocusRequest instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 116 B in 4 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ AudioFocusRequest.mFocusListener
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                        ~~~~~~~~~~~~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ com.lagradost.quicknovel.TTSSession$$ExternalSyntheticLambda0 instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 12 B in 1 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ TTSSession$$ExternalSyntheticLambda0.f$0
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                                           ~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ com.lagradost.quicknovel.TTSSession instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 434 B in 13 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    appContext instance of com.lagradost.quicknovel.BaseApplication
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ TTSSession.event
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                 ~~~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ├─ com.lagradost.quicknovel.ReadActivityViewModel$initTTSSession$1$1 instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Retaining 40 B in 1 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    Anonymous subclass of kotlin.jvm.internal.FunctionReferenceImpl
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │    ↓ CallableReference.receiver
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  │                        ~~~~~~~~
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ╰→ com.lagradost.quicknovel.ReadActivityViewModel instance
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     Leaking: YES (ObjectWatcher was watching this because com.lagradost.quicknovel.ReadActivityViewModel received
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     ViewModel#onCleared() callback)
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     Retaining 2.1 MB in 1980 objects
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     key = 3a390970-8746-4e51-9181-e405bfcfdf61
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     watchDurationMillis = 7288
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ​     retainedDurationMillis = 2286
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  0 LIBRARY LEAKS
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  A Library Leak is a leak caused by a known bug in 3rd party code that you do not have control over.
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  See https://square.github.io/leakcanary/fundamentals-how-leakcanary-works/#4-categorizing-leaks
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  0 UNREACHABLE OBJECTS
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  An unreachable object is still in memory but LeakCanary could not find a strong reference path
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  from GC roots.
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  METADATA
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Please include this in bug reports and Stack Overflow questions.
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Build.VERSION.SDK_INT: 36
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Build.MANUFACTURER: Nothing
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  LeakCanary version: 2.14
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  App process name: com.shady.neoqn.debug
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Class count: 41091
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Instance count: 615029
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Primitive array count: 248417
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Object array count: 77121
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Thread count: 108
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Heap total bytes: 56700469
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Bitmap count: 143
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Bitmap total bytes: 128328478
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Large bitmap count: 3
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Large bitmap total bytes: 50392067
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Db 1: open /data/user/0/com.shady.neoqn.debug/no_backup/androidx.work.workdb
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Db 2: open /data/user/0/com.shady.neoqn.debug/databases/quicknovel_database
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Db 3: open /data/user/0/com.shady.neoqn.debug/databases/com.google.android.datatransport.events
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Stats: LruCache[maxSize=3000,hits=168967,misses=465395,hitRate=26%]
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  RandomAccess[bytes=24059101,reads=465395,travel=449223740285,range=73897110,size=83006787]
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Heap dump reason: 6 retained objects, app is visible
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Analysis duration: 28937 ms
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Heap dump file path: /storage/emulated/0/Download/leakcanary-com.shady.neoqn.debug/2026-07-02_16-17-11_794.hprof
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Heap dump timestamp: 1782989267506
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  Heap dump duration: 3847 ms
+2026-07-02 16:17:47.553 25222-28738 LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:17:47.559 25222-25302 WM-WorkerWrapper        com.shady.neoqn.debug                I  Worker result SUCCESS for Work [ id=6fda5a9a-cc9c-4193-a499-5a327f96cf8a, tags={ leakcanary.internal.HeapAnalyzerWorker } ]
+2026-07-02 16:17:47.579 25222-25222 LeakCanary              com.shady.neoqn.debug                D  Watching instance of androidx.work.impl.background.systemjob.SystemJobService (androidx.work.impl.background.systemjob.SystemJobService received Service#onDestroy() callback) with key 14eaf31e-35b3-46ba-806f-780ab45f0023
+2026-07-02 16:17:49.361 25222-25243 LeakCanary              com.shady.neoqn.debug                D  Found 1 object retained, not dumping heap yet (app is visible & < 5 threshold)
+
+3)  HEAP ANALYSIS RESULT
+                                                                                                    ====================================
+                                                                                                    1 APPLICATION LEAKS
+                                                                                                    
+                                                                                                    References underlined with "~~~" are likely causes.
+                                                                                                    Learn more at https://squ.re/leaks.
+                                                                                                    
+                                                                                                    128 bytes retained by leaking objects
+                                                                                                    Signature: 099e7804c1433b5477fe40e3ebca5ffce0e9dd16
+                                                                                                    ┬───
+                                                                                                    │ GC Root: System class
+                                                                                                    │
+                                                                                                    ├─ android.content.res.ResourcesImpl class
+                                                                                                    │    Leaking: NO (a class is never leaking)
+                                                                                                    │    ↓ static ResourcesImpl.mAppContext
+                                                                                                    │                           ~~~~~~~~~~~
+                                                                                                    ├─ android.app.ContextImpl instance
+                                                                                                    │    Leaking: UNKNOWN
+                                                                                                    │    Retaining 2.3 kB in 27 objects
+                                                                                                    │    mOuterContext instance of com.lagradost.quicknovel.TTSNotificationService
+                                                                                                    │    ContextImpl.mOuterContext is an instance of com.lagradost.quicknovel.TTSNotificationService
+                                                                                                    │    ↓ ContextImpl.mOuterContext
+                                                                                                    │                  ~~~~~~~~~~~~~
+                                                                                                    ╰→ com.lagradost.quicknovel.TTSNotificationService instance
+                                                                                                    ​     Leaking: YES (ObjectWatcher was watching this because com.lagradost.quicknovel.TTSNotificationService received
+                                                                                                    ​     Service#onDestroy() callback and Service not held by ActivityThread)
+                                                                                                    ​     Retaining 128 B in 4 objects
+                                                                                                    ​     key = 5a5aad99-bdf1-4b6f-88f2-5673e3f79121
+                                                                                                    ​     watchDurationMillis = 32543
+                                                                                                    ​     retainedDurationMillis = 27543
+                                                                                                    ​     mApplication instance of com.lagradost.quicknovel.BaseApplication
+                                                                                                    ​     mBase instance of android.app.ContextImpl
+                                                                                                    ====================================
+                                                                                                    0 LIBRARY LEAKS
+                                                                                                    
+                                                                                                    A Library Leak is a leak caused by a known bug in 3rd party code that you do not have control over.
+                                                                                                    See https://square.github.io/leakcanary/fundamentals-how-leakcanary-works/#4-categorizing-leaks
+                                                                                                    ====================================
+                                                                                                    0 UNREACHABLE OBJECTS
+                                                                                                    
+                                                                                                    An unreachable object is still in memory but LeakCanary could not find a strong reference path
+                                                                                                    from GC roots.
+                                                                                                    ====================================
+                                                                                                    METADATA
+                                                                                                    
+                                                                                                    Please include this in bug reports and Stack Overflow questions.
+                                                                                                    
+                                                                                                    Build.VERSION.SDK_INT: 36
+                                                                                                    Build.MANUFACTURER: Nothing
+                                                                                                    LeakCanary version: 2.14
+                                                                                                    App process name: com.shady.neoqn.debug
+                                                                                                    Class count: 41094
+                                                                                                    Instance count: 529585
+                                                                                                    Primitive array count: 226016
+                                                                                                    Object array count: 67216
+                                                                                                    Thread count: 85
+                                                                                                    Heap total bytes: 52671505
+                                                                                                    Bitmap count: 109
+                                                                                                    Bitmap total bytes: 91438858
+                                                                                                    Large bitmap count: 3
+                                                                                                    Large bitmap total bytes: 50392067
+                                                                                                    Db 1: open /data/user/0/com.shady.neoqn.debug/no_backup/androidx.work.workdb
+                                                                                                    Db 2: open /data/user/0/com.shady.neoqn.debug/databases/quicknovel_database
+                                                                                                    Db 3: open /data/user/0/com.shady.neoqn.debug/databases/com.google.android.datatransport.events
+                                                                                                    Stats: LruCache[maxSize=3000,hits=164428,misses=455992,hitRate=26%]
+                                                                                                    RandomAccess[bytes=23665880,reads=455992,travel=411846538202,range=62921604,size=76997663]
+                                                                                                    Heap dump reason: 1 retained objects, app is not visible
+                                                                                                    Analysis duration: 27447 ms
+                                                                                                    Heap dump file path: /storage/emulated/0/Download/leakcanary-com.shady.neoqn.debug/2026-07-02_16-18-16_696.hprof
+                                                                                                    Heap dump timestamp: 1782989343835
+                                                                                                    Heap dump duration: 10296 ms
+                                                                                                    ====================================
+
+5) HEAP ANALYSIS RESULT
+                                                                                                    ====================================
+                                                                                                    1 APPLICATION LEAKS
+                                                                                                    
+                                                                                                    References underlined with "~~~" are likely causes.
+                                                                                                    Learn more at https://squ.re/leaks.
+                                                                                                    
+                                                                                                    473 bytes retained by leaking objects
+                                                                                                    Signature: 099e7804c1433b5477fe40e3ebca5ffce0e9dd16
+                                                                                                    ┬───
+                                                                                                    │ GC Root: System class
+                                                                                                    │
+                                                                                                    ├─ android.content.res.ResourcesImpl class
+                                                                                                    │    Leaking: NO (a class is never leaking)
+                                                                                                    │    ↓ static ResourcesImpl.mAppContext
+                                                                                                    │                           ~~~~~~~~~~~
+                                                                                                    ├─ android.app.ContextImpl instance
+                                                                                                    │    Leaking: UNKNOWN
+                                                                                                    │    Retaining 2.5 kB in 33 objects
+                                                                                                    │    mOuterContext instance of androidx.work.impl.background.systemjob.SystemJobService
+                                                                                                    │    ContextImpl.mOuterContext is an instance of androidx.work.impl.background.systemjob.SystemJobService
+                                                                                                    │    ↓ ContextImpl.mOuterContext
+                                                                                                    │                  ~~~~~~~~~~~~~
+                                                                                                    ╰→ androidx.work.impl.background.systemjob.SystemJobService instance
+                                                                                                    ​     Leaking: YES (ObjectWatcher was watching this because androidx.work.impl.background.systemjob.SystemJobService
+                                                                                                    ​     received Service#onDestroy() callback and Service not held by ActivityThread)
+                                                                                                    ​     Retaining 473 B in 13 objects
+                                                                                                    ​     key = b5808ee2-8d1e-4817-94a3-99595dda482f
+                                                                                                    ​     watchDurationMillis = 50645
+                                                                                                    ​     retainedDurationMillis = 45644
+                                                                                                    ​     mApplication instance of com.lagradost.quicknovel.BaseApplication
+                                                                                                    ​     mBase instance of android.app.ContextImpl
+                                                                                                    ====================================
+                                                                                                    0 LIBRARY LEAKS
+                                                                                                    
+                                                                                                    A Library Leak is a leak caused by a known bug in 3rd party code that you do not have control over.
+                                                                                                    See https://square.github.io/leakcanary/fundamentals-how-leakcanary-works/#4-categorizing-leaks
+                                                                                                    ====================================
+                                                                                                    0 UNREACHABLE OBJECTS
+                                                                                                    
+                                                                                                    An unreachable object is still in memory but LeakCanary could not find a strong reference path
+                                                                                                    from GC roots.
+                                                                                                    ====================================
+                                                                                                    METADATA
+                                                                                                    
+                                                                                                    Please include this in bug reports and Stack Overflow questions.
+                                                                                                    
+                                                                                                    Build.VERSION.SDK_INT: 36
+                                                                                                    Build.MANUFACTURER: Nothing
+                                                                                                    LeakCanary version: 2.14
+                                                                                                    App process name: com.shady.neoqn.debug
+                                                                                                    Class count: 41157
+                                                                                                    Instance count: 544027
+                                                                                                    Primitive array count: 230623
+                                                                                                    Object array count: 71553
+                                                                                                    Thread count: 79
+                                                                                                    Heap total bytes: 53798151
+                                                                                                    Bitmap count: 89
+                                                                                                    Bitmap total bytes: 75113364
+                                                                                                    Large bitmap count: 3
+                                                                                                    Large bitmap total bytes: 50392067
+                                                                                                    Db 1: open /data/user/0/com.shady.neoqn.debug/no_backup/androidx.work.workdb
+                                                                                                    Db 2: open /data/user/0/com.shady.neoqn.debug/databases/quicknovel_database
+                                                                                                    Db 3: open /data/user/0/com.shady.neoqn.debug/databases/com.google.android.datatransport.events
+                                                                                                    Stats: LruCache[maxSize=3000,hits=172012,misses=473273,hitRate=26%]
+                                                                                                    RandomAccess[bytes=25011172,reads=473273,travel=416573927725,range=64579400,size=78523774]
+                                                                                                    Heap dump reason: 1 retained objects, app is not visible
+                                                                                                    Analysis duration: 138263 ms
+                                                                                                    Heap dump file path: /storage/emulated/0/Download/leakcanary-com.shady.neoqn.debug/2026-07-02_16-19-54_518.hprof
+                                                                                                    Heap dump timestamp: 1782989555823
+                                                                                                    Heap dump duration: 10044 ms
+                                                                                                    ====================================
+
+6) HEAP ANALYSIS RESULT
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  2 APPLICATION LEAKS
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  References underlined with "~~~" are likely causes.
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Learn more at https://squ.re/leaks.
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  1032 bytes retained by leaking objects
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Signature: 099e7804c1433b5477fe40e3ebca5ffce0e9dd16
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ┬───
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │ GC Root: System class
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ android.content.res.ResourcesImpl class
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: NO (a class is never leaking)
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ static ResourcesImpl.mAppContext
+2026-07-02 16:29:32.724  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │                           ~~~~~~~~~~~
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ android.app.ContextImpl instance
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Retaining 3.7 kB in 77 objects
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mOuterContext instance of androidx.work.impl.foreground.SystemForegroundService
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ContextImpl.mOuterContext is an instance of androidx.work.impl.foreground.SystemForegroundService
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ ContextImpl.mOuterContext
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │                  ~~~~~~~~~~~~~
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ╰→ androidx.work.impl.foreground.SystemForegroundService instance
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     Leaking: YES (ObjectWatcher was watching this because androidx.work.impl.foreground.SystemForegroundService
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     received Service#onDestroy() callback and Service not held by ActivityThread)
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     Retaining 1.0 kB in 38 objects
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     key = 399e4eb2-013b-4c4b-85d3-b47bef55514d
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     watchDurationMillis = 60334
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     retainedDurationMillis = 55333
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     mApplication instance of com.lagradost.quicknovel.BaseApplication
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     mBase instance of android.app.ContextImpl
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  2929165 bytes retained by leaking objects
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Signature: 36fd00f02abd398c9bfd88b62c3df647adc034f0
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ┬───
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │ GC Root: Thread object
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.Thread instance
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: NO (the main thread always runs)
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Thread name: 'main'
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ Thread.threadLocals
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │             ~~~~~~~~~~~~
+2026-07-02 16:29:32.725  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap instance
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Retaining 16.7 kB in 141 objects
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap.table
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │                                 ~~~~~
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap$Entry[] array
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Retaining 16.7 kB in 140 objects
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap$Entry[38]
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │                                      ~~~~
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ java.lang.ThreadLocal$ThreadLocalMap$Entry instance
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Retaining 28 B in 1 objects
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ ThreadLocal$ThreadLocalMap$Entry.value
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │                                       ~~~~~
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ android.animation.AnimationHandler instance
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.9 MB in 15380 objects
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ AnimationHandler.mAnimationCallbacks
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │                       ~~~~~~~~~~~~~~~~~~~
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ java.util.ArrayList instance
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.9 MB in 15370 objects
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ ArrayList[0]
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │               ~~~
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ android.animation.ObjectAnimator instance
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: UNKNOWN
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.9 MB in 15368 objects
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mListeners = null
+2026-07-02 16:29:32.726  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mPropertyName = alpha
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mProperty = null
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mInitialized = true
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mStarted = true
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mRunning = true
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mAnimationEndRequested = false
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mDuration = 5000
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mStartDelay = 0
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mRepeatCount = INFINITE (-1)
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mRepeatMode = REVERSE (2)
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ ObjectAnimator.mTarget
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │                     ~~~~~~~
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ├─ android.view.View instance
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Leaking: YES (View.mContext references a destroyed activity)
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    Retaining 2.9 MB in 15354 objects
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    View is part of a window view hierarchy
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    View.mAttachInfo is null (view detached)
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    View.mID = R.id.reader_halo
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    View.mWindowAttachCount = 1
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    mContext instance of com.lagradost.quicknovel.ReadActivity2 with mDestroyed = true
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  │    ↓ View.mContext
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ╰→ com.lagradost.quicknovel.ReadActivity2 instance
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     Leaking: YES (ObjectWatcher was watching this because com.lagradost.quicknovel.ReadActivity2 received
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     Activity#onDestroy() callback and Activity#mDestroyed is true)
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     Retaining 230.9 kB in 4671 objects
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     key = c1e6da75-1085-435c-b9db-140f6049fd6f
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     watchDurationMillis = 6119
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     retainedDurationMillis = 1119
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     mApplication instance of com.lagradost.quicknovel.BaseApplication
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ​     mBase instance of androidx.appcompat.view.ContextThemeWrapper
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  0 LIBRARY LEAKS
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  A Library Leak is a leak caused by a known bug in 3rd party code that you do not have control over.
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  See https://square.github.io/leakcanary/fundamentals-how-leakcanary-works/#4-categorizing-leaks
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  0 UNREACHABLE OBJECTS
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  An unreachable object is still in memory but LeakCanary could not find a strong reference path
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  from GC roots.
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ====================================
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  METADATA
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Please include this in bug reports and Stack Overflow questions.
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Build.VERSION.SDK_INT: 36
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Build.MANUFACTURER: Nothing
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  LeakCanary version: 2.14
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  App process name: com.shady.neoqn.debug
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Class count: 39707
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Instance count: 1083530
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Primitive array count: 534167
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Object array count: 157993
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Thread count: 235
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Heap total bytes: 83744492
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Bitmap count: 180
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Bitmap total bytes: 168701578
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Large bitmap count: 4
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Large bitmap total bytes: 63284355
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Db 1: open /data/user/0/com.shady.neoqn.debug/databases/quicknovel_database
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Db 2: open /data/user/0/com.shady.neoqn.debug/no_backup/androidx.work.workdb
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Stats: LruCache[maxSize=3000,hits=214918,misses=712993,hitRate=23%]
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  RandomAccess[bytes=37586273,reads=712993,travel=1257959569357,range=114596498,size=124694641]
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Heap dump reason: 6 retained objects, app is visible
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Analysis duration: 89583 ms
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Heap dump file path: /storage/emulated/0/Download/leakcanary-com.shady.neoqn.debug/2026-07-02_16-27-53_801.hprof
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Heap dump timestamp: 1782989972669
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  Heap dump duration: 4092 ms
+2026-07-02 16:29:32.727  5802-7636  LeakCanary              com.shady.neoqn.debug                D  ====================================
+

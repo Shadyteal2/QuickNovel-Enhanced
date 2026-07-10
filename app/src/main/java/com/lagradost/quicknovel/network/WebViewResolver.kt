@@ -10,6 +10,9 @@ import com.lagradost.nicehttp.requestCreator
 import com.lagradost.quicknovel.BaseApplication.Companion.context
 import com.lagradost.quicknovel.MainActivity.Companion.app
 import com.lagradost.quicknovel.USER_AGENT
+import com.lagradost.quicknovel.BuildConfig
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
@@ -103,7 +106,9 @@ class WebViewResolver(
 
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
             // Useful for debugging
-            WebView.setWebContentsDebuggingEnabled(true)
+            if (BuildConfig.DEBUG) {
+                WebView.setWebContentsDebuggingEnabled(true)
+            }
             try {
                 // IMPORTANT: For AlertDialog we MUST use an Activity context.
                 // We try to get the current activity from CommonActivity.
@@ -122,6 +127,61 @@ class WebViewResolver(
                         settings.userAgentString = userAgent
                     }
                     webViewUserAgent = settings.userAgentString
+                }
+
+                val stealthScript = """
+                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => {
+                            const arr = [
+                                { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+                                { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
+                                { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' }
+                            ];
+                            arr.__proto__ = PluginArray.prototype;
+                            return arr;
+                        }
+                    });
+                    window.chrome = {
+                        runtime: {
+                            connect: () => {},
+                            sendMessage: () => {},
+                            id: undefined
+                        },
+                        loadTimes: () => ({
+                            requestTime: Date.now() / 1000,
+                            startLoadTime: Date.now() / 1000,
+                            commitLoadTime: Date.now() / 1000,
+                            finishDocumentLoadTime: 0,
+                            finishLoadTime: 0,
+                            firstPaintTime: 0,
+                            firstPaintAfterLoadTime: 0,
+                            navigationType: 'Other',
+                            wasFetchedViaSpdy: false,
+                            wasNpnNegotiated: false,
+                            npnNegotiatedProtocol: 'http/1.1',
+                            wasAlternateProtocolAvailable: false,
+                            connectionInfo: 'http/1.1'
+                        }),
+                        csi: () => ({
+                            startE: Date.now(),
+                            onloadT: Date.now(),
+                            pageT: 0,
+                            tran: 15
+                        })
+                    };
+                    if (window.navigator.permissions && window.navigator.permissions.query) {
+                        const originalQuery = window.navigator.permissions.query;
+                        window.navigator.permissions.query = (parameters) =>
+                            parameters.name === 'notifications'
+                                ? Promise.resolve({ state: typeof Notification !== 'undefined' ? Notification.permission : 'default' })
+                                : originalQuery(parameters);
+                    }
+                """.trimIndent()
+
+                val hasDocStartScriptSupport = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+                if (hasDocStartScriptSupport) {
+                    WebViewCompat.addDocumentStartJavaScript(webView!!, stealthScript, setOf("*"))
                 }
 
                 if (showDialog) {
@@ -148,6 +208,17 @@ class WebViewResolver(
                 }
 
                 webView?.webViewClient = object : WebViewClient() {
+                    override fun onPageStarted(
+                        view: WebView?,
+                        url: String?,
+                        favicon: android.graphics.Bitmap?
+                    ) {
+                        super.onPageStarted(view, url, favicon)
+                        if (!hasDocStartScriptSupport) {
+                            view?.evaluateJavascript(stealthScript, null)
+                        }
+                    }
+
                     override fun shouldInterceptRequest(
                         view: WebView,
                         request: WebResourceRequest

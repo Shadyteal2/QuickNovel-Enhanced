@@ -17,6 +17,15 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -39,6 +48,7 @@ fun ReaderSettingsSheet(
     viewModel: ReadActivityViewModel,
     onHardReset: () -> Unit,
     onShowCustomization: () -> Unit,
+    onShowTapZones: () -> Unit,
     onReadingTypeClick: () -> Unit,
     onShowFonts: () -> Unit,
     onLanguageClick: () -> Unit,
@@ -58,9 +68,11 @@ fun ReaderSettingsSheet(
     var showBattery by remember { mutableStateOf(viewModel.showBattery) }
     var showBionic by remember { mutableStateOf(viewModel.bionicReading) }
     var isTextSelectable by remember { mutableStateOf(viewModel.isTextSelectable) }
+    var bionicBoldRatio by remember { mutableStateOf(viewModel.bionicBoldRatio) }
     var keepScreenActive by remember { mutableStateOf(viewModel.screenAwake) }
     var authorNotes by remember { mutableStateOf(viewModel.authorNotes) }
     var showProgress by remember { mutableStateOf(viewModel.showReaderProgress) }
+    var showProgressOnlyOnTap by remember { mutableStateOf(viewModel.showProgressOnlyOnTap) }
     var paginatedSwipeEnabled by remember { mutableStateOf(viewModel.paginatedSwipeEnabled) }
     var dynamicLuminanceEnabled by remember { mutableStateOf(viewModel.dynamicLuminanceEnabled) }
     var autoScroll by remember { mutableStateOf(viewModel.autoScroll) }
@@ -71,10 +83,16 @@ fun ReaderSettingsSheet(
     var textPadding by remember { mutableStateOf(viewModel.paddingHorizontal.toFloat()) }
     var textPaddingTop by remember { mutableStateOf(viewModel.paddingVertical.toFloat()) }
     var textVerticalPadding by remember { mutableStateOf(viewModel.textVerticalPadding) }
+    var lineHeightMultiplier by remember { mutableStateOf(viewModel.lineHeightMultiplier) }
     
     var ttsSpeed by remember { mutableStateOf(viewModel.ttsSpeed) }
     var ttsPitch by remember { mutableStateOf(viewModel.ttsPitch) }
     val useGoogleTts by viewModel.ttsUseGoogleLive.observeAsState(viewModel.ttsUseGoogle)
+
+    var isDisplayExpanded by remember { mutableStateOf(true) }
+    var isTextFontExpanded by remember { mutableStateOf(true) }
+    var isTtsVoiceExpanded by remember { mutableStateOf(true) }
+    var isTranslationExpanded by remember { mutableStateOf(true) }
     
     LazyColumn(
         modifier = Modifier
@@ -104,415 +122,495 @@ fun ReaderSettingsSheet(
 
         // Display settings card
         item {
-            Text(
-                text = stringResource(R.string.read_display_settings),
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
+            SectionHeader(
+                title = stringResource(R.string.read_display_settings),
+                isExpanded = isDisplayExpanded,
+                onToggle = { isDisplayExpanded = !isDisplayExpanded }
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glassCard(shape = RoundedCornerShape(24.dp))
-                    .padding(16.dp)
+            AnimatedVisibility(
+                visible = isDisplayExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
             ) {
-                if (viewModel.canReload()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .glassCard(shape = RoundedCornerShape(24.dp))
+                        .padding(16.dp)
+                ) {
+                    if (viewModel.canReload()) {
+                        SettingsButton(
+                            text = stringResource(R.string.reload_chapter),
+                            iconRes = R.drawable.ic_baseline_autorenew_24,
+                            onClick = onHardReset
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    
+                    SettingsSwitchRow(stringResource(R.string.scroll_with_volume_keys), scrollWithVolume) {
+                        scrollWithVolume = it; viewModel.scrollWithVolume = it
+                    }
+                    SettingsSwitchRow(stringResource(R.string.lock_tts), ttsLock) {
+                        ttsLock = it; viewModel.ttsLock = it
+                    }
+                    SettingsSwitchRow(stringResource(R.string.show_time), showTime) {
+                        showTime = it; viewModel.showTime = it
+                    }
+                    SettingsSwitchRow(stringResource(R.string.show_battery), showBattery) {
+                        showBattery = it; viewModel.showBattery = it
+                    }
+                    SettingsSwitchRow(stringResource(R.string.bionic_reading), showBionic) {
+                        showBionic = it; viewModel.bionicReading = it
+                    }
+                    if (showBionic) {
+                        SettingsSliderRow(
+                            title = "Bionic Reading Intensity",
+                            value = bionicBoldRatio,
+                            valueFrom = 0.2f,
+                            valueTo = 0.8f,
+                            stepSize = 0.05f,
+                            leftIcon = R.drawable.smaller_font,
+                            rightIcon = R.drawable.bigger_font,
+                            onValueChange = { bionicBoldRatio = it; viewModel.bionicBoldRatio = it },
+                            valueFormatter = { "${(it * 100).toInt()}%" }
+                        )
+                    }
+                    SettingsSwitchRow(stringResource(R.string.selectable_text), isTextSelectable) {
+                        isTextSelectable = it; viewModel.isTextSelectable = it
+                    }
+                    SettingsSwitchRow(stringResource(R.string.keep_screen_active), keepScreenActive) {
+                        keepScreenActive = it; viewModel.screenAwake = it
+                    }
+                    SettingsSwitchRow("Auto Scroll", autoScroll) {
+                        autoScroll = it; viewModel.autoScroll = it
+                    }
+                    if (autoScroll) {
+                        SettingsSliderRow(
+                            title = "Auto Scroll Speed",
+                            value = autoScrollSpeed,
+                            valueFrom = 1f,
+                            valueTo = 20f,
+                            stepSize = 1f,
+                            leftIcon = R.drawable.pace_24px,
+                            rightIcon = R.drawable.acute_24px,
+                            onValueChange = { autoScrollSpeed = it; viewModel.autoScrollSpeed = it.roundToInt() },
+                            valueFormatter = { "${it.toInt()} (~${(it * 120).toInt()} WPM)" }
+                        )
+                    }
+                    SettingsSwitchRow(stringResource(R.string.show_authors_notes), authorNotes) {
+                        authorNotes = it; viewModel.authorNotes = it; viewModel.refreshChapters()
+                    }
+                    SettingsSwitchRow(stringResource(R.string.show_reading_progress), showProgress) {
+                        showProgress = it; viewModel.showReaderProgress = it
+                    }
+                    if (showProgress) {
+                        SettingsSwitchRow("  Show Progress Only on Tap", showProgressOnlyOnTap) {
+                            showProgressOnlyOnTap = it; viewModel.showProgressOnlyOnTap = it
+                        }
+                    }
+                    SettingsSwitchRow("Reading Timer Overlay", showReadingTimer) {
+                        showReadingTimer = it; viewModel.showReadingTimer = it
+                    }
+                    SettingsSwitchRow("Paginated Swipe Mode", paginatedSwipeEnabled) {
+                        paginatedSwipeEnabled = it; viewModel.paginatedSwipeEnabled = it
+                    }
+                    SettingsSwitchRow("Auto-Fix Bright Backgrounds", dynamicLuminanceEnabled) {
+                        dynamicLuminanceEnabled = it; viewModel.dynamicLuminanceEnabled = it
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     SettingsButton(
-                        text = stringResource(R.string.reload_chapter),
-                        iconRes = R.drawable.ic_baseline_autorenew_24,
-                        onClick = onHardReset
+                        text = "Reader Customization",
+                        iconRes = R.drawable.ic_baseline_settings_24,
+                        onClick = onShowCustomization
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                }
-                
-                SettingsSwitchRow(stringResource(R.string.scroll_with_volume_keys), scrollWithVolume) {
-                    scrollWithVolume = it; viewModel.scrollWithVolume = it
-                }
-                SettingsSwitchRow(stringResource(R.string.lock_tts), ttsLock) {
-                    ttsLock = it; viewModel.ttsLock = it
-                }
-                SettingsSwitchRow(stringResource(R.string.show_time), showTime) {
-                    showTime = it; viewModel.showTime = it
-                }
-                SettingsSwitchRow(stringResource(R.string.show_battery), showBattery) {
-                    showBattery = it; viewModel.showBattery = it
-                }
-                SettingsSwitchRow(stringResource(R.string.bionic_reading), showBionic) {
-                    showBionic = it; viewModel.bionicReading = it
-                }
-                SettingsSwitchRow(stringResource(R.string.selectable_text), isTextSelectable) {
-                    isTextSelectable = it; viewModel.isTextSelectable = it
-                }
-                SettingsSwitchRow(stringResource(R.string.keep_screen_active), keepScreenActive) {
-                    keepScreenActive = it; viewModel.screenAwake = it
-                }
-                SettingsSwitchRow("Auto Scroll", autoScroll) {
-                    autoScroll = it; viewModel.autoScroll = it
-                }
-                if (autoScroll) {
-                    SettingsSliderRow(
-                        title = "Auto Scroll Speed",
-                        value = autoScrollSpeed,
-                        valueFrom = 1f,
-                        valueTo = 20f,
-                        stepSize = 1f,
-                        leftIcon = R.drawable.pace_24px,
-                        rightIcon = R.drawable.acute_24px,
-                        onValueChange = { autoScrollSpeed = it; viewModel.autoScrollSpeed = it.roundToInt() }
+                    SettingsButton(
+                        text = "Customize Tap Zones",
+                        iconRes = R.drawable.ic_baseline_settings_24,
+                        onClick = onShowTapZones
                     )
                 }
-                SettingsSwitchRow(stringResource(R.string.show_authors_notes), authorNotes) {
-                    authorNotes = it; viewModel.authorNotes = it; viewModel.refreshChapters()
-                }
-                SettingsSwitchRow(stringResource(R.string.show_reading_progress), showProgress) {
-                    showProgress = it; viewModel.showReaderProgress = it
-                }
-                SettingsSwitchRow("Reading Timer Overlay", showReadingTimer) {
-                    showReadingTimer = it; viewModel.showReadingTimer = it
-                }
-                SettingsSwitchRow("Paginated Swipe Mode", paginatedSwipeEnabled) {
-                    paginatedSwipeEnabled = it; viewModel.paginatedSwipeEnabled = it
-                }
-                SettingsSwitchRow("Auto-Fix Bright Backgrounds", dynamicLuminanceEnabled) {
-                    dynamicLuminanceEnabled = it; viewModel.dynamicLuminanceEnabled = it
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                SettingsButton(
-                    text = "Reader Customization",
-                    iconRes = R.drawable.ic_baseline_settings_24,
-                    onClick = onShowCustomization
-                )
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
 
         // Text & Font card
         item {
-            Text(
-                text = stringResource(R.string.text_font),
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
+            SectionHeader(
+                title = stringResource(R.string.text_font),
+                isExpanded = isTextFontExpanded,
+                onToggle = { isTextFontExpanded = !isTextFontExpanded }
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glassCard(shape = RoundedCornerShape(24.dp))
-                    .padding(16.dp)
+            AnimatedVisibility(
+                visible = isTextFontExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
             ) {
-                Text(stringResource(R.string.scroll_type), fontSize = 15.sp, color = Color.Gray)
-                Spacer(modifier = Modifier.height(8.dp))
-                SettingsButton(
-                    text = stringResource(viewModel.readerType.stringRes),
-                    iconRes = R.drawable.swipe_vertical_24px,
-                    onClick = onReadingTypeClick
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(stringResource(R.string.text_font), fontSize = 15.sp, color = Color.Gray)
-                Spacer(modifier = Modifier.height(8.dp))
-                SettingsButton(
-                    text = stringResource(R.string.reader_font),
-                    iconRes = R.drawable.ic_baseline_font_download_24,
-                    onClick = onShowFonts
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .glassCard(shape = RoundedCornerShape(24.dp))
+                        .padding(16.dp)
+                ) {
+                    Text(stringResource(R.string.scroll_type), fontSize = 15.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SettingsButton(
+                        text = stringResource(viewModel.readerType.stringRes),
+                        iconRes = R.drawable.swipe_vertical_24px,
+                        onClick = onReadingTypeClick
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(stringResource(R.string.text_font), fontSize = 15.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SettingsButton(
+                        text = stringResource(R.string.reader_font),
+                        iconRes = R.drawable.ic_baseline_font_download_24,
+                        onClick = onShowFonts
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
 
         // TTS & Advanced values card (including rulers)
         item {
-            Text(
-                text = stringResource(R.string.tts_voice_title),
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
+            SectionHeader(
+                title = stringResource(R.string.tts_voice_title),
+                isExpanded = isTtsVoiceExpanded,
+                onToggle = { isTtsVoiceExpanded = !isTtsVoiceExpanded }
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glassCard(shape = RoundedCornerShape(24.dp))
-                    .padding(16.dp)
+            AnimatedVisibility(
+                visible = isTtsVoiceExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SettingsButton(
-                        text = stringResource(R.string.tts_locale),
-                        iconRes = R.drawable.ic_baseline_language_24,
-                        onClick = onLanguageClick,
-                        modifier = Modifier.weight(1f)
-                    )
-                    SettingsButton(
-                        text = stringResource(R.string.tts_voice),
-                        iconRes = R.drawable.ic_baseline_volume_up_24,
-                        onClick = onVoiceClick,
-                        modifier = Modifier.weight(1f)
-                    )
-                    SettingsButton(
-                        text = stringResource(R.string.sleep_timer),
-                        iconRes = R.drawable.nights_stay_24px,
-                        onClick = onSleepTimerClick,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                SettingsSwitchRow("Use Google TTS (Neural Online)", useGoogleTts) {
-                    viewModel.ttsUseGoogle = it
-                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .glassCard(shape = RoundedCornerShape(24.dp))
+                        .padding(16.dp)
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SettingsButton(
+                            text = stringResource(R.string.tts_locale),
+                            iconRes = R.drawable.ic_baseline_language_24,
+                            onClick = onLanguageClick,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SettingsButton(
+                            text = stringResource(R.string.tts_voice),
+                            iconRes = R.drawable.ic_baseline_volume_up_24,
+                            onClick = onVoiceClick,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SettingsButton(
+                            text = stringResource(R.string.sleep_timer),
+                            iconRes = R.drawable.nights_stay_24px,
+                            onClick = onSleepTimerClick,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SettingsSwitchRow("Use Google TTS (Neural Online)", useGoogleTts) {
+                        viewModel.ttsUseGoogle = it
+                    }
 
-                SettingsSliderRow(
-                    title = stringResource(R.string.tts_speed),
-                    value = ttsSpeed,
-                    valueFrom = 0.1f,
-                    valueTo = 5.0f,
-                    stepSize = 0.1f,
-                    leftIcon = R.drawable.pace_24px,
-                    rightIcon = R.drawable.acute_24px,
-                    onValueChange = { ttsSpeed = it; viewModel.ttsSpeed = it }
-                )
-                
-                SettingsSliderRow(
-                    title = stringResource(R.string.tts_pitch),
-                    value = ttsPitch,
-                    valueFrom = 0.1f,
-                    valueTo = 3.0f,
-                    stepSize = 0.1f,
-                    leftIcon = R.drawable.hiking_24px,
-                    rightIcon = R.drawable.directions_run_24px,
-                    onValueChange = { ttsPitch = it; viewModel.ttsPitch = it }
-                )
-                
-                SettingsSliderRow(
-                    title = stringResource(R.string.text_size),
-                    value = textSize,
-                    valueFrom = 10f,
-                    valueTo = 30f,
-                    stepSize = 1f,
-                    leftIcon = R.drawable.smaller_font,
-                    rightIcon = R.drawable.bigger_font,
-                    onValueChange = { textSize = it; viewModel.textSize = it.roundToInt() }
-                )
-                
-                SettingsSliderRow(
-                    title = stringResource(R.string.text_padding),
-                    value = textPadding,
-                    valueFrom = 0f,
-                    valueTo = 50f,
-                    stepSize = 1f,
-                    leftIcon = R.drawable.format_padding_decrease_white_24dp,
-                    rightIcon = R.drawable.format_padding_increase_white_24dp,
-                    onValueChange = { textPadding = it; viewModel.paddingHorizontal = it.roundToInt() }
-                )
-                
-                SettingsSliderRow(
-                    title = stringResource(R.string.text_padding_top),
-                    value = textPaddingTop,
-                    valueFrom = 0f,
-                    valueTo = 50f,
-                    stepSize = 1f,
-                    leftIcon = R.drawable.text_top_bottom_margin,
-                    rightIcon = R.drawable.text_top_bottom_margin_expand,
-                    onValueChange = { textPaddingTop = it; viewModel.paddingVertical = it.roundToInt() }
-                )
-                
-                SettingsSliderRow(
-                    title = stringResource(R.string.paragraph_spacing),
-                    value = textVerticalPadding,
-                    valueFrom = 0f,
-                    valueTo = 30f,
-                    stepSize = 0.5f,
-                    leftIcon = R.drawable.density_small_24px,
-                    rightIcon = R.drawable.density_medium_24px,
-                    onValueChange = { textVerticalPadding = it; viewModel.textVerticalPadding = it }
-                )
+                    SettingsSliderRow(
+                        title = stringResource(R.string.tts_speed),
+                        value = ttsSpeed,
+                        valueFrom = 0.1f,
+                        valueTo = 5.0f,
+                        stepSize = 0.1f,
+                        leftIcon = R.drawable.pace_24px,
+                        rightIcon = R.drawable.acute_24px,
+                        onValueChange = { ttsSpeed = it; viewModel.ttsSpeed = it }
+                    )
+
+                    val presets = listOf(1.0f, 1.5f, 2.0f, 2.5f)
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        presets.forEach { speed ->
+                            val isSelected = ttsSpeed == speed
+                            val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                            val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(containerColor)
+                                    .clickable {
+                                        ttsSpeed = speed
+                                        viewModel.ttsSpeed = speed
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${speed}x",
+                                    fontSize = 12.sp,
+                                    color = contentColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    SettingsSliderRow(
+                        title = stringResource(R.string.tts_pitch),
+                        value = ttsPitch,
+                        valueFrom = 0.1f,
+                        valueTo = 3.0f,
+                        stepSize = 0.1f,
+                        leftIcon = R.drawable.hiking_24px,
+                        rightIcon = R.drawable.directions_run_24px,
+                        onValueChange = { ttsPitch = it; viewModel.ttsPitch = it }
+                    )
+                    
+                    SettingsSliderRow(
+                        title = stringResource(R.string.text_size),
+                        value = textSize,
+                        valueFrom = 10f,
+                        valueTo = 30f,
+                        stepSize = 1f,
+                        leftIcon = R.drawable.smaller_font,
+                        rightIcon = R.drawable.bigger_font,
+                        onValueChange = { textSize = it; viewModel.textSize = it.roundToInt() }
+                    )
+                    
+                    SettingsSliderRow(
+                        title = stringResource(R.string.text_padding),
+                        value = textPadding,
+                        valueFrom = 0f,
+                        valueTo = 50f,
+                        stepSize = 1f,
+                        leftIcon = R.drawable.format_padding_decrease_white_24dp,
+                        rightIcon = R.drawable.format_padding_increase_white_24dp,
+                        onValueChange = { textPadding = it; viewModel.paddingHorizontal = it.roundToInt() }
+                    )
+                    
+                    SettingsSliderRow(
+                        title = stringResource(R.string.text_padding_top),
+                        value = textPaddingTop,
+                        valueFrom = 0f,
+                        valueTo = 50f,
+                        stepSize = 1f,
+                        leftIcon = R.drawable.text_top_bottom_margin,
+                        rightIcon = R.drawable.text_top_bottom_margin_expand,
+                        onValueChange = { textPaddingTop = it; viewModel.paddingVertical = it.roundToInt() }
+                    )
+                    
+                    SettingsSliderRow(
+                        title = stringResource(R.string.paragraph_spacing),
+                        value = textVerticalPadding,
+                        valueFrom = 0f,
+                        valueTo = 30f,
+                        stepSize = 0.5f,
+                        leftIcon = R.drawable.density_small_24px,
+                        rightIcon = R.drawable.density_medium_24px,
+                        onValueChange = { textVerticalPadding = it; viewModel.textVerticalPadding = it }
+                    )
+
+                    SettingsSliderRow(
+                        title = "Line Height",
+                        value = lineHeightMultiplier,
+                        valueFrom = 0.8f,
+                        valueTo = 2.5f,
+                        stepSize = 0.1f,
+                        leftIcon = R.drawable.format_line_spacing_24px,
+                        rightIcon = R.drawable.format_line_spacing_24px,
+                        onValueChange = { lineHeightMultiplier = it; viewModel.lineHeightMultiplier = it }
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
 
         // Google ML Translation card
         item {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = if (viewModel.isTranslationActive) {
-                        "${stringResource(R.string.google_ml)} (${viewModel.mlSettings.fromDisplay} -> ${viewModel.mlSettings.toDisplay})"
-                    } else {
-                        stringResource(R.string.google_ml)
-                    },
-                    color = Color.Gray,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onMlInfoClick) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_google_ml),
-                        contentDescription = stringResource(R.string.a11y_info),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Text(
-                text = "Downloading can take upto 10mins depending on google server",
-                color = Color.Gray,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
+            SectionHeader(
+                title = if (viewModel.isTranslationActive) {
+                    "${stringResource(R.string.google_ml)} (${viewModel.mlSettings.fromDisplay} -> ${viewModel.mlSettings.toDisplay})"
+                } else {
+                    stringResource(R.string.google_ml)
+                },
+                isExpanded = isTranslationExpanded,
+                onToggle = { isTranslationExpanded = !isTranslationExpanded },
+                infoIcon = R.drawable.ic_google_ml,
+                onInfoClick = onMlInfoClick
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glassCard(shape = RoundedCornerShape(24.dp))
-                    .padding(16.dp)
+            AnimatedVisibility(
+                visible = isTranslationExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SettingsButton(
-                        text = ReadActivityViewModel.MLSettings.fromShortToDisplay(viewModel.mlFromLanguage),
-                        iconRes = R.drawable.ic_baseline_menu_book_24,
-                        onClick = onMlFromClick,
-                        modifier = Modifier.weight(1f)
+                Column {
+                    Text(
+                        text = "Downloading can take upto 10mins depending on google server",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    SettingsButton(
-                        text = ReadActivityViewModel.MLSettings.fromShortToDisplay(viewModel.mlToLanguage),
-                        iconRes = R.drawable.fiber_new_24px,
-                        onClick = onMlToClick,
-                        modifier = Modifier.weight(1f)
-                    )
-                    SettingsButton(
-                        text = stringResource(R.string.sort_apply),
-                        iconRes = R.drawable.translate_24px,
-                        onClick = onApplyTranslationClick,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        )
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                val context = androidx.compose.ui.platform.LocalContext.current
-                val prefs = remember(context) { androidx.preference.PreferenceManager.getDefaultSharedPreferences(context) }
-                
-                // Get configured credentials
-                val apiUrl = remember(prefs) { 
-                    prefs.getString("pref_translation_api_url", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent")?.trim() ?: "" 
-                }
-                val apiKey = remember(prefs) { prefs.getString("pref_translation_api_key", "")?.trim() ?: "" }
-                val isCloudConfigured = apiUrl.isNotEmpty() && apiKey.isNotEmpty()
-                
-                val engineKey = remember(context) { context.getString(R.string.translation_engine_key) }
-                var currentEngineValue by remember(engineKey) {
-                    mutableStateOf(prefs.getInt(engineKey, 1))
-                }
-                
-                // If current selected is Cloud AI but not configured, fallback to Google ML Kit (1)
-                LaunchedEffect(isCloudConfigured, currentEngineValue) {
-                    if (currentEngineValue == 4 && !isCloudConfigured) {
-                        currentEngineValue = 1
-                        prefs.edit().putInt(engineKey, 1).apply()
-                    }
-                }
-                
-                val availableEngines = remember(isCloudConfigured) {
-                    buildList {
-                        add(TranslationEngineType.GoogleMLKit)
-                        add(TranslationEngineType.GoogleGTX)
-                        add(TranslationEngineType.Yandex)
-                        if (isCloudConfigured) {
-                            add(TranslationEngineType.CloudAI)
-                        }
-                    }
-                }
-                
-                fun getEngineName(type: TranslationEngineType): String {
-                    return when (type) {
-                        TranslationEngineType.GoogleMLKit -> "On-Device (Google ML Kit)"
-                        TranslationEngineType.GoogleGTX -> "Online (Google GTX Scraper)"
-                        TranslationEngineType.Yandex -> "Online (Yandex Scraper)"
-                        TranslationEngineType.CloudAI -> "Cloud AI (API Key)"
-                        else -> "None"
-                    }
-                }
-                
-                var dropdownExpanded by remember { mutableStateOf(false) }
-                
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { dropdownExpanded = true }
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Translation Engine",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = getEngineName(TranslationEngineType.fromInt(currentEngineValue)),
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Box {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
-                            contentDescription = "Select Engine",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-                        ) {
-                            availableEngines.forEach { type ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = getEngineName(type),
-                                            fontWeight = if (currentEngineValue == type.value) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (currentEngineValue == type.value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    },
-                                    onClick = {
-                                        currentEngineValue = type.value
-                                        prefs.edit().putInt(engineKey, type.value).apply()
-                                        dropdownExpanded = false
-                                        if (viewModel.isTranslationActive) {
-                                            onApplyTranslationClick()
-                                        }
-                                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .glassCard(shape = RoundedCornerShape(24.dp))
+                            .padding(16.dp)
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SettingsButton(
+                                text = ReadActivityViewModel.MLSettings.fromShortToDisplay(viewModel.mlFromLanguage),
+                                iconRes = R.drawable.ic_baseline_menu_book_24,
+                                onClick = onMlFromClick,
+                                modifier = Modifier.weight(1f)
+                            )
+                            SettingsButton(
+                                text = ReadActivityViewModel.MLSettings.fromShortToDisplay(viewModel.mlToLanguage),
+                                iconRes = R.drawable.fiber_new_24px,
+                                onClick = onMlToClick,
+                                modifier = Modifier.weight(1f)
+                            )
+                            SettingsButton(
+                                text = stringResource(R.string.sort_apply),
+                                iconRes = R.drawable.translate_24px,
+                                onClick = onApplyTranslationClick,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black
                                 )
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val prefs = remember(context) { androidx.preference.PreferenceManager.getDefaultSharedPreferences(context) }
+                        
+                        // Get configured credentials
+                        val apiUrl = remember(prefs) { 
+                            prefs.getString("pref_translation_api_url", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent")?.trim() ?: "" 
+                        }
+                        val apiKey = remember(prefs) { prefs.getString("pref_translation_api_key", "")?.trim() ?: "" }
+                        val isCloudConfigured = apiUrl.isNotEmpty() && apiKey.isNotEmpty()
+                        
+                        val engineKey = remember(context) { context.getString(R.string.translation_engine_key) }
+                        var currentEngineValue by remember(engineKey) {
+                            mutableStateOf(prefs.getInt(engineKey, 1))
+                        }
+                        
+                        // If current selected is Cloud AI but not configured, fallback to Google ML Kit (1)
+                        LaunchedEffect(isCloudConfigured, currentEngineValue) {
+                            if (currentEngineValue == 4 && !isCloudConfigured) {
+                                currentEngineValue = 1
+                                prefs.edit().putInt(engineKey, 1).apply()
                             }
                         }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                var rememberTranslationState by remember { 
-                    mutableStateOf(prefs.getBoolean("reader_remember_translation_state", true)) 
-                }
-                SettingsSwitchRow("Remember Translation State", rememberTranslationState) { checked ->
-                    rememberTranslationState = checked
-                    prefs.edit().putBoolean("reader_remember_translation_state", checked).apply()
-                    if (!checked) {
-                        viewModel.mlSettings = viewModel.mlSettings
+                        
+                        val availableEngines = remember(isCloudConfigured) {
+                            buildList {
+                                add(TranslationEngineType.GoogleMLKit)
+                                add(TranslationEngineType.GoogleGTX)
+                                add(TranslationEngineType.Yandex)
+                                if (isCloudConfigured) {
+                                    add(TranslationEngineType.CloudAI)
+                                }
+                            }
+                        }
+                        
+                        fun getEngineName(type: TranslationEngineType): String {
+                            return when (type) {
+                                TranslationEngineType.GoogleMLKit -> "On-Device (Google ML Kit)"
+                                TranslationEngineType.GoogleGTX -> "Online (Google GTX Scraper)"
+                                TranslationEngineType.Yandex -> "Online (Yandex Scraper)"
+                                TranslationEngineType.CloudAI -> "Cloud AI (API Key)"
+                                else -> "None"
+                            }
+                        }
+                        
+                        var dropdownExpanded by remember { mutableStateOf(false) }
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { dropdownExpanded = true }
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Translation Engine",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = getEngineName(TranslationEngineType.fromInt(currentEngineValue)),
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Box {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+                                    contentDescription = "Select Engine",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                
+                                DropdownMenu(
+                                    expanded = dropdownExpanded,
+                                    onDismissRequest = { dropdownExpanded = false },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                ) {
+                                    availableEngines.forEach { type ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = getEngineName(type),
+                                                    fontWeight = if (currentEngineValue == type.value) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (currentEngineValue == type.value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                )
+                                            },
+                                            onClick = {
+                                                currentEngineValue = type.value
+                                                prefs.edit().putInt(engineKey, type.value).apply()
+                                                dropdownExpanded = false
+                                                if (viewModel.isTranslationActive) {
+                                                    onApplyTranslationClick()
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        var rememberTranslationState by remember { 
+                            mutableStateOf(prefs.getBoolean("reader_remember_translation_state", true)) 
+                        }
+                        SettingsSwitchRow("Remember Translation State", rememberTranslationState) { checked ->
+                            rememberTranslationState = checked
+                            prefs.edit().putBoolean("reader_remember_translation_state", checked).apply()
+                            if (!checked) {
+                                viewModel.mlSettings = viewModel.mlSettings
+                            }
+                        }
                     }
                 }
             }
@@ -693,7 +791,8 @@ fun SettingsSliderRow(
     stepSize: Float,
     leftIcon: Int,
     rightIcon: Int,
-    onValueChange: (Float) -> Unit
+    onValueChange: (Float) -> Unit,
+    valueFormatter: (Float) -> String = { if (stepSize >= 1f) it.toInt().toString() else it.toString() }
 ) {
     var liveValue by remember(value) { mutableStateOf(value) }
     
@@ -709,7 +808,7 @@ fun SettingsSliderRow(
                 color = Color.Gray
             )
             Text(
-                text = if (stepSize >= 1f) liveValue.toInt().toString() else liveValue.toString(),
+                text = valueFormatter(liveValue),
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -744,5 +843,60 @@ fun SettingsSliderRow(
                 modifier = Modifier.size(24.dp)
             )
         }
+    }
+}
+
+@Composable
+fun SectionHeader(
+    title: String,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    infoIcon: Int? = null,
+    onInfoClick: (() -> Unit)? = null
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow)
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle() }
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (infoIcon != null && onInfoClick != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = onInfoClick,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(infoIcon),
+                        contentDescription = "Info",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+        Icon(
+            painter = painterResource(id = R.drawable.ic_baseline_keyboard_arrow_down_24),
+            contentDescription = if (isExpanded) "Collapse" else "Expand",
+            modifier = Modifier.rotate(rotation),
+            tint = MaterialTheme.colorScheme.primary
+        )
     }
 }

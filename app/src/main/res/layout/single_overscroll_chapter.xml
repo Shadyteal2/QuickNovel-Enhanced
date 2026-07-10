@@ -4,40 +4,49 @@
         android:layout_width="match_parent"
         android:gravity="center"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:paddingTop="32dp"
+        android:paddingBottom="32dp"
+        android:orientation="vertical">
 
-    <androidx.core.widget.ContentLoadingProgressBar
-            android:padding="10dp"
-            android:id="@+id/progress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-
-            android:layout_gravity="start"
-            android:indeterminate="false"
-            android:max="100"
-            android:progress="0"
-
-            tools:progress="60"
-
-            android:progressDrawable="@drawable/circular_progress_bar_clockwise"
-            android:visibility="visible" />
-
-    <TextView
-            android:visibility="gone"
-            android:id="@+id/text"
-            android:layout_gravity="center"
-            android:textStyle="bold"
-            android:paddingBottom="7.5dp"
-            android:paddingTop="7.5dp"
-            android:fontFamily="serif"
-            android:lineSpacingExtra="3sp"
-            android:gravity="center"
-            tools:text="@string/exampleTXT"
-            android:textSize="16sp"
-            android:textColor="@color/readerTextColor"
-            android:clickable="false"
-            android:focusable="false"
+    <LinearLayout
+            android:id="@+id/overscroll_card"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:background="@drawable/spatial_glass_card"
+            android:elevation="4dp"
+            android:alpha="0.0">
+
+        <androidx.core.widget.ContentLoadingProgressBar
+                android:id="@+id/progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:indeterminate="false"
+                android:max="100"
+                android:progress="0"
+                tools:progress="60"
+                android:progressDrawable="@drawable/circular_progress_bar_clockwise" />
+
+        <TextView
+                android:id="@+id/text"
+                android:layout_gravity="center"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="start|center_vertical"
+                tools:text="Next Chapter: Chapter 5"
+                android:textSize="14sp"
+                android:paddingStart="12dp"
+                android:textColor="@color/readerTextColor"
+                android:clickable="false"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+    </LinearLayout>
 </LinearLayout>

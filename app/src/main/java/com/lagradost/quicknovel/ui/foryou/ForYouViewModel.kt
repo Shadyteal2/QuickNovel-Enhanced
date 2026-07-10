@@ -26,6 +26,7 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
     private val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
 
     private val _baseProfile = MutableStateFlow<UserTasteProfile>(UserTasteProfile.EMPTY)
+    val baseProfile: StateFlow<UserTasteProfile> = _baseProfile.asStateFlow()
 
     // Bounded and aggregated UserTasteProfile pipeline combining bookmarks and interactions reactively
     val profile: StateFlow<UserTasteProfile> = combine(
@@ -56,7 +57,7 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
         val preferredMap = baseProfile.preferredTags.associateBy { it.tag }.toMutableMap()
         val avoidedMap = baseProfile.avoidedTags.associateBy { it.tag }.toMutableMap()
         
-        // 1. Seed from Bookmarks
+        // 1. Seed from Bookmarks - only boost tags that are already preferred or avoided (do not auto-add new tags to prevent dilution)
         for (novel in bookmarks) {
             val novelTags = urlToTags[novel.source] ?: emptySet()
             for (tag in novelTags) {
@@ -66,8 +67,6 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
                         score = (current.score + 0.3f).coerceAtMost(1.0f),
                         confidence = (current.confidence + 0.3f).coerceAtMost(1.0f)
                     )
-                } else {
-                    preferredMap[tag] = TagAffinity(tag, 0.6f, 0.6f)
                 }
                 avoidedMap.remove(tag)
             }
@@ -259,7 +258,7 @@ class ForYouViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun markWizardComplete(diversityScore: Float) {
-        val current = profile.value
+        val current = _baseProfile.value
         saveProfile(current.copy(isWizardComplete = true, diversityScore = diversityScore))
     }
 

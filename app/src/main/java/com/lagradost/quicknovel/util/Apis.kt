@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.preference.PreferenceManager
 import com.lagradost.quicknovel.APIRepository
+import com.lagradost.quicknovel.APIRepository.Companion.providersActive
 import com.lagradost.quicknovel.CommonActivity.activity
 import com.lagradost.quicknovel.MainAPI
 import com.lagradost.quicknovel.R
@@ -28,11 +29,60 @@ class Apis {
         private val _apisLiveData = androidx.lifecycle.MutableLiveData<List<MainAPI>>()
         val apisLiveData: androidx.lifecycle.LiveData<List<MainAPI>> get() = _apisLiveData
 
+        private val _providersActiveLiveData = androidx.lifecycle.MutableLiveData<Set<String>>(emptySet())
+        val providersActiveLiveData: androidx.lifecycle.LiveData<Set<String>> get() = _providersActiveLiveData
+
+        private val _pinnedProvidersLiveData = androidx.lifecycle.MutableLiveData<Set<String>>(emptySet())
+        val pinnedProvidersLiveData: androidx.lifecycle.LiveData<Set<String>> get() = _pinnedProvidersLiveData
+
+        private val _hiddenProvidersLiveData = androidx.lifecycle.MutableLiveData<Set<String>>(emptySet())
+        val hiddenProvidersLiveData: androidx.lifecycle.LiveData<Set<String>> get() = _hiddenProvidersLiveData
+
+        val apisFlow = kotlinx.coroutines.flow.MutableStateFlow<List<MainAPI>>(emptyList())
+        val providersActiveFlow = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+        val pinnedProvidersFlow = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+        val hiddenProvidersFlow = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+
+        val pinnedProviders = java.util.concurrent.CopyOnWriteArraySet<String>()
+        val hiddenProviders = java.util.concurrent.CopyOnWriteArraySet<String>()
+
         private val _isSyncing = androidx.lifecycle.MutableLiveData<Boolean>(false)
         val isSyncing: androidx.lifecycle.LiveData<Boolean> get() = _isSyncing
 
         fun setSyncing(value: Boolean) {
             _isSyncing.postValue(value)
+        }
+
+        fun updateProvidersActive(context: Context) {
+            val settings = context.getApiSettings()
+            providersActive.clear()
+            providersActive.addAll(settings)
+            
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+            settingsManager.edit().putStringSet(context.getString(R.string.search_providers_list_key), settings).apply()
+            
+            val hidden = settingsManager.getStringSet("hidden_providers", emptySet()) ?: emptySet()
+            val pinned = settingsManager.getStringSet("pinned_providers", emptySet()) ?: emptySet()
+            
+            hiddenProviders.clear()
+            hiddenProviders.addAll(hidden)
+            pinnedProviders.clear()
+            pinnedProviders.addAll(pinned)
+
+            _providersActiveLiveData.postValue(settings)
+            _hiddenProvidersLiveData.postValue(hidden)
+            _pinnedProvidersLiveData.postValue(pinned)
+
+            providersActiveFlow.value = settings
+            hiddenProvidersFlow.value = hidden
+            pinnedProvidersFlow.value = pinned
+        }
+
+        fun clearPlugins() {
+            synchronized(pluginApis) {
+                pluginApis.clear()
+                cachedApis = null
+            }
         }
 
         val apis: List<MainAPI>
@@ -46,7 +96,7 @@ class Apis {
                 return combined
             }
 
-        private fun notifyChange() {
+        internal fun notifyChange() {
             // Re-build repository cache with pre-initialized objects atomically
             // Note: Caller already holds synchronized(pluginApis)
             val current = (internalApis + pluginApis).sortedBy { it.name }
@@ -63,6 +113,7 @@ class Apis {
             
             Log.i("Apis", "Providers updated and pre-warmed. Total: ${current.size}")
             _apisLiveData.postValue(current)
+            apisFlow.value = current
         }
 
         fun addPlugins(apis: List<MainAPI>) {
@@ -73,7 +124,12 @@ class Apis {
                     pluginApis.add(api)
                     com.lagradost.quicknovel.APIRepository.providersActive.add(api.name)
                 }
-                if (apis.isNotEmpty()) notifyChange()
+                if (apis.isNotEmpty()) {
+                    notifyChange()
+                    val activeSet = com.lagradost.quicknovel.APIRepository.providersActive.toSet()
+                    _providersActiveLiveData.postValue(activeSet)
+                    providersActiveFlow.value = activeSet
+                }
             }
         }
 
@@ -83,6 +139,9 @@ class Apis {
                 pluginApis.add(api)
                 com.lagradost.quicknovel.APIRepository.providersActive.add(api.name)
                 notifyChange()
+                val activeSet = com.lagradost.quicknovel.APIRepository.providersActive.toSet()
+                _providersActiveLiveData.postValue(activeSet)
+                providersActiveFlow.value = activeSet
             }
         }
 
@@ -99,16 +158,18 @@ class Apis {
         }
 
         /**
-         * Returns pre-warmed repositories for all currently active providers.
+         * Returns pre-warmed repositories for all currently active providers,
+         * excluding any that have been hidden by the user.
          * Uses the cached repository pool — O(1) lookup, zero allocation.
          */
         fun getActiveRepositories(): List<APIRepository> {
             val active = com.lagradost.quicknovel.APIRepository.providersActive
-            return if (active.isEmpty()) {
+            val repos = if (active.isEmpty()) {
                 apiRepositoryCache.values.toList()
             } else {
                 active.mapNotNull { name -> apiRepositoryCache[name] }
             }
+            return repos.filter { it.name !in hiddenProviders }
         }
 
         fun getApiFromNameNull(apiName: String?): MainAPI? {

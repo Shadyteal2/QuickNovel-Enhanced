@@ -7,6 +7,7 @@ import android.text.SpannableString
 import android.text.method.LinkMovementMethod
 import android.util.TypedValue
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -105,7 +106,10 @@ data class ScrollVisibilityIndex(
     val lastHalfVisible: TextVisualLine?,
 
     // first line after the bottom bar you can see clearly
-    val firstFullyVisibleUnderLine: TextVisualLine?
+    val firstFullyVisibleUnderLine: TextVisualLine?,
+
+    // first line visible on screen (even if partially)
+    val firstVisible: TextVisualLine? = null
 )
 
 /** this represents a single text line split by the layout, NOT newlines,
@@ -194,6 +198,7 @@ data class TextConfig(
     val letterSpacing: Float = 0f,
     val luminescent: Boolean = false,
     val luminescentIntensity: Float = 0.5f,
+    val bionicBoldRatio: Float = 0.4f,
 ) {
     private val fontFile: File? by lazy {
         if (textFont == "") null else {
@@ -323,6 +328,12 @@ class TextAdapter(
     fun changeBionicReading(to: Boolean): Boolean {
         if (config.bionicReading == to) return false
         config = config.copy(bionicReading = to)
+        return true
+    }
+
+    fun changeBionicBoldRatio(to: Float): Boolean {
+        if (config.bionicBoldRatio == to) return false
+        config = config.copy(bionicBoldRatio = to)
         return true
     }
 
@@ -733,7 +744,7 @@ class TextAdapter(
                 binding.root.apply {
                     // this is set to fix the nonclick https://stackoverflow.com/questions/8641343/android-clickablespan-not-calling-onclick
                     text = if (config.bionicReading) {
-                        obj.bionicText
+                        obj.getBionicText(config.bionicBoldRatio)
                     } else {
                         obj.text
                     }
@@ -786,8 +797,56 @@ class TextAdapter(
                         }
                     } else {
                         movementMethod = LinkMovementMethod.getInstance()
+                        var lastTouchX = 0f
+                        var lastTouchY = 0f
+                        setOnTouchListener { _, event ->
+                            if (event.action == MotionEvent.ACTION_DOWN) {
+                                lastTouchX = event.x
+                                lastTouchY = event.y
+                            }
+                            false
+                        }
+
                         setOnClickListener {
-                            viewModel.switchVisibility()
+                            val activity = ReadActivity2.readActivity
+                            if (activity != null && activity.viewModel.tapZonesEnabled && activity.viewModel.bottomVisibility.value != true) {
+                                val location = IntArray(2)
+                                getLocationOnScreen(location)
+                                val screenX = location[0] + lastTouchX
+                                val screenY = location[1] + lastTouchY
+
+                                val rvLocation = IntArray(2)
+                                activity.binding.realText.getLocationOnScreen(rvLocation)
+                                val localX = screenX - rvLocation[0].toFloat()
+                                val localY = screenY - rvLocation[1].toFloat()
+
+                                activity.routeTapZoneClick(localX, localY)
+                            } else {
+                                viewModel.switchVisibility()
+                            }
+                        }
+
+                        setOnLongClickListener { v ->
+                            if (v !is TextView) return@setOnLongClickListener false
+                            val layout = v.layout ?: return@setOnLongClickListener false
+                            try {
+                                val x = lastTouchX - v.paddingLeft + v.scrollX
+                                val y = lastTouchY - v.paddingTop + v.scrollY
+                                val line = layout.getLineForVertical(y.toInt())
+                                val offset = layout.getOffsetForHorizontal(line, x)
+
+                                val textStr = v.text.toString()
+                                val word = getWordAtOffset(textStr, offset)
+                                if (word.isNotBlank()) {
+                                    ReadActivity2.readActivity?.showDictionary(word)
+                                    v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                    true
+                                } else {
+                                    false
+                                }
+                            } catch (t: Throwable) {
+                                false
+                            }
                         }
                     }
                     //val links = obj.text.getSpans<io.noties.markwon.core.spans.LinkSpan>()
@@ -896,12 +955,10 @@ class TextAdapter(
     ) {
         if (binding !is SingleOverscrollChapterBinding) return
 
-        //binding.text.setText(obj.name)
-        binding.text.isVisible = false
+        binding.text.text = obj.name.asString(binding.root.context)
+        binding.text.isVisible = true
         binding.progress.progress = 0
-        //binding.root.setOnClickListener {
-        //    viewModel.seekToChapter(obj.loadIndex)
-        //}
+        binding.overscrollCard.alpha = 0f
     }
 
     private fun bindChapter(binding: ViewBinding, obj: ChapterStartSpanned) {
@@ -976,5 +1033,22 @@ class TextAdapter(
                 else -> throw NotImplementedError()
             }
         }
+    }
+
+    private fun getWordAtOffset(text: String, offset: Int): String {
+        if (text.isEmpty() || offset < 0 || offset >= text.length) return ""
+        val boundary = java.text.BreakIterator.getWordInstance()
+        boundary.setText(text)
+
+        var wordStart = boundary.preceding(offset + 1)
+        if (wordStart == java.text.BreakIterator.DONE) wordStart = 0
+        var wordEnd = boundary.following(offset)
+        if (wordEnd == java.text.BreakIterator.DONE) wordEnd = text.length
+
+        if (wordStart < 0) wordStart = 0
+        if (wordEnd > text.length) wordEnd = text.length
+        if (wordStart >= wordEnd) return ""
+
+        return text.substring(wordStart, wordEnd).filter { it.isLetter() }.trim()
     }
 }

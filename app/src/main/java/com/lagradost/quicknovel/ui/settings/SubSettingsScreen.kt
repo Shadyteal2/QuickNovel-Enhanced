@@ -1136,6 +1136,24 @@ fun SubSettingsScreen(
                         }
 
                         item {
+                            ActionPreferenceCard(
+                                title = "Clear All Providers ⚠️",
+                                summary = "Delete all downloaded and imported provider APKs and metadata",
+                                iconRes = R.drawable.ic_baseline_warning_24,
+                                onClick = { onPreferenceClick("clear_all_providers_key") }
+                            )
+                        }
+
+                        item {
+                            ActionPreferenceCard(
+                                title = "Manage Hidden Providers",
+                                summary = "Restore or unhide providers that you previously hid from search",
+                                iconRes = R.drawable.ic_baseline_select_all_24,
+                                onClick = { onPreferenceClick("manage_hidden_providers_key") }
+                            )
+                        }
+
+                        item {
                             SwitchPreferenceCard(
                                 title = "Automatic Cloudflare Solving",
                                 summary = "Automatically attempt to solve Cloudflare challenges using WebView",

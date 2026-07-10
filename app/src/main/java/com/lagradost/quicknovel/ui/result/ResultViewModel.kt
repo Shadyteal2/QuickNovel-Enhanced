@@ -3,6 +3,11 @@ package com.lagradost.quicknovel.ui.result
 import android.content.DialogInterface
 import android.content.Intent
 import androidx.appcompat.app.AlertDialog
+import android.net.Uri
+import androidx.core.content.FileProvider
+import java.io.File
+import com.lagradost.quicknovel.DOWNLOAD_TOTAL
+import com.lagradost.quicknovel.DOWNLOAD_SIZE
 import androidx.core.net.toUri
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -59,6 +64,9 @@ import com.lagradost.quicknovel.ui.download.REVERSE_CHAPTER_SORT
 import com.lagradost.quicknovel.ui.download.REVERSE_LAST_ACCES_SORT
 import com.lagradost.quicknovel.ui.download.REVERSE_LAST_UPDATED_SORT
 import com.lagradost.quicknovel.ui.download.SortingMethod
+import com.lagradost.quicknovel.ui.settings.getBasePath
+import com.lagradost.quicknovel.ui.settings.getDefaultDir
+import com.lagradost.safefile.SafeFile
 import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.ResultCached
@@ -555,6 +563,13 @@ class ResultViewModel : ViewModel() {
                     }
                 }
             }
+        }
+    }
+
+    fun forceDownloadDone() = viewModelScope.launchSafe {
+        loadMutex.withLock {
+            if (!hasLoaded) return@launchSafe
+            BookDownloader2.forceDownloadDone(loadId)
         }
     }
 
@@ -1232,16 +1247,58 @@ class ResultViewModel : ViewModel() {
                     } ?: DownloadState.Nothing
 
                     val inMemory = downloadProgress[loadId]
+                    val total = dbState.downloadTotal ?: inMemory?.total ?: (load as? StreamResponse)?.data?.size?.toLong() ?: 1L
                     val new = DownloadProgressState(
                         state = stateEnum,
                         progress = dbState.downloadProgress ?: inMemory?.progress ?: 0L,
-                        total = dbState.downloadTotal ?: inMemory?.total ?: (load as? StreamResponse)?.data?.size?.toLong() ?: 1L,
+                        total = total,
                         downloaded = dbState.downloadProgress ?: inMemory?.downloaded ?: 0L,
                         lastUpdatedMs = System.currentTimeMillis(),
                         etaMs = null
                     )
                     downloadProgress[loadId] = new
                     setDownloadState(new)
+
+                    // Asynchronously check if the EPUB exists on disk to override stale progress without blocking UI thread
+                    viewModelScope.launch(Dispatchers.IO) {
+                        try {
+                            val sApiname = BookDownloader2Helper.sanitizeFilename(apiName)
+                            val sAuthor = BookDownloader2Helper.sanitizeFilename(load.author ?: "")
+                            val sName = BookDownloader2Helper.sanitizeFilename(load.name)
+                            val cleanTitle = load.name.replace("[^a-zA-Z0-9]".toRegex(), "_")
+                            val ctx = context ?: com.lagradost.quicknovel.BaseApplication.context
+                            if (ctx != null) {
+                                val epubFile = File(
+                                    ctx.filesDir.toString() + BookDownloader2Helper.getDirectory(sApiname, sAuthor, sName),
+                                    BookDownloader2.LOCAL_EPUB
+                                )
+                                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                                val publicEpub = File(downloadsDir, "Epub/${cleanTitle}.epub")
+                                val publicPdf = File(downloadsDir, "Epub/${cleanTitle}.pdf")
+
+                                val epubExists = (epubFile.exists() && epubFile.length() > BookDownloader2.LOCAL_EPUB_MIN_SIZE) ||
+                                                (publicEpub.exists() && publicEpub.length() > BookDownloader2.LOCAL_EPUB_MIN_SIZE) ||
+                                                (publicPdf.exists() && publicPdf.length() > BookDownloader2.LOCAL_EPUB_MIN_SIZE)
+
+                                if (epubExists) {
+                                    val completedState = DownloadProgressState(
+                                        state = DownloadState.IsDone,
+                                        progress = total,
+                                        total = total,
+                                        downloaded = total,
+                                        lastUpdatedMs = System.currentTimeMillis(),
+                                        etaMs = null
+                                    )
+                                    withContext(Dispatchers.Main) {
+                                        downloadProgress[loadId] = completedState
+                                        setDownloadState(completedState)
+                                    }
+                                }
+                            }
+                        } catch (t: Throwable) {
+                            com.lagradost.quicknovel.mvvm.logError(t)
+                        }
+                    }
                 } else {
                     val current = downloadProgress[loadId]
                     if (current != null) {
@@ -1492,6 +1549,193 @@ class ResultViewModel : ViewModel() {
             }
             else -> {
                 isMigrating.postValue(false)
+            }
+        }
+    }
+
+    suspend fun getEpubFile(context: android.content.Context): File? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        val sApiname = BookDownloader2Helper.sanitizeFilename(apiName)
+        val sAuthor = BookDownloader2Helper.sanitizeFilename(load.author ?: "")
+        val sName = BookDownloader2Helper.sanitizeFilename(load.name)
+        val cleanTitle = load.name.replace("[^a-zA-Z0-9]".toRegex(), "_")
+        
+        // 1. Check internal fallback
+        val internalFile = File(
+            context.filesDir.toString() + BookDownloader2Helper.getDirectory(sApiname, sAuthor, sName),
+            BookDownloader2.LOCAL_EPUB
+        )
+        if (internalFile.exists() && internalFile.length() > BookDownloader2.LOCAL_EPUB_MIN_SIZE) {
+            return@withContext internalFile
+        }
+
+        // 2. Check custom path from database if set
+        try {
+            val db = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context)
+            val dbState = db.novelDao().getById(loadId)
+            if (dbState?.filePath != null) {
+                val dbFile = File(dbState.filePath)
+                if (dbFile.exists() && dbFile.length() > BookDownloader2.LOCAL_EPUB_MIN_SIZE) {
+                    return@withContext dbFile
+                }
+            }
+        } catch (t: Throwable) {
+            logError(t)
+        }
+
+        // 3. Check public Epub folder/custom path using SafeFile API (Scoped Storage compliant)
+        try {
+            val (subDir, _) = context.getBasePath()
+            val defaultDir = getDefaultDir(context)
+            val displayNameEpub = "${sName}.epub"
+            val displayNamePdf = "${sName}.pdf"
+
+            var foundFile: SafeFile? = null
+            var isPdf = false
+
+            if (subDir != null) {
+                foundFile = subDir.findFile(displayNameEpub)
+                if (foundFile == null) {
+                    foundFile = subDir.findFile(displayNamePdf)
+                    if (foundFile != null) isPdf = true
+                }
+            }
+
+            if (foundFile == null && defaultDir != null) {
+                foundFile = defaultDir.findFile(displayNameEpub)
+                if (foundFile == null) {
+                    foundFile = defaultDir.findFile(displayNamePdf)
+                    if (foundFile != null) isPdf = true
+                }
+            }
+
+            if (foundFile == null) {
+                val fallbackRoot = SafeFile.fromUri(context, File(context.filesDir, "Fallback-Epub").apply { mkdirs() }.toUri())
+                foundFile = fallbackRoot?.findFile(displayNameEpub)
+                if (foundFile == null) {
+                    foundFile = fallbackRoot?.findFile(displayNamePdf)
+                    if (foundFile != null) isPdf = true
+                }
+            }
+
+            if (foundFile != null) {
+                val extension = if (isPdf) ".pdf" else ".epub"
+                val cacheFile = File(context.cacheDir, "${cleanTitle}${extension}")
+                context.contentResolver.openInputStream(foundFile.uriOrThrow())?.use { input ->
+                    cacheFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                if (cacheFile.exists() && cacheFile.length() > BookDownloader2.LOCAL_EPUB_MIN_SIZE) {
+                    return@withContext cacheFile
+                }
+            }
+        } catch (t: Throwable) {
+            logError(t)
+        }
+
+        // 4. Legacy Check public Epub folder
+        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        val publicEpub = File(downloadsDir, "Epub/${cleanTitle}.epub")
+        if (publicEpub.exists() && publicEpub.length() > BookDownloader2.LOCAL_EPUB_MIN_SIZE) {
+            return@withContext publicEpub
+        }
+
+        val publicPdf = File(downloadsDir, "Epub/${cleanTitle}.pdf")
+        if (publicPdf.exists() && publicPdf.length() > BookDownloader2.LOCAL_EPUB_MIN_SIZE) {
+            return@withContext publicPdf
+        }
+
+        return@withContext null
+    }
+
+    fun shareEpub(context: android.content.Context) = viewModelScope.launchSafe(Dispatchers.Main) {
+        val epubFile = getEpubFile(context)
+        if (epubFile != null) {
+            try {
+                val authority = "${context.packageName}.provider"
+                val fileUri = FileProvider.getUriForFile(context, authority, epubFile)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = if (epubFile.name.endsWith(".pdf", ignoreCase = true)) "application/pdf" else "application/epub+zip"
+                    putExtra(Intent.EXTRA_STREAM, fileUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val chooser = Intent.createChooser(shareIntent, "Share Book")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+            } catch (t: Throwable) {
+                logError(t)
+                showToast("Failed to share: ${t.message}")
+            }
+        } else {
+            showToast("Book file not found. Re-download first.")
+        }
+    }
+
+    fun redownload(context: android.content.Context) = viewModelScope.launchSafe(Dispatchers.IO) {
+        try {
+            val sApiname = BookDownloader2Helper.sanitizeFilename(apiName)
+            val sAuthor = BookDownloader2Helper.sanitizeFilename(load.author ?: "")
+            val sName = BookDownloader2Helper.sanitizeFilename(load.name)
+            val cleanTitle = load.name.replace("[^a-zA-Z0-9]".toRegex(), "_")
+            val novelDir = File(
+                context.filesDir.toString() + BookDownloader2Helper.getDirectory(sApiname, sAuthor, sName)
+            )
+
+            // 1. Delete generated internal epub file
+            val epubFile = File(novelDir, BookDownloader2.LOCAL_EPUB)
+            if (epubFile.exists()) {
+                epubFile.delete()
+            }
+
+            // Also delete public EPUB/PDF files if they exist
+            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val publicEpub = File(downloadsDir, "Epub/${cleanTitle}.epub")
+            val publicPdf = File(downloadsDir, "Epub/${cleanTitle}.pdf")
+            if (publicEpub.exists()) {
+                publicEpub.delete()
+            }
+            if (publicPdf.exists()) {
+                publicPdf.delete()
+            }
+
+            // 2. Delete all other downloaded files inside directory (except poster)
+            if (novelDir.exists() && novelDir.isDirectory) {
+                novelDir.listFiles()?.forEach { file ->
+                    try {
+                        if (file.name != "poster.jpg" && file.name != BookDownloader2.LOCAL_EPUB) {
+                            file.delete()
+                        }
+                    } catch (t: Throwable) {
+                        logError(t) // Handle file locks gracefully
+                    }
+                }
+            }
+
+            // 3. Reset database record
+            val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(context).novelDao()
+            val totalChapters = (load as? StreamResponse)?.data?.size ?: 0
+            dao.updateDownloadProgress(loadId, DownloadState.Nothing.ordinal, 0L, totalChapters.toLong())
+
+            // 4. Update in-memory state and live data
+            val newState = DownloadProgressState(
+                state = DownloadState.Nothing,
+                progress = 0,
+                total = totalChapters.toLong(),
+                downloaded = 0,
+                lastUpdatedMs = System.currentTimeMillis(),
+                etaMs = null
+            )
+            BookDownloader2.downloadProgress[loadId] = newState
+            withContext(Dispatchers.Main) {
+                setDownloadState(newState)
+            }
+
+            // 5. Trigger download worker
+            BookDownloader2.download(load, context)
+        } catch (t: Throwable) {
+            logError(t)
+            withContext(Dispatchers.Main) {
+                showToast("Failed to start re-download: ${t.message}")
             }
         }
     }

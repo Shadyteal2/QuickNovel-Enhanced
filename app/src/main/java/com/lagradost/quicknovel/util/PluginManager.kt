@@ -236,6 +236,25 @@ object PluginManager {
     }
 
     /**
+     * Deletes all imported plugins from disk and clears all class loaders, caches, and memory.
+     */
+    fun deleteAllPlugins(context: Context) {
+        val dir = getPluginsDir(context)
+        dir.listFiles()?.forEach { it.delete() }
+        
+        synchronized(this) {
+            contextCache.clear()
+            loaderCache.clear()
+            classCache.clear()
+            verifiedSignatureCache.clear()
+            classLoaders.clear()
+        }
+        
+        Apis.clearPlugins()
+        Apis.updateProvidersActive(context)
+    }
+
+    /**
      * Synchronous entry point for application startup to ensure all providers are ready.
      * Uses internal parallelism to stay significantly faster than the original sequential loader.
      */
@@ -315,11 +334,14 @@ object PluginManager {
             
             val allResults = results.awaitAll()
             val allInstances = allResults.flatten()
+            Apis.clearPlugins()
             if (allInstances.isNotEmpty()) {
                 Apis.addPlugins(allInstances)
             } else {
+                Apis.notifyChange()
                 Log.w(TAG, "Scan complete: No providers were successfully loaded from existing files.")
             }
+            Apis.updateProvidersActive(context)
             
             val totalBundles = allResults.count { it.isNotEmpty() }
             Log.i(TAG, "Plugin initialization finished. Total bundles: $totalBundles, Total providers: ${allInstances.size}")

@@ -29,6 +29,8 @@ object DownloadPrefs {
     const val SETTINGS              = "download_settings"
     const val CUSTOM_PARALLEL_DOWNLOADS = "custom_parallel_downloads"
     const val CUSTOM_RATE_LIMIT         = "custom_rate_limit"
+    const val DOWNLOAD_REMOTE_CHAPTER_COUNT = "downloads_remote_chapter_count"
+    const val DOWNLOAD_REMOTE_CHAPTER_LAST_CHECKED = "downloads_remote_chapter_last_checked"
 }
 
 // ─── Reader ──────────────────────────────────────────────────────────────────
@@ -40,6 +42,8 @@ object ReaderPrefs {
     const val LOCK_ROTATION         = "reader_epub_rotation"
     const val TEXT_SIZE             = "reader_epub_text_size"
     const val TEXT_BIONIC           = "reader_epub_bionic_reading"
+    const val TEXT_BIONIC_RATIO     = "reader_epub_bionic_bold_ratio"
+    const val SHOW_PROGRESS_ONLY_ON_TAP = "reader_epub_show_progress_only_on_tap"
     const val TEXT_SELECTABLE       = "reader_epub_text_selectable"
     const val DICTIONARY_ENABLED    = "reader_epub_dictionary_enabled"
     const val SCROLL_VOL            = "reader_epub_scroll_volume"
@@ -54,6 +58,18 @@ object ReaderPrefs {
     const val SHOW_READER_PROGRESS  = "reader_epub_show_progress"
     const val PAGINATED_SWIPE_ENABLED = "reader_paginated_swipe_enabled"
     const val DYNAMIC_LUMINANCE_ENABLED = "reader_dynamic_luminance_enabled"
+    const val PINCH_FONT_ENABLED    = "reader_pinch_font_enabled"
+    const val SWIPE_BRIGHTNESS_ENABLED = "reader_swipe_brightness_enabled"
+
+    object TapZones {
+        const val ENABLED           = "reader_tap_zones_enabled"
+        const val ZONE_LEFT         = "reader_tap_zone_left"
+        const val ZONE_RIGHT        = "reader_tap_zone_right"
+        const val ZONE_TOP          = "reader_tap_zone_top"
+        const val ZONE_CENTER       = "reader_tap_zone_center"
+        const val ZONE_BOTTOM       = "reader_tap_zone_bottom"
+    }
+
     const val LINE_HEIGHT_MULTIPLIER = "reader_line_height_multiplier"
     const val ACTIVE_CUSTOM_THEME    = "reader_active_custom_theme"
     const val CONTENT_RULES_ENABLED  = "reader_content_rules_enabled"

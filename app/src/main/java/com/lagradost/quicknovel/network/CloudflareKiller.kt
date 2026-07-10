@@ -29,6 +29,8 @@ class CloudflareKiller : Interceptor {
     }
 
     private val savedCookies: MutableMap<String, Map<String, String>> = mutableMapOf()
+    private val cookieTimestamps: MutableMap<String, Long> = mutableMapOf()
+    private val COOKIE_TTL_MS = 30 * 60 * 1000L // 30 minutes
 
     override fun intercept(chain: Interceptor.Chain): Response = runBlocking {
         val request = chain.request()
@@ -127,12 +129,40 @@ class CloudflareKiller : Interceptor {
     }
 
     private fun trySolveWithSavedCookies(request: Request): Boolean {
-        return getWebViewCookie(request.url.toString())?.let { cookie ->
-            if (cookie.contains("cf_clearance")) {
-                savedCookies[request.url.host] = parseCookieMap(cookie)
-                true
-            } else false
-        } ?: false
+        val host = request.url.host
+        val now = System.currentTimeMillis()
+        val lastSolved = cookieTimestamps[host] ?: 0L
+
+        // If the request already contains the exact cf_clearance cookie that we saved,
+        // and we still got a 403/503/challenge, it means that cookie has been invalidated.
+        // In that case, we must NOT return true, otherwise we'd loop trying the same cookie.
+        val reqCfClearance = request.cookies["cf_clearance"]
+
+        val cookie = getWebViewCookie(request.url.toString()) ?: return false
+        if (cookie.contains("cf_clearance")) {
+            val parsed = parseCookieMap(cookie)
+            val currentCfClearance = parsed["cf_clearance"]
+
+            if (currentCfClearance != null && currentCfClearance == reqCfClearance) {
+                return false
+            }
+
+            val saved = savedCookies[request.url.host]
+
+            // Case 1: Cookie is valid and within TTL, and matches what we have saved
+            if (lastSolved != 0L && (now - lastSolved) <= COOKIE_TTL_MS && currentCfClearance == saved?.get("cf_clearance")) {
+                return true
+            }
+
+            // Case 2: Either we don't have a saved timestamp, or it's expired, or it's a new cookie.
+            // If the cookie in CookieManager is different from the one we last saved, it's a new solve!
+            if (currentCfClearance != saved?.get("cf_clearance")) {
+                savedCookies[request.url.host] = parsed
+                cookieTimestamps[host] = now
+                return true
+            }
+        }
+        return false
     }
 
     private suspend fun proceed(request: Request, cookies: Map<String, String>): Response {

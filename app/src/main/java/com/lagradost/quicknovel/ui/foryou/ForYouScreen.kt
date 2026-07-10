@@ -69,7 +69,7 @@ fun ForYouScreen(
     onRefresh: () -> Unit
 ) {
     val context = LocalContext.current
-    val profile by viewModel.profile.collectAsStateWithLifecycle()
+    val baseProfile by viewModel.baseProfile.collectAsStateWithLifecycle()
     val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
     val carouselItems by viewModel.carouselItems.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -84,12 +84,12 @@ fun ForYouScreen(
         modifier = Modifier.fillMaxSize(),
         color = containerColor
     ) {
-        if (!profile.isWizardComplete) {
+        if (!baseProfile.isWizardComplete) {
             WizardScreen(
-                profile = profile,
+                profile = baseProfile,
                 onTagsSelected = { selected ->
                     val affinities = selected.map { TagAffinity(it, 1.0f, 1.0f) }
-                    viewModel.saveProfile(profile.copy(preferredTags = affinities))
+                    viewModel.saveProfile(baseProfile.copy(preferredTags = affinities))
                 },
                 onComplete = { diversity -> viewModel.markWizardComplete(diversity) }
             )
@@ -102,7 +102,7 @@ fun ForYouScreen(
                 onBookClick = onBookClick,
                 onRefresh = onRefresh,
                 onEditTags = {
-                    viewModel.saveProfile(profile.copy(isWizardComplete = false))
+                    viewModel.saveProfile(baseProfile.copy(isWizardComplete = false))
                 },
                 onDismissClick = { url -> viewModel.recordInteraction(url, "DISMISS") }
             )

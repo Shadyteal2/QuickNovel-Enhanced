@@ -136,10 +136,16 @@ fun DownloadScreen(
             }
         }
     }
+    val onDownloadNewClick = remember(viewModel) {
+        { card: DownloadFragment.DownloadDataLoaded ->
+            viewModel.downloadNewChapters(card)
+        }
+    }
 
     // Observe sorting, query, lists, categories
     // Observe sorting, query, lists, categories
     val cards by viewModel.cards.observeAsState(emptyList())
+    val isCheckingUpdates by viewModel.isCheckingUpdates.collectAsState()
     val categories by viewModel.categories.observeAsState(emptyList<CategoryItem>())
     val pages by viewModel.pages.observeAsState(emptyList<com.lagradost.quicknovel.ui.download.Page>())
     val currentQuery by viewModel.searchQuery.observeAsState("")
@@ -312,13 +318,29 @@ fun DownloadScreen(
                         )
 
                         // Check updates / refresh
+                        val infiniteTransition = rememberInfiniteTransition(label = "syncRotation")
+                        val syncRotation by if (isCheckingUpdates) {
+                            infiniteTransition.animateFloat(
+                                initialValue = 0f,
+                                targetValue = 360f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(1200, easing = LinearEasing),
+                                    repeatMode = RepeatMode.Restart
+                                ),
+                                label = "syncAngle"
+                            )
+                        } else {
+                            remember { mutableStateOf(0f) }
+                        }
+
                         ModernIconButton(
                             icon = Icons.Default.Sync,
                             contentDescription = "Refresh & sync downloads",
-                            isActive = false,
+                            isActive = isCheckingUpdates,
+                            modifier = Modifier.graphicsLayer { rotationZ = syncRotation },
                             onClick = {
                                 view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                                viewModel.loadAllData(true)
+                                viewModel.checkForChapterUpdates(force = true)
                                 com.lagradost.quicknovel.CommonActivity.showToast(activity, "Checking for updates...")
                             }
                         )
@@ -884,6 +906,7 @@ fun DownloadScreen(
                                             onResumeClick = { if (card is DownloadFragment.DownloadDataLoaded) onResumeClick(card) },
                                             onRefreshClick = { if (card is DownloadFragment.DownloadDataLoaded) onRefreshClick(card) },
                                             onDeleteClick = { onDeleteClick(card) },
+                                            onDownloadNewClick = { if (card is DownloadFragment.DownloadDataLoaded) onDownloadNewClick(card) },
                                             isSelectionMode = isSelectionMode,
                                             isSelected = isSelected,
                                             modifier = Modifier.animateItem()
@@ -1320,16 +1343,16 @@ fun DownloadScreen(
 
     // Modal Bottom Sheet: Sort options
     if (showSortSheet) {
-        val currentSelectedIdx = if (pagerState.currentPage == 0) {
-            com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.DOWNLOAD_SORTING_METHOD) ?: 0
-        } else {
-            com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.DOWNLOAD_NORMAL_SORTING_METHOD) ?: 0
-        }
-        
         val sortingList = if (pagerState.currentPage == 0) {
             DownloadViewModel.sortingMethods
         } else {
             DownloadViewModel.normalSortingMethods
+        }
+        
+        val currentSelectedId = if (pagerState.currentPage == 0) {
+            com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.DOWNLOAD_SORTING_METHOD) ?: DEFAULT_SORT
+        } else {
+            com.lagradost.quicknovel.BaseApplication.getKey<Int>(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.DOWNLOAD_NORMAL_SORTING_METHOD) ?: DEFAULT_SORT
         }
 
         ModalBottomSheet(
@@ -1351,18 +1374,25 @@ fun DownloadScreen(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                sortingList.forEachIndexed { index, pair ->
-                    val isSelected = index == currentSelectedIdx
+                sortingList.forEach { pair ->
+                    val isSelected = currentSelectedId == pair.id || currentSelectedId == pair.inverse
+                    val isInverse = currentSelectedId == pair.inverse && pair.inverse != pair.id
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .clickable {
                                 view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                if (pagerState.currentPage == 0) {
-                                    com.lagradost.quicknovel.BaseApplication.setKey(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.DOWNLOAD_SORTING_METHOD, index)
+                                val targetId = if (currentSelectedId == pair.id && pair.inverse != pair.id) {
+                                    pair.inverse
                                 } else {
-                                    com.lagradost.quicknovel.BaseApplication.setKey(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.DOWNLOAD_NORMAL_SORTING_METHOD, index)
+                                    pair.id
+                                }
+                                
+                                if (pagerState.currentPage == 0) {
+                                    com.lagradost.quicknovel.BaseApplication.setKey(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.DOWNLOAD_SORTING_METHOD, targetId)
+                                } else {
+                                    com.lagradost.quicknovel.BaseApplication.setKey(com.lagradost.quicknovel.DOWNLOAD_SETTINGS, com.lagradost.quicknovel.DOWNLOAD_NORMAL_SORTING_METHOD, targetId)
                                 }
                                 viewModel.resortAllData()
                                 showSortSheet = false
@@ -1371,8 +1401,11 @@ fun DownloadScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        val suffix = if (isSelected && pair.inverse != pair.id) {
+                            if (isInverse) " ↓" else " ↑"
+                        } else ""
                         Text(
-                            text = context.getString(pair.name),
+                            text = context.getString(pair.name) + suffix,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
@@ -1959,6 +1992,32 @@ fun GridCardItem(
                     )
             )
 
+            // New chapters update badge
+            val newUpdates = remember(card) {
+                if (card is DownloadFragment.DownloadDataLoaded) card.newChaptersAvailable else 0
+            }
+            if (newUpdates > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .glassCard(
+                            shape = RoundedCornerShape(6.dp),
+                            backgroundColor = Color(0xFF00BFA5), // Teal/green
+                            strokeColor = Color(0xFF00BFA5).copy(alpha = 0.5f),
+                            strokeWidth = 0.5.dp
+                        )
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "+$newUpdates new",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             // Diff unread count badge
             if (diffCount > 0) {
                 Box(
@@ -2067,6 +2126,7 @@ fun CompactCardItem(
     onResumeClick: () -> Unit,
     onRefreshClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    onDownloadNewClick: () -> Unit = {},
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     modifier: Modifier = Modifier
@@ -2184,6 +2244,27 @@ fun CompactCardItem(
                     com.lagradost.quicknovel.ui.theme.LoadingIndicator(
                         modifier = Modifier.size(24.dp),
                         color = Color.White
+                    )
+                }
+            }
+
+            val newUpdates = remember(card) {
+                if (card is DownloadFragment.DownloadDataLoaded) card.newChaptersAvailable else 0
+            }
+            if (newUpdates > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .background(Color(0xFF00BFA5), shape = RoundedCornerShape(4.dp))
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "+$newUpdates new",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 8.sp
                     )
                 }
             }
@@ -2373,6 +2454,19 @@ fun CompactCardItem(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (card.newChaptersAvailable > 0) {
+                    IconButton(onClick = {
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                        onDownloadNewClick()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download new chapters",
+                            tint = Color(0xFF00BFA5) // Teal/green
+                        )
+                    }
+                }
+
                 // Action: Pause / Resume / Refresh
                 if (card.generating || realState == DownloadState.IsPending) {
                     Box(

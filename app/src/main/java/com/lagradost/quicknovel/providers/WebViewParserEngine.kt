@@ -5,6 +5,8 @@ import android.content.Context
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.lagradost.quicknovel.ChapterData
 import com.lagradost.quicknovel.USER_AGENT
 import com.lagradost.quicknovel.util.Coroutines.main
@@ -23,6 +25,57 @@ object WebViewParserEngine {
     private val mutex = Mutex()
     private var webView: WebView? = null
     private var activeDialog: androidx.appcompat.app.AlertDialog? = null
+
+    private val STEALTH_SCRIPT = """
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => {
+                const arr = [
+                    { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+                    { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
+                    { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' }
+                ];
+                arr.__proto__ = PluginArray.prototype;
+                return arr;
+            }
+        });
+        window.chrome = {
+            runtime: {
+                connect: () => {},
+                sendMessage: () => {},
+                id: undefined
+            },
+            loadTimes: () => ({
+                requestTime: Date.now() / 1000,
+                startLoadTime: Date.now() / 1000,
+                commitLoadTime: Date.now() / 1000,
+                finishDocumentLoadTime: 0,
+                finishLoadTime: 0,
+                firstPaintTime: 0,
+                firstPaintAfterLoadTime: 0,
+                navigationType: 'Other',
+                wasFetchedViaSpdy: false,
+                wasNpnNegotiated: false,
+                npnNegotiatedProtocol: 'http/1.1',
+                wasAlternateProtocolAvailable: false,
+                connectionInfo: 'http/1.1'
+            }),
+            csi: () => ({
+                startE: Date.now(),
+                onloadT: Date.now(),
+                pageT: 0,
+                tran: 15
+            })
+        };
+        if (window.navigator.permissions && window.navigator.permissions.query) {
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) =>
+                parameters.name === 'notifications'
+                    ? Promise.resolve({ state: typeof Notification !== 'undefined' ? Notification.permission : 'default' })
+                    : originalQuery(parameters);
+        }
+    """.trimIndent()
+
     
     // In-memory script cache to avoid repeated disk reads
     private var cachedCoreScripts: String? = null
@@ -96,6 +149,9 @@ object WebViewParserEngine {
             settings.userAgentString = USER_AGENT
             // Do NOT block images as it triggers headless/bot detection on Cloudflare Turnstile
             settings.blockNetworkImage = false 
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(new, STEALTH_SCRIPT, setOf("*"))
         }
         webView = new
         return new
@@ -176,6 +232,17 @@ object WebViewParserEngine {
                 view.addJavascriptInterface(bridge, "AndroidBridge")
                 
                 view.webViewClient = object : WebViewClient() {
+                    override fun onPageStarted(
+                        v: WebView?,
+                        pageUrl: String?,
+                        favicon: android.graphics.Bitmap?
+                    ) {
+                        super.onPageStarted(v, pageUrl, favicon)
+                        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                            v?.evaluateJavascript(STEALTH_SCRIPT, null)
+                        }
+                    }
+
                     override fun onPageFinished(v: WebView?, pageUrl: String?) {
                         super.onPageFinished(v, pageUrl)
                         

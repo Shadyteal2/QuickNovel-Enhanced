@@ -34,6 +34,7 @@ import com.lagradost.quicknovel.DOWNLOAD_NORMAL_SORTING_METHOD
 import com.lagradost.quicknovel.DOWNLOAD_SETTINGS
 import com.lagradost.quicknovel.DOWNLOAD_SORTING_METHOD
 import com.lagradost.quicknovel.RESULT_PINNED
+import com.lagradost.quicknovel.DownloadPrefs
 import com.lagradost.quicknovel.DownloadActionType
 import com.lagradost.quicknovel.DownloadFileWorkManager
 import com.lagradost.quicknovel.DownloadFileWorkManager.Companion.viewModel
@@ -55,6 +56,9 @@ import com.lagradost.quicknovel.util.ResultCached
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -125,12 +129,14 @@ class DownloadViewModel : ViewModel() {
                 R.string.download_perc, DOWNLOADPRECENTAGE_SORT,
                 REVERSE_DOWNLOADPRECENTAGE_SORT
             ),
+            SortingMethod(R.string.chapter_sort, CHAPTER_SORT, REVERSE_CHAPTER_SORT)
         )
 
         val normalSortingMethods = arrayOf(
             SortingMethod(R.string.default_sort, DEFAULT_SORT),
             SortingMethod(R.string.recently_sort, LAST_ACCES_SORT, REVERSE_LAST_ACCES_SORT),
             SortingMethod(R.string.alpha_sort, ALPHA_SORT, REVERSE_ALPHA_SORT),
+            SortingMethod(R.string.chapter_sort, CHAPTER_SORT, REVERSE_CHAPTER_SORT)
         )
 
         val systemCategories = listOf(
@@ -182,6 +188,9 @@ class DownloadViewModel : ViewModel() {
 
     private val _readList = MutableStateFlow<List<CategoryItem>>(getSavedCategories())
     val readList: List<CategoryItem> get() = _readList.value
+
+    private val _isCheckingUpdates = MutableStateFlow(false)
+    val isCheckingUpdates: kotlinx.coroutines.flow.StateFlow<Boolean> = _isCheckingUpdates
 
     var activeQuery: String = ""
     private var resortJob: Job? = null
@@ -263,6 +272,9 @@ class DownloadViewModel : ViewModel() {
                         val total = novel.downloadTotal ?: info?.total ?: 0L
                         val state = novel.downloadStatus?.let { DownloadState.values().getOrNull(it) } ?: info?.state ?: DownloadState.Nothing
                         
+                        val remoteCount = getKey<Int>(DOWNLOAD_SETTINGS, "${DownloadPrefs.DOWNLOAD_REMOTE_CHAPTER_COUNT}_${novel.id}") ?: 0
+                        val newChapters = (remoteCount - total.toInt()).coerceAtLeast(0)
+
                         cardsData[novel.id] = com.lagradost.quicknovel.ui.download.DownloadFragment.DownloadDataLoaded(
                             source = novel.source,
                             name = novel.name,
@@ -287,7 +299,8 @@ class DownloadViewModel : ViewModel() {
                             formatType = novel.formatType,
                             hash = novel.hash,
                             bookmarkType = novel.bookmarkType,
-                            lastChapterRead = getKey<Int>(com.lagradost.quicknovel.EPUB_CURRENT_POSITION, novel.name)?.let { it + 1 } ?: 0
+                            lastChapterRead = getKey<Int>(com.lagradost.quicknovel.EPUB_CURRENT_POSITION, novel.name)?.let { it + 1 } ?: 0,
+                            newChaptersAvailable = newChapters
                         )
                     }
                 }
@@ -397,6 +410,77 @@ class DownloadViewModel : ViewModel() {
 
     fun refreshReadingProgress(){
         DownloadFileWorkManager.refreshAllReadingProgress(this@DownloadViewModel, context ?: return, currentTab.value ?: 1)
+    }
+
+    fun checkForChapterUpdates(force: Boolean = false): Job = viewModelScope.launch(Dispatchers.IO) {
+        if (_isCheckingUpdates.value) return@launch
+        _isCheckingUpdates.value = true
+        try {
+            val downloadedNovels = dao.getAll().filter {
+                it.downloadStatus != null && it.downloadStatus != DownloadState.Nothing.ordinal &&
+                it.apiName != com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE &&
+                it.apiName != com.lagradost.quicknovel.BookDownloader2Helper.IMPORT_SOURCE_PDF
+            }
+            if (downloadedNovels.isEmpty()) return@launch
+
+            val twelveHours = 12 * 60 * 60 * 1000L
+            val currentTime = System.currentTimeMillis()
+            val semaphore = kotlinx.coroutines.sync.Semaphore(4)
+
+            kotlinx.coroutines.coroutineScope {
+                downloadedNovels.map { novel ->
+                    async(Dispatchers.IO) {
+                        val lastChecked = getKey<Long>(
+                            DOWNLOAD_SETTINGS,
+                            "${DownloadPrefs.DOWNLOAD_REMOTE_CHAPTER_LAST_CHECKED}_${novel.id}",
+                            0L
+                        ) ?: 0L
+
+                        if (!force && (currentTime - lastChecked) < twelveHours) {
+                            return@async
+                        }
+
+                        semaphore.withPermit {
+                            try {
+                                val api = getApiFromNameOrNull(novel.apiName) ?: return@withPermit
+                                val resource = api.load(novel.source, allowCache = true)
+                                val response = (resource as? Resource.Success)?.value as? StreamResponse ?: return@withPermit
+                                val totalChapters = response.data.size
+                                
+                                setKey(DOWNLOAD_SETTINGS, "${DownloadPrefs.DOWNLOAD_REMOTE_CHAPTER_COUNT}_${novel.id}", totalChapters)
+                                setKey(DOWNLOAD_SETTINGS, "${DownloadPrefs.DOWNLOAD_REMOTE_CHAPTER_LAST_CHECKED}_${novel.id}", currentTime)
+                            } catch (e: Throwable) {
+                                if (e !is CancellationException) logError(e)
+                            }
+                        }
+                    }
+                }.forEach { it.await() }
+            }
+        } catch (t: Throwable) {
+            logError(t)
+        } finally {
+            _isCheckingUpdates.value = false
+            loadAllData(false)
+        }
+    }
+
+    fun downloadNewChapters(card: DownloadFragment.DownloadDataLoaded) = ioSafe {
+        val api = getApiFromNameOrNull(card.apiName) ?: return@ioSafe
+        val response = api.load(card.source, allowCache = false)
+        if (response is Resource.Success) {
+            val loaded = response.value as? StreamResponse ?: return@ioSafe
+            val startIndex = card.downloadedTotal.toInt()
+            if (startIndex >= loaded.data.size) {
+                return@ioSafe
+            }
+            clearUpdateBadge(card)
+            val indices = startIndex until loaded.data.size
+            DownloadFileWorkManager.download(loaded, context ?: return@ioSafe, card.id, indices.toList())
+        }
+    }
+
+    fun clearUpdateBadge(card: DownloadFragment.DownloadDataLoaded) {
+        removeKey(DOWNLOAD_SETTINGS, "${DownloadPrefs.DOWNLOAD_REMOTE_CHAPTER_COUNT}_${card.id}")
     }
 
     fun showMetadata(card: DownloadFragment.DownloadDataLoaded) {
@@ -523,6 +607,8 @@ class DownloadViewModel : ViewModel() {
         method: Int
     ): List<DownloadFragment.DownloadDataLoaded> {
         val mutable = list.toMutableList()
+        val accessTimes = list.associate { it.id to (getKey<Long>(DOWNLOAD_EPUB_LAST_ACCESS, it.id.toString(), 0L) ?: 0L) }
+
         when (method) {
             ALPHA_SORT -> {
                 mutable.sortBy { t -> t.name }
@@ -548,50 +634,38 @@ class DownloadViewModel : ViewModel() {
                 mutable.sortBy { t -> t.downloadedCount.toFloat() / t.downloadedTotal }
             }
 
+            LAST_ACCES_SORT -> {
+                mutable.sortByDescending { t -> accessTimes[t.id] ?: 0L }
+            }
+
             REVERSE_LAST_ACCES_SORT -> {
-                mutable.sortBy { t ->
-                    (getKey<Long>(
-                        DOWNLOAD_EPUB_LAST_ACCESS,
-                        t.id.toString(),
-                        0
-                    )!!)
-                }
+                mutable.sortBy { t -> accessTimes[t.id] ?: 0L }
             }
 
             LAST_UPDATED_SORT -> {
                 if (mutable.any { it.lastDownloaded == null }) {
-                    mutable.sortByDescending { t ->
-                        (getKey<Long>(
-                            DOWNLOAD_EPUB_LAST_ACCESS,
-                            t.id.toString(),
-                            0
-                        )!!)
-                    }
+                    mutable.sortByDescending { t -> accessTimes[t.id] ?: 0L }
                 }
                 mutable.sortByDescending { it.lastDownloaded ?: 0L }
             }
 
             REVERSE_LAST_UPDATED_SORT -> {
                 if (mutable.any { it.lastDownloaded == null }) {
-                    mutable.sortByDescending { t ->
-                        (getKey<Long>(
-                            DOWNLOAD_EPUB_LAST_ACCESS,
-                            t.id.toString(),
-                            0
-                        )!!)
-                    }
+                    mutable.sortByDescending { t -> accessTimes[t.id] ?: 0L }
                 }
                 mutable.sortBy { it.lastDownloaded ?: 0L }
             }
-            //DEFAULT_SORT, LAST_ACCES_SORT
+
+            CHAPTER_SORT -> {
+                mutable.sortByDescending { t -> t.downloadedTotal }
+            }
+
+            REVERSE_CHAPTER_SORT -> {
+                mutable.sortBy { t -> t.downloadedTotal }
+            }
+
             else -> {
-                mutable.sortByDescending { t ->
-                    (getKey<Long>(
-                        DOWNLOAD_EPUB_LAST_ACCESS,
-                        t.id.toString(),
-                        0
-                    )!!)
-                }
+                mutable.sortByDescending { t -> accessTimes[t.id] ?: 0L }
             }
         }
         return mutable
@@ -624,6 +698,8 @@ class DownloadViewModel : ViewModel() {
         method: Int
     ): List<ResultCached> {
         val mutable = list.toMutableList()
+        val accessTimes = list.associate { it.id to (getKey<Long>(DOWNLOAD_EPUB_LAST_ACCESS, it.id.toString(), 0L) ?: 0L) }
+
         when (method) {
             ALPHA_SORT -> {
                 mutable.sortBy { t -> t.name }
@@ -633,24 +709,24 @@ class DownloadViewModel : ViewModel() {
                 mutable.sortByDescending { t -> t.name }
             }
 
-            REVERSE_LAST_ACCES_SORT -> {
-                mutable.sortBy { t ->
-                    (getKey<Long>(
-                        DOWNLOAD_EPUB_LAST_ACCESS,
-                        t.id.toString(),
-                        0
-                    )!!)
-                }
+            LAST_ACCES_SORT -> {
+                mutable.sortByDescending { t -> accessTimes[t.id] ?: 0L }
             }
-            // DEFAULT_SORT, LAST_ACCES_SORT
+
+            REVERSE_LAST_ACCES_SORT -> {
+                mutable.sortBy { t -> accessTimes[t.id] ?: 0L }
+            }
+
+            CHAPTER_SORT -> {
+                mutable.sortByDescending { t -> t.currentTotalChapters }
+            }
+
+            REVERSE_CHAPTER_SORT -> {
+                mutable.sortBy { t -> t.currentTotalChapters }
+            }
+
             else -> {
-                mutable.sortByDescending { t ->
-                    (getKey<Long>(
-                        DOWNLOAD_EPUB_LAST_ACCESS,
-                        t.id.toString(),
-                        0
-                    )!!)
-                }
+                mutable.sortByDescending { t -> accessTimes[t.id] ?: 0L }
             }
         }
         return mutable
@@ -698,7 +774,10 @@ class DownloadViewModel : ViewModel() {
 
     // QN-Enhanced: Background data loading from Room SSOT with native SQLite sorting/filtering
     fun loadAllData(refreshAll: Boolean) = viewModelScope.launch(Dispatchers.Default) {
-        if (refreshAll) fetchAllData(false)
+        if (refreshAll) {
+            fetchAllData(false)
+            checkForChapterUpdates(false)
+        }
         val mapping: HashMap<Int, ArrayList<ResultCached>> = hashMapOf()
         val currentCategories = readList
         for (cat in currentCategories) {
@@ -912,6 +991,7 @@ class DownloadViewModel : ViewModel() {
                     lastUpdated = value.lastUpdated,
                     lastDownloaded = value.lastDownloaded
                 ) ?: run {
+                    val remoteCount = getKey<Int>(DOWNLOAD_SETTINGS, "${DownloadPrefs.DOWNLOAD_REMOTE_CHAPTER_COUNT}_$id") ?: 0
                     DownloadFragment.DownloadDataLoaded(
                         source = value.source,
                         name = value.name,
@@ -932,6 +1012,7 @@ class DownloadViewModel : ViewModel() {
                         lastUpdated = value.lastUpdated,
                         lastDownloaded = value.lastDownloaded,
                         readCount = getKey(DOWNLOAD_EPUB_SIZE, id.toString()) ?: 0,
+                        newChaptersAvailable = remoteCount
                     )
                 }
             }
@@ -943,6 +1024,8 @@ class DownloadViewModel : ViewModel() {
             cardsDataMutex.withLock {
                 BookDownloader2.downloadData.map { (key, value) ->
                     val info = downloadProgress[key] ?: return@map
+                    val remoteCount = getKey<Int>(DOWNLOAD_SETTINGS, "${DownloadPrefs.DOWNLOAD_REMOTE_CHAPTER_COUNT}_$key") ?: 0
+                    val newChapters = (remoteCount - info.total.toInt()).coerceAtLeast(0)
                     cardsData[key] = DownloadFragment.DownloadDataLoaded(
                         source = value.source,
                         name = value.name,
@@ -963,6 +1046,7 @@ class DownloadViewModel : ViewModel() {
                         lastUpdated = value.lastUpdated,
                         lastDownloaded = value.lastDownloaded,
                         readCount = getKey(DOWNLOAD_EPUB_SIZE, key.toString()) ?: 0,
+                        newChaptersAvailable = newChapters
                     )
                 }
             }

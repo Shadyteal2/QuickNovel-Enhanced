@@ -235,5 +235,10 @@ object CommonActivity {
             android.graphics.Color.TRANSPARENT
         act.window?.statusBarColor =
             android.graphics.Color.TRANSPARENT
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            act.window?.isNavigationBarContrastEnforced = false
+            act.window?.isStatusBarContrastEnforced = false
+        }
     }
 }

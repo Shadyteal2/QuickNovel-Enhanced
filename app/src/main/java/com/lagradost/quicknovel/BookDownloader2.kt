@@ -242,9 +242,9 @@ object BookDownloader2Helper {
     }
 
     fun Context.checkWrite(): Boolean {
-        // Since Android 13 (API 33), WRITE_EXTERNAL_STORAGE is deprecated and not requestable.
+        // Since Android 11 (API 30, R), WRITE_EXTERNAL_STORAGE is deprecated and not requestable.
         // On modern Android, we rely on Scoped Storage or SAF.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return true
         
         return (ContextCompat.checkSelfPermission(
             this,
@@ -427,9 +427,17 @@ object BookDownloader2Helper {
                     sName
                 ), LOCAL_EPUB
             )
+            val cleanTitle = sName.replace("[^a-zA-Z0-9]".toRegex(), "_")
+            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val publicEpub = File(downloadsDir, "Epub/${cleanTitle}.epub")
+            val publicPdf = File(downloadsDir, "Epub/${cleanTitle}.pdf")
+
+            val epubExists = (epub.exists() && epub.length() > LOCAL_EPUB_MIN_SIZE) ||
+                            (publicEpub.exists() && publicEpub.length() > LOCAL_EPUB_MIN_SIZE) ||
+                            (publicPdf.exists() && publicPdf.length() > LOCAL_EPUB_MIN_SIZE)
 
             val (count, downloaded) =
-                if (epub.exists()) {
+                if (epubExists) {
                     var value: Pair<Int, Int> = 1 to 1
                     //if is an epub, calculate progress
                     if (sApiname == IMPORT_SOURCE_PDF) {
@@ -444,11 +452,10 @@ object BookDownloader2Helper {
                             val total = getKey<Int>(DOWNLOAD_TOTAL, id.toString()) ?: return null
                             value = total to total
                         }
-                    } else
-                        if (epub.length() > LOCAL_EPUB_MIN_SIZE)
-                            value = 1 to 1
-                        else
-                            value = 0 to 0
+                    } else {
+                        val total = getKey<Int>(DOWNLOAD_TOTAL, id.toString()) ?: 1
+                        value = total to total
+                    }
 
                     value
                 } else {
@@ -626,7 +633,13 @@ object BookDownloader2Helper {
         val subDir =
             activity.getBasePath().first ?: getDefaultDir(activity) ?: throw IOException("No file")
         val displayName = "${sanitizeFilename(name)}.epub"
-        val foundFile = subDir.findFileOrThrow(displayName)
+        
+        val foundFile = try {
+            subDir.findFileOrThrow(displayName)
+        } catch (e: Exception) {
+            val fallbackRoot = SafeFile.fromUri(activity, File(activity.filesDir, "Fallback-Epub").apply { mkdirs() }.toUri())
+            fallbackRoot?.findFile(displayName) ?: throw e
+        }
 
         // Always open in internal reader view
         val myIntent = Intent(activity, ReadActivity2::class.java)
@@ -1942,6 +1955,42 @@ object BookDownloader2 {
         setKey(
             DOWNLOAD_OFFSET, id.toString(), to,
         )
+    }
+
+    fun forceDownloadDone(id: Int) {
+        ioSafe {
+            val ctx = context ?: return@ioSafe
+            val dao = com.lagradost.quicknovel.db.AppDatabase.getDatabase(ctx).novelDao()
+            
+            // Fetch current progress or default to 1/1
+            val current = downloadInfoMutex.withLock { downloadProgress[id] }
+            val totalChaps = current?.total ?: 1L
+
+            // Update database to state IsDone (ordinal 2)
+            dao.updateDownloadProgress(id, DownloadState.IsDone.ordinal, totalChaps, totalChaps)
+
+            // Update in-memory state and trigger observers
+            downloadInfoMutex.withLock {
+                downloadProgress[id]?.apply {
+                    state = DownloadState.IsDone
+                    progress = total
+                    downloaded = total
+                    lastUpdatedMs = System.currentTimeMillis()
+                    downloadProgressChanged.invoke(id to this)
+                } ?: run {
+                    val newState = DownloadProgressState(
+                        state = DownloadState.IsDone,
+                        progress = totalChaps,
+                        downloaded = totalChaps,
+                        total = totalChaps,
+                        lastUpdatedMs = System.currentTimeMillis(),
+                        etaMs = null
+                    )
+                    downloadProgress[id] = newState
+                    downloadProgressChanged.invoke(id to newState)
+                }
+            }
+        }
     }
 
     fun download(load: LoadResponse, context: Context, indices: List<Int>? = null) {

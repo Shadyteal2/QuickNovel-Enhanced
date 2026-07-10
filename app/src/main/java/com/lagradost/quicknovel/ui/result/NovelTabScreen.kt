@@ -39,6 +39,7 @@ import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.theme.glassCard
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -53,6 +54,8 @@ fun NovelTabScreen(
     val downloadState by viewModel.downloadState.observeAsState()
     val isSyncEnabled by viewModel.isSyncEnabledDisplay.observeAsState(false)
     val chapters by viewModel.chapters.collectAsStateWithLifecycle()
+    var showManageSheet by remember { mutableStateOf(false) }
+    var showDownloadMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -354,28 +357,95 @@ fun NovelTabScreen(
                     DownloadState.IsPending -> stringResource(R.string.loading)
                     else -> if (canDownload) stringResource(R.string.download) else stringResource(R.string.manage)
                 }
+                val isManageAction = buttonText == stringResource(R.string.manage)
 
-                Button(
-                    onClick = { viewModel.downloadOrPause() },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 2.dp,
-                        pressedElevation = 4.dp
-                    )
+                Box(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = buttonText,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.5.sp
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(28.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        tonalElevation = 2.dp,
+                        shadowElevation = 2.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(28.dp))
+                            .combinedClickable(
+                                onClick = {
+                                    if (isManageAction) {
+                                        showManageSheet = true
+                                    } else {
+                                        viewModel.downloadOrPause()
+                                    }
+                                },
+                                onLongClick = {
+                                    showDownloadMenu = true
+                                }
+                            )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 24.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = buttonText,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showDownloadMenu,
+                        onDismissRequest = { showDownloadMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Mark as Completed (Done)") },
+                            onClick = {
+                                showDownloadMenu = false
+                                viewModel.forceDownloadDone()
+                            }
+                        )
+                        if (downloadState?.state == DownloadState.IsDownloading) {
+                            DropdownMenuItem(
+                                text = { Text("Pause Download") },
+                                onClick = {
+                                    showDownloadMenu = false
+                                    viewModel.pause()
+                                }
+                            )
+                        } else if (downloadState?.state == DownloadState.IsPaused || downloadState?.state == DownloadState.IsStopped) {
+                            DropdownMenuItem(
+                                text = { Text("Resume Download") },
+                                onClick = {
+                                    showDownloadMenu = false
+                                    viewModel.downloadOrPause()
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Re-download All") },
+                            onClick = {
+                                showDownloadMenu = false
+                                viewModel.redownload(activity)
+                            }
+                        )
+                    }
                 }
             }
+        }
+        
+        if (showManageSheet) {
+            ManageDownloadBottomSheet(
+                viewModel = viewModel,
+                novelName = res.name,
+                author = res.author,
+                apiName = viewModel.apiName,
+                onDismiss = { showManageSheet = false }
+            )
         }
         
         Spacer(modifier = Modifier.height(100.dp))

@@ -88,7 +88,8 @@ class DownloadFragment : Fragment() {
         val formatType: String? = null,
         val hash: String? = null,
         val bookmarkType: Int? = null,
-        val lastChapterRead: Int = 0
+        val lastChapterRead: Int = 0,
+        val newChaptersAvailable: Int = 0
     ) {
         val image by lazy {
             if(isImported) {

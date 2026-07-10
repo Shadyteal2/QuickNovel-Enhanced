@@ -302,7 +302,14 @@ data class TextSpan(
     override val index: Int,
     override var innerIndex: Int,
 ) : SpanDisplay() {
-    val bionicText: Spanned by lazy {
+    private var cachedBionicText: Spanned? = null
+    private var cachedBionicRatio: Float? = null
+
+    fun getBionicText(boldRatio: Float): Spanned {
+        val cached = cachedBionicText
+        if (cached != null && cachedBionicRatio == boldRatio) {
+            return cached
+        }
         val wordToSpan: Spannable = SpannableString(text)
         val length = wordToSpan.length
         Regex("""\p{L}+(?:['’\-]\p{L}+)*""").findAll(text).forEach { match ->
@@ -313,7 +320,7 @@ data class TextSpan(
                 1, 2, 3 -> 1
                 4 -> 2
                 else -> {
-                    (wordLength.toFloat() * 0.4f).roundToInt()
+                    (wordLength.toFloat() * boldRatio).roundToInt()
                 }
             }
             wordToSpan.setSpan(
@@ -323,9 +330,12 @@ data class TextSpan(
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }
-
-        wordToSpan
+        cachedBionicText = wordToSpan
+        cachedBionicRatio = boldRatio
+        return wordToSpan
     }
+
+    val bionicText: Spanned get() = getBionicText(0.4f)
 
     override fun id(): Long {
         return generateId(0, index, innerIndex, 0)

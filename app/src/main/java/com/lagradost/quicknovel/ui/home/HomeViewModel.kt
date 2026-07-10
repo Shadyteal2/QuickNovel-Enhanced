@@ -10,17 +10,24 @@ import com.lagradost.quicknovel.util.Apis
 import com.lagradost.quicknovel.util.Apis.Companion.getApiProviderLangSettings
 import com.lagradost.quicknovel.util.Coroutines.ioSafe
 import com.lagradost.quicknovel.util.ResultCached
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.combine
+import androidx.lifecycle.asLiveData
 
 class HomeViewModel : ViewModel() {
-    val homeApis: LiveData<List<MainAPI>> = androidx.lifecycle.MediatorLiveData<List<MainAPI>>().apply {
-        addSource(Apis.apisLiveData) { apis ->
-            val langs = getApiProviderLangSettings()
-            value = apis.filter { api -> api.hasMainPage && (langs.contains(api.lang)) }
-        }
-        // Also initialize with current value
+    val homeApis: LiveData<List<MainAPI>> = combine(
+        Apis.apisFlow,
+        Apis.providersActiveFlow,
+        Apis.pinnedProvidersFlow,
+        Apis.hiddenProvidersFlow
+    ) { apis, active, pinned, hidden ->
         val langs = getApiProviderLangSettings()
-        value = Apis.apis.filter { api -> api.hasMainPage && (langs.contains(api.lang)) }
-    }
+        apis.filter { api ->
+            api.hasMainPage && langs.contains(api.lang) && active.contains(api.name) && api.name !in hidden
+        }.sortedWith(
+            compareByDescending<MainAPI> { it.name in pinned }.thenBy { it.name }
+        )
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).asLiveData()
 
     val latestHistory: MutableLiveData<ResultCached?> = MutableLiveData(null)
 
