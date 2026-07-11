@@ -104,6 +104,17 @@
     <color name="colorPrimaryWhite">#FFFFFF</color>
     <color name="colorPrimaryBrown">#622C00</color>
 
+    <!-- Premium Curated Accent Colors -->
+    <color name="colorPrimaryElectricIndigo">#6366F1</color>
+    <color name="colorPrimaryRoyalLavender">#8A5CF5</color>
+    <color name="colorPrimaryCyberCyan">#00F0FF</color>
+    <color name="colorPrimarySolarOrange">#FF7043</color>
+    <color name="colorPrimaryGoldenHour">#FFD54F</color>
+    <color name="colorPrimaryNeonMint">#00FF87</color>
+    <color name="colorPrimarySageLeaf">#7A9A74</color>
+    <color name="colorPrimaryRoseGold">#E5A9A5</color>
+    <color name="colorPrimaryIceWhite">#E3F2FD</color>
+
     <color name="colorTestPass">#48E484</color>
     <color name="colorTestFail">#ea596e</color>
     <color name="grayBackground">#2b2b2b</color>

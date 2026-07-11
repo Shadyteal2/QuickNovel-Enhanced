@@ -158,9 +158,10 @@ fun ThemeEditorCompose(
     var luminescentIntensity by remember { mutableStateOf(initialTheme?.luminescentIntensity ?: 0.5f) }
 
     val presetColors = listOf(
-        Color(0xFFFFFFFF), Color(0xFFE0E0E0), Color(0xFFF4ECD8), Color(0xFFEADBCE),
-        Color(0xFFF5F5DC), Color(0xFFE8F5E9), Color(0xFFE3F2FD), Color(0xFF5B4636),
-        Color(0xFF292832), Color(0xFF1E1E1E), Color(0xFF121212), Color(0xFF000000)
+        Color(0xFFFFFFFF), Color(0xFFEBEFF2), Color(0xFFF4ECD8), Color(0xFFE5E9EC),
+        Color(0xFFF7EDD6), Color(0xFFE5C39E), Color(0xFFE2CFFF), Color(0xFF9ECFCF),
+        Color(0xFF3B2510), Color(0xFF2F3E46), Color(0xFF2A3B4C), Color(0xFF1F140D),
+        Color(0xFF120A1C), Color(0xFF0B1720), Color(0xFF1E1E1E), Color(0xFF000000)
     )
 
     // Load available fonts

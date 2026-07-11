@@ -499,13 +499,94 @@
     </style>
 
     <style name="OverlayPrimaryColorMonetTwo">
-        <item name="colorPrimary">@color/material_dynamic_secondary80</item>
-        <item name="android:colorPrimary">@color/material_dynamic_secondary80</item>
-        <item name="colorPrimaryDark">@color/material_dynamic_secondary30</item>
-        <item name="colorAccent">@color/material_dynamic_secondary80</item>
-        <item name="colorOnPrimary">@color/material_dynamic_secondary20</item>
+        <item name="colorPrimary">@color/material_dynamic_tertiary80</item>
+        <item name="android:colorPrimary">@color/material_dynamic_tertiary80</item>
+        <item name="colorPrimaryDark">@color/material_dynamic_tertiary30</item>
+        <item name="colorAccent">@color/material_dynamic_tertiary80</item>
+        <item name="colorOnPrimary">@color/material_dynamic_tertiary20</item>
         <!-- Needed for leanback fuckery -->
-        <item name="android:colorAccent">@color/material_dynamic_secondary80</item>
+        <item name="android:colorAccent">@color/material_dynamic_tertiary80</item>
+    </style>
+
+    <style name="OverlayPrimaryColorElectricIndigo">
+        <item name="colorPrimary">@color/colorPrimaryElectricIndigo</item>
+        <item name="android:colorPrimary">@color/colorPrimaryElectricIndigo</item>
+        <item name="colorPrimaryDark">#4338CA</item>
+        <item name="colorAccent">#6366F1</item>
+        <item name="colorOnPrimary">#6366F1</item>
+        <item name="android:colorAccent">@color/colorPrimaryElectricIndigo</item>
+    </style>
+
+    <style name="OverlayPrimaryColorRoyalLavender">
+        <item name="colorPrimary">@color/colorPrimaryRoyalLavender</item>
+        <item name="android:colorPrimary">@color/colorPrimaryRoyalLavender</item>
+        <item name="colorPrimaryDark">#6D28D9</item>
+        <item name="colorAccent">#8A5CF5</item>
+        <item name="colorOnPrimary">#8A5CF5</item>
+        <item name="android:colorAccent">@color/colorPrimaryRoyalLavender</item>
+    </style>
+
+    <style name="OverlayPrimaryColorCyberCyan">
+        <item name="colorPrimary">@color/colorPrimaryCyberCyan</item>
+        <item name="android:colorPrimary">@color/colorPrimaryCyberCyan</item>
+        <item name="colorPrimaryDark">#0097A7</item>
+        <item name="colorAccent">#00E5FF</item>
+        <item name="colorOnPrimary">#00E5FF</item>
+        <item name="android:colorAccent">@color/colorPrimaryCyberCyan</item>
+    </style>
+
+    <style name="OverlayPrimaryColorSolarOrange">
+        <item name="colorPrimary">@color/colorPrimarySolarOrange</item>
+        <item name="android:colorPrimary">@color/colorPrimarySolarOrange</item>
+        <item name="colorPrimaryDark">#E64A19</item>
+        <item name="colorAccent">#FF7043</item>
+        <item name="colorOnPrimary">#FF7043</item>
+        <item name="android:colorAccent">@color/colorPrimarySolarOrange</item>
+    </style>
+
+    <style name="OverlayPrimaryColorGoldenHour">
+        <item name="colorPrimary">@color/colorPrimaryGoldenHour</item>
+        <item name="android:colorPrimary">@color/colorPrimaryGoldenHour</item>
+        <item name="colorPrimaryDark">#F57C00</item>
+        <item name="colorAccent">#FFD54F</item>
+        <item name="colorOnPrimary">#FFD54F</item>
+        <item name="android:colorAccent">@color/colorPrimaryGoldenHour</item>
+    </style>
+
+    <style name="OverlayPrimaryColorNeonMint">
+        <item name="colorPrimary">@color/colorPrimaryNeonMint</item>
+        <item name="android:colorPrimary">@color/colorPrimaryNeonMint</item>
+        <item name="colorPrimaryDark">#00C853</item>
+        <item name="colorAccent">#00FF87</item>
+        <item name="colorOnPrimary">#00FF87</item>
+        <item name="android:colorAccent">@color/colorPrimaryNeonMint</item>
+    </style>
+
+    <style name="OverlayPrimaryColorSageLeaf">
+        <item name="colorPrimary">@color/colorPrimarySageLeaf</item>
+        <item name="android:colorPrimary">@color/colorPrimarySageLeaf</item>
+        <item name="colorPrimaryDark">#4A6B5D</item>
+        <item name="colorAccent">#7A9A74</item>
+        <item name="colorOnPrimary">#7A9A74</item>
+        <item name="android:colorAccent">@color/colorPrimarySageLeaf</item>
+    </style>
+
+    <style name="OverlayPrimaryColorRoseGold">
+        <item name="colorPrimary">@color/colorPrimaryRoseGold</item>
+        <item name="android:colorPrimary">@color/colorPrimaryRoseGold</item>
+        <item name="colorPrimaryDark">#B57A76</item>
+        <item name="colorAccent">#E5A9A5</item>
+        <item name="colorOnPrimary">#E5A9A5</item>
+        <item name="android:colorAccent">@color/colorPrimaryRoseGold</item>
+    </style>
+
+    <style name="OverlayPrimaryColorIceWhite">
+        <item name="colorPrimary">@color/colorPrimaryIceWhite</item>
+        <item name="android:colorPrimary">@color/colorPrimaryIceWhite</item>
+        <item name="colorPrimaryDark">#B0BEC5</item>
+        <item name="colorAccent">#E3F2FD</item>
+        <item name="colorOnPrimary">#E3F2FD</item>
+        <item name="android:colorAccent">@color/colorPrimaryIceWhite</item>
     </style>
 
     <style name="MonetMode">

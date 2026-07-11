@@ -190,23 +190,36 @@ object CommonActivity {
                 else -> R.style.AppTheme
             }
 
+        val primaryColorKey = act.getString(R.string.primary_color_key)
+        val selectedColor = settingsManager.getString(primaryColorKey, "Banana") ?: "Banana"
+        val oldColors = setOf(
+            "Pink", "DarkGreen", "Maroon", "NavyBlue", "Grey", "Brown", "Purple",
+            "ElectricBlue", "AuroraViolet", "SakuraBlush", "CrimsonGlow"
+        )
+        val finalColor = if (selectedColor in oldColors) {
+            settingsManager.edit().putString(primaryColorKey, "Normal").apply()
+            "Normal"
+        } else {
+            selectedColor
+        }
+
         val currentOverlayTheme =
-            when (settingsManager.getString(act.getString(R.string.primary_color_key), "Banana")) {
+            when (finalColor) {
                 "Normal" -> R.style.OverlayPrimaryColorNormal
-                "CarnationPink" -> R.style.OverlayPrimaryColorCarnationPink
-                "DarkGreen" -> R.style.OverlayPrimaryColorDarkGreen
-                "Maroon" -> R.style.OverlayPrimaryColorMaroon
-                "NavyBlue" -> R.style.OverlayPrimaryColorNavyBlue
-                "Grey" -> R.style.OverlayPrimaryColorGrey
-                "White" -> R.style.OverlayPrimaryColorWhite
-                "Brown" -> R.style.OverlayPrimaryColorBrown
-                "Purple" -> R.style.OverlayPrimaryColorPurple
+                "ElectricIndigo" -> R.style.OverlayPrimaryColorElectricIndigo
+                "RoyalLavender" -> R.style.OverlayPrimaryColorRoyalLavender
+                "CyberCyan" -> R.style.OverlayPrimaryColorCyberCyan
+                "Red" -> R.style.OverlayPrimaryColorRed
+                "SolarOrange" -> R.style.OverlayPrimaryColorSolarOrange
+                "GoldenHour" -> R.style.OverlayPrimaryColorGoldenHour
                 "Green" -> R.style.OverlayPrimaryColorGreen
                 "GreenApple" -> R.style.OverlayPrimaryColorGreenApple
-                "Red" -> R.style.OverlayPrimaryColorRed
-                "Banana" -> R.style.OverlayPrimaryColorBanana
+                "SageLeaf" -> R.style.OverlayPrimaryColorSageLeaf
+                "RoseGold" -> R.style.OverlayPrimaryColorRoseGold
+                "IceWhite" -> R.style.OverlayPrimaryColorIceWhite
+                "White" -> R.style.OverlayPrimaryColorWhite
                 "Party" -> R.style.OverlayPrimaryColorParty
-                "Pink" -> R.style.OverlayPrimaryColorPink
+                "CarnationPink" -> R.style.OverlayPrimaryColorCarnationPink
                 "Monet" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
                     R.style.OverlayPrimaryColorMonet else R.style.OverlayPrimaryColorNormal
                 "Monet2" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)

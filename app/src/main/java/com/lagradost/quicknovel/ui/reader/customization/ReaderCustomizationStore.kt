@@ -128,6 +128,63 @@ object ReaderCustomizationStore {
                 letterSpacing = 0.01f,
                 luminescent = true,
                 luminescentIntensity = 0.65f
+            ),
+
+            // ─── Theme 4: Nordic Frost ──────────────────────────────────
+            // Minimalist day mode / cool gray-blue Scandinavian design.
+            // Soft deep slate text on clean glacial slate-gray, low grain.
+            ReaderTheme(
+                name = "Nordic Frost",
+                textColor = Color.parseColor("#2F3E46"),
+                backgroundColor = Color.parseColor("#E5E9EC"),
+                textSize = 18,
+                lineHeightMultiplier = 1.48f,
+                verticalPadding = 14f,
+                textFont = "",
+                bionicReading = false,
+                paddingHorizontal = 24,
+                backgroundGrain = 12,
+                letterSpacing = 0.02f,
+                luminescent = false,
+                luminescentIntensity = 0f
+            ),
+
+            // ─── Theme 5: Nebula Velvet ─────────────────────────────────
+            // Mystical deep violet twilight atmosphere. Glowing lavender-pink
+            // text on dark amethyst canvas, soft grain, gentle reading glow.
+            ReaderTheme(
+                name = "Nebula Velvet",
+                textColor = Color.parseColor("#E2CFFF"),
+                backgroundColor = Color.parseColor("#120A1C"),
+                textSize = 19,
+                lineHeightMultiplier = 1.52f,
+                verticalPadding = 16f,
+                textFont = "",
+                bionicReading = false,
+                paddingHorizontal = 30,
+                backgroundGrain = 18,
+                letterSpacing = 0.02f,
+                luminescent = true,
+                luminescentIntensity = 0.70f
+            ),
+
+            // ─── Theme 6: Vintage Espresso ──────────────────────────────
+            // Warm roasted dark chocolate/coffee cozy nighttime reading.
+            // Rich caramel text on dark espresso background, heavy grain.
+            ReaderTheme(
+                name = "Vintage Espresso",
+                textColor = Color.parseColor("#E5C39E"),
+                backgroundColor = Color.parseColor("#1F140D"),
+                textSize = 20,
+                lineHeightMultiplier = 1.58f,
+                verticalPadding = 18f,
+                textFont = "",
+                bionicReading = false,
+                paddingHorizontal = 32,
+                backgroundGrain = 45,
+                letterSpacing = 0.015f,
+                luminescent = true,
+                luminescentIntensity = 0.35f
             )
         )
         for (theme in presets) {

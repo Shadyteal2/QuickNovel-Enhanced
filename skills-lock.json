@@ -1,6 +1,24 @@
 {
   "version": 1,
   "skills": {
+    "apify-ultimate-scraper": {
+      "source": "apify/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/apify-ultimate-scraper/SKILL.md",
+      "computedHash": "60c5652a183804376934c14d20378031ff1e7473ec835412bbdabb6bba1fb545"
+    },
+    "color-expert": {
+      "source": "meodai/skill.color-expert",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "831166b40b4fb101ad83fa312374b38c6e2c708b83bd42c6602d3496323f5a83"
+    },
+    "color-palette": {
+      "source": "nhatmobile1/color-palette-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "1514c5b6964dc444388eb012f1776c42a05862b5544b3b5f3720c38cccb1952a"
+    },
     "mobile-android-design": {
       "source": "wshobson/agents",
       "sourceType": "github",
@@ -12,6 +30,12 @@
       "sourceType": "github",
       "skillPath": "skills/01-by-domain/mobile-touch/SKILL.md",
       "computedHash": "cd852f253ae7120d318fef2b495d93f00e682ecc6584f980cb96a9371211d2d3"
+    },
+    "web-scraping": {
+      "source": "jamditis/claude-skills-journalism",
+      "sourceType": "github",
+      "skillPath": "dev-toolkit/skills/web-scraping/SKILL.md",
+      "computedHash": "be6023b8a3f3b175f118502c2e34176865b33c0f24c01015a20f2aedd573cc37"
     }
   }
 }

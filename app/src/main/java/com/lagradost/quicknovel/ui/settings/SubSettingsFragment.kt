@@ -368,8 +368,8 @@ class SubSettingsFragment : Fragment() {
             }
 
             "primary_color_key" -> {
-                val names = listOf("Normal", "Pink", "Dark Green", "Maroon", "Navy Blue", "Grey", "White", "Brown", "Purple", "Green", "Green Apple", "Red", "Banana", "Party", "Carnation Pink", "Monet", "Monet 2")
-                val values = listOf("Normal", "Pink", "DarkGreen", "Maroon", "NavyBlue", "Grey", "White", "Brown", "Purple", "Green", "GreenApple", "Red", "Banana", "Party", "CarnationPink", "Monet", "Monet2")
+                val names = listOf("Normal", "Electric Indigo", "Royal Lavender", "Cyber Cyan", "Red", "Sunset Orange", "Golden Hour", "Green", "Green Apple", "Sage Leaf", "Rose Gold", "Ice White", "White", "Coral Rose", "Carnation Pink", "Material You", "Material You (Tertiary)")
+                val values = listOf("Normal", "ElectricIndigo", "RoyalLavender", "CyberCyan", "Red", "SolarOrange", "GoldenHour", "Green", "GreenApple", "SageLeaf", "RoseGold", "IceWhite", "White", "Party", "CarnationPink", "Monet", "Monet2")
                 val current = sharedPrefs.getString(getString(R.string.primary_color_key), "Banana")
                 activity?.showBottomDialog(names, values.indexOf(current), getString(R.string.primary_color_settings), false, {}) {
                     sharedPrefs.edit().putString(getString(R.string.primary_color_key), values[it]).apply()
