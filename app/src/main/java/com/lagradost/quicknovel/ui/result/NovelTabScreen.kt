@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.quicknovel.DownloadProgressState
 import com.lagradost.quicknovel.DownloadState
 import com.lagradost.quicknovel.LoadResponse
+import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.ui.theme.glassCard
@@ -46,9 +47,11 @@ import androidx.compose.foundation.combinedClickable
 fun NovelTabScreen(
     viewModel: ResultViewModel,
     res: LoadResponse,
-    activity: Activity
+    activity: Activity,
+    onRelatedClick: (SearchResponse) -> Unit
 ) {
     // Observers
+    val relatedState by viewModel.relatedState.collectAsStateWithLifecycle()
     val readState by viewModel.readState.observeAsState(ReadType.NONE)
     val userNote by viewModel.userNote.observeAsState("")
     val downloadState by viewModel.downloadState.observeAsState()
@@ -156,6 +159,13 @@ fun NovelTabScreen(
                 }
             }
         }
+
+        // Smart Related / You May Also Like Section (positioned below tags and above interaction card)
+        SmartRelatedSection(
+            state = relatedState,
+            onNovelClick = onRelatedClick,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         // Interaction Card (Notes & Downloads)
         Column(

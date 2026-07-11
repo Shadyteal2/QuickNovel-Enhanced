@@ -93,6 +93,7 @@ fun ResultDetailModernScreen(
     onScrollToLatestChapter: () -> Unit,
     onScrollToLastRead: () -> Unit,
     onChapterRecyclerReady: (RecyclerView) -> Unit,
+    onRelatedClick: (SearchResponse) -> Unit,
 ) {
     val loadResponse       by viewModel.loadResponse.observeAsState()
     val isSyncEnabled      by viewModel.isSyncEnabledDisplay.observeAsState(false)
@@ -510,7 +511,7 @@ fun ResultDetailModernScreen(
                                             .fillMaxSize()
                                             .verticalScroll(rememberScrollState())
                                     ) {
-                                        NovelTabScreen(viewModel, res, activity)
+                                        NovelTabScreen(viewModel, res, activity, onRelatedClick)
                                         // Extra bottom padding for action bar
                                         Spacer(Modifier.height(100.dp))
                                     }

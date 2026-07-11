@@ -58,6 +58,7 @@ import com.lagradost.quicknovel.ChapterData
 import com.lagradost.quicknovel.DOWNLOAD_SETTINGS
 import com.lagradost.quicknovel.EPUB_CURRENT_POSITION_READ_AT
 import com.lagradost.quicknovel.LoadResponse
+import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.RESULT_BOOKMARK_STATE
 import com.lagradost.quicknovel.StreamResponse
@@ -96,6 +97,7 @@ fun ResultDetailDefaultScreen(
     onScrollToLatestChapter: () -> Unit,
     onScrollToLastRead: () -> Unit,
     onChapterRecyclerReady: (RecyclerView) -> Unit,
+    onRelatedClick: (SearchResponse) -> Unit,
 ) {
     val loadResponse       by viewModel.loadResponse.observeAsState()
     val isSyncEnabled      by viewModel.isSyncEnabledDisplay.observeAsState(false)
@@ -617,7 +619,7 @@ fun ResultDetailDefaultScreen(
                                         Spacer(Modifier.height(12.dp))
 
                                         // ── Novel tab content (stats, synopsis, tags, notes) ──
-                                        NovelTabScreen(viewModel, res, activity)
+                                        NovelTabScreen(viewModel, res, activity, onRelatedClick)
 
                                         Spacer(Modifier.height(32.dp))
                                     }

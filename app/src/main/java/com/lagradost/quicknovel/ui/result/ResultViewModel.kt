@@ -83,7 +83,30 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
+import com.lagradost.quicknovel.db.AppDatabase
+import com.lagradost.quicknovel.DataStore.getKey
+import com.lagradost.quicknovel.ui.foryou.recommendation.TagNormalizer
+import com.lagradost.quicknovel.ui.foryou.recommendation.SynopsisTagExtractor
+import com.lagradost.quicknovel.ui.foryou.recommendation.TagCategory
+import com.lagradost.quicknovel.ui.foryou.recommendation.UserTasteProfile
 
+// ─── Smart Related / You May Also Like ───────────────────────────────────────
+sealed class RelatedState {
+    /** Section hidden — nothing to show, zero layout cost */
+    object Hidden : RelatedState()
+    /** Computing Tier 2 or 3 — show shimmer */
+    object Loading : RelatedState()
+    /**
+     * @param items      The SearchResponse list to display
+     * @param label      Section header text
+     * @param tier       1 = provider native, 2 = novel-context, 3 = ForYou fallback
+     */
+    data class Shown(
+        val items: List<SearchResponse>,
+        val label: String,
+        val tier: Int
+    ) : RelatedState()
+}
 
 class ResultViewModel : ViewModel() {
     companion object {
@@ -377,6 +400,209 @@ class ResultViewModel : ViewModel() {
 
     private val _chapters: MutableStateFlow<List<ChapterData>?> = MutableStateFlow(null)
     val chapters: StateFlow<List<ChapterData>?> = _chapters.asStateFlow()
+
+    // ─── Smart Related State ──────────────────────────────────────────────────
+    private val _relatedState = MutableStateFlow<RelatedState>(RelatedState.Hidden)
+    val relatedState: StateFlow<RelatedState> = _relatedState.asStateFlow()
+
+    /**
+     * Jaccard similarity between two tag sets.
+     * Symmetric, no profile needed — purely content-to-content.
+     */
+    private fun jaccardScore(
+        novelTags: Set<TagCategory>,
+        candidateTags: Set<TagCategory>
+    ): Float {
+        if (novelTags.isEmpty() || candidateTags.isEmpty()) return 0f
+        val intersection = novelTags.intersect(candidateTags).size
+        val union = (novelTags + candidateTags).size
+        return intersection.toFloat() / union.toFloat()
+    }
+
+    /**
+     * Resolves related novels using the three-tier priority:
+     *   1. Provider's own getRelated() — already in loadResponse.related
+     *   2. Novel-context scoring via Jaccard on tags/title/synopsis
+     *   3. UserTasteProfile ForYou fallback
+     *
+     * Called once per successful LoadResponse. Runs on Dispatchers.IO / Default.
+     */
+    private fun computeRelated(res: LoadResponse) {
+        viewModelScope.launchSafe {
+            android.util.Log.d("ResultViewModel", "computeRelated: Initialized for novel = '${res.name}', provider = '${res.apiName}'")
+            
+            // ── Tier 1: Provider-native related ──────────────────────────────
+            val nativeRelated = res.related
+            android.util.Log.d("ResultViewModel", "computeRelated: Tier 1: nativeRelated size = ${nativeRelated?.size ?: "null/empty"}")
+            if (!nativeRelated.isNullOrEmpty()) {
+                android.util.Log.d("ResultViewModel", "computeRelated: Tier 1 Matched! Showing Native related novels.")
+                _relatedState.value = RelatedState.Shown(
+                    items = nativeRelated.take(15),
+                    label = "Similar on ${res.apiName}",
+                    tier = 1
+                )
+                return@launchSafe
+            }
+
+            // ── Tier 2: Novel-context scoring (Jaccard) ───────────────────────
+            _relatedState.value = RelatedState.Loading
+
+            val novelTags: Set<TagCategory> = withContext(Dispatchers.Default) {
+                TagNormalizer.normalize(res.tags) +
+                SynopsisTagExtractor.extractAll(res.name, res.synopsis)
+            }
+            android.util.Log.d("ResultViewModel", "computeRelated: Tier 2: novelTags extracted = $novelTags")
+
+            if (novelTags.isNotEmpty()) {
+                val ctx = context
+                if (ctx != null) {
+                    var candidates = withContext(Dispatchers.IO) {
+                        AppDatabase.getDatabase(ctx).recommendationDao().getAllCandidates(300)
+                    }
+                    android.util.Log.d("ResultViewModel", "computeRelated: Tier 2: Database candidates count = ${candidates.size}")
+
+                    // Self-healing fallback if database candidate pool is completely empty
+                    if (candidates.isEmpty()) {
+                        android.util.Log.d("ResultViewModel", "computeRelated: Candidate pool is empty. Triggering background pool fetch...")
+                        viewModelScope.launchSafe(Dispatchers.IO) {
+                            try {
+                                com.lagradost.quicknovel.ui.foryou.recommendation.RecommendationPoolManager(ctx).fetchNewCandidates()
+                                val newCandidates = AppDatabase.getDatabase(ctx).recommendationDao().getAllCandidates(300)
+                                android.util.Log.d("ResultViewModel", "computeRelated: Background pool fetch complete. Candidates count = ${newCandidates.size}")
+                                if (newCandidates.isNotEmpty()) {
+                                    val scored = withContext(Dispatchers.Default) {
+                                        newCandidates
+                                            .filter { it.url != res.url }
+                                            .mapNotNull { candidate ->
+                                                val cTags = TagNormalizer.normalize(candidate.tags) +
+                                                            SynopsisTagExtractor.extractFromTitle(candidate.name)
+                                                val score = jaccardScore(novelTags, cTags)
+                                                if (score > 0.28f) candidate to score else null
+                                            }
+                                            .sortedByDescending { it.second }
+                                            .take(15)
+                                            .map { (candidate, _) ->
+                                                SearchResponse(
+                                                    name      = candidate.name,
+                                                    url       = candidate.url,
+                                                    apiName   = candidate.apiName,
+                                                    posterUrl = candidate.posterUrl,
+                                                    rating    = candidate.rating
+                                                )
+                                            }
+                                    }
+                                    android.util.Log.d("ResultViewModel", "computeRelated: Background Jaccard scoring complete. Matches = ${scored.size}")
+                                    if (scored.isNotEmpty()) {
+                                        _relatedState.value = RelatedState.Shown(
+                                            items = scored,
+                                            label = "You May Also Like",
+                                            tier = 2
+                                        )
+                                    } else {
+                                        _relatedState.value = RelatedState.Hidden
+                                    }
+                                } else {
+                                    _relatedState.value = RelatedState.Hidden
+                                }
+                            } catch (t: Throwable) {
+                                android.util.Log.e("ResultViewModel", "computeRelated: Background fetch candidates failed", t)
+                                _relatedState.value = RelatedState.Hidden
+                            }
+                        }
+                        return@launchSafe
+                    }
+
+                    val scored = withContext(Dispatchers.Default) {
+                        candidates
+                            .filter { it.url != res.url } // exclude current novel
+                            .mapNotNull { candidate ->
+                                val cTags = TagNormalizer.normalize(candidate.tags) +
+                                            SynopsisTagExtractor.extractFromTitle(candidate.name)
+                                val score = jaccardScore(novelTags, cTags)
+                                if (score > 0.28f) candidate to score else null
+                            }
+                            .sortedByDescending { it.second }
+                            .take(15)
+                            .map { (candidate, _) ->
+                                SearchResponse(
+                                    name      = candidate.name,
+                                    url       = candidate.url,
+                                    apiName   = candidate.apiName,
+                                    posterUrl = candidate.posterUrl,
+                                    rating    = candidate.rating
+                                )
+                            }
+                    }
+                    android.util.Log.d("ResultViewModel", "computeRelated: Jaccard scoring complete. Matches = ${scored.size}")
+
+                    if (scored.isNotEmpty()) {
+                        android.util.Log.d("ResultViewModel", "computeRelated: Tier 2 Matched! Showing similarity based related novels.")
+                        _relatedState.value = RelatedState.Shown(
+                            items = scored,
+                            label = "You May Also Like",
+                            tier = 2
+                        )
+                        return@launchSafe
+                    }
+                }
+            } else {
+                android.util.Log.d("ResultViewModel", "computeRelated: novelTags is empty. Skipping Jaccard similarity scoring (Tier 2).")
+            }
+
+            // ── Tier 3: ForYou taste-profile fallback ─────────────────────────
+            val ctx = context
+            android.util.Log.d("ResultViewModel", "computeRelated: Tier 3 check...")
+            if (ctx != null) {
+                val profile = withContext(Dispatchers.IO) {
+                    ctx.getKey<UserTasteProfile>("user_taste_profile")
+                }
+                android.util.Log.d("ResultViewModel", "computeRelated: Tier 3: User profile wizard complete = ${profile?.isWizardComplete ?: "false"}")
+
+                if (profile != null && profile.isWizardComplete && profile.preferredTags.isNotEmpty()) {
+                    val candidates = withContext(Dispatchers.IO) {
+                        AppDatabase.getDatabase(ctx).recommendationDao().getAllCandidates(200)
+                    }
+
+                    val fallback = withContext(Dispatchers.Default) {
+                        candidates
+                            .filter { it.url != res.url }
+                            .mapNotNull { candidate ->
+                                val cTags = TagNormalizer.normalize(candidate.tags) +
+                                            SynopsisTagExtractor.extractFromTitle(candidate.name)
+                                val score = profile.scoreMatch(cTags)
+                                if (score > 0.40f) candidate to score else null
+                            }
+                            .sortedByDescending { it.second }
+                            .take(12)
+                            .map { (candidate, _) ->
+                                SearchResponse(
+                                    name      = candidate.name,
+                                    url       = candidate.url,
+                                    apiName   = candidate.apiName,
+                                    posterUrl = candidate.posterUrl,
+                                    rating    = candidate.rating
+                                )
+                            }
+                    }
+                    android.util.Log.d("ResultViewModel", "computeRelated: Tier 3 fallback match size = ${fallback.size}")
+
+                    if (fallback.isNotEmpty()) {
+                        android.util.Log.d("ResultViewModel", "computeRelated: Tier 3 Matched! Showing taste-profile related fallback fictions.")
+                        _relatedState.value = RelatedState.Shown(
+                            items = fallback,
+                            label = "Discover More",
+                            tier = 3
+                        )
+                        return@launchSafe
+                    }
+                }
+            }
+
+            // Nothing found across all tiers — hide the section
+            android.util.Log.d("ResultViewModel", "computeRelated: All tiers returned empty. Hiding RelatedSection UI.")
+            _relatedState.value = RelatedState.Hidden
+        }
+    }
 
     init {
         loadCategories()
@@ -1390,6 +1616,7 @@ class ResultViewModel : ViewModel() {
 
         if (::load.isInitialized) {
             reorderChapters(load)
+            computeRelated(load)
         }
     }
 

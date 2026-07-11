@@ -33,6 +33,7 @@ import com.lagradost.quicknovel.MainActivity.Companion.navigate
 import com.lagradost.quicknovel.R
 import com.lagradost.quicknovel.StreamResponse
 import com.lagradost.quicknovel.databinding.*
+import com.lagradost.quicknovel.SearchResponse
 import com.lagradost.quicknovel.mvvm.Resource
 import com.lagradost.quicknovel.mvvm.observe
 import com.lagradost.quicknovel.mvvm.observeNullable
@@ -1027,6 +1028,15 @@ class ResultFragment : Fragment() {
                     onScrollToLatestChapter = { scrollModernChaptersToLatest() },
                     onScrollToLastRead = { scrollModernChaptersToLastRead() },
                     onChapterRecyclerReady = { modernChapterList = it },
+                    onRelatedClick = { searchResponse ->
+                        val bundle = newInstance(searchResponse.url, searchResponse.apiName)
+                        (act as? com.lagradost.quicknovel.MainActivity)?.navigate(
+                            com.lagradost.quicknovel.R.id.global_to_navigation_results,
+                            bundle,
+                            null,
+                            null
+                        )
+                    }
                 )
             }
         }
@@ -1112,6 +1122,15 @@ class ResultFragment : Fragment() {
                     onScrollToLatestChapter = { scrollDefaultChaptersToLatest() },
                     onScrollToLastRead      = { scrollDefaultChaptersToLastRead() },
                     onChapterRecyclerReady  = { defaultChapterList = it },
+                    onRelatedClick = { searchResponse ->
+                        val bundle = newInstance(searchResponse.url, searchResponse.apiName)
+                        (act as? com.lagradost.quicknovel.MainActivity)?.navigate(
+                            com.lagradost.quicknovel.R.id.global_to_navigation_results,
+                            bundle,
+                            null,
+                            null
+                        )
+                    }
                 )
             }
         }
@@ -1192,7 +1211,15 @@ class ResultFragment : Fragment() {
                 val res = (loadResponse as? Resource.Success<LoadResponse>)?.value ?: return@setContent
                 
                 QuickNovelTheme {
-                    NovelTabScreen(viewModel, res, requireActivity())
+                    NovelTabScreen(viewModel, res, requireActivity()) { searchResponse ->
+                        val bundle = newInstance(searchResponse.url, searchResponse.apiName)
+                        (requireActivity() as? com.lagradost.quicknovel.MainActivity)?.navigate(
+                            com.lagradost.quicknovel.R.id.global_to_navigation_results,
+                            bundle,
+                            null,
+                            null
+                        )
+                    }
                 }
             }
         }
