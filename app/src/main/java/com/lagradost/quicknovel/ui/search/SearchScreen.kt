@@ -540,6 +540,56 @@ fun ProviderCard(
                     }
                 }
             )
+            DropdownMenuItem(
+                text = { Text("Solve Cloudflare / Login") },
+                onClick = {
+                    showMenu = false
+                    scope.launch {
+                        val act = com.lagradost.quicknovel.CommonActivity.activity
+                        if (act != null) {
+                            act.runOnUiThread {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Starting Cloudflare check for ${api.name}...",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                try {
+                                    com.lagradost.quicknovel.network.WebViewResolver(
+                                        Regex(".^"),
+                                        userAgent = null,
+                                        useOkhttp = false,
+                                        additionalUrls = listOf(Regex("."))
+                                    ).resolveUsingWebView(api.mainUrl, showDialog = true)
+                                    act.runOnUiThread {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Finished checking ${api.name}",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                } catch (e: Exception) {
+                                    com.lagradost.quicknovel.mvvm.logError(e)
+                                    act.runOnUiThread {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Failed to solve: ${e.message}",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            }
+                        } else {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Error: Activity not found",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            )
         }
     }
 }

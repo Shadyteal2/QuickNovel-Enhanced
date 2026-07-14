@@ -32,15 +32,47 @@ class CloudflareKiller : Interceptor {
     private val cookieTimestamps: MutableMap<String, Long> = mutableMapOf()
     private val COOKIE_TTL_MS = 30 * 60 * 1000L // 30 minutes
 
+    private fun syncWebViewCookies(request: Request): Request {
+        val urlStr = request.url.toString()
+        val webViewCookiesStr = getWebViewCookie(urlStr) ?: return request
+        if (webViewCookiesStr.isBlank()) return request
+
+        val webViewCookies = parseCookieMap(webViewCookiesStr)
+        if (webViewCookies.isEmpty()) return request
+
+        // Parse existing cookies from the request
+        val reqCookiesStr = request.header("Cookie") ?: ""
+        val reqCookies = parseCookieMap(reqCookiesStr)
+
+        // Merge request cookies and WebView cookies (WebView cookies override request cookies)
+        val mergedCookies = reqCookies + webViewCookies
+        if (mergedCookies.isEmpty()) return request
+
+        val cookieHeaderValue = mergedCookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+        
+        // Override User-Agent to match WebView's User-Agent if available
+        val userAgent = WebViewResolver.getWebViewUserAgent() ?: com.lagradost.quicknovel.USER_AGENT
+
+        return request.newBuilder()
+            .header("Cookie", cookieHeaderValue)
+            .apply {
+                if (request.header("User-Agent") == null) {
+                    header("User-Agent", userAgent)
+                }
+            }
+            .build()
+    }
+
     override fun intercept(chain: Interceptor.Chain): Response = runBlocking {
-        val request = chain.request()
-        val host = request.url.host.lowercase()
+        val originalRequest = chain.request()
+        val host = originalRequest.url.host.lowercase()
         if (host.contains("googleapis.com") ||
             host.contains("yandex.net") ||
             host.contains("yandex.com") ||
             host.contains("openrouter.ai")) {
-            return@runBlocking chain.proceed(request)
+            return@runBlocking chain.proceed(originalRequest)
         }
+        val request = syncWebViewCookies(originalRequest)
         val response = chain.proceed(request)
         
         Log.d(TAG, "Intercepted ${request.url} - Code: ${response.code}")

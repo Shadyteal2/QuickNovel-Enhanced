@@ -832,6 +832,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 textLayoutManager.scrollToPositionWithOffset(adapterPosition, 1)
+                viewModel.hasPerformedInitialSeek = true
 
                 if (pendingFlingDirection != 0) {
                     val dir = pendingFlingDirection
@@ -2124,7 +2125,6 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 textAdapter.submitIncomparableList(chapter.data) {
                     viewModel.postLoadingStatus(Resource.Success(""))
                     scrollToDesired()
-                    onScroll()
                     UsageStatsManager.incrementChapterRead(this@ReadActivity2)
                 }
             } else {

@@ -1096,7 +1096,7 @@ fun SubSettingsScreen(
 
                         item {
                             ActionPreferenceCard(
-                                title = "Share Crash Log 📋",
+                                title = "Share Crash Log",
                                 summary = "Share the stack trace of the last fatal crash",
                                 iconRes = R.drawable.baseline_description_24,
                                 onClick = { onPreferenceClick("show_logcat_key") }
@@ -1105,7 +1105,7 @@ fun SubSettingsScreen(
 
                         item {
                             ActionPreferenceCard(
-                                title = "Share App Logs 🐛",
+                                title = "Share App Logs",
                                 summary = "Export recent app activity to help developers diagnose lag or bugs",
                                 iconRes = R.drawable.baseline_description_24,
                                 onClick = {
@@ -1137,7 +1137,7 @@ fun SubSettingsScreen(
 
                         item {
                             ActionPreferenceCard(
-                                title = "Clear All Providers ⚠️",
+                                title = "Clear All Providers",
                                 summary = "Delete all downloaded and imported provider APKs and metadata",
                                 iconRes = R.drawable.ic_baseline_warning_24,
                                 onClick = { onPreferenceClick("clear_all_providers_key") }

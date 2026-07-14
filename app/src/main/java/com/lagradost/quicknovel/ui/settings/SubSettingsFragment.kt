@@ -163,119 +163,20 @@ class SubSettingsFragment : Fragment() {
             if (uri == null) return@registerForActivityResult
             val ctx = context ?: return@registerForActivityResult
             ioSafe {
-                try {
-                    if (!PluginManager.verifyApkSignature(ctx, uri)) {
-                        activity?.runOnUiThread { showToast(getString(R.string.import_provider_apk_bad_sig)) }
-                        return@ioSafe
-                    }
-
-                    val displayName = ctx.contentResolver
-                        .query(uri, null, null, null, null)?.use { cursor ->
-                            val col = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                            cursor.moveToFirst()
-                            cursor.getString(col)
-                        } ?: "provider.apk"
-
-                    val bundleId = displayName
-                        .removeSuffix(".apk").removeSuffix(".dex")
-                        .replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
-
-                    val timestamp = System.currentTimeMillis()
-                    val destFileName = "${bundleId}_$timestamp"
-                    val pluginsDir = PluginManager.getPluginsDir(ctx)
-                    val destApk   = File(pluginsDir, "$destFileName.apk")
-                    val destJson  = File(pluginsDir, "$destFileName.json")
-
-                    ctx.contentResolver.openInputStream(uri)?.use { input ->
-                        destApk.outputStream().use { out -> input.copyTo(out) }
-                    }
-                    destApk.setReadOnly()
-
-                    PluginManager.removeCachesForPath(destApk.absolutePath)
-
-                    val foundClasses = mutableListOf<String>()
-                    try {
-                        @Suppress("DEPRECATION")
-                        val dex = dalvik.system.DexFile(destApk.absolutePath)
-                        val loader = dalvik.system.DexClassLoader(
-                            destApk.absolutePath,
-                            ctx.codeCacheDir.absolutePath,
-                            null,
-                            ctx.classLoader
-                        )
-                        val entries = dex.entries()
-                        while (entries.hasMoreElements()) {
-                            val className = entries.nextElement()
-                            if (className.startsWith("android.") ||
-                                className.startsWith("kotlin.") ||
-                                className.startsWith("kotlinx.") ||
-                                className.startsWith("java.")) continue
-                            try {
-                                val clazz = loader.loadClass(className)
-                                if (MainAPI::class.java.isAssignableFrom(clazz) &&
-                                    !java.lang.reflect.Modifier.isAbstract(clazz.modifiers) &&
-                                    !clazz.isInterface) {
-                                    foundClasses.add(className)
-                                }
-                            } catch (_: Throwable) {}
-                        }
-                        dex.close()
-                    } catch (e: Exception) {
-                        com.lagradost.quicknovel.mvvm.logError(e)
-                    }
-
-                    if (foundClasses.isEmpty()) {
-                        destApk.delete()
-                        activity?.runOnUiThread { showToast(getString(R.string.import_provider_apk_none_found)) }
-                        return@ioSafe
-                    }
-
-                    // Legacy cleanup - clean up old versions with same bundleId, matching names, or overlapping classes
-                    val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
-                    pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
-                        try {
-                            val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
-                            val hasOverlap = existingMeta.mainClasses?.any { foundClasses.contains(it) } ?: false
-                            val isStale = existingMeta.pluginId == bundleId || hasOverlap || existingMeta.mainClasses?.any { oldClass ->
-                                val newName = oldClass.split(".").last()
-                                existingMeta.pluginId.replace("_", " ").equals(newName, ignoreCase = true)
-                            } ?: false
-                            if (isStale) {
-                                val baseName = jsonFile.nameWithoutExtension
-                                val staleApk = File(pluginsDir, "$baseName.apk")
-                                val staleDex = File(pluginsDir, "$baseName.dex")
-                                
-                                // Unload old classes to clear them from active registry
-                                existingMeta.mainClasses?.forEach { className ->
-                                    PluginManager.unloadPlugin(className)
-                                }
-                                
-                                PluginManager.removeCachesForPath(staleApk.absolutePath)
-                                staleApk.delete()
-                                staleDex.delete()
-                                jsonFile.delete()
+                val result = PluginManager.importProviderApk(ctx, uri)
+                activity?.runOnUiThread {
+                    result.fold(
+                        onSuccess = { count ->
+                            showToast(getString(R.string.import_provider_apk_success_format, count))
+                        },
+                        onFailure = { error ->
+                            if (error.message == "No providers found in APK") {
+                                showToast(getString(R.string.import_provider_apk_none_found))
+                            } else {
+                                showToast("Import failed: ${error.message}")
                             }
-                        } catch (_: Exception) {}
-                    }
-
-                    val meta = PluginItem(
-                        pluginId      = bundleId,
-                        name          = bundleId,
-                        version       = 1,
-                        minApiVersion = API_VERSION,
-                        mainClasses   = foundClasses,
-                        url           = "local://$bundleId",
-                        isManualImport = true
+                        }
                     )
-                    destJson.writeText(com.lagradost.quicknovel.util.AppUtils.mapper.writeValueAsString(meta))
-
-                    PluginManager.loadAllPlugins(ctx)
-                    activity?.runOnUiThread {
-                        showToast(getString(R.string.import_provider_apk_success_format, foundClasses.size))
-                    }
-                } catch (e: Exception) {
-                    com.lagradost.quicknovel.mvvm.logError(e)
-                    activity?.runOnUiThread { showToast("Import failed: ${e.message}") }
                 }
             }
         }

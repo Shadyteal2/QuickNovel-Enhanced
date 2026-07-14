@@ -525,10 +525,13 @@ object BookDownloader2Helper {
         }
     }
 
-    fun openQuickStream(activity: Activity?, uri: Uri?) {
+    fun openQuickStream(activity: Activity?, uri: Uri?, name: String? = null) {
         if (uri == null || activity == null) return
         val myIntent = Intent(activity, ReadActivity2::class.java)
         myIntent.setDataAndType(uri, "quickstream")
+        if (name != null) {
+            myIntent.putExtra("novelTitle", name)
+        }
         activity.startActivity(myIntent)
     }
 
@@ -644,6 +647,7 @@ object BookDownloader2Helper {
         // Always open in internal reader view
         val myIntent = Intent(activity, ReadActivity2::class.java)
         myIntent.setDataAndType(foundFile.uriOrThrow(), "application/epub+zip")
+        myIntent.putExtra("novelTitle", name)
         activity.startActivity(myIntent)
     }
 
@@ -1194,8 +1198,8 @@ object ImageDownloader {
 }
 
 object BookDownloader2 {
-    fun openQuickStream(uri: Uri?) = main {
-        BookDownloader2Helper.openQuickStream(activity, uri)
+    fun openQuickStream(uri: Uri?, name: String? = null) = main {
+        BookDownloader2Helper.openQuickStream(activity, uri, name)
     }
 
     private val streamMutex = Mutex()
@@ -1244,7 +1248,7 @@ object BookDownloader2 {
                     )
                 )
 
-            openQuickStream(uri)
+            openQuickStream(uri, res.name)
         }
     }
 
@@ -1387,6 +1391,7 @@ object BookDownloader2 {
                             val myIntent = android.content.Intent(ctx, com.lagradost.quicknovel.ReadActivity2::class.java).apply {
                                 setDataAndType(uri, "application/epub+zip")
                                 addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                putExtra("novelTitle", name)
                             }
                             myIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                             ctx.startActivity(myIntent)

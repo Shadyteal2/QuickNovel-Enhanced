@@ -181,153 +181,20 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri == null) return@registerForActivityResult
             ioSafe {
-                val pluginsDir = PluginManager.getPluginsDir(this@MainActivity)
-                val tempApk = File(pluginsDir, "_import_staging.apk")
-                try {
-                    // ── 1. Verify signature ─────────────────────────────────────────
-                    if (!PluginManager.verifyApkSignature(this@MainActivity, uri)) {
-                        runOnUiThread { showToast(getString(R.string.import_provider_apk_bad_sig)) }
-                        return@ioSafe
-                    }
-
-                    // ── 2. Stage APK to a temp file ──────────────────────────────────
-                    // We inspect the APK before committing it to its final location so
-                    // we can derive the correct on-disk name from the provider's own identity.
-                    tempApk.delete() // clean up any leftover from a previous crashed import
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        tempApk.outputStream().use { out -> input.copyTo(out) }
-                    }
-                    if (tempApk.canWrite()) tempApk.setReadOnly()
-
-                    // ── 3. Scan DEX and instantiate each MainAPI class ────────────
-                    // Instantiating lets us read `instance.name` — the real provider name.
-                    // This is the source-of-truth we use to build a STABLE bundleId
-                    // (e.g. "Ranobes") that never changes across APK renames.
-                    data class FoundProvider(val className: String, val providerName: String)
-                    val foundProviders = mutableListOf<FoundProvider>()
-                    try {
-                        @Suppress("DEPRECATION")
-                        val dex = DexFile(tempApk.absolutePath)
-                        val loader = DexClassLoader(
-                            tempApk.absolutePath,
-                            codeCacheDir.absolutePath,
-                            null,
-                            classLoader
-                        )
-                        val entries = dex.entries()
-                        while (entries.hasMoreElements()) {
-                            val className = entries.nextElement()
-                            if (className.startsWith("android.") ||
-                                className.startsWith("kotlin.") ||
-                                className.startsWith("kotlinx.") ||
-                                className.startsWith("java.")) continue
-                            try {
-                                val clazz = loader.loadClass(className)
-                                if (MainAPI::class.java.isAssignableFrom(clazz) &&
-                                    !java.lang.reflect.Modifier.isAbstract(clazz.modifiers) &&
-                                    !clazz.isInterface) {
-                                    val instance = clazz.getDeclaredConstructor().newInstance() as MainAPI
-                                    foundProviders.add(FoundProvider(className, instance.name))
-                                }
-                            } catch (_: Throwable) {}
+                val result = PluginManager.importProviderApk(this@MainActivity, uri)
+                runOnUiThread {
+                    result.fold(
+                        onSuccess = { count ->
+                            showToast(getString(R.string.import_provider_apk_success_format, count))
+                        },
+                        onFailure = { error ->
+                            if (error.message == "No providers found in APK") {
+                                showToast(getString(R.string.import_provider_apk_none_found))
+                            } else {
+                                showToast("Import failed: ${error.message}")
+                            }
                         }
-                        dex.close()
-                    } catch (e: Exception) {
-                        logError(e)
-                    }
-
-                    // ── 4. Abort if no providers were found ───────────────────────
-                    if (foundProviders.isEmpty()) {
-                        runOnUiThread { showToast(getString(R.string.import_provider_apk_none_found)) }
-                        return@ioSafe
-                    }
-
-                    // ── 5. Derive a stable bundleId from the actual provider name(s) ──
-                    // "Ranobes_Fix_v2.apk" and "Ranobes.apk" will both produce bundleId="Ranobes"
-                    // if both contain a class whose name property returns "Ranobes".
-                    val providerNames = foundProviders.map { it.providerName }
-                    val bundleId = providerNames
-                        .joinToString("_")
-                        .replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
-                        .take(128)
-
-                    val timestamp = System.currentTimeMillis()
-                    val destFileName = "${bundleId}_$timestamp"
-                    val destApk  = File(pluginsDir, "$destFileName.apk")
-                    val destJson = File(pluginsDir, "$destFileName.json")
-                    val mapper   = com.lagradost.quicknovel.util.AppUtils.mapper
-
-                    // ── 6. Legacy cleanup — remove stale bundles for these providers ──
-                    // On existing installs, providers may be stored under an old filename-based
-                    // id (e.g. "Ranobes_v1") or as part of a multi-provider bundle pack.
-                    // We scan every JSON file and remove any that share any of the same
-                    // class names as the APK we are importing, or match the name/pluginId.
-                    // This is the silent fix that saves users from having to clear app data.
-                    val newClassesSet = foundProviders.map { it.className }.toSet()
-                    pluginsDir.listFiles { _, n -> n.endsWith(".json") }?.forEach { jsonFile ->
-                        // Never delete the destination file we're about to write
-                        if (jsonFile.absolutePath == destJson.absolutePath) return@forEach
-                        try {
-                            val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
-                            val existingClasses = (existingMeta.mainClasses ?: listOfNotNull(existingMeta.mainClass)).toSet()
-                            
-                            // Match 1: Class name intersection (most reliable)
-                            val hasClassOverlap = newClassesSet.any { it in existingClasses }
-                            
-                            // Match 2: Stored pluginId or name equals any new provider name
-                            val isStaleNameOrId = providerNames.any { newName ->
-                                existingMeta.name.equals(newName, ignoreCase = true) ||
-                                existingMeta.pluginId.equals(newName, ignoreCase = true) ||
-                                existingMeta.pluginId.replace("_", " ").equals(newName, ignoreCase = true)
-                            }
-                            
-                            if (hasClassOverlap || isStaleNameOrId) {
-                                val baseName = jsonFile.nameWithoutExtension
-                                val staleApk = File(pluginsDir, "$baseName.apk")
-                                val staleDex = File(pluginsDir, "$baseName.dex")
-                                PluginManager.removeCachesForPath(staleApk.absolutePath)
-                                staleApk.delete()
-                                staleDex.delete()
-                                jsonFile.delete()
-                                android.util.Log.i("PluginImport",
-                                    "Removed stale bundle: $baseName → replaced by $destFileName")
-                            }
-                        } catch (_: Exception) { /* corrupt json — leave it alone */ }
-                    }
-
-                    // ── 7. Notify if updating an already-installed same-id bundle ──
-                    // (Checked during the stale cleanup loop above, but we can just skip the explicit notification 
-                    // or it would be too complex to show the exact old version since we deleted it)
-
-                    // ── 8. Move staged APK to its final name-stable destination ───
-                    PluginManager.removeCachesForPath(destApk.absolutePath)
-                    if (destApk.exists()) destApk.delete()
-                    tempApk.renameTo(destApk)
-                    if (destApk.canWrite()) destApk.setReadOnly()
-
-                    // ── 9. Write companion JSON ───────────────────────────────────
-                    val meta = PluginItem(
-                        pluginId      = bundleId,
-                        name          = bundleId,
-                        version       = 1,
-                        minApiVersion = API_VERSION,
-                        mainClasses   = foundProviders.map { it.className },
-                        url           = "local://$bundleId",
-                        isManualImport = true
                     )
-                    destJson.writeText(mapper.writeValueAsString(meta))
-
-                    // ── 10. Hot-reload so providers appear immediately ─────────────
-                    PluginManager.loadAllPlugins(this@MainActivity)
-                    runOnUiThread {
-                        showToast(getString(R.string.import_provider_apk_success_format, foundProviders.size))
-                    }
-                } catch (e: Exception) {
-                    logError(e)
-                    runOnUiThread { showToast("Import failed: ${e.message}") }
-                } finally {
-                    // Always clean up the staging file, even if we crashed mid-import
-                    if (tempApk.exists()) tempApk.delete()
                 }
             }
         }

@@ -471,7 +471,11 @@ class ReadActivityViewModel : ViewModel() {
 
     var context: Context? = null
     private var loadId: Int = -1
-    private var hasPerformedInitialSeek = false
+    var hasPerformedInitialSeek = false
+    var novelTitle: String? = null
+    fun bookTitle(): String {
+        return novelTitle ?: book.title()
+    }
     private var hasInit: Boolean = false
     private var isEpub: Boolean = false
     lateinit var book: AbstractBook
@@ -486,8 +490,8 @@ class ReadActivityViewModel : ViewModel() {
         set(value) = isTranslationActiveLive.postValue(value)
 
     fun leftApp() {
-        lastChangeIndex?.let { setScrollKeys(it) }
         isInApp = false
+        lastChangeIndex?.let { setScrollKeys(it) }
         leftAppAt = desiredIndex
     }
 
@@ -521,16 +525,16 @@ class ReadActivityViewModel : ViewModel() {
             if (!rememberTranslation) {
                 return sessionMlSettings ?: MLSettings("en", "en")
             }
-            return getKey<MLSettings>(EPUB_CURRENT_ML, book.title()) ?: MLSettings("en", "en")
+            return getKey<MLSettings>(EPUB_CURRENT_ML, bookTitle()) ?: MLSettings("en", "en")
         }
         set(value) {
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(context ?: return)
             val rememberTranslation = settingsManager.getBoolean("reader_remember_translation_state", true)
             sessionMlSettings = value
             if (rememberTranslation) {
-                setKey(EPUB_CURRENT_ML, book.title(), value)
+                setKey(EPUB_CURRENT_ML, bookTitle(), value)
             } else {
-                setKey(EPUB_CURRENT_ML, book.title(), null)
+                setKey(EPUB_CURRENT_ML, bookTitle(), null)
             }
         }
 
@@ -1725,7 +1729,9 @@ class ReadActivityViewModel : ViewModel() {
 
 
     fun init(intent: Intent?, context: ReadActivity2) {
+        hasInit = false
         isInApp = true
+        novelTitle = intent?.getStringExtra("novelTitle")
         ioSafe {
             com.lagradost.quicknovel.ui.reader.customization.ReaderCustomizationStore.init(context)
         _loadingStatus.postValue(Resource.Loading())
@@ -1828,8 +1834,8 @@ class ReadActivityViewModel : ViewModel() {
             is Resource.Success -> {
                 init(loadedBook.value, context)
 
-                val lastAccessTime = getKey<Long>("reader_book_last_access_time", book.title())
-                val lastChapterName = getKey<String>(EPUB_CURRENT_POSITION_CHAPTER, book.title())
+                val lastAccessTime = getKey<Long>("reader_book_last_access_time", bookTitle())
+                val lastChapterName = getKey<String>(EPUB_CURRENT_POSITION_CHAPTER, bookTitle())
                 if (lastAccessTime != null && lastChapterName != null) {
                     val diff = System.currentTimeMillis() - lastAccessTime
                     if (diff > 24 * 60 * 60 * 1000L) { // > 24 hours
@@ -1843,7 +1849,7 @@ class ReadActivityViewModel : ViewModel() {
                         lastReadBreadcrumbLive.postValue("Last read: $lastChapterName ($friendlyTime)")
                     }
                 }
-                setKey("reader_book_last_access_time", book.title(), System.currentTimeMillis())
+                setKey("reader_book_last_access_time", bookTitle(), System.currentTimeMillis())
 
                 // Restore translation active state based on whether mlSettings is valid
                 isTranslationActive = mlSettings.isValid()
@@ -1855,12 +1861,12 @@ class ReadActivityViewModel : ViewModel() {
 
                 // cant assume we know a chapter max as it can expand
 
-                val desiredChapterName = getKey<String>(EPUB_CURRENT_POSITION_CHAPTER, book.title())
+                val desiredChapterName = getKey<String>(EPUB_CURRENT_POSITION_CHAPTER, bookTitle())
                 val desiredChapterIndex =
                     (0 until book.size()).firstOrNull {
                         loadedBook.value.getChapterTitle(it)
                             .asStringNull(context) == desiredChapterName
-                    } ?: getKey<Int>(EPUB_CURRENT_POSITION, book.title()) ?: 0
+                    } ?: getKey<Int>(EPUB_CURRENT_POSITION, bookTitle()) ?: 0
                 val widgetChapterIndex = intent?.getIntExtra("chapterIndex", -1) ?: -1
                 val loadedChapterIndex = if (widgetChapterIndex != -1) {
                     widgetChapterIndex
@@ -1900,13 +1906,24 @@ class ReadActivityViewModel : ViewModel() {
                 }
 
                 val char = getKey(
-                    EPUB_CURRENT_POSITION_SCROLL_CHAR, book.title()
+                    EPUB_CURRENT_POSITION_SCROLL_CHAR, bookTitle()
                 ) ?: 0
 
                 val innerIndex = innerCharToIndex(currentIndex, char) ?: 0
 
-                // don't update as you want to seek on update
-                changeIndex(ScrollIndex(currentIndex, innerIndex, char))
+                val scrollTarget = ScrollIndex(currentIndex, innerIndex, char)
+
+                // Synchronously set desiredIndex on the main thread BEFORE postValue fires
+                // so scrollToDesired() never sees a null/stale desiredIndex on the first seek.
+                // NOTE: Only desiredIndex is set here. programmaticTarget is intentionally left
+                // to updateReadArea below, which runs on IO *before* postValue enqueues the
+                // observer — so there is no race for programmaticTarget.
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    desiredIndex = scrollTarget
+                }
+
+                // Also update title + save keys via the normal path
+                changeIndex(scrollTarget)
 
                 // notify once because initial load is 3 chapters I don't care about 10 notifications when the user cant see it
                 updateReadArea(seekToDesired = true)
@@ -1929,7 +1946,7 @@ class ReadActivityViewModel : ViewModel() {
         }
 
         val service = com.lagradost.quicknovel.widget.TTSForegroundService.instance
-        if (service != null && service.activeNovelName() == book.title()) {
+        if (service != null && service.activeNovelName() == bookTitle()) {
             service.bindViewModel(this@ReadActivityViewModel)
         }
     }
@@ -1945,7 +1962,7 @@ class ReadActivityViewModel : ViewModel() {
             this.loadId = BookDownloader2Helper.generateId(book.data.meta.apiName, book.data.meta.author, book.data.meta.name)
         } else {
             // For RegularBooks (EPUB), use the title hash as a unique enough identifier
-            this.loadId = book.title().hashCode()
+            this.loadId = bookTitle().hashCode()
         }
         loadAliases()
 
@@ -1991,6 +2008,7 @@ class ReadActivityViewModel : ViewModel() {
             .build()
         //reducer = MarkwonReducer.directChildren()
         checkDynamicLuminanceContrast()
+        hasInit = true
     }
 
     // ========================================  TTS STUFF ========================================
@@ -2034,7 +2052,7 @@ class ReadActivityViewModel : ViewModel() {
 
     private fun isStandaloneActive(): Boolean {
         val service = com.lagradost.quicknovel.widget.TTSForegroundService.instance
-        return service != null && service.activeNovelName() == book.title()
+        return service != null && service.activeNovelName() == bookTitle()
     }
 
     fun stopTTS() {
@@ -2178,7 +2196,7 @@ class ReadActivityViewModel : ViewModel() {
 
                     fun notify() {
                         TTSNotifications.notify(
-                            book.title(),
+                            bookTitle(),
                             chaptersTitlesInternal[index],
                             book.poster(),
                             currentTTSStatus,
@@ -2303,7 +2321,7 @@ class ReadActivityViewModel : ViewModel() {
         } finally {
             currentTTSStatus = TTSHelper.TTSStatus.IsStopped
             TTSNotifications.notify(
-                book.title(),
+                bookTitle(),
                 "".toUiText(),
                 book.poster(),
                 TTSHelper.TTSStatus.IsStopped,
@@ -2355,6 +2373,7 @@ class ReadActivityViewModel : ViewModel() {
     private var lastScrollMs: Long = 0
     private fun changeIndex(scrollIndex: ScrollIndex, alsoTitle: Boolean = true) {
         runOnMainThread {
+            if (!hasInit || !isInApp) return@runOnMainThread
             if (alsoTitle) {
                 _chapterTile.value = chaptersTitlesInternal[scrollIndex.index]
             }
@@ -2373,24 +2392,24 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     private fun setScrollKeys(scrollIndex: ScrollIndex) {
-        val prevChapter = getKey<Int>(EPUB_CURRENT_POSITION, book.title()) ?: -1
+        val prevChapter = getKey<Int>(EPUB_CURRENT_POSITION, bookTitle()) ?: -1
         setKey(
             EPUB_CURRENT_POSITION_READ_AT,
-            "${book.title()}/${scrollIndex.index}",
+            "${bookTitle()}/${scrollIndex.index}",
             System.currentTimeMillis()
         )
-        setKey("reader_book_last_access_time", book.title(), System.currentTimeMillis())
+        setKey("reader_book_last_access_time", bookTitle(), System.currentTimeMillis())
 
         setKey(
             EPUB_CURRENT_POSITION_SCROLL_CHAR,
-            book.title(),
+            bookTitle(),
             scrollIndex.char
         )
-        setKey(EPUB_CURRENT_POSITION, book.title(), scrollIndex.index)
+        setKey(EPUB_CURRENT_POSITION, bookTitle(), scrollIndex.index)
         context?.let { ctx ->
             setKey(
                 EPUB_CURRENT_POSITION_CHAPTER,
-                book.title(),
+                bookTitle(),
                 book.getChapterTitle(scrollIndex.index).asString(ctx)
             )
             if (prevChapter != scrollIndex.index) {
@@ -2422,8 +2441,8 @@ class ReadActivityViewModel : ViewModel() {
         // load the chapters
         updateIndexAsync(index, notify = false, postLoading = true)
         // set the keys
-        setKey(EPUB_CURRENT_POSITION, book.title(), index)
-        setKey(EPUB_CURRENT_POSITION_SCROLL_CHAR, book.title(), 0)
+        setKey(EPUB_CURRENT_POSITION, bookTitle(), index)
+        setKey(EPUB_CURRENT_POSITION_SCROLL_CHAR, bookTitle(), 0)
 
         // set the state
         desiredIndex = ScrollIndex(index, 0, 0)
@@ -2447,6 +2466,7 @@ class ReadActivityViewModel : ViewModel() {
     }*/
 
     fun onScroll(visibility: ScrollVisibilityIndex?) {
+        if (!hasInit || !isInApp) return
         if (visibility == null) return
 
         // dynamically increase padding in case of very small chapters with a maximum of 10 chapters

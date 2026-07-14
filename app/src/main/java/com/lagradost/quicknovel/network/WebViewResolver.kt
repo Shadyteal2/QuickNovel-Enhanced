@@ -92,6 +92,11 @@ class WebViewResolver(
 
         fun destroyWebView() {
             main {
+                try {
+                    android.webkit.CookieManager.getInstance().flush()
+                } catch (t: Throwable) {
+                    logError(t)
+                }
                 dialog?.dismiss()
                 webView?.stopLoading()
                 webView?.destroy()
@@ -121,16 +126,41 @@ class WebViewResolver(
                     // Bare minimum to bypass captcha
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    settings.databaseEnabled = true
                     
-                    // Force matching User-Agent
-                    if (userAgent != null) {
-                        settings.userAgentString = userAgent
+                    // Enable third-party cookies for OAuth/social redirects
+                    try {
+                        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                    } catch (t: Throwable) {
+                        logError(t)
                     }
-                    webViewUserAgent = settings.userAgentString
+                    
+                    // Enable keyboard input and focusability
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+                    
+                    // Force matching User-Agent (ensure we don't pass null to settings.userAgentString)
+                    val ua = userAgent ?: USER_AGENT
+                    settings.userAgentString = ua
+                    webViewUserAgent = ua
+                    
+                    // Ensure touch focus behaves correctly
+                    setOnTouchListener { v, event ->
+                        when (event.action) {
+                            android.view.MotionEvent.ACTION_DOWN,
+                            android.view.MotionEvent.ACTION_UP -> {
+                                if (!v.hasFocus()) {
+                                    v.requestFocus()
+                                }
+                            }
+                        }
+                        false
+                    }
                 }
 
                 val stealthScript = """
                     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                    Object.defineProperty(navigator, 'userAgentData', { get: () => undefined });
                     Object.defineProperty(navigator, 'plugins', {
                         get: () => {
                             const arr = [
@@ -190,15 +220,74 @@ class WebViewResolver(
                         return@withContext
                     }
                     
+                    val rootLayout = android.widget.LinearLayout(activity).apply {
+                        orientation = android.widget.LinearLayout.VERTICAL
+                        layoutParams = android.view.ViewGroup.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    }
+
+                    val buttonBar = android.widget.LinearLayout(activity).apply {
+                        orientation = android.widget.LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.END
+                        layoutParams = android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            setMargins(16, 0, 16, 8)
+                        }
+                    }
+
+                    val btnCancel = android.widget.Button(activity, null, android.R.attr.borderlessButtonStyle).apply {
+                        text = "Cancel"
+                        setOnClickListener {
+                            destroyWebView()
+                        }
+                    }
+
+                    val btnDone = android.widget.Button(activity).apply {
+                        text = "I'm Done"
+                        setOnClickListener {
+                            shouldExit = true
+                            destroyWebView()
+                        }
+                    }
+
+                    buttonBar.addView(btnCancel)
+                    val spacer = android.view.View(activity).apply {
+                        layoutParams = android.widget.LinearLayout.LayoutParams(16, 1)
+                    }
+                    buttonBar.addView(spacer)
+                    buttonBar.addView(btnDone)
+                    rootLayout.addView(buttonBar)
+
+                    // Add WebView with a fixed height to prevent collapsing inside wrap_content dialog parent
+                    webView?.layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        (activity.resources.displayMetrics.heightPixels * 0.7).toInt()
+                    )
+                    (webView?.parent as? android.view.ViewGroup)?.removeView(webView)
+                    rootLayout.addView(webView)
+
                     val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity, com.lagradost.quicknovel.R.style.AlertDialogCustom)
-                        .setView(webView)
-                        .setTitle("Cloudflare Verification")
-                        .setMessage("Please complete the verification challenge below to safely access the provider.")
-                        .setNegativeButton("Cancel") { _, _ -> destroyWebView() }
+                        .setView(rootLayout)
+                        .setTitle("Verification / Login")
+                        .setMessage("Please complete the verification challenge or log into your account, then tap 'I'm Done'.")
                         .setOnCancelListener { destroyWebView() }
                     
                     dialog = builder.create()
                     dialog?.show()
+                    
+                    // Clear NOT_FOCUSABLE to allow keyboard/input focus on the WebView input elements AFTER showing dialog
+                    dialog?.window?.clearFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        android.view.WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
+                    )
+                    dialog?.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+                    
+                    // Force input focus on the WebView on the UI thread
+                    webView?.requestFocus()
                     
                     // Resize to be useful but not full screen
                     dialog?.window?.setLayout(
@@ -295,15 +384,43 @@ class WebViewResolver(
                                     request
                                 )
 
-                                useOkhttp && request.method == "GET" -> app.get(
-                                    webViewUrl,
-                                    headers = request.requestHeaders
-                                ).okhttpResponse.toWebResourceResponse()
+                                (webViewUrl.contains("accounts.google.com") || webViewUrl.contains("github.com")) && request.method == "GET" -> {
+                                    val reqHeaders = request.requestHeaders.toMutableMap()
+                                    reqHeaders.remove("X-Requested-With")
+                                    reqHeaders["User-Agent"] = userAgent ?: USER_AGENT
+                                    app.get(
+                                        webViewUrl,
+                                        headers = reqHeaders
+                                    ).okhttpResponse.toWebResourceResponse()
+                                }
 
-                                useOkhttp && request.method == "POST" -> app.post(
-                                    webViewUrl,
-                                    headers = request.requestHeaders
-                                ).okhttpResponse.toWebResourceResponse()
+                                (webViewUrl.contains("accounts.google.com") || webViewUrl.contains("github.com")) && request.method == "POST" -> {
+                                    val reqHeaders = request.requestHeaders.toMutableMap()
+                                    reqHeaders.remove("X-Requested-With")
+                                    reqHeaders["User-Agent"] = userAgent ?: USER_AGENT
+                                    app.post(
+                                        webViewUrl,
+                                        headers = reqHeaders
+                                    ).okhttpResponse.toWebResourceResponse()
+                                }
+
+                                useOkhttp && request.method == "GET" -> {
+                                    val reqHeaders = request.requestHeaders.toMutableMap()
+                                    reqHeaders.remove("X-Requested-With")
+                                    app.get(
+                                        webViewUrl,
+                                        headers = reqHeaders
+                                    ).okhttpResponse.toWebResourceResponse()
+                                }
+
+                                useOkhttp && request.method == "POST" -> {
+                                    val reqHeaders = request.requestHeaders.toMutableMap()
+                                    reqHeaders.remove("X-Requested-With")
+                                    app.post(
+                                        webViewUrl,
+                                        headers = reqHeaders
+                                    ).okhttpResponse.toWebResourceResponse()
+                                }
 
                                 else -> super.shouldInterceptRequest(
                                     view,
@@ -323,7 +440,10 @@ class WebViewResolver(
                         handler?.proceed() // Ignore ssl issues
                     }
                 }
-                webView?.loadUrl(url, headers.toMap())
+                val loadHeaders = headers.toMap().toMutableMap()
+                // Override/remove X-Requested-With header to bypass "unsafe browser" blocks on OAuth screens
+                loadHeaders["X-Requested-With"] = ""
+                webView?.loadUrl(url, loadHeaders)
             } catch (e: Exception) {
                 logError(e)
             }

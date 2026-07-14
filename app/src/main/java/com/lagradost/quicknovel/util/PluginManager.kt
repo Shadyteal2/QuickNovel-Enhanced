@@ -352,6 +352,156 @@ object PluginManager {
             0
         }
     }
+
+    /**
+     * Unified helper to import a provider APK from a Uri safely.
+     * Copies the APK, scans for MainAPI classes (WITHOUT instantiating them),
+     * removes stale cached versions, and registers/hot-loads the new provider.
+     * Note: Signature checks are skipped as requested.
+     */
+    fun importProviderApk(context: Context, uri: android.net.Uri): Result<Int> {
+        return try {
+            // ── 1. Resolve display name → stable bundle id ────────────────
+            val displayName = context.contentResolver
+                .query(uri, null, null, null, null)?.use { cursor ->
+                    val col = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (col != -1 && cursor.moveToFirst()) {
+                        cursor.getString(col)
+                    } else null
+                } ?: "provider.apk"
+
+            val bundleId = displayName
+                .removeSuffix(".apk").removeSuffix(".dex")
+                .replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
+
+            // ── 2. Copy APK bytes to a temp file first for safe scanning ──
+            val tempApk = File(context.cacheDir, "temp_import_${System.currentTimeMillis()}.apk")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                tempApk.outputStream().use { out -> input.copyTo(out) }
+            }
+            if (tempApk.canWrite()) {
+                tempApk.setReadOnly() // DexClassLoader requires read-only on API 26+
+            }
+
+            // ── 3. Scan DEX from temp file for all concrete MainAPI subclasses ──
+            val foundClasses = mutableListOf<String>()
+            try {
+                @Suppress("DEPRECATION")
+                val dex = dalvik.system.DexFile(tempApk.absolutePath)
+                val loader = DexClassLoader(
+                    tempApk.absolutePath,
+                    context.codeCacheDir.absolutePath,
+                    null,
+                    context.classLoader
+                )
+                val entries = dex.entries()
+                while (entries.hasMoreElements()) {
+                    val className = entries.nextElement()
+                    // Fast-skip framework packages to keep scan time low
+                    if (className.startsWith("android.") ||
+                        className.startsWith("kotlin.") ||
+                        className.startsWith("kotlinx.") ||
+                        className.startsWith("java.")) continue
+                    try {
+                        val clazz = loader.loadClass(className)
+                        if (MainAPI::class.java.isAssignableFrom(clazz) &&
+                            !java.lang.reflect.Modifier.isAbstract(clazz.modifiers) &&
+                            !clazz.isInterface) {
+                            foundClasses.add(className)
+                            Log.d(TAG, "Found provider class: $className")
+                        }
+                    } catch (_: Throwable) { /* skip unloadable / abstract classes */ }
+                }
+                dex.close()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error scanning DexFile", e)
+                logError(e)
+            }
+
+            // ── 4. Abort if nothing was found ─────────────────────────────
+            if (foundClasses.isEmpty()) {
+                tempApk.delete()
+                return Result.failure(Exception("No providers found in APK"))
+            }
+
+            val timestamp = System.currentTimeMillis()
+            val destFileName = "${bundleId}_$timestamp"
+            val pluginsDir = getPluginsDir(context)
+            val destApk   = File(pluginsDir, "$destFileName.apk")
+            val destJson  = File(pluginsDir, "$destFileName.json")
+
+            // ── 5. Legacy cleanup — remove stale bundles for these providers ──
+            val mapper = com.lagradost.quicknovel.util.AppUtils.mapper
+            val foundClassesSet = foundClasses.toSet()
+            pluginsDir.listFiles { _, name -> name.endsWith(".json") }?.forEach { jsonFile ->
+                try {
+                    val existingMeta = mapper.readValue(jsonFile.readText(), PluginItem::class.java)
+                    val existingClasses = (existingMeta.mainClasses ?: listOfNotNull(existingMeta.mainClass)).toSet()
+                    
+                    // Match 1: Class name intersection (most reliable)
+                    val hasClassOverlap = foundClassesSet.any { it in existingClasses }
+                    
+                    // Match 2: Stored pluginId or name overlap
+                    val isStaleNameOrId = existingMeta.pluginId == bundleId || 
+                        existingMeta.name.equals(bundleId, ignoreCase = true) ||
+                        existingMeta.mainClasses?.any { oldClass ->
+                            val newName = oldClass.split(".").last()
+                            existingMeta.pluginId.replace("_", " ").equals(newName, ignoreCase = true)
+                        } ?: false
+                    
+                    if (hasClassOverlap || isStaleNameOrId) {
+                        val baseName = jsonFile.nameWithoutExtension
+                        val staleApk = File(pluginsDir, "$baseName.apk")
+                        val staleDex = File(pluginsDir, "$baseName.dex")
+                        
+                        // Unload old classes to clear them from active registry
+                        existingClasses.forEach { className ->
+                            unloadPlugin(className)
+                        }
+                        
+                        removeCachesForPath(staleApk.absolutePath)
+                        staleApk.delete()
+                        staleDex.delete()
+                        jsonFile.delete()
+                        Log.i(TAG, "Removed stale bundle: $baseName → replaced by $destFileName")
+                    }
+                } catch (_: Exception) { /* corrupt json — leave it alone */ }
+            }
+
+            // ── 6. Move temp APK to plugins dir and clear its old caches ──
+            if (!tempApk.renameTo(destApk)) {
+                tempApk.copyTo(destApk, overwrite = true)
+                tempApk.delete()
+            }
+            if (destApk.canWrite()) {
+                destApk.setReadOnly()
+            }
+            removeCachesForPath(destApk.absolutePath)
+
+            // ── 7. Write companion JSON ───────────────────────────────────
+            val meta = PluginItem(
+                pluginId      = bundleId,
+                name          = bundleId,
+                version       = 1,
+                minApiVersion = API_VERSION,
+                mainClasses   = foundClasses,
+                url           = "local://$bundleId",
+                isManualImport = true
+            )
+            destJson.writeText(mapper.writeValueAsString(meta))
+
+            // ── 8. Hot-reload so providers appear immediately ──────────────
+            runBlocking {
+                loadAllPlugins(context)
+            }
+
+            Result.success(foundClasses.size)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error importing provider APK", e)
+            logError(e)
+            Result.failure(e)
+        }
+    }
 }
 
 class PluginContextWrapper(base: Context, apkFile: File) : ContextWrapper(base) {
