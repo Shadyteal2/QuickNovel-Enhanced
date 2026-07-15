@@ -75,9 +75,7 @@ fun ForYouScreen(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
 
-    val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
-    val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
-    val hasBackground = !imageUri.isNullOrBlank()
+    val hasBackground = com.lagradost.quicknovel.ui.theme.rememberHasBackground()
     val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
 
     Surface(

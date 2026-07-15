@@ -303,6 +303,48 @@ class SubSettingsFragment : Fragment() {
 
 
 
+            "novel_detail_preset" -> {
+                val names = listOf("None", "Golden Feather", "Cherry Blossom", "Cosmic Abyss")
+                val values = listOf("none", "golden", "cherry", "cosmic")
+                val current = sharedPrefs.getString("novel_detail_preset", "none") ?: "none"
+                val index = values.indexOf(current).coerceAtLeast(0)
+                activity?.showBottomDialog(names, index, "Novel Detail Preset", false, {}) { selectedIndex ->
+                    sharedPrefs.edit().putString("novel_detail_preset", values[selectedIndex]).apply()
+                    CommonActivity.recreateWithSmoothTransition(activity)
+                }
+            }
+
+            "global_fluid_background" -> {
+                val names = listOf("None", "Coastal Mist", "Crimson Void", "Desert Parchment", "Midnight Neon", "Volcanic Embers")
+                val values = listOf("none", "coastal", "crimson", "desert", "neon", "embers")
+                val current = sharedPrefs.getString("global_fluid_background", "none") ?: "none"
+                val index = values.indexOf(current).coerceAtLeast(0)
+                activity?.showBottomDialog(names, index, "Global Fluid Background", false, {}) { selectedIndex ->
+                    sharedPrefs.edit().putString("global_fluid_background", values[selectedIndex]).apply()
+                    CommonActivity.recreateWithSmoothTransition(activity)
+                }
+            }
+
+            "global_fluid_animation_type" -> {
+                val names = listOf("Atmospheric Aura", "Chroma Waves", "Morphing Core", "Auroral Ribbon", "Cosmic Dust")
+                val values = listOf("blobs", "waves", "glass", "aurora", "stardust")
+                val current = sharedPrefs.getString("global_fluid_animation_type", "blobs") ?: "blobs"
+                val index = values.indexOf(current).coerceAtLeast(0)
+                activity?.showBottomDialog(names, index, "Fluid Animation Style", false, {}) { selectedIndex ->
+                    sharedPrefs.edit().putString("global_fluid_animation_type", values[selectedIndex]).apply()
+                }
+            }
+
+            "global_fluid_animation_speed" -> {
+                val names = listOf("Slow", "Normal", "Fast")
+                val values = listOf("slow", "normal", "fast")
+                val current = sharedPrefs.getString("global_fluid_animation_speed", "normal") ?: "normal"
+                val index = values.indexOf(current).coerceAtLeast(0)
+                activity?.showBottomDialog(names, index, "Animation Speed", false, {}) { selectedIndex ->
+                    sharedPrefs.edit().putString("global_fluid_animation_speed", values[selectedIndex]).apply()
+                }
+            }
+
             "locale_key" -> {
                 val tempLangs = BaseSettingsFragment.appLanguages.toMutableList()
                 val current = BaseSettingsFragment.getCurrentLocale(context)

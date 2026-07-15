@@ -45,9 +45,7 @@ fun UpdatesScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
-    val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
-    val hasBackground = !imageUri.isNullOrBlank()
+    val hasBackground = com.lagradost.quicknovel.ui.theme.rememberHasBackground()
     val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
 
     val groupedUpdates by viewModel.groupedUpdates.collectAsState()

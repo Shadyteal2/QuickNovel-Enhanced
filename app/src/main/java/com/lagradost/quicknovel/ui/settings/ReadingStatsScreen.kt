@@ -55,8 +55,7 @@ fun ReadingStatsScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
-    val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
-    val hasBackground = !imageUri.isNullOrBlank()
+    val hasBackground = com.lagradost.quicknovel.ui.theme.rememberHasBackground()
 
     // Database / DataStore reloading trigger
     var reloadTrigger by remember { mutableStateOf(0) }

@@ -496,3 +496,13 @@ suspend fun PointerInputScope.disallowParentIntercept(view: android.view.View) {
         } while (event.changes.any { it.pressed })
     }
 }
+
+@Composable
+fun rememberHasBackground(): Boolean {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val settings = remember(context) { androidx.preference.PreferenceManager.getDefaultSharedPreferences(context) }
+    val imageUri = remember(settings) { settings.getString(context.getString(com.lagradost.quicknovel.R.string.background_image_key), null) }
+    val globalFluidBg = remember(settings) { settings.getString("global_fluid_background", "none") ?: "none" }
+    return !imageUri.isNullOrBlank() || globalFluidBg != "none"
+}
+

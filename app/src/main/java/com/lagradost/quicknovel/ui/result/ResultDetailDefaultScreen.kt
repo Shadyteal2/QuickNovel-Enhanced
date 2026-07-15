@@ -73,6 +73,8 @@ import com.lagradost.quicknovel.ui.theme.coverAuraGlow
 import com.lagradost.quicknovel.ui.theme.extractAuraColor
 import com.lagradost.quicknovel.ui.theme.rememberAuraEnabled
 import com.lagradost.quicknovel.ui.theme.rememberAccentGradientBrush
+import com.lagradost.quicknovel.ui.theme.rememberPreferenceString
+import com.lagradost.quicknovel.ui.theme.FluidMeshBackground
 
 // ─── Dimensions ───────────────────────────────────────────────────────────────
 private val POSTER_WIDTH  = 120.dp
@@ -100,6 +102,21 @@ fun ResultDetailDefaultScreen(
     onRelatedClick: (SearchResponse) -> Unit,
 ) {
     val loadResponse       by viewModel.loadResponse.observeAsState()
+    val presetKey          by rememberPreferenceString("novel_detail_preset", "none")
+    val activePreset       = remember(presetKey) { NovelDetailPreset.fromKey(presetKey) }
+    val globalFluidBgKey   by rememberPreferenceString("global_fluid_background", "none")
+    val globalAnimType     by rememberPreferenceString("global_fluid_animation_type", "blobs")
+    val globalAnimSpeed    by rememberPreferenceString("global_fluid_animation_speed", "normal")
+    val fluidPalette = remember(activePreset, globalFluidBgKey) {
+        activePreset.fluidMeshPalette ?: when (globalFluidBgKey) {
+            "coastal" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.CoastalMist
+            "crimson" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.CrimsonVoid
+            "desert" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.DesertParchment
+            "neon" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.MidnightNeon
+            "embers" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.VolcanicEmbers
+            else -> null
+        }
+    }
     val isSyncEnabled      by viewModel.isSyncEnabledDisplay.observeAsState(false)
     val isMigrating        by viewModel.isMigrating.observeAsState(false)
     val isSelectionMode    by viewModel.isInSelectionMode.observeAsState(false)
@@ -253,34 +270,49 @@ fun ResultDetailDefaultScreen(
                     )
                 }
 
-                // ── Blurred full-screen ambient backdrop ──────────────────────
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                ) {
-                    AsyncImage(
-                        model = rememberDefaultImageRequest(res.image, context),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(30.dp)
-                            .graphicsLayer(alpha = 0.45f)
+                // ── Background layer: fluid mesh OR blurred poster ──────────────────
+                if (fluidPalette != null) {
+                    val animType = if (activePreset.fluidMeshPalette != null) "blobs" else globalAnimType
+                    val animSpeed = if (activePreset.fluidMeshPalette != null) "normal" else globalAnimSpeed
+                    // Preset active/fallback → animated fluid mesh canvas fills the backdrop
+                    FluidMeshBackground(
+                        palette = fluidPalette,
+                        modifier = Modifier.fillMaxSize(),
+                        blobAlpha = 0.72f,
+                        dotAlpha = 0.030f,
+                        animationType = animType,
+                        speed = animSpeed,
+                        isProcessing = isBatchDownloading || isMigrating
                     )
-                    // Gradient scrim blending toward the theme background color
+                } else {
+                    // No preset → keep the classic blurred poster backdrop
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
-                                        MaterialTheme.colorScheme.background.copy(alpha = 0.80f),
-                                        MaterialTheme.colorScheme.background
-                                    )
-                                )
+                    ) {
+                        AsyncImage(
+                            model = rememberDefaultImageRequest(res.image, context),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .blur(30.dp)
+                                .graphicsLayer(alpha = 0.45f)
+                        )
+                        // Gradient scrim blending toward the theme background color
+                        val backgroundBrush = Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.80f),
+                                MaterialTheme.colorScheme.background
                             )
-                    )
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(backgroundBrush)
+                        )
+                    }
                 }
 
                 // ── Foreground scrollable content ─────────────────────────────
@@ -489,7 +521,11 @@ fun ResultDetailDefaultScreen(
 
                                         // ── Stacked CTA buttons ───────────────
                                         // Continue reading pill
-                                        val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+                                        val accentBrush = if (activePreset != NovelDetailPreset.None) {
+                                            activePreset.gradientBrush
+                                        } else {
+                                            rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+                                        }
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -614,12 +650,19 @@ fun ResultDetailDefaultScreen(
                                                 stringResource(R.string.read_action_chapters)
                                             ),
                                             onSelect = { selectedTab = it },
+                                            preset = activePreset,
                                             modifier = Modifier.fillMaxWidth()
                                         )
                                         Spacer(Modifier.height(12.dp))
 
                                         // ── Novel tab content (stats, synopsis, tags, notes) ──
-                                        NovelTabScreen(viewModel, res, activity, onRelatedClick)
+                                         NovelTabScreen(
+                                             viewModel = viewModel,
+                                             res = res,
+                                             activity = activity,
+                                             onRelatedClick = onRelatedClick,
+                                             preset = activePreset
+                                         )
 
                                         Spacer(Modifier.height(32.dp))
                                     }
@@ -636,6 +679,7 @@ fun ResultDetailDefaultScreen(
                                                 stringResource(R.string.read_action_chapters)
                                             ),
                                             onSelect = { selectedTab = it },
+                                            preset = activePreset,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -804,9 +848,14 @@ private fun DefaultTabRow(
     selectedTab: Int,
     tabs: List<String>,
     onSelect: (Int) -> Unit,
+    preset: NovelDetailPreset = NovelDetailPreset.None,
     modifier: Modifier = Modifier,
 ) {
-    val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+    val accentBrush = if (preset != NovelDetailPreset.None) {
+        preset.gradientBrush
+    } else {
+        rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+    }
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))

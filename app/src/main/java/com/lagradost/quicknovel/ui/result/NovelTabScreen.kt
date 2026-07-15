@@ -41,6 +41,7 @@ import com.lagradost.quicknovel.ui.theme.glassCard
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import com.lagradost.quicknovel.ui.theme.ParticleEffect
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -48,7 +49,8 @@ fun NovelTabScreen(
     viewModel: ResultViewModel,
     res: LoadResponse,
     activity: Activity,
-    onRelatedClick: (SearchResponse) -> Unit
+    onRelatedClick: (SearchResponse) -> Unit,
+    preset: NovelDetailPreset = NovelDetailPreset.None
 ) {
     // Observers
     val relatedState by viewModel.relatedState.collectAsStateWithLifecycle()
@@ -66,10 +68,26 @@ fun NovelTabScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        val statTint = if (preset != NovelDetailPreset.None) preset.primaryAccent else MaterialTheme.colorScheme.primary
+        val activeBgColor = if (preset != NovelDetailPreset.None) {
+            val isAmoled = androidx.compose.ui.platform.LocalContext.current.let { ctx ->
+                val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx)
+                val themeKey = prefs.getString(ctx.getString(R.string.theme_key), "Amoled") ?: "Amoled"
+                themeKey == "Amoled" || themeKey == "Black"
+            }
+            if (isAmoled) preset.primaryAccent.copy(alpha = 0.08f) else preset.primaryAccent.copy(alpha = 0.12f)
+        } else {
+            Color.Transparent
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .glassCard(shape = RoundedCornerShape(28.dp))
+                .glassCard(
+                    shape = RoundedCornerShape(28.dp),
+                    strokeColor = if (preset != NovelDetailPreset.None) preset.primaryAccent.copy(alpha = 0.25f) else null,
+                    backgroundColor = if (preset != NovelDetailPreset.None) activeBgColor else null
+                )
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -77,58 +95,92 @@ fun NovelTabScreen(
                 icon = R.drawable.ic_baseline_history_24,
                 text = res.views?.toString() ?: stringResource(id = R.string.no_data),
                 label = "Views",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                tint = statTint
             )
             Box(modifier = Modifier.width(1.dp).height(24.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)))
             StatItem(
                 icon = R.drawable.ic_baseline_star_24,
                 text = if (res.rating != null) String.format("%.1f", res.rating!! / 200f) else stringResource(id = R.string.no_data),
                 label = "Rating",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                tint = statTint
             )
             Box(modifier = Modifier.width(1.dp).height(24.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)))
             StatItem(
                 icon = R.drawable.ic_baseline_list_24,
                 text = "${chapters?.size ?: 0}",
                 label = "Chapters",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                tint = statTint
             )
         }
 
         // Synopsis Card
         var isSynopsisExpanded by remember { mutableStateOf(false) }
-        Column(
+
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .glassCard(shape = RoundedCornerShape(28.dp))
-                .clickable { isSynopsisExpanded = !isSynopsisExpanded }
-                .padding(16.dp)
-                .animateContentSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = stringResource(id = R.string.synopsis),
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
-            )
-            Text(
-                text = res.synopsis ?: "No Synopsis Available",
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                maxLines = if (isSynopsisExpanded) Int.MAX_VALUE else 4,
-                overflow = TextOverflow.Ellipsis,
-                fontSize = 14.sp,
-                lineHeight = 20.sp
-            )
-            if (!isSynopsisExpanded && !res.synopsis.isNullOrEmpty()) {
-                Text(
-                    text = "Read More",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    modifier = Modifier.align(Alignment.End)
+                .glassCard(
+                    shape = RoundedCornerShape(28.dp),
+                    strokeColor = if (preset != NovelDetailPreset.None) preset.primaryAccent.copy(alpha = 0.35f) else null,
+                    backgroundColor = if (preset != NovelDetailPreset.None) activeBgColor else null
                 )
+                .clickable { isSynopsisExpanded = !isSynopsisExpanded }
+        ) {
+            if (preset != NovelDetailPreset.None) {
+                ParticleEffect(
+                    type = preset.particleType,
+                    color = preset.primaryAccent,
+                    secondaryColor = preset.secondaryAccent,
+                    modifier = Modifier.matchParentSize()
+                )
+            }
+
+            if (preset != NovelDetailPreset.None && preset.symbolicDraw != null) {
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(130.dp)
+                        .offset(x = 10.dp, y = 20.dp)
+                ) {
+                    preset.symbolicDraw.invoke(this, preset.primaryAccent)
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .animateContentSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = stringResource(id = R.string.synopsis),
+                    color = if (preset != NovelDetailPreset.None) preset.primaryAccent else MaterialTheme.colorScheme.onSurface,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = res.synopsis ?: "No Synopsis Available",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                    maxLines = if (isSynopsisExpanded) Int.MAX_VALUE else 4,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.fillMaxWidth(if (isSynopsisExpanded || preset == NovelDetailPreset.None) 1f else 0.82f)
+                )
+                if (!isSynopsisExpanded && !res.synopsis.isNullOrEmpty()) {
+                    Text(
+                        text = "Read More",
+                        color = if (preset != NovelDetailPreset.None) preset.primaryAccent else MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        modifier = Modifier.align(Alignment.End)
+                    )
+                }
             }
         }
 
@@ -144,16 +196,19 @@ fun NovelTabScreen(
                         modifier = Modifier
                             .glassCard(
                                 shape = RoundedCornerShape(20.dp),
-                                backgroundColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
-                                strokeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                                backgroundColor = if (preset != NovelDetailPreset.None) preset.primaryAccent.copy(alpha = 0.06f)
+                                                  else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                strokeColor = if (preset != NovelDetailPreset.None) preset.primaryAccent.copy(alpha = 0.20f)
+                                              else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
                             )
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = tag,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                            color = if (preset != NovelDetailPreset.None) preset.primaryAccent.copy(alpha = 0.90f)
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -293,7 +348,7 @@ fun NovelTabScreen(
                         )
                         Text(
                             text = "${state.progress} / ${state.total} Chapters",
-                            color = MaterialTheme.colorScheme.primary,
+                            color = if (preset != NovelDetailPreset.None) preset.primaryAccent else MaterialTheme.colorScheme.primary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -311,12 +366,16 @@ fun NovelTabScreen(
                                 .fillMaxWidth(progressFraction)
                                 .fillMaxHeight()
                                 .background(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                    brush = if (preset != NovelDetailPreset.None) {
+                                        preset.gradientBrush
+                                    } else {
+                                        Brush.horizontalGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                            )
                                         )
-                                    ),
+                                    },
                                     shape = RoundedCornerShape(3.dp)
                                 )
                         )
@@ -334,9 +393,14 @@ fun NovelTabScreen(
                         onClick = { viewModel.readEpub() },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(28.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                        border = BorderStroke(
+                            1.dp,
+                            if (preset != NovelDetailPreset.None) preset.primaryAccent.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        ),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
+                            contentColor = if (preset != NovelDetailPreset.None) preset.primaryAccent
+                                           else MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Row(
@@ -374,13 +438,20 @@ fun NovelTabScreen(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                         tonalElevation = 2.dp,
                         shadowElevation = 2.dp,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(28.dp))
+                            .then(
+                                if (preset != NovelDetailPreset.None) {
+                                    Modifier.background(preset.gradientBrush)
+                                } else {
+                                    Modifier.background(MaterialTheme.colorScheme.primary)
+                                }
+                            )
                             .combinedClickable(
                                 onClick = {
                                     if (isManageAction) {
@@ -463,7 +534,7 @@ fun NovelTabScreen(
 }
 
 @Composable
-fun StatItem(icon: Int, text: String, label: String, modifier: Modifier = Modifier) {
+fun StatItem(icon: Int, text: String, label: String, modifier: Modifier = Modifier, tint: Color = MaterialTheme.colorScheme.primary) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -476,7 +547,7 @@ fun StatItem(icon: Int, text: String, label: String, modifier: Modifier = Modifi
             Icon(
                 painter = painterResource(id = icon),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = tint,
                 modifier = Modifier.size(18.dp)
             )
             Text(

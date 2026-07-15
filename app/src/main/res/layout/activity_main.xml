@@ -8,6 +8,12 @@
         android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
         android:paddingTop="0dp">
 
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/app_background_fluid_mesh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <ImageView
         android:id="@+id/app_background_image"
         android:layout_width="match_parent"

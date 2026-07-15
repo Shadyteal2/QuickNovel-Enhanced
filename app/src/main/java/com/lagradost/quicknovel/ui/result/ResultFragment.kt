@@ -1211,15 +1211,20 @@ class ResultFragment : Fragment() {
                 val res = (loadResponse as? Resource.Success<LoadResponse>)?.value ?: return@setContent
                 
                 QuickNovelTheme {
-                    NovelTabScreen(viewModel, res, requireActivity()) { searchResponse ->
-                        val bundle = newInstance(searchResponse.url, searchResponse.apiName)
-                        (requireActivity() as? com.lagradost.quicknovel.MainActivity)?.navigate(
-                            com.lagradost.quicknovel.R.id.global_to_navigation_results,
-                            bundle,
-                            null,
-                            null
-                        )
-                    }
+                    NovelTabScreen(
+                        viewModel = viewModel,
+                        res = res,
+                        activity = requireActivity(),
+                        onRelatedClick = { searchResponse ->
+                            val bundle = newInstance(searchResponse.url, searchResponse.apiName)
+                            (requireActivity() as? com.lagradost.quicknovel.MainActivity)?.navigate(
+                                com.lagradost.quicknovel.R.id.global_to_navigation_results,
+                                bundle,
+                                null,
+                                null
+                            )
+                        }
+                    )
                 }
             }
         }

@@ -30,6 +30,8 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.Animator
 import android.view.ViewAnimationUtils
 import kotlin.math.hypot
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.getValue
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -98,6 +100,7 @@ import com.lagradost.quicknovel.util.toPx
 import com.lagradost.quicknovel.util.DrawerHelper
 import com.lagradost.safefile.SafeFile
 import androidx.viewpager2.adapter.FragmentStateAdapter
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.bottomnavigation.BottomNavigationItemView
 import com.google.android.material.bottomnavigation.BottomNavigationMenuView
@@ -1339,6 +1342,9 @@ class MainActivity : AppCompatActivity(), TabNavigator {
         val imageUri = settingsManager.getString(getString(R.string.background_image_key), null)
 
         binding?.apply {
+            val fluidBgKey = settingsManager.getString("global_fluid_background", "none") ?: "none"
+            val hasFluidBg = fluidBgKey != "none"
+
             if (imageUri.isNullOrBlank()) {
                 appBackgroundImage.isVisible = false
                 appBackgroundDim.isVisible = false
@@ -1349,7 +1355,48 @@ class MainActivity : AppCompatActivity(), TabNavigator {
                     appBackgroundImage.setRenderEffect(null)
                 }
                 appBackgroundImage.colorFilter = null
+
+                if (hasFluidBg) {
+                    appBackgroundFluidMesh.visibility = android.view.View.VISIBLE
+                    val palette = when (fluidBgKey) {
+                        "coastal" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.CoastalMist
+                        "crimson" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.CrimsonVoid
+                        "desert" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.DesertParchment
+                        "neon" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.MidnightNeon
+                        "embers" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.VolcanicEmbers
+                        else -> null
+                    }
+                    if (palette != null) {
+                        appBackgroundFluidMesh.setContent {
+                            val animType by com.lagradost.quicknovel.ui.theme.rememberPreferenceString("global_fluid_animation_type", "blobs")
+                            val animSpeed by com.lagradost.quicknovel.ui.theme.rememberPreferenceString("global_fluid_animation_speed", "normal")
+                            
+                            val isSyncing by com.lagradost.quicknovel.util.Apis.isSyncing.observeAsState(false)
+                            val searchState by searchViewModel.searchResponse.observeAsState()
+                            val isSearching = searchState is Resource.Loading
+                            
+                            val isProcessing = isSyncing || isSearching
+
+                            com.lagradost.quicknovel.ui.theme.QuickNovelTheme {
+                                com.lagradost.quicknovel.ui.theme.FluidMeshBackground(
+                                    palette = palette,
+                                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                                    animationType = animType,
+                                    speed = animSpeed,
+                                    isProcessing = isProcessing
+                                )
+                            }
+                        }
+                    }
+                    val helper = com.lagradost.quicknovel.util.AuraTransparencyHelper
+                    helper.forceTransparent(mainContentWrapper)
+                    helper.forceTransparent(homeRoot)
+                } else {
+                    appBackgroundFluidMesh.visibility = android.view.View.GONE
+                }
                 return@apply
+            } else {
+                appBackgroundFluidMesh.visibility = android.view.View.GONE
             }
 
             bindBackgroundEffects(

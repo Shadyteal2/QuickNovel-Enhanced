@@ -66,9 +66,11 @@ import com.lagradost.quicknovel.ui.download.DownloadViewModel
 import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 import com.lagradost.quicknovel.ui.theme.rememberAccentGradientBrush
+import com.lagradost.quicknovel.ui.theme.rememberPreferenceString
 import com.lagradost.quicknovel.ui.ReadType
 import com.lagradost.quicknovel.util.SettingsHelper.getRating
 import com.lagradost.quicknovel.ui.theme.rememberShimmerBrush
+import com.lagradost.quicknovel.ui.theme.FluidMeshBackground
 
 // ─── Hero dimensions ──────────────────────────────────────────────────────────
 private val HERO_HEIGHT  = 380.dp
@@ -96,6 +98,21 @@ fun ResultDetailModernScreen(
     onRelatedClick: (SearchResponse) -> Unit,
 ) {
     val loadResponse       by viewModel.loadResponse.observeAsState()
+    val presetKey          by rememberPreferenceString("novel_detail_preset", "none")
+    val activePreset       = remember(presetKey) { NovelDetailPreset.fromKey(presetKey) }
+    val globalFluidBgKey   by rememberPreferenceString("global_fluid_background", "none")
+    val globalAnimType     by rememberPreferenceString("global_fluid_animation_type", "blobs")
+    val globalAnimSpeed    by rememberPreferenceString("global_fluid_animation_speed", "normal")
+    val fluidPalette = remember(activePreset, globalFluidBgKey) {
+        activePreset.fluidMeshPalette ?: when (globalFluidBgKey) {
+            "coastal" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.CoastalMist
+            "crimson" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.CrimsonVoid
+            "desert" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.DesertParchment
+            "neon" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.MidnightNeon
+            "embers" -> com.lagradost.quicknovel.ui.theme.FluidMeshPalettes.VolcanicEmbers
+            else -> null
+        }
+    }
     val isSyncEnabled      by viewModel.isSyncEnabledDisplay.observeAsState(false)
     val isMigrating        by viewModel.isMigrating.observeAsState(false)
     val isSelectionMode    by viewModel.isInSelectionMode.observeAsState(false)
@@ -258,7 +275,28 @@ fun ResultDetailModernScreen(
                     )
                 }
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                // ── Fluid Mesh Animated Background (per-preset) ─────────────────────────
+                if (fluidPalette != null) {
+                    val animType = if (activePreset.fluidMeshPalette != null) "blobs" else globalAnimType
+                    val animSpeed = if (activePreset.fluidMeshPalette != null) "normal" else globalAnimSpeed
+                    FluidMeshBackground(
+                        palette = fluidPalette,
+                        modifier = Modifier.fillMaxSize(),
+                        blobAlpha = 0.78f,
+                        dotAlpha = 0.035f,
+                        animationType = animType,
+                        speed = animSpeed,
+                        isProcessing = isBatchDownloading
+                    )
+                } else {
+                    // Default: plain theme background (no animated layer)
+                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                ) {
                     // The static poster image background layer
                     Box(
                         modifier = Modifier
@@ -490,6 +528,7 @@ fun ResultDetailModernScreen(
                                 stringResource(R.string.read_action_chapters)
                             ),
                             onSelect = { selectedTab = it },
+                            preset = activePreset,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 20.dp, vertical = 8.dp)
@@ -511,7 +550,13 @@ fun ResultDetailModernScreen(
                                             .fillMaxSize()
                                             .verticalScroll(rememberScrollState())
                                     ) {
-                                        NovelTabScreen(viewModel, res, activity, onRelatedClick)
+                                        NovelTabScreen(
+                                            viewModel = viewModel,
+                                            res = res,
+                                            activity = activity,
+                                            preset = activePreset,
+                                            onRelatedClick = onRelatedClick
+                                        )
                                         // Extra bottom padding for action bar
                                         Spacer(Modifier.height(100.dp))
                                     }
@@ -650,6 +695,7 @@ fun ResultDetailModernScreen(
                                     bookmarkMenuExpanded = false
                                 },
                                 viewModel = viewModel,
+                                preset = activePreset,
                             )
                         }
                     }
@@ -781,9 +827,14 @@ private fun PremiumTabRow(
     selectedTab: Int,
     tabs: List<String>,
     onSelect: (Int) -> Unit,
+    preset: NovelDetailPreset,
     modifier: Modifier = Modifier,
 ) {
-    val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+    val accentBrush = if (preset != NovelDetailPreset.None) {
+        preset.gradientBrush
+    } else {
+        rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+    }
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
@@ -827,6 +878,7 @@ private fun PremiumActionBar(
     onContinue: () -> Unit,
     onBookmarkSelect: (Int) -> Unit,
     viewModel: ResultViewModel,
+    preset: NovelDetailPreset,
 ) {
     val context = LocalContext.current
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -924,7 +976,11 @@ private fun PremiumActionBar(
             }
 
             // Continue / Start reading pill
-            val accentBrush = rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+            val accentBrush = if (preset != NovelDetailPreset.None) {
+                preset.gradientBrush
+            } else {
+                rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+            }
             Button(
                 onClick = onContinue,
                 modifier = Modifier

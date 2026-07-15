@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "algorithmic-art": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/algorithmic-art/SKILL.md",
+      "computedHash": "987b24aa98171a0d3690420173b2cdb6eaafd57981ed716b5d50371affa82ea3"
+    },
     "apify-ultimate-scraper": {
       "source": "apify/agent-skills",
       "sourceType": "github",

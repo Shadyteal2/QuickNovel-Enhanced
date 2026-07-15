@@ -64,9 +64,8 @@ fun HistoryScreen(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     val context = LocalContext.current
-    val settings = remember(context) { PreferenceManager.getDefaultSharedPreferences(context) }
-    val imageUri = remember(settings) { settings.getString(context.getString(R.string.background_image_key), null) }
-    val hasBackground = !imageUri.isNullOrBlank()
+    val settings = remember(context) { androidx.preference.PreferenceManager.getDefaultSharedPreferences(context) }
+    val hasBackground = com.lagradost.quicknovel.ui.theme.rememberHasBackground()
 
     // Read the active density preference (history_compact_view)
     val isCompactState = remember { mutableStateOf(settings.getBoolean("history_compact_view", false)) }

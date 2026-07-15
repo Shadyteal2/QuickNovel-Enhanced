@@ -52,6 +52,11 @@ object VibePrefs {
     // Expressive Shapes & Morphing
     const val ASYMMETRIC_SHAPES_ENABLED  = "asymmetric_shapes_enabled"
     const val STAGGERED_ENTRANCES_ENABLED = "staggered_entrances_enabled"
+    
+    // Global Fluid Background
+    const val GLOBAL_FLUID_BACKGROUND     = "global_fluid_background"
+    const val GLOBAL_FLUID_ANIMATION_TYPE = "global_fluid_animation_type"
+    const val GLOBAL_FLUID_ANIMATION_SPEED = "global_fluid_animation_speed"
 }
 
 // ─── Cover Aura Glow ─────────────────────────────────────────────────────────

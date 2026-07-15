@@ -181,8 +181,7 @@ fun SubSettingsScreen(
             )
         }
 
-        val imageUri = remember(cachedPrefs) { getString(context.getString(R.string.background_image_key), "") }
-        val hasBackground = !imageUri.isNullOrBlank()
+        val hasBackground = com.lagradost.quicknovel.ui.theme.rememberHasBackground()
         val containerColor = if (hasBackground) Color.Transparent else MaterialTheme.colorScheme.background
 
         Scaffold(
@@ -356,6 +355,20 @@ fun SubSettingsScreen(
 
                         item {
                             ActionPreferenceCard(
+                                title = "Novel Detail Preset",
+                                summary = when (getString("novel_detail_preset", "none")) {
+                                    "golden" -> "Golden Feather"
+                                    "cherry" -> "Cherry Blossom"
+                                    "cosmic" -> "Cosmic Abyss"
+                                    else -> "None"
+                                },
+                                iconRes = R.drawable.ic_baseline_color_lens_24,
+                                onClick = { onPreferenceClick("novel_detail_preset") }
+                            )
+                        }
+
+                        item {
+                            ActionPreferenceCard(
                                 title = "App Theme",
                                 summary = getString("theme_key", "Amoled"),
                                 iconRes = R.drawable.ic_baseline_color_lens_24,
@@ -489,7 +502,101 @@ fun SubSettingsScreen(
                             )
                         }
 
+                        item { PreferenceHeader("Atmospheric Background") }
 
+                        item {
+                            val hasGlobalFluidBg = getString(VibePrefs.GLOBAL_FLUID_BACKGROUND, "none") != "none"
+                            NestedSettingsGroupCard {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onPreferenceClick(VibePrefs.GLOBAL_FLUID_BACKGROUND) }
+                                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_baseline_color_lens_24),
+                                        contentDescription = "Global Fluid Background",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.width(16.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Global Fluid Background",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        val bgSummary = when (getString(VibePrefs.GLOBAL_FLUID_BACKGROUND, "none")) {
+                                            "coastal" -> "Coastal Mist"
+                                            "crimson" -> "Crimson Void"
+                                            "desert" -> "Desert Parchment"
+                                            "neon" -> "Midnight Neon"
+                                            "embers" -> "Volcanic Embers"
+                                            else -> "None"
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = bgSummary,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                                            lineHeight = 14.sp
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_baseline_arrow_forward_24),
+                                        contentDescription = "Select",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+
+                                AnimatedVisibility(
+                                    visible = hasGlobalFluidBg,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                            thickness = 1.dp
+                                        )
+                                        NestedActionRow(
+                                            title = "Fluid Animation Style",
+                                            summary = when (getString(VibePrefs.GLOBAL_FLUID_ANIMATION_TYPE, "blobs")) {
+                                                "waves" -> "Chroma Waves"
+                                                "glass" -> "Morphing Core"
+                                                "aurora" -> "Auroral Ribbon"
+                                                "stardust" -> "Cosmic Dust"
+                                                else -> "Atmospheric Aura"
+                                            },
+                                            iconRes = R.drawable.ic_baseline_tune_24,
+                                            onClick = { onPreferenceClick(VibePrefs.GLOBAL_FLUID_ANIMATION_TYPE) }
+                                        )
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                            thickness = 0.5.dp
+                                        )
+                                        NestedActionRow(
+                                            title = "Animation Speed",
+                                            summary = when (getString(VibePrefs.GLOBAL_FLUID_ANIMATION_SPEED, "normal")) {
+                                                "slow" -> "Slow"
+                                                "fast" -> "Fast"
+                                                else -> "Normal"
+                                            },
+                                            iconRes = R.drawable.ic_baseline_tune_24,
+                                            onClick = { onPreferenceClick(VibePrefs.GLOBAL_FLUID_ANIMATION_SPEED) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         // ─ PREMIUM VISUALS GROUP ────────────────────────────
                         item { PreferenceHeader("Premium Visuals") }
