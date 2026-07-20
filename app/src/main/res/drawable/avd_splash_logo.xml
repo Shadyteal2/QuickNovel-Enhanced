@@ -8,7 +8,7 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="600"
+                android:duration="350"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -21,7 +21,7 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="600"
+                android:duration="350"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -34,8 +34,8 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="600"
-                android:startDelay="200"
+                android:duration="350"
+                android:startDelay="100"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -48,8 +48,8 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="300"
-                android:startDelay="180"
+                android:duration="200"
+                android:startDelay="100"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -62,8 +62,8 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="300"
-                android:startDelay="240"
+                android:duration="200"
+                android:startDelay="130"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -76,8 +76,8 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="300"
-                android:startDelay="300"
+                android:duration="200"
+                android:startDelay="160"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -90,8 +90,8 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="300"
-                android:startDelay="360"
+                android:duration="200"
+                android:startDelay="190"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -104,8 +104,8 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="300"
-                android:startDelay="420"
+                android:duration="200"
+                android:startDelay="220"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -118,8 +118,8 @@
         <aapt:attr name="android:animation">
             <objectAnimator
                 android:propertyName="trimPathEnd"
-                android:duration="300"
-                android:startDelay="480"
+                android:duration="200"
+                android:startDelay="250"
                 android:valueFrom="0"
                 android:valueTo="1"
                 android:valueType="floatType"
@@ -133,8 +133,8 @@
             <set android:ordering="together">
                 <objectAnimator
                     android:propertyName="translateY"
-                    android:duration="300"
-                    android:startDelay="900"
+                    android:duration="200"
+                    android:startDelay="450"
                     android:valueFrom="-20"
                     android:valueTo="0"
                     android:valueType="floatType"
@@ -142,8 +142,8 @@
                 <!-- Add Fade In -->
                 <objectAnimator
                     android:propertyName="alpha"
-                    android:duration="300"
-                    android:startDelay="900"
+                    android:duration="200"
+                    android:startDelay="450"
                     android:valueFrom="0"
                     android:valueTo="1"
                     android:valueType="floatType" />

@@ -6,7 +6,9 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -124,7 +126,8 @@ fun ResultDetailDefaultScreen(
     val isBatchDownloading by viewModel.isBatchDownloading.observeAsState(false)
     val chapters           by viewModel.chapters.collectAsStateWithLifecycle()
 
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var chapterQuery by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(selectedTab) {
         viewModel.switchTab(selectedTab, if (selectedTab == 0) 0 else 3)
@@ -182,6 +185,19 @@ fun ResultDetailDefaultScreen(
                 val res          = state.value
                 val ratingText   = res.rating?.let { context.getRating(it) }
                 val chapterCount = (res as? StreamResponse)?.data?.size
+
+                val filteredChapters = remember(chapters, chapterQuery) {
+                    val rawList = chapters ?: emptyList()
+                    if (chapterQuery.isBlank()) {
+                        rawList
+                    } else {
+                        val q = chapterQuery.trim().lowercase(java.util.Locale.ROOT)
+                        rawList.filter { ch ->
+                            ch.name.lowercase(java.util.Locale.ROOT).contains(q) ||
+                            ch.dateOfRelease?.lowercase(java.util.Locale.ROOT)?.contains(q) == true
+                        }
+                    }
+                }
 
                 var showPosterViewer by remember { mutableStateOf(false) }
                 var showShareSheet by remember { mutableStateOf(false) }
@@ -381,389 +397,433 @@ fun ResultDetailDefaultScreen(
                                 .weight(1f)
                                 .imePadding()
                         ) {
-                            // Scrollable novel tab content
-                            when (selectedTab) {
-                                0 -> {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .verticalScroll(rememberScrollState())
-                                            .padding(horizontal = 16.dp)
-                                    ) {
-                                        // ── Header row: poster + info ─────────
-                                        Row(
+                            // Smooth crossfade tab transition
+                            Crossfade(targetState = selectedTab, label = "TabSwitch") { tab ->
+                                when (tab) {
+                                    0 -> {
+                                        Column(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 4.dp, bottom = 16.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                                .fillMaxSize()
+                                                .verticalScroll(rememberScrollState())
+                                                .padding(horizontal = 16.dp)
                                         ) {
-                                            // ─── Cover Aura Glow ─────────────────────────────────────────────────────
-                                            val isAuraEnabled = rememberAuraEnabled()
-                                            var auraColor by remember(res.image) { mutableStateOf(Color.Unspecified) }
-
-                                            if (isAuraEnabled) {
-                                                LaunchedEffect(res.image) {
-                                                    val cacheKey = res.image?.toString() ?: return@LaunchedEffect
-                                                    if (cacheKey.isBlank()) return@LaunchedEffect
-                                                    try {
-                                                        val loader = coil3.SingletonImageLoader.get(context)
-                                                        // Use buildImageRequest to inherit cache path resolution & custom header logic
-                                                        val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, res.image).newBuilder(context)
-                                                            .allowHardware(false)
-                                                            .size(32) // tiny decode — just need dominant color
-                                                            .build()
-                                                        val result = loader.execute(req)
-                                                        val drawable = (result as? coil3.request.SuccessResult)?.image
-                                                        val bmp = (drawable as? coil3.BitmapImage)?.bitmap
-                                                        if (bmp != null) {
-                                                            auraColor = extractAuraColor(
-                                                                bitmap = bmp,
-                                                                cacheKey = cacheKey
-                                                            )
-                                                        }
-                                                    } catch (_: Throwable) { /* fail silently — aura is cosmetic */ }
-                                                }
-                                            }
-
-                                            // Poster card wrapper Box (allows cover aura glow to bleed out unclipped)
+                                            // ── Header row: poster + info (Spatial Glass Card) ─────────
                                             Box(
                                                 modifier = Modifier
-                                                    .width(POSTER_WIDTH + 16.dp)
-                                                    .height(POSTER_HEIGHT + 16.dp)
-                                                    .padding(8.dp)
-                                                    .coverAuraGlow(auraColor = auraColor, enabled = isAuraEnabled)
+                                                    .fillMaxWidth()
+                                                    .glassCard(shape = RoundedCornerShape(20.dp), strokeWidth = 0.5.dp)
+                                                    .padding(12.dp)
                                             ) {
-                                                Card(
-                                                    shape = RoundedCornerShape(POSTER_RADIUS),
-                                                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                                                Row(
                                                     modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .clickable {
-                                                            showPosterViewer = true
-                                                        }
+                                                        .fillMaxWidth()
+                                                        .padding(top = 4.dp, bottom = 4.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                                                 ) {
-                                                    AsyncImage(
-                                                        model = rememberDefaultImageRequest(res.image, context),
-                                                        contentDescription = res.name,
-                                                        contentScale = ContentScale.Crop,
-                                                        modifier = Modifier.fillMaxSize()
+                                                    // ─── Cover Aura Glow ─────────────────────────────────────────────────────
+                                                    val isAuraEnabled = rememberAuraEnabled()
+                                                    var auraColor by remember(res.image) { mutableStateOf(Color.Unspecified) }
+
+                                                    if (isAuraEnabled) {
+                                                        LaunchedEffect(res.image) {
+                                                            val cacheKey = res.image?.toString() ?: return@LaunchedEffect
+                                                            if (cacheKey.isBlank()) return@LaunchedEffect
+                                                            try {
+                                                                val loader = coil3.SingletonImageLoader.get(context)
+                                                                // Use buildImageRequest to inherit cache path resolution & custom header logic
+                                                                val req = com.lagradost.quicknovel.ui.theme.buildImageRequest(context, res.image).newBuilder(context)
+                                                                    .allowHardware(false)
+                                                                    .size(32) // tiny decode — just need dominant color
+                                                                    .build()
+                                                                val result = loader.execute(req)
+                                                                val drawable = (result as? coil3.request.SuccessResult)?.image
+                                                                val bmp = (drawable as? coil3.BitmapImage)?.bitmap
+                                                                if (bmp != null) {
+                                                                    auraColor = extractAuraColor(
+                                                                        bitmap = bmp,
+                                                                        cacheKey = cacheKey
+                                                                    )
+                                                                }
+                                                            } catch (_: Throwable) { /* fail silently — aura is cosmetic */ }
+                                                        }
+                                                    }
+
+                                                    // Poster card wrapper Box (allows cover aura glow to bleed out unclipped)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(POSTER_WIDTH + 16.dp)
+                                                            .height(POSTER_HEIGHT + 16.dp)
+                                                            .padding(8.dp)
+                                                            .coverAuraGlow(auraColor = auraColor, enabled = isAuraEnabled)
+                                                    ) {
+                                                        Card(
+                                                            shape = RoundedCornerShape(POSTER_RADIUS),
+                                                            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                                                            modifier = Modifier
+                                                                .fillMaxSize()
+                                                                .clickable {
+                                                                    showPosterViewer = true
+                                                                }
+                                                        ) {
+                                                            AsyncImage(
+                                                                model = rememberDefaultImageRequest(res.image, context),
+                                                                contentDescription = res.name,
+                                                                contentScale = ContentScale.Crop,
+                                                                modifier = Modifier.fillMaxSize()
+                                                            )
+                                                        }
+                                                    }
+
+                                                    // Info column
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .heightIn(min = POSTER_HEIGHT),
+                                                        verticalArrangement = Arrangement.Top
+                                                    ) {
+                                                        // Provider chip badge
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(50))
+                                                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = res.apiName,
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                        Spacer(Modifier.height(6.dp))
+
+                                                        // Title (tap to copy)
+                                                        Text(
+                                                            text = res.name,
+                                                            color = MaterialTheme.colorScheme.onBackground,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            fontSize = 19.sp,
+                                                            lineHeight = 25.sp,
+                                                            maxLines = 4,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier.clickable {
+                                                                copyToClipboardDefault(context, "Novel Title", res.name)
+                                                            }
+                                                        )
+                                                        Spacer(Modifier.height(4.dp))
+
+                                                        // Author (tap to copy)
+                                                        val authorVal  = res.author
+                                                        val authorText = authorVal ?: stringResource(R.string.no_author)
+                                                        Text(
+                                                            text = authorText,
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
+                                                            fontSize = 12.sp,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier.clickable {
+                                                                if (authorVal != null) {
+                                                                    copyToClipboardDefault(context, "Author", authorVal)
+                                                                }
+                                                            }
+                                                        )
+
+                                                        // Latest chapter count
+                                                        if (chapterCount != null) {
+                                                            Spacer(Modifier.height(4.dp))
+                                                            Text(
+                                                                text = "Latest Chapter: $chapterCount",
+                                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                                                                fontSize = 12.sp
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Spacer(Modifier.height(12.dp))
+
+                                            // ── Stacked CTA buttons ───────────────
+                                            // Continue reading pill
+                                            val accentBrush = if (activePreset != NovelDetailPreset.None) {
+                                                activePreset.gradientBrush
+                                            } else {
+                                                rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(50.dp)
+                                                    .background(accentBrush, shape = RoundedCornerShape(14.dp))
+                                                    .clickable { onContinueReading() },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.PlayArrow,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(18.dp),
+                                                        tint = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text(
+                                                        text = continueLabel,
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onPrimary
                                                     )
                                                 }
                                             }
+                                            Spacer(Modifier.height(8.dp))
 
-                                            // Info column
-                                            Column(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .heightIn(min = POSTER_HEIGHT),
-                                                verticalArrangement = Arrangement.Top
-                                            ) {
-                                                // Provider chip badge
-                                                Box(
+                                            // Bookmark pill (outlined)
+                                            Box {
+                                                OutlinedButton(
+                                                    onClick = { bookmarkMenuExpanded = true },
                                                     modifier = Modifier
-                                                        .clip(RoundedCornerShape(50))
-                                                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                        .fillMaxWidth()
+                                                        .height(50.dp),
+                                                    shape = RoundedCornerShape(14.dp),
+                                                    border = androidx.compose.foundation.BorderStroke(
+                                                        1.5.dp,
+                                                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+                                                    ),
+                                                    colors = ButtonDefaults.outlinedButtonColors(
+                                                        contentColor = if (hasBookmark)
+                                                            MaterialTheme.colorScheme.primary
+                                                        else MaterialTheme.colorScheme.onSurface
+                                                    )
                                                 ) {
+                                                    Icon(
+                                                        if (hasBookmark) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                                        null, modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(Modifier.width(8.dp))
                                                     Text(
-                                                        text = res.apiName,
-                                                        fontSize = 11.sp,
+                                                        text = if (hasBookmark) bookmarkLabel else "Add to Library",
+                                                        fontSize = 14.sp,
                                                         fontWeight = FontWeight.SemiBold,
-                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
                                                 }
-                                                Spacer(Modifier.height(6.dp))
-
-                                                // Title (tap to copy)
-                                                Text(
-                                                    text = res.name,
-                                                    color = MaterialTheme.colorScheme.onBackground,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    fontSize = 19.sp,
-                                                    lineHeight = 25.sp,
-                                                    maxLines = 4,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.clickable {
-                                                        copyToClipboardDefault(context, "Novel Title", res.name)
+                                                DropdownMenu(
+                                                    expanded = bookmarkMenuExpanded,
+                                                    onDismissRequest = { bookmarkMenuExpanded = false }
+                                                ) {
+                                                    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+                                                    // categories is observed from viewModel
+                                                    val currentStateId = remember(readState, currentId, bookmarkState) {
+                                                        BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
                                                     }
-                                                )
-                                                Spacer(Modifier.height(4.dp))
-
-                                                // Author (tap to copy)
-                                                val authorVal  = res.author
-                                                val authorText = authorVal ?: stringResource(R.string.no_author)
-                                                Text(
-                                                    text = authorText,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
-                                                    fontSize = 12.sp,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.clickable {
-                                                        if (authorVal != null) {
-                                                            copyToClipboardDefault(context, "Author", authorVal)
+                                                    val neoListCategoryIds = remember {
+                                                        val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "NEOLIST_CATEGORY_IDS", "[]") ?: "[]"
+                                                        try {
+                                                            com.lagradost.quicknovel.DataStore.mapper.readValue(
+                                                                json,
+                                                                object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {}
+                                                            )
+                                                        } catch (_: Throwable) { emptyList<Int>() }
+                                                    }
+                                                    categories.forEach { (id, label) ->
+                                                        val isChecked = if (neoListCategoryIds.contains(id)) {
+                                                            novelFolders.contains(id)
+                                                        } else {
+                                                            id == currentStateId
                                                         }
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    if (isChecked) {
+                                                                        Text("✓ ",
+                                                                            color = MaterialTheme.colorScheme.primary,
+                                                                            fontWeight = FontWeight.Bold)
+                                                                    }
+                                                                    Text(label)
+                                                                }
+                                                            },
+                                                            onClick = {
+                                                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                                                viewModel.bookmark(id)
+                                                                bookmarkMenuExpanded = false
+                                                            }
+                                                        )
                                                     }
-                                                )
-
-                                                // Latest chapter count
-                                                if (chapterCount != null) {
-                                                    Spacer(Modifier.height(4.dp))
-                                                    Text(
-                                                        text = "Latest Chapter: $chapterCount",
-                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-                                                        fontSize = 12.sp
-                                                    )
+                                                    if (currentStateId != -1) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("Unbookmark") },
+                                                            onClick = {
+                                                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                                                viewModel.bookmark(-1)
+                                                                bookmarkMenuExpanded = false
+                                                            }
+                                                        )
+                                                    }
                                                 }
                                             }
-                                        }
+                                            Spacer(Modifier.height(12.dp))
 
-                                        // ── Stacked CTA buttons ───────────────
-                                        // Continue reading pill
-                                        val accentBrush = if (activePreset != NovelDetailPreset.None) {
-                                            activePreset.gradientBrush
-                                        } else {
-                                            rememberAccentGradientBrush(accentColor = MaterialTheme.colorScheme.primary)
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(50.dp)
-                                                .background(accentBrush, shape = RoundedCornerShape(14.dp))
-                                                .clickable { onContinueReading() },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.Center
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.PlayArrow,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp),
-                                                    tint = MaterialTheme.colorScheme.onPrimary
-                                                )
-                                                Spacer(Modifier.width(8.dp))
-                                                Text(
-                                                    text = continueLabel,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onPrimary
-                                                )
-                                            }
-                                        }
-                                        Spacer(Modifier.height(8.dp))
+                                            // ── Pill tab row ──────────────────────
+                                            DefaultTabRow(
+                                                selectedTab = selectedTab,
+                                                tabs = listOf(
+                                                    stringResource(R.string.novel),
+                                                    stringResource(R.string.read_action_chapters)
+                                                ),
+                                                onSelect = { selectedTab = it },
+                                                preset = activePreset,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(Modifier.height(12.dp))
 
-                                        // Bookmark pill (outlined)
-                                        Box {
-                                            OutlinedButton(
-                                                onClick = { bookmarkMenuExpanded = true },
+                                            // ── Novel tab content (stats, synopsis, tags, notes) ──
+                                             NovelTabScreen(
+                                                 viewModel = viewModel,
+                                                 res = res,
+                                                 activity = activity,
+                                                 onRelatedClick = onRelatedClick,
+                                                 preset = activePreset
+                                             )
+
+                                            Spacer(Modifier.height(32.dp))
+                                        }
+                                    }
+
+                                    1 -> {
+                                        // ── Chapters tab ──────────────────────────
+                                        Column(modifier = Modifier.fillMaxSize()) {
+                                            // Tab row pinned at top
+                                            DefaultTabRow(
+                                                selectedTab = selectedTab,
+                                                tabs = listOf(
+                                                    stringResource(R.string.novel),
+                                                    stringResource(R.string.read_action_chapters)
+                                                ),
+                                                onSelect = { selectedTab = it },
+                                                preset = activePreset,
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .height(50.dp),
-                                                shape = RoundedCornerShape(14.dp),
-                                                border = androidx.compose.foundation.BorderStroke(
-                                                    1.5.dp,
-                                                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-                                                ),
-                                                colors = ButtonDefaults.outlinedButtonColors(
-                                                    contentColor = if (hasBookmark)
-                                                        MaterialTheme.colorScheme.primary
-                                                    else MaterialTheme.colorScheme.onSurface
-                                                )
+                                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                            )
+                                            // Real-time Chapter Search / Quick Jump toolbar
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(
-                                                    if (hasBookmark) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                                    null, modifier = Modifier.size(18.dp)
-                                                )
-                                                Spacer(Modifier.width(8.dp))
-                                                Text(
-                                                    text = if (hasBookmark) bookmarkLabel else "Add to Library",
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            DropdownMenu(
-                                                expanded = bookmarkMenuExpanded,
-                                                onDismissRequest = { bookmarkMenuExpanded = false }
-                                            ) {
-                                                val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-                                                // categories is observed from viewModel
-                                                val currentStateId = remember(readState, currentId, bookmarkState) {
-                                                    BaseApplication.getKey<Int>(RESULT_BOOKMARK_STATE, currentId.toString()) ?: -1
-                                                }
-                                                val neoListCategoryIds = remember {
-                                                    val json = BaseApplication.getKey<String>(DOWNLOAD_SETTINGS, "NEOLIST_CATEGORY_IDS", "[]") ?: "[]"
-                                                    try {
-                                                        com.lagradost.quicknovel.DataStore.mapper.readValue(
-                                                            json,
-                                                            object : com.fasterxml.jackson.core.type.TypeReference<List<Int>>() {}
-                                                        )
-                                                    } catch (_: Throwable) { emptyList<Int>() }
-                                                }
-                                                categories.forEach { (id, label) ->
-                                                    val isChecked = if (neoListCategoryIds.contains(id)) {
-                                                        novelFolders.contains(id)
-                                                    } else {
-                                                        id == currentStateId
-                                                    }
-                                                    DropdownMenuItem(
-                                                        text = {
-                                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                                if (isChecked) {
-                                                                    Text("✓ ",
-                                                                        color = MaterialTheme.colorScheme.primary,
-                                                                        fontWeight = FontWeight.Bold)
-                                                                }
-                                                                Text(label)
+                                                OutlinedTextField(
+                                                    value = chapterQuery,
+                                                    onValueChange = { chapterQuery = it },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .heightIn(min = 44.dp),
+                                                    placeholder = { Text("Filter chapters...", fontSize = 13.sp) },
+                                                    leadingIcon = {
+                                                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                    },
+                                                    trailingIcon = {
+                                                        if (chapterQuery.isNotEmpty()) {
+                                                            IconButton(onClick = { chapterQuery = "" }) {
+                                                                Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
                                                             }
-                                                        },
-                                                        onClick = {
-                                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                                            viewModel.bookmark(id)
-                                                            bookmarkMenuExpanded = false
                                                         }
+                                                    },
+                                                    singleLine = true,
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
                                                     )
-                                                }
-                                                if (currentStateId != -1) {
-                                                    DropdownMenuItem(
-                                                        text = { Text("Unbookmark") },
-                                                        onClick = {
-                                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                                            viewModel.bookmark(-1)
-                                                            bookmarkMenuExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        Spacer(Modifier.height(12.dp))
+                                                )
 
-                                        // ── Pill tab row ──────────────────────
-                                        DefaultTabRow(
-                                            selectedTab = selectedTab,
-                                            tabs = listOf(
-                                                stringResource(R.string.novel),
-                                                stringResource(R.string.read_action_chapters)
-                                            ),
-                                            onSelect = { selectedTab = it },
-                                            preset = activePreset,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(Modifier.height(12.dp))
-
-                                        // ── Novel tab content (stats, synopsis, tags, notes) ──
-                                         NovelTabScreen(
-                                             viewModel = viewModel,
-                                             res = res,
-                                             activity = activity,
-                                             onRelatedClick = onRelatedClick,
-                                             preset = activePreset
-                                         )
-
-                                        Spacer(Modifier.height(32.dp))
-                                    }
-                                }
-
-                                1 -> {
-                                    // ── Chapters tab ──────────────────────────
-                                    Column(modifier = Modifier.fillMaxSize()) {
-                                        // Tab row pinned at top
-                                        DefaultTabRow(
-                                            selectedTab = selectedTab,
-                                            tabs = listOf(
-                                                stringResource(R.string.novel),
-                                                stringResource(R.string.read_action_chapters)
-                                            ),
-                                            onSelect = { selectedTab = it },
-                                            preset = activePreset,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                        )
-                                        // Chapter sort/filter toolbar
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.End,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Box {
-                                                TextButton(onClick = { chaptersMenuExpanded = true }) {
-                                                    Icon(Icons.Default.MoreVert, null,
-                                                        modifier = Modifier.size(16.dp))
-                                                    Spacer(Modifier.width(4.dp))
-                                                    Text(
-                                                        text = stringResource(R.string.mainpage_sort_by_button_text),
-                                                        fontSize = 13.sp
-                                                    )
-                                                }
-                                                DropdownMenu(
-                                                    expanded = chaptersMenuExpanded,
-                                                    onDismissRequest = { chaptersMenuExpanded = false }
-                                                ) {
-                                                    DropdownMenuItem(
-                                                        text = { Text("Filter & Sort") },
-                                                        onClick = {
-                                                            chaptersMenuExpanded = false
-                                                            onShowFilterSort()
-                                                        }
-                                                    )
-                                                    DropdownMenuItem(
-                                                        text = { Text("Go to Latest Chapter") },
-                                                        onClick = {
-                                                            chaptersMenuExpanded = false
-                                                            onScrollToLatestChapter()
-                                                        }
-                                                    )
-                                                    DropdownMenuItem(
-                                                        text = { Text("Go to Last Read") },
-                                                        onClick = {
-                                                            chaptersMenuExpanded = false
-                                                            onScrollToLastRead()
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        // RecyclerView — full height, no nested scroll
-                                        AndroidView(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .weight(1f),
-                                            factory = { ctx ->
-                                                RecyclerView(ctx).apply {
-                                                    layoutParams = android.view.ViewGroup.LayoutParams(
-                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                                                    )
-                                                    layoutManager = LinearLayoutManager(ctx)
-                                                    adapter = chapterAdapter
-                                                    setHasFixedSize(true)
-                                                    onChapterRecyclerReady(this)
-                                                }
-                                            },
-                                            update = { rv ->
-                                                val list = chapters
-                                                // Reference selection states to force recomposing update block on selection change
-                                                val selMode = isSelectionMode
-                                                val selChapters = selectedChapters
-                                                if (list != null && list.isNotEmpty()) {
-                                                    if (chapterAdapter.immutableCurrentList != list) {
-                                                        if (chapterAdapter.immutableCurrentList.isEmpty()) {
-                                                            chapterAdapter.submitIncomparableList(list)
-                                                        } else {
-                                                            chapterAdapter.submitList(list)
-                                                        }
+                                                Box {
+                                                    TextButton(onClick = { chaptersMenuExpanded = true }) {
+                                                        Icon(Icons.Default.MoreVert, null,
+                                                            modifier = Modifier.size(16.dp))
+                                                        Spacer(Modifier.width(4.dp))
+                                                        Text(
+                                                            text = stringResource(R.string.mainpage_sort_by_button_text),
+                                                            fontSize = 13.sp
+                                                        )
                                                     }
-                                                    chapterAdapter.updateSelectionStates(selMode ?: false, selChapters ?: emptySet())
+                                                    DropdownMenu(
+                                                        expanded = chaptersMenuExpanded,
+                                                        onDismissRequest = { chaptersMenuExpanded = false }
+                                                    ) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("Filter & Sort") },
+                                                            onClick = {
+                                                                chaptersMenuExpanded = false
+                                                                onShowFilterSort()
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Go to Latest Chapter") },
+                                                            onClick = {
+                                                                chaptersMenuExpanded = false
+                                                                onScrollToLatestChapter()
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Go to Last Read") },
+                                                            onClick = {
+                                                                chaptersMenuExpanded = false
+                                                                onScrollToLastRead()
+                                                            }
+                                                        )
+                                                    }
                                                 }
                                             }
-                                        )
+                                            if (chapterQuery.isNotBlank()) {
+                                                Text(
+                                                    text = "${filteredChapters.size} matching chapters",
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                            // RecyclerView — full height, no nested scroll
+                                            AndroidView(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .weight(1f),
+                                                factory = { ctx ->
+                                                    RecyclerView(ctx).apply {
+                                                        layoutParams = android.view.ViewGroup.LayoutParams(
+                                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                                        )
+                                                        layoutManager = LinearLayoutManager(ctx)
+                                                        adapter = chapterAdapter
+                                                        setHasFixedSize(true)
+                                                        onChapterRecyclerReady(this)
+                                                    }
+                                                },
+                                                update = { rv ->
+                                                    val list = filteredChapters
+                                                    // Reference selection states to force recomposing update block on selection change
+                                                    val selMode = isSelectionMode
+                                                    val selChapters = selectedChapters
+                                                    if (list.isNotEmpty()) {
+                                                        if (chapterAdapter.immutableCurrentList != list) {
+                                                            if (chapterAdapter.immutableCurrentList.isEmpty()) {
+                                                                chapterAdapter.submitIncomparableList(list)
+                                                            } else {
+                                                                chapterAdapter.submitList(list)
+                                                            }
+                                                        }
+                                                        chapterAdapter.updateSelectionStates(selMode ?: false, selChapters ?: emptySet())
+                                                    }
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }

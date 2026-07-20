@@ -32,6 +32,8 @@ import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -347,19 +349,22 @@ fun FeaturedCarousel(
             .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        HorizontalUncontainedCarousel(
-            state = carouselState,
-            itemWidth = 300.dp,
-            itemSpacing = 8.dp,
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .pointerInput(Unit) {
-                    disallowParentIntercept(view)
-                }
-        ) { index ->
-            val rec = items[index]
+        CompositionLocalProvider(
+            LocalOverscrollConfiguration provides null
+        ) {
+            HorizontalUncontainedCarousel(
+                state = carouselState,
+                itemWidth = 300.dp,
+                itemSpacing = 8.dp,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .pointerInput(Unit) {
+                        disallowParentIntercept(view)
+                    }
+            ) { index ->
+                val rec = items[index]
             val novel = rec.novel
             var showMenu by remember { mutableStateOf(false) }
  
@@ -489,10 +494,11 @@ fun FeaturedCarousel(
         }
     }
 }
+}
 
 // ─── Recommendation Group Section (M3 HorizontalMultiBrowseCarousel) ─────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun RecommendationGroupSection(
     group: RecommendationGroup,
@@ -521,10 +527,13 @@ fun RecommendationGroupSection(
         }
     }
  
-    // Tactile haptic feedback as new items snap into focus
+    // Tactile haptic feedback as new items snap into focus (guarded against boundary bounce index vibration)
+    var lastHapticIndex by remember { mutableIntStateOf(-1) }
     LaunchedEffect(carouselState.currentItem) {
-        if (carouselState.currentItem > 0) {
+        val current = carouselState.currentItem
+        if (current > 0 && current != lastHapticIndex) {
             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            lastHapticIndex = current
         }
     }
  
@@ -537,22 +546,26 @@ fun RecommendationGroupSection(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
  
-        HorizontalMultiBrowseCarousel(
-            state = carouselState,
-            preferredItemWidth = 130.dp,
-            itemSpacing = 8.dp,
-            flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(215.dp)
-                .pointerInput(Unit) {
-                    disallowParentIntercept(view)
+        CompositionLocalProvider(
+            LocalOverscrollConfiguration provides null
+        ) {
+            HorizontalMultiBrowseCarousel(
+                state = carouselState,
+                preferredItemWidth = 130.dp,
+                itemSpacing = 8.dp,
+                flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(215.dp)
+                    .pointerInput(Unit) {
+                        disallowParentIntercept(view)
+                    }
+            ) { index ->
+                val rec = uniqueRecommendations[index]
+                key(rec.novel.url) {
+                    NovelCarouselItem(recommendation = rec, onBookClick = onBookClick, onDismissClick = onDismissClick)
                 }
-        ) { index ->
-            val rec = uniqueRecommendations[index]
-            key(rec.novel.url) {
-                NovelCarouselItem(recommendation = rec, onBookClick = onBookClick, onDismissClick = onDismissClick)
             }
         }
     }

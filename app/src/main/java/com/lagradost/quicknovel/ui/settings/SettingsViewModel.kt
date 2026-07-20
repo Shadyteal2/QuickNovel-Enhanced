@@ -29,6 +29,9 @@ class SettingsViewModel : ViewModel() {
     private val _webViewCacheSize = MutableStateFlow("Calculating...")
     val webViewCacheSize: StateFlow<String> = _webViewCacheSize.asStateFlow()
 
+    private val _wallpaperCacheSize = MutableStateFlow("Calculating...")
+    val wallpaperCacheSize: StateFlow<String> = _wallpaperCacheSize.asStateFlow()
+
     fun loadSizes(context: Context) {
         val appContext = context.applicationContext
         viewModelScope.launch(Dispatchers.IO) {
@@ -54,6 +57,10 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             _webViewCacheSize.value = "Calculating..."
             _webViewCacheSize.value = StorageCacheHelper.getWebViewCacheSize(appContext)
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _wallpaperCacheSize.value = "Calculating..."
+            _wallpaperCacheSize.value = StorageCacheHelper.getWallpaperCacheSize(appContext)
         }
     }
 }

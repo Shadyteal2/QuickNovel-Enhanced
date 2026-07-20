@@ -187,6 +187,7 @@ fun HistoryScreen(
                                     item = heroItem,
                                     onClick = { viewModel.open(heroItem) },
                                     onResumeClick = { viewModel.stream(heroItem) },
+                                    onDeleteClick = { viewModel.deleteAlert(heroItem) },
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                             }
@@ -450,6 +451,7 @@ fun ResumeReadingCard(
     item: ResultCached,
     onClick: () -> Unit,
     onResumeClick: () -> Unit,
+    onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val formattedTime = remember(item.cachedTime) { formatHistoryTimestamp(item.cachedTime) }
@@ -546,21 +548,39 @@ fun ResumeReadingCard(
                     Text(
                         text = "Chapter ${item.lastChapterRead} of ${item.totalChapters} • $formattedTime",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f)
                     )
                     
-                    FilledTonalButton(
-                        onClick = onResumeClick,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Resume", fontSize = 12.sp)
+                        IconButton(
+                            onClick = onDeleteClick,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = "Delete from History",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = onResumeClick,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Resume", fontSize = 12.sp)
+                        }
                     }
                 }
             }

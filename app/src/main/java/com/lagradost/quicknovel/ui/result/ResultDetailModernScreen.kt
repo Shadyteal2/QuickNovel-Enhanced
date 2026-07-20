@@ -6,7 +6,9 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -124,10 +126,21 @@ fun ResultDetailModernScreen(
     val currentId          by viewModel.id.observeAsState(-1)
     val bookmarkState      by viewModel.bookmarkState.observeAsState(-1)
 
-    var selectedTab          by remember { mutableIntStateOf(0) }
+    var selectedTab          by rememberSaveable { mutableIntStateOf(0) }
+    var chapterQuery         by rememberSaveable { mutableStateOf("") }
+
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val novelScrollState = rememberScrollState()
+    var chaptersScrollOffset by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(selectedTab) {
         viewModel.switchTab(selectedTab, if (selectedTab == 0) 0 else 3)
+        chaptersScrollOffset = 0
+        try {
+            novelScrollState.scrollTo(0)
+        } catch (e: Exception) {
+            // Ignore if layout not ready
+        }
     }
 
     var bookmarkMenuExpanded by remember { mutableStateOf(false) }
@@ -177,6 +190,19 @@ fun ResultDetailModernScreen(
                 val ratingText = res.rating?.let { context.getRating(it) }
                 val chapterCount = (res as? StreamResponse)?.data?.size
 
+                val filteredChapters = remember(chapters, chapterQuery) {
+                    val rawList = chapters ?: emptyList()
+                    if (chapterQuery.isBlank()) {
+                        rawList
+                    } else {
+                        val q = chapterQuery.trim().lowercase(java.util.Locale.ROOT)
+                        rawList.filter { ch ->
+                            ch.name.lowercase(java.util.Locale.ROOT).contains(q) ||
+                            ch.dateOfRelease?.lowercase(java.util.Locale.ROOT)?.contains(q) == true
+                        }
+                    }
+                }
+
                 var showPosterViewer by remember { mutableStateOf(false) }
                 var showShareSheet by remember { mutableStateOf(false) }
 
@@ -190,6 +216,16 @@ fun ResultDetailModernScreen(
                         380.dp
                     }
                 }
+
+                val currentScrollOffset = if (selectedTab == 0) novelScrollState.value else chaptersScrollOffset
+                val currentScrollOffsetDp = with(density) { currentScrollOffset.toDp() }
+
+                val minHeroHeight = 80.dp // Keeps top bar visible
+                val maxCollapse = dynamicHeroHeight - minHeroHeight
+                val collapsedHeroHeight = (dynamicHeroHeight - currentScrollOffsetDp).coerceAtLeast(minHeroHeight)
+
+                val collapseProgress = ((dynamicHeroHeight - collapsedHeroHeight) / maxCollapse).coerceIn(0f, 1f)
+                val textAlpha = 1f - collapseProgress
 
                 // Full-screen dialog viewer for the cover poster
                 if (showPosterViewer) {
@@ -301,7 +337,7 @@ fun ResultDetailModernScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(dynamicHeroHeight)
+                            .height(collapsedHeroHeight)
                     ) {
                         AsyncImage(
                             model = rememberHighQualityRequest(res.image, context),
@@ -347,7 +383,7 @@ fun ResultDetailModernScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(dynamicHeroHeight)
+                                .height(collapsedHeroHeight)
                         ) {
                             // ── Back pill (top-left) — notch & cutout safe ──────────────────────────────
                             Box(
@@ -435,6 +471,7 @@ fun ResultDetailModernScreen(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .fillMaxWidth()
+                                .graphicsLayer { alpha = textAlpha }
                                 .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
                         ) {
                             Text(
@@ -542,117 +579,159 @@ fun ResultDetailModernScreen(
                             .weight(1f)
                             .imePadding()
                         ) {
-                            when (selectedTab) {
-                                0 -> {
-                                    // Novel tab — scrollable column
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .verticalScroll(rememberScrollState())
-                                    ) {
-                                        NovelTabScreen(
-                                            viewModel = viewModel,
-                                            res = res,
-                                            activity = activity,
-                                            preset = activePreset,
-                                            onRelatedClick = onRelatedClick
-                                        )
-                                        // Extra bottom padding for action bar
-                                        Spacer(Modifier.height(100.dp))
-                                    }
-                                }
-                                1 -> {
-                                    // Chapters tab — RecyclerView owns its own scroll,
-                                    // no wrapping scroll → all chapters accessible
-                                    Column(modifier = Modifier.fillMaxSize()) {
-                                        // Chapter toolbar (sort/filter)
-                                        Row(
+                            // Smooth crossfade tab transition
+                            Crossfade(targetState = selectedTab, label = "TabSwitch") { tab ->
+                                when (tab) {
+                                    0 -> {
+                                        // Novel tab — scrollable column
+                                        Column(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.End,
-                                            verticalAlignment = Alignment.CenterVertically
+                                                .fillMaxSize()
+                                                .verticalScroll(novelScrollState)
                                         ) {
-                                            Box {
-                                                TextButton(
-                                                    onClick = { chaptersMenuExpanded = true }
-                                                ) {
-                                                    Icon(Icons.Default.MoreVert, null,
-                                                        modifier = Modifier.size(16.dp))
-                                                    Spacer(Modifier.width(4.dp))
-                                                    Text(
-                                                        text = stringResource(R.string.mainpage_sort_by_button_text),
-                                                        fontSize = 13.sp
-                                                    )
-                                                }
-                                                DropdownMenu(
-                                                    expanded = chaptersMenuExpanded,
-                                                    onDismissRequest = { chaptersMenuExpanded = false }
-                                                ) {
-                                                    DropdownMenuItem(
-                                                        text = { Text("Filter & Sort") },
-                                                        onClick = {
-                                                            chaptersMenuExpanded = false
-                                                            onShowFilterSort()
-                                                        }
-                                                    )
-                                                    DropdownMenuItem(
-                                                        text = { Text("Go to Latest Chapter") },
-                                                        onClick = {
-                                                            chaptersMenuExpanded = false
-                                                            onScrollToLatestChapter()
-                                                        }
-                                                    )
-                                                    DropdownMenuItem(
-                                                        text = { Text("Go to Last Read") },
-                                                        onClick = {
-                                                            chaptersMenuExpanded = false
-                                                            onScrollToLastRead()
-                                                        }
-                                                    )
-                                                }
-                                            }
+                                            NovelTabScreen(
+                                                viewModel = viewModel,
+                                                res = res,
+                                                activity = activity,
+                                                preset = activePreset,
+                                                onRelatedClick = onRelatedClick
+                                            )
+                                            // Extra bottom padding for action bar
+                                            Spacer(Modifier.height(100.dp))
                                         }
-                                        // RecyclerView — fillMaxSize, no height cap, no nested scroll
-                                        AndroidView(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .weight(1f),
-                                            factory = { ctx ->
-                                                RecyclerView(ctx).apply {
-                                                    layoutParams = android.view.ViewGroup.LayoutParams(
-                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                                                    )
-                                                    
-                                                    // Add bottom padding to allow scrolling past the floating action bar
-                                                    val padBottom = (96 * ctx.resources.displayMetrics.density).toInt()
-                                                    setPadding(paddingLeft, paddingTop, paddingRight, padBottom)
-                                                    clipToPadding = false
-                                                    
-                                                    layoutManager = LinearLayoutManager(ctx)
-                                                    adapter = chapterAdapter
-                                                    setHasFixedSize(true)
-                                                    onChapterRecyclerReady(this)
-                                                }
-                                            },
-                                            update = { rv ->
-                                                val list = chapters
-                                                // Reference selection states to force recomposing update block on selection change
-                                                val selMode = isSelectionMode
-                                                val selChapters = selectedChapters
-                                                if (list != null && list.isNotEmpty()) {
-                                                    if (chapterAdapter.immutableCurrentList != list) {
-                                                        if (chapterAdapter.immutableCurrentList.isEmpty()) {
-                                                            chapterAdapter.submitIncomparableList(list)
-                                                        } else {
-                                                            chapterAdapter.submitList(list)
+                                    }
+                                    1 -> {
+                                        // Chapters tab — RecyclerView owns its own scroll,
+                                        // no wrapping scroll → all chapters accessible
+                                        Column(modifier = Modifier.fillMaxSize()) {
+                                            // Real-time Chapter Search / Quick Jump toolbar
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = chapterQuery,
+                                                    onValueChange = { chapterQuery = it },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .heightIn(min = 44.dp),
+                                                    placeholder = { Text("Filter chapters...", fontSize = 13.sp) },
+                                                    leadingIcon = {
+                                                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                    },
+                                                    trailingIcon = {
+                                                        if (chapterQuery.isNotEmpty()) {
+                                                            IconButton(onClick = { chapterQuery = "" }) {
+                                                                Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                                                            }
                                                         }
+                                                    },
+                                                    singleLine = true,
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                                                    )
+                                                )
+
+                                                Box {
+                                                    TextButton(
+                                                        onClick = { chaptersMenuExpanded = true }
+                                                    ) {
+                                                        Icon(Icons.Default.MoreVert, null,
+                                                            modifier = Modifier.size(16.dp))
+                                                        Spacer(Modifier.width(4.dp))
+                                                        Text(
+                                                            text = stringResource(R.string.mainpage_sort_by_button_text),
+                                                            fontSize = 13.sp
+                                                        )
                                                     }
-                                                    chapterAdapter.updateSelectionStates(selMode ?: false, selChapters ?: emptySet())
+                                                    DropdownMenu(
+                                                        expanded = chaptersMenuExpanded,
+                                                        onDismissRequest = { chaptersMenuExpanded = false }
+                                                    ) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("Filter & Sort") },
+                                                            onClick = {
+                                                                chaptersMenuExpanded = false
+                                                                onShowFilterSort()
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Go to Latest Chapter") },
+                                                            onClick = {
+                                                                chaptersMenuExpanded = false
+                                                                onScrollToLatestChapter()
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Go to Last Read") },
+                                                            onClick = {
+                                                                chaptersMenuExpanded = false
+                                                                onScrollToLastRead()
+                                                            }
+                                                        )
+                                                    }
                                                 }
                                             }
-                                        )
+                                            if (chapterQuery.isNotBlank()) {
+                                                Text(
+                                                    text = "${filteredChapters.size} matching chapters",
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                            // RecyclerView — fillMaxSize, no height cap, no nested scroll
+                                            AndroidView(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .weight(1f),
+                                                factory = { ctx ->
+                                                    RecyclerView(ctx).apply {
+                                                        layoutParams = android.view.ViewGroup.LayoutParams(
+                                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                                        )
+                                                        
+                                                        // Add bottom padding to allow scrolling past the floating action bar
+                                                        val padBottom = (96 * ctx.resources.displayMetrics.density).toInt()
+                                                        setPadding(paddingLeft, paddingTop, paddingRight, padBottom)
+                                                        clipToPadding = false
+                                                        
+                                                        layoutManager = LinearLayoutManager(ctx)
+                                                        adapter = chapterAdapter
+                                                        setHasFixedSize(true)
+                                                        onChapterRecyclerReady(this)
+                                                        addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                                                            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                                                                chaptersScrollOffset = (chaptersScrollOffset + dy).coerceAtLeast(0)
+                                                            }
+                                                        })
+                                                    }
+                                                },
+                                                update = { rv ->
+                                                    val list = filteredChapters
+                                                    // Reference selection states to force recomposing update block on selection change
+                                                    val selMode = isSelectionMode
+                                                    val selChapters = selectedChapters
+                                                    if (list.isNotEmpty()) {
+                                                        if (chapterAdapter.immutableCurrentList != list) {
+                                                            if (chapterAdapter.immutableCurrentList.isEmpty()) {
+                                                                chapterAdapter.submitIncomparableList(list)
+                                                            } else {
+                                                                chapterAdapter.submitList(list)
+                                                            }
+                                                        }
+                                                        chapterAdapter.updateSelectionStates(selMode ?: false, selChapters ?: emptySet())
+                                                    }
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }

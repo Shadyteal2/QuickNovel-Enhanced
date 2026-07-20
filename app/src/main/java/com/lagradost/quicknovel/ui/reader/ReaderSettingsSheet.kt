@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,6 +80,8 @@ fun ReaderSettingsSheet(
     var autoScroll by remember { mutableStateOf(viewModel.autoScroll) }
     var autoScrollSpeed by remember { mutableStateOf(viewModel.autoScrollSpeed.toFloat()) }
     var showReadingTimer by remember { mutableStateOf(viewModel.showReadingTimer) }
+    var twoFingerGestures by remember { mutableStateOf(viewModel.pinchFontEnabled && viewModel.swipeBrightnessEnabled) }
+    var showGesturesInfoDialog by remember { mutableStateOf(false) }
     
     var textSize by remember { mutableStateOf(viewModel.textSize.toFloat()) }
     var textPadding by remember { mutableStateOf(viewModel.paddingHorizontal.toFloat()) }
@@ -88,6 +92,7 @@ fun ReaderSettingsSheet(
     var ttsSpeed by remember { mutableStateOf(viewModel.ttsSpeed) }
     var ttsPitch by remember { mutableStateOf(viewModel.ttsPitch) }
     val useGoogleTts by viewModel.ttsUseGoogleLive.observeAsState(viewModel.ttsUseGoogle)
+    val ttsEngineType by viewModel.ttsEngineTypeLive.observeAsState(viewModel.ttsEngineType)
 
     var isDisplayExpanded by remember { mutableStateOf(true) }
     var isTextFontExpanded by remember { mutableStateOf(true) }
@@ -181,6 +186,66 @@ fun ReaderSettingsSheet(
                     }
                     SettingsSwitchRow(stringResource(R.string.keep_screen_active), keepScreenActive) {
                         keepScreenActive = it; viewModel.screenAwake = it
+                    }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { 
+                                val newVal = !twoFingerGestures
+                                twoFingerGestures = newVal
+                                viewModel.pinchFontEnabled = newVal
+                                viewModel.swipeBrightnessEnabled = newVal
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Two-Finger Gestures",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { showGesturesInfoDialog = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Gesture Info",
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = twoFingerGestures,
+                            onCheckedChange = { newVal ->
+                                twoFingerGestures = newVal
+                                viewModel.pinchFontEnabled = newVal
+                                viewModel.swipeBrightnessEnabled = newVal
+                            }
+                        )
+                    }
+
+                    if (showGesturesInfoDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showGesturesInfoDialog = false },
+                            title = { Text(text = "Two-Finger Gestures") },
+                            text = {
+                                Column {
+                                    Text(text = "1. Pinch to Zoom:", fontWeight = FontWeight.Bold)
+                                    Text(text = "Pinch with two fingers inside the reader to increase or decrease the font size.")
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(text = "2. Adjust Brightness:", fontWeight = FontWeight.Bold)
+                                    Text(text = "Drag two fingers horizontally (left/right) to adjust screen brightness instantly.")
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showGesturesInfoDialog = false }) {
+                                    Text("OK")
+                                }
+                            }
+                        )
                     }
                     SettingsSwitchRow("Auto Scroll", autoScroll) {
                         autoScroll = it; viewModel.autoScroll = it
@@ -316,10 +381,59 @@ fun ReaderSettingsSheet(
                         )
                     }
                     
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SettingsSwitchRow("Use Google TTS (Neural Online)", useGoogleTts) {
-                        viewModel.ttsUseGoogle = it
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "TTS Engine",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val engines = listOf(
+                            "native" to "System",
+                            "google" to "Google Neural",
+                            "edge" to "Edge (MS)"
+                        )
+                        engines.forEach { (type, label) ->
+                            val isSelected = ttsEngineType == type
+                            val containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            }
+                            val contentColor = if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(containerColor)
+                                    .clickable {
+                                        viewModel.ttsEngineType = type
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    color = contentColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     SettingsSliderRow(
                         title = stringResource(R.string.tts_speed),
@@ -378,8 +492,8 @@ fun ReaderSettingsSheet(
                     SettingsSliderRow(
                         title = stringResource(R.string.text_size),
                         value = textSize,
-                        valueFrom = 10f,
-                        valueTo = 30f,
+                        valueFrom = 8f,
+                        valueTo = 60f,
                         stepSize = 1f,
                         leftIcon = R.drawable.smaller_font,
                         rightIcon = R.drawable.bigger_font,
@@ -521,6 +635,7 @@ fun ReaderSettingsSheet(
                                 add(TranslationEngineType.GoogleMLKit)
                                 add(TranslationEngineType.GoogleGTX)
                                 add(TranslationEngineType.Yandex)
+                                add(TranslationEngineType.Azure)
                                 if (isCloudConfigured) {
                                     add(TranslationEngineType.CloudAI)
                                 }
@@ -532,6 +647,7 @@ fun ReaderSettingsSheet(
                                 TranslationEngineType.GoogleMLKit -> "On-Device (Google ML Kit)"
                                 TranslationEngineType.GoogleGTX -> "Online (Google GTX Scraper)"
                                 TranslationEngineType.Yandex -> "Online (Yandex Scraper)"
+                                TranslationEngineType.Azure -> "Online (Azure Translator)"
                                 TranslationEngineType.CloudAI -> "Cloud AI (API Key)"
                                 else -> "None"
                             }

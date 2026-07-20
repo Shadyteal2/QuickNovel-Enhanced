@@ -35,6 +35,8 @@ import androidx.compose.material3.carousel.CarouselDefaults
 import com.lagradost.quicknovel.ui.theme.rememberHighQualityRequest
 import com.lagradost.quicknovel.ui.theme.disallowParentIntercept
 import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -660,7 +662,7 @@ fun AdvancedSearchLayout(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ProviderSearchResultsRow(
     provider: HomePageList,
@@ -708,26 +710,30 @@ fun ProviderSearchResultsRow(
             )
         }
 
-        HorizontalMultiBrowseCarousel(
-            state = carouselState,
-            preferredItemWidth = 120.dp,
-            itemSpacing = 8.dp,
-            flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(210.dp)
-                .pointerInput(Unit) {
-                    disallowParentIntercept(view)
+        CompositionLocalProvider(
+            LocalOverscrollConfiguration provides null
+        ) {
+            HorizontalMultiBrowseCarousel(
+                state = carouselState,
+                preferredItemWidth = 120.dp,
+                itemSpacing = 8.dp,
+                flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(210.dp)
+                    .pointerInput(Unit) {
+                        disallowParentIntercept(view)
+                    }
+            ) { index ->
+                val novel = uniqueProviderList[index]
+                key(novel.url) {
+                    SearchNovelCarouselItem(
+                        novel = novel,
+                        onClick = { onBookClick(novel) },
+                        onLongClick = { onBookLongClick(novel) }
+                    )
                 }
-        ) { index ->
-            val novel = uniqueProviderList[index]
-            key(novel.url) {
-                SearchNovelCarouselItem(
-                    novel = novel,
-                    onClick = { onBookClick(novel) },
-                    onLongClick = { onBookLongClick(novel) }
-                )
             }
         }
     }

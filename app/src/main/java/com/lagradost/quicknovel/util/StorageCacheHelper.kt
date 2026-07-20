@@ -141,4 +141,38 @@ object StorageCacheHelper {
             false
         }
     }
+
+    suspend fun getWallpaperCacheSize(context: Context): String = withContext(Dispatchers.IO) {
+        val dir = File(context.filesDir, "wallpapers")
+        formatSize(getFolderSize(dir))
+    }
+
+    suspend fun clearWallpaperCache(context: Context): Long = withContext(Dispatchers.IO) {
+        try {
+            val dir = File(context.filesDir, "wallpapers")
+            if (!dir.exists()) return@withContext 0L
+            val files = dir.listFiles()?.filter { it.isFile } ?: return@withContext 0L
+            
+            val sharedPrefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+            val currentBgUri = sharedPrefs.getString(context.getString(com.lagradost.quicknovel.R.string.background_image_key), null)
+            
+            var clearedBytes = 0L
+            for (file in files) {
+                val isActive = currentBgUri != null && (
+                    currentBgUri == file.toURI().toString() || 
+                    currentBgUri == android.net.Uri.fromFile(file).toString() || 
+                    currentBgUri.contains(file.name)
+                )
+                if (!isActive) {
+                    val size = file.length()
+                    if (file.delete()) {
+                        clearedBytes += size
+                    }
+                }
+            }
+            clearedBytes
+        } catch (e: Exception) {
+            0L
+        }
+    }
 }

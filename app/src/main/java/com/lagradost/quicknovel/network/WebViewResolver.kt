@@ -18,6 +18,8 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
+import com.lagradost.quicknovel.util.UIHelper.colorFromAttribute
+import com.lagradost.quicknovel.R
 import java.net.URI
 
 /**
@@ -108,6 +110,9 @@ class WebViewResolver(
 
         var fixedRequest: Request? = null
         val extraRequestList = mutableListOf<Request>()
+        var btnBack: android.widget.Button? = null
+        var btnForward: android.widget.Button? = null
+        var txtUrl: android.widget.TextView? = null
 
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
             // Useful for debugging
@@ -224,10 +229,89 @@ class WebViewResolver(
                         orientation = android.widget.LinearLayout.VERTICAL
                         layoutParams = android.view.ViewGroup.LayoutParams(
                             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
                         )
                     }
 
+                    // Top Bar for navigation and address
+                    val topBar = android.widget.LinearLayout(activity).apply {
+                        orientation = android.widget.LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        layoutParams = android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            setMargins(8, 4, 8, 4)
+                        }
+                    }
+
+                    btnBack = android.widget.Button(activity, null, android.R.attr.borderlessButtonStyle).apply {
+                        text = "◀"
+                        textSize = 14f
+                        minimumWidth = 0
+                        minWidth = 0
+                        setPadding(16, 0, 16, 0)
+                        isEnabled = false
+                        setOnClickListener {
+                            webView?.goBack()
+                        }
+                    }
+
+                    btnForward = android.widget.Button(activity, null, android.R.attr.borderlessButtonStyle).apply {
+                        text = "▶"
+                        textSize = 14f
+                        minimumWidth = 0
+                        minWidth = 0
+                        setPadding(16, 0, 16, 0)
+                        isEnabled = false
+                        setOnClickListener {
+                            webView?.goForward()
+                        }
+                    }
+
+                    val btnRefresh = android.widget.Button(activity, null, android.R.attr.borderlessButtonStyle).apply {
+                        text = "⟳"
+                        textSize = 18f
+                        minimumWidth = 0
+                        minWidth = 0
+                        setPadding(16, 0, 16, 0)
+                        setOnClickListener {
+                            webView?.reload()
+                        }
+                    }
+
+                    txtUrl = android.widget.TextView(activity).apply {
+                        layoutParams = android.widget.LinearLayout.LayoutParams(
+                            0,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                            1f
+                        ).apply {
+                            setMargins(8, 0, 8, 0)
+                        }
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        gravity = android.view.Gravity.CENTER
+                        textSize = 12f
+                        text = url
+                        setTextColor(activity.colorFromAttribute(R.attr.grayTextColor))
+                    }
+
+                    topBar.addView(btnBack)
+                    topBar.addView(btnForward)
+                    topBar.addView(txtUrl)
+                    topBar.addView(btnRefresh)
+                    rootLayout.addView(topBar)
+
+                    // Add WebView with a fixed height to prevent collapsing inside wrap_content dialog parent
+                    val webViewHeight = (activity.resources.displayMetrics.heightPixels * 0.75).toInt()
+                    webView?.layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        webViewHeight
+                    )
+                    (webView?.parent as? android.view.ViewGroup)?.removeView(webView)
+                    rootLayout.addView(webView)
+
+                    // Bottom Bar for cancel / done
                     val buttonBar = android.widget.LinearLayout(activity).apply {
                         orientation = android.widget.LinearLayout.HORIZONTAL
                         gravity = android.view.Gravity.END
@@ -235,7 +319,7 @@ class WebViewResolver(
                             android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
                         ).apply {
-                            setMargins(16, 0, 16, 8)
+                            setMargins(16, 8, 16, 8)
                         }
                     }
 
@@ -262,18 +346,8 @@ class WebViewResolver(
                     buttonBar.addView(btnDone)
                     rootLayout.addView(buttonBar)
 
-                    // Add WebView with a fixed height to prevent collapsing inside wrap_content dialog parent
-                    webView?.layoutParams = android.widget.LinearLayout.LayoutParams(
-                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                        (activity.resources.displayMetrics.heightPixels * 0.7).toInt()
-                    )
-                    (webView?.parent as? android.view.ViewGroup)?.removeView(webView)
-                    rootLayout.addView(webView)
-
                     val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity, com.lagradost.quicknovel.R.style.AlertDialogCustom)
                         .setView(rootLayout)
-                        .setTitle("Verification / Login")
-                        .setMessage("Please complete the verification challenge or log into your account, then tap 'I'm Done'.")
                         .setOnCancelListener { destroyWebView() }
                     
                     dialog = builder.create()
@@ -289,14 +363,22 @@ class WebViewResolver(
                     // Force input focus on the WebView on the UI thread
                     webView?.requestFocus()
                     
-                    // Resize to be useful but not full screen
+                    // Set bigger layout size: 95% width, 92% height
                     dialog?.window?.setLayout(
-                        (activity.resources.displayMetrics.widthPixels * 0.9).toInt(),
-                        (activity.resources.displayMetrics.heightPixels * 0.85).toInt()
+                        (activity.resources.displayMetrics.widthPixels * 0.95).toInt(),
+                        (activity.resources.displayMetrics.heightPixels * 0.92).toInt()
                     )
                 }
 
                 webView?.webViewClient = object : WebViewClient() {
+                    private fun updateNavigationState(view: WebView?, currentUrl: String?) {
+                        activity?.runOnUiThread {
+                            currentUrl?.let { txtUrl?.text = it }
+                            btnBack?.isEnabled = view?.canGoBack() == true
+                            btnForward?.isEnabled = view?.canGoForward() == true
+                        }
+                    }
+
                     override fun onPageStarted(
                         view: WebView?,
                         url: String?,
@@ -306,6 +388,17 @@ class WebViewResolver(
                         if (!hasDocStartScriptSupport) {
                             view?.evaluateJavascript(stealthScript, null)
                         }
+                        updateNavigationState(view, url)
+                    }
+
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        updateNavigationState(view, url)
+                    }
+
+                    override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                        super.doUpdateVisitedHistory(view, url, isReload)
+                        updateNavigationState(view, url)
                     }
 
                     override fun shouldInterceptRequest(

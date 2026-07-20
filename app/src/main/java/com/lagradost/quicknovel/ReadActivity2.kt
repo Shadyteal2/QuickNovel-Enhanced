@@ -832,7 +832,11 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
 
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 textLayoutManager.scrollToPositionWithOffset(adapterPosition, 1)
-                viewModel.hasPerformedInitialSeek = true
+                binding.realText.post {
+                    binding.realText.post {
+                        viewModel.hasPerformedInitialSeek = true
+                    }
+                }
 
                 if (pendingFlingDirection != 0) {
                     val dir = pendingFlingDirection
@@ -863,32 +867,40 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         sought = true
                         postLines(lines)
                         lines.firstOrNull { line ->
-                            line.index == desired.index && line.endChar >= desired.char
+                            line.index == desired.index && line.innerIndex == desired.innerIndex && line.endChar >= desired.char
                         }?.let { line ->
                             binding.realText.scrollBy(0, line.top - getTopY())
                         }
                     }
                 }
 
-                binding.realText.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
-                    override fun onLayoutChange(
-                        v: View?,
-                        left: Int,
-                        top: Int,
-                        right: Int,
-                        bottom: Int,
-                        oldLeft: Int,
-                        oldTop: Int,
-                        oldRight: Int,
-                        oldBottom: Int
-                    ) {
-                        binding.realText.removeOnLayoutChangeListener(this)
-                        performSeek()
-                    }
-                })
-
                 binding.realText.post {
-                    performSeek()
+                    val lines = getAllLines()
+                    if (lines.isNotEmpty()) {
+                        performSeek()
+                    } else {
+                        binding.realText.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+                            override fun onLayoutChange(
+                                v: View?,
+                                left: Int,
+                                top: Int,
+                                right: Int,
+                                bottom: Int,
+                                oldLeft: Int,
+                                oldTop: Int,
+                                oldRight: Int,
+                                oldBottom: Int
+                            ) {
+                                val currentLines = getAllLines()
+                                if (currentLines.isNotEmpty()) {
+                                    binding.realText.removeOnLayoutChangeListener(this)
+                                    binding.realText.post {
+                                        performSeek()
+                                    }
+                                }
+                            }
+                        })
+                    }
                 }
             }
         }
@@ -1048,9 +1060,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         }
     }
 
+    private var isPostDesiredPending = false
     private fun postDesired(view: View) {
+        viewModel.hasPerformedInitialSeek = false
+        if (isPostDesiredPending) return
+        isPostDesiredPending = true
         val currentDesired = viewModel.desiredIndex
         view.post {
+            isPostDesiredPending = false
             viewModel.desiredIndex = currentDesired
             scrollToDesired()
             updateTTSLine(viewModel.ttsLine.value)
@@ -1296,10 +1313,10 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                 if (now - lastScaleTime > 150L) {
                     val factor = detector.scaleFactor
                     if (factor > 1.05f) {
-                        viewModel.textSize = (viewModel.textSize + 1).coerceIn(10, 50)
+                        viewModel.textSize = (viewModel.textSize + 1).coerceIn(8, 60)
                         lastScaleTime = now
                     } else if (factor < 0.95f) {
-                        viewModel.textSize = (viewModel.textSize - 1).coerceIn(10, 50)
+                        viewModel.textSize = (viewModel.textSize - 1).coerceIn(8, 60)
                         lastScaleTime = now
                     }
                 }
@@ -1440,12 +1457,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         observe(viewModel.textVerticalPaddingLive) { padding ->
             if (textAdapter.changeTextVerticalPadding(padding)) {
                 updateTextAdapterConfig()
+                postDesired(binding.realText)
             }
         }
 
         observe(viewModel.lineHeightMultiplierLive) { multiplier ->
             if (textAdapter.changeLineHeightMultiplier(multiplier)) {
                 updateTextAdapterConfig()
+                postDesired(binding.realText)
             }
         }
 
@@ -1453,12 +1472,14 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         observe(viewModel.bionicReadingLive) { color ->
             if (textAdapter.changeBionicReading(color)) {
                 updateTextAdapterConfig()
+                postDesired(binding.realText)
             }
         }
 
         observe(viewModel.bionicBoldRatioLive) { ratio ->
             if (textAdapter.changeBionicBoldRatio(ratio)) {
                 updateTextAdapterConfig()
+                postDesired(binding.realText)
             }
         }
 
@@ -1544,6 +1565,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
         observe(viewModel.textFontLive) { font ->
             if (textAdapter.changeFont(font)) {
                 updateTextAdapterConfig()
+                postDesired(binding.realText)
             }
         }
 
@@ -2100,10 +2122,17 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
                         }
                     } else {
                         updateFromCode = false
+                        onScroll()
                     }
 
-                    onScroll()
                     super.onScrolled(recyclerView, dx, dy)
+                }
+
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    super.onScrollStateChanged(recyclerView, newState)
+                    if (newState == RecyclerView.SCROLL_STATE_SETTLING || newState == RecyclerView.SCROLL_STATE_IDLE) {
+                        onScroll()
+                    }
 
                     // binding.tmpTtsEnd.fixLine((getBottomY()- remainingBottom) + 7.toPx)
                     // binding.tmpTtsStart.fixLine(remainingTop + 7.toPx)
@@ -2121,7 +2150,7 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             }
             lastChapterHapticIndex = currentIdx
 
-            if (chapter.seekToDesired) {
+            if (chapter.seekToDesired && !viewModel.isTTSRunning()) {
                 textAdapter.submitIncomparableList(chapter.data) {
                     viewModel.postLoadingStatus(Resource.Success(""))
                     scrollToDesired()
@@ -2130,7 +2159,13 @@ class ReadActivity2 : AppCompatActivity(), ColorPickerDialogListener {
             } else {
                 textAdapter.submitList(chapter.data) {
                     viewModel.postLoadingStatus(Resource.Success(""))
-                    onScroll()
+                    if (chapter.seekToDesired) {
+                        scrollToDesired()
+                    } else {
+                        binding.realText.post {
+                            onScroll()
+                        }
+                    }
                     UsageStatsManager.incrementChapterRead(this@ReadActivity2)
                 }
             }

@@ -18,6 +18,7 @@ object TranslationEnginesManager {
         registerEngine(GoogleMLKitEngine())
         registerEngine(GoogleGTXEngine())
         registerEngine(YandexEngine())
+        registerEngine(AzureEngine())
         registerEngine(CloudAITranslator())
     }
 

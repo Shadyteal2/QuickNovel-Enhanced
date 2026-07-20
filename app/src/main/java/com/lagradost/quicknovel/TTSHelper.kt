@@ -144,7 +144,40 @@ class TTSSession(context: Context, val event: (TTSHelper.TTSActionType) -> Boole
                 engine.stop()
                 TTSQueueId++
                 lineId = TTSQueueId
-                engine.speak(line.speakOutMsg, lineId, false)
+                val success = engine.speak(line.speakOutMsg, lineId, false)
+                if (!success && engine is com.lagradost.quicknovel.tts.edge.EdgeTTSEngine) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            appContext,
+                            "Edge TTS connection failed. Falling back to Native TTS.",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    setKey(TTS_ENGINE_TYPE, "native")
+                    engine.release()
+                    
+                    val onStatusUpdate = { id: Int, isStarted: Boolean ->
+                        if (isStarted) {
+                            TTSStartSpeakId = maxOf(TTSStartSpeakId, id)
+                        } else {
+                            TTSEndSpeakId = maxOf(TTSEndSpeakId, id)
+                        }
+                    }
+                    val newEngine = NativeTTSEngine(appContext, onStatusUpdate)
+                    newEngine.setSpeed(speed)
+                    newEngine.setPitch(pitch)
+                    
+                    val waitStart = System.currentTimeMillis()
+                    while (!newEngine.isInitialized() && System.currentTimeMillis() - waitStart < 2000) {
+                        delay(50)
+                    }
+                    
+                    val voiceName = BaseApplication.getKey<String>(EPUB_VOICE)
+                    newEngine.setVoice(voiceName)
+                    
+                    this@TTSSession.engine = newEngine
+                    newEngine.speak(line.speakOutMsg, lineId, false)
+                }
                 currentQueued = line to lineId
                 nextQueued = null
             }
@@ -181,6 +214,7 @@ class TTSSession(context: Context, val event: (TTSHelper.TTSActionType) -> Boole
             coroutineScope {
                 return@coroutineScope engine?.let { callback(it) } ?: run {
                     val useGoogle = BaseApplication.getKey<Boolean>("TTS_USE_GOOGLE") ?: false
+                    val engineType = BaseApplication.getKey<String>(TTS_ENGINE_TYPE) ?: if (useGoogle) "google" else "native"
                     
                     val onStatusUpdate = { id: Int, isStarted: Boolean ->
                         if (isStarted) {
@@ -190,8 +224,9 @@ class TTSSession(context: Context, val event: (TTSHelper.TTSActionType) -> Boole
                         }
                     }
 
-                    val newEngine: TTSEngine = when {
-                        useGoogle -> GoogleTTSEngine(appContext).apply { setStatusUpdateCallback(onStatusUpdate) }
+                    val newEngine: TTSEngine = when (engineType) {
+                        "google" -> GoogleTTSEngine(appContext).apply { setStatusUpdateCallback(onStatusUpdate) }
+                        "edge" -> com.lagradost.quicknovel.tts.edge.EdgeTTSEngine(appContext).apply { setStatusUpdateCallback(onStatusUpdate) }
                         else -> NativeTTSEngine(appContext, onStatusUpdate)
                     }
                     
@@ -315,12 +350,27 @@ data class TextSpan(
         Regex("""\p{L}+(?:['’\-]\p{L}+)*""").findAll(text).forEach { match ->
             val range = match.range
             val wordLength = range.last + 1 - range.first
-            val correctLength = when (wordLength) {
+            var correctLength = when (wordLength) {
                 0 -> return@forEach
                 1, 2, 3 -> 1
                 4 -> 2
                 else -> {
                     (wordLength.toFloat() * boldRatio).roundToInt()
+                }
+            }
+            // Prevent splitting combining marks (diacritics/matras) from their base characters.
+            // If the character immediately following the bold segment is a combining mark,
+            // we extend the bold span to include it (and any subsequent combining marks).
+            while (range.first + correctLength < range.last + 1) {
+                val nextChar = text[range.first + correctLength]
+                val type = java.lang.Character.getType(nextChar)
+                if (type == java.lang.Character.NON_SPACING_MARK.toInt() ||
+                    type == java.lang.Character.COMBINING_SPACING_MARK.toInt() ||
+                    type == java.lang.Character.ENCLOSING_MARK.toInt()
+                ) {
+                    correctLength++
+                } else {
+                    break
                 }
             }
             wordToSpan.setSpan(

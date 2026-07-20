@@ -16,6 +16,13 @@ import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +43,7 @@ import com.lagradost.quicknovel.ui.theme.glassCard
 import com.lagradost.quicknovel.ui.theme.rememberImageRequest
 import com.lagradost.quicknovel.ui.theme.rememberShimmerBrush
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SmartRelatedSection(
     state: RelatedState,
@@ -49,62 +56,75 @@ fun SmartRelatedSection(
         exit = fadeOut(),
         modifier = modifier
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(vertical = 8.dp)
+                .glassCard(shape = RoundedCornerShape(24.dp), strokeWidth = 0.5.dp)
+                .padding(vertical = 16.dp)
         ) {
-            val title = when (state) {
-                is RelatedState.Shown -> state.label
-                else -> "You May Also Like"
-            }
-
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                letterSpacing = 0.5.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            when (state) {
-                is RelatedState.Loading -> {
-                    RelatedShimmerRow()
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val title = when (state) {
+                    is RelatedState.Shown -> state.label
+                    else -> "You May Also Like"
                 }
-                is RelatedState.Shown -> {
-                    val view = LocalView.current
-                    val carouselState = rememberCarouselState { state.items.size }
 
-                    // Tactile haptic feedback as new items snap into focus
-                    LaunchedEffect(carouselState.currentItem) {
-                        if (carouselState.currentItem > 0) {
-                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                when (state) {
+                    is RelatedState.Loading -> {
+                        RelatedShimmerRow()
+                    }
+                    is RelatedState.Shown -> {
+                        val view = LocalView.current
+                        val carouselState = rememberCarouselState { state.items.size }
+
+                        // Tactile haptic feedback as new items snap into focus (guarded against boundary bounce index vibration)
+                        var lastHapticIndex by remember { mutableIntStateOf(-1) }
+                        LaunchedEffect(carouselState.currentItem) {
+                            val current = carouselState.currentItem
+                            if (current > 0 && current != lastHapticIndex) {
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                lastHapticIndex = current
+                            }
+                        }
+
+                        CompositionLocalProvider(
+                            LocalOverscrollConfiguration provides null
+                        ) {
+                            HorizontalMultiBrowseCarousel(
+                                state = carouselState,
+                                preferredItemWidth = 130.dp,
+                                itemSpacing = 8.dp,
+                                flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .pointerInput(Unit) {
+                                        disallowParentIntercept(view)
+                                    }
+                            ) { index ->
+                                val item = state.items[index]
+                                RelatedNovelCarouselCard(
+                                    item = item,
+                                    onClick = { onNovelClick(item) }
+                                )
+                            }
                         }
                     }
-
-                    HorizontalMultiBrowseCarousel(
-                        state = carouselState,
-                        preferredItemWidth = 130.dp,
-                        itemSpacing = 8.dp,
-                        flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .pointerInput(Unit) {
-                                disallowParentIntercept(view)
-                            }
-                    ) { index ->
-                        val item = state.items[index]
-                        RelatedNovelCarouselCard(
-                            item = item,
-                            onClick = { onNovelClick(item) }
-                        )
-                    }
+                    else -> {}
                 }
-                else -> {}
             }
         }
     }

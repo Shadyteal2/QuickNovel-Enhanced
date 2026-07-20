@@ -111,8 +111,10 @@ class SearchFragment : Fragment() {
 
         val backCallback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                val viewPager = activity?.findViewById<androidx.viewpager2.widget.ViewPager2>(R.id.main_viewpager)
+                val isVisibleToUser = viewPager?.visibility == View.VISIBLE && viewPager.currentItem == 1
                 val hasResponse = viewModel.searchResponse.value != null || viewModel.currentSearch.value != null
-                if (hasResponse) {
+                if (isVisibleToUser && hasResponse) {
                     viewModel.clearSearch()
                     hideKeyboard(view)
                 } else {
@@ -123,13 +125,5 @@ class SearchFragment : Fragment() {
             }
         }
         activity?.onBackPressedDispatcher?.addCallback(viewLifecycleOwner, backCallback)
-        
-        // Observers to toggle the back button logic since we are no longer using live data explicitly here
-        viewModel.searchResponse.observe(viewLifecycleOwner) { response ->
-            backCallback.isEnabled = response != null || viewModel.currentSearch.value != null
-        }
-        viewModel.currentSearch.observe(viewLifecycleOwner) { list ->
-            backCallback.isEnabled = list != null || viewModel.searchResponse.value != null
-        }
     }
 }

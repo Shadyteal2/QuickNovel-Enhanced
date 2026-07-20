@@ -472,6 +472,7 @@ class ReadActivityViewModel : ViewModel() {
     var context: Context? = null
     private var loadId: Int = -1
     var hasPerformedInitialSeek = false
+    var hasTriggeredInitialSeek = false
     var novelTitle: String? = null
     fun bookTitle(): String {
         return novelTitle ?: book.title()
@@ -959,9 +960,9 @@ class ReadActivityViewModel : ViewModel() {
     private fun notifyChapterUpdate(index: Int, seekToDesired: Boolean = false) {
         val cIndex = currentIndex
         if (cIndex - chapterPaddingBottom <= index && index <= cIndex + chapterPaddingTop) {
-            val shouldSeek = seekToDesired || (index == cIndex && !hasPerformedInitialSeek)
+            val shouldSeek = seekToDesired || (index == cIndex && !hasTriggeredInitialSeek)
             if (shouldSeek && index == cIndex) {
-                hasPerformedInitialSeek = true
+                hasTriggeredInitialSeek = true
             }
             updateReadArea(shouldSeek)
         }
@@ -1502,6 +1503,12 @@ class ReadActivityViewModel : ViewModel() {
                 _loadingStatus.postValue(Resource.Failure(t, t.message ?: "Failed to apply translation settings"))
                 _translationLoadingStatus.postValue(Resource.Failure(t, t.message ?: "Failed to apply translation settings"))
                 showToast("Translation application failed: ${t.message ?: "Unknown error"}")
+
+                // Reset translation active state to original text on failure!
+                isTranslationActive = false
+                isShowingOriginalLive.postValue(true)
+                invalidateTranslationCache()
+                updateReadArea(seekToDesired = false)
             }
         }
     }
@@ -1720,10 +1727,12 @@ class ReadActivityViewModel : ViewModel() {
             _translationLoadingStatus.postValue(Resource.Failure(e, msg))
             mlTranslator?.closeQuietly()
             mlTranslator = null
+            throw e
         } catch (t: Throwable) {
             if (t is CancellationException) throw t
             _translationLoadingStatus.postValue(Resource.Failure(t, t.message ?: "Error"))
             logError(t)
+            throw t
         }
     }
 
@@ -1737,6 +1746,7 @@ class ReadActivityViewModel : ViewModel() {
         _loadingStatus.postValue(Resource.Loading())
         initTTSSession(context)
         hasPerformedInitialSeek = false
+        hasTriggeredInitialSeek = false
 
         val loadedBook = safeApiCall {
             if (intent == null) throw ErrorLoadingException("No intent")
@@ -1857,7 +1867,13 @@ class ReadActivityViewModel : ViewModel() {
                     isShowingOriginalLive.postValue(false)
                 }
 
-                initMLFromSettings(mlSettings, false)
+                try {
+                    initMLFromSettings(mlSettings, false)
+                } catch (t: Throwable) {
+                    Log.e("TranslationEngine", "Failed to initialize ML translator on start", t)
+                    isTranslationActive = false
+                    isShowingOriginalLive.postValue(true)
+                }
 
                 // cant assume we know a chapter max as it can expand
 
@@ -2363,7 +2379,7 @@ class ReadActivityViewModel : ViewModel() {
         return runBlocking {
             chapterMutex.withLock { chapterData[index] }?.letInner { live ->
                 // todo binary search, but strip all but TextSpan first
-                live.spans.firstOrNull { it.start >= char }?.innerIndex
+                live.spans.lastOrNull { it.start <= char }?.innerIndex
             }
         }
     }
@@ -2392,6 +2408,7 @@ class ReadActivityViewModel : ViewModel() {
     }
 
     private fun setScrollKeys(scrollIndex: ScrollIndex) {
+        if (!hasPerformedInitialSeek) return
         val prevChapter = getKey<Int>(EPUB_CURRENT_POSITION, bookTitle()) ?: -1
         setKey(
             EPUB_CURRENT_POSITION_READ_AT,
@@ -2438,6 +2455,9 @@ class ReadActivityViewModel : ViewModel() {
         // set loading
         _loadingStatus.postValue(Resource.Loading())
 
+        hasPerformedInitialSeek = false
+        hasTriggeredInitialSeek = true
+
         // load the chapters
         updateIndexAsync(index, notify = false, postLoading = true)
         // set the keys
@@ -2467,6 +2487,7 @@ class ReadActivityViewModel : ViewModel() {
 
     fun onScroll(visibility: ScrollVisibilityIndex?) {
         if (!hasInit || !isInApp) return
+        if (!hasPerformedInitialSeek) return
         if (visibility == null) return
 
         // dynamically increase padding in case of very small chapters with a maximum of 10 chapters
@@ -2487,7 +2508,7 @@ class ReadActivityViewModel : ViewModel() {
             }
         }
 
-        desiredTTSIndex = visibility.firstFullyVisibleUnderLine?.toScroll()
+        desiredTTSIndex = (visibility.firstFullyVisibleUnderLine ?: save).toScroll()
         changeIndex(save.toScroll())
 
         // update the read area if changed index
@@ -2564,13 +2585,38 @@ class ReadActivityViewModel : ViewModel() {
         ttsSession.interruptTTS()
     }
 
-    private val _ttsUseGoogleLive = MutableLiveData<Boolean>()
+    private val _ttsUseGoogleLive = MutableLiveData<Boolean>().apply {
+        val useGoogle = BaseApplication.getKey<Boolean>("TTS_USE_GOOGLE") ?: false
+        val initialType = BaseApplication.getKey<String>(TTS_ENGINE_TYPE) ?: if (useGoogle) "google" else "native"
+        postValue(initialType == "google")
+    }
     val ttsUseGoogleLive: LiveData<Boolean> get() = _ttsUseGoogleLive
     var ttsUseGoogle: Boolean
         get() = _ttsUseGoogleLive.value ?: false
         set(value) {
             _ttsUseGoogleLive.postValue(value)
             setKey("TTS_USE_GOOGLE", value)
+            ttsEngineType = if (value) "google" else "native"
+        }
+
+    private val _ttsEngineTypeLive = MutableLiveData<String>().apply {
+        val useGoogle = BaseApplication.getKey<Boolean>("TTS_USE_GOOGLE") ?: false
+        val initialType = BaseApplication.getKey<String>(TTS_ENGINE_TYPE) ?: if (useGoogle) "google" else "native"
+        postValue(initialType)
+    }
+    val ttsEngineTypeLive: LiveData<String> get() = _ttsEngineTypeLive
+    var ttsEngineType: String
+        get() = _ttsEngineTypeLive.value ?: "native"
+        set(value) {
+            _ttsEngineTypeLive.postValue(value)
+            setKey(TTS_ENGINE_TYPE, value)
+            if (value == "google") {
+                setKey("TTS_USE_GOOGLE", true)
+                _ttsUseGoogleLive.postValue(true)
+            } else {
+                setKey("TTS_USE_GOOGLE", false)
+                _ttsUseGoogleLive.postValue(false)
+            }
             ttsSession.releaseEngine()
             ttsSession.interruptTTS()
         }

@@ -78,6 +78,19 @@ class GoogleMLKitEngine : TranslationEngine {
                 }
             }
 
+            val modelsToCheck = mutableListOf<String>()
+            if (fromLang != "en") modelsToCheck.add(fromLang)
+            if (toLang != "en") modelsToCheck.add(toLang)
+
+            for (lang in modelsToCheck) {
+                if (!isModelDownloaded(lang)) {
+                    val msg = "ML Kit model not ready: Download required for language '$lang'. " +
+                        "Open Translation settings and tap Apply to download the model."
+                    Log.e(TAG, msg)
+                    return Resource.Failure(null, msg)
+                }
+            }
+
             if (currentTranslator == null || currentFrom != fromLang || currentTo != toLang) {
                 currentTranslator?.close()
                 val options = TranslatorOptions.Builder()

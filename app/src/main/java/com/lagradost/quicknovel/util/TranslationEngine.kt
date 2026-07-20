@@ -8,7 +8,8 @@ enum class TranslationEngineType(val value: Int) {
     GoogleMLKit(1),
     GoogleGTX(2),
     Yandex(3),
-    CloudAI(4);
+    CloudAI(4),
+    Azure(5);
 
     companion object {
         fun fromInt(value: Int) = entries.firstOrNull { it.value == value } ?: None

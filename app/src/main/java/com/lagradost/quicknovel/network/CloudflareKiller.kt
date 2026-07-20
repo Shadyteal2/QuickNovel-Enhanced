@@ -193,6 +193,23 @@ class CloudflareKiller : Interceptor {
                 cookieTimestamps[host] = now
                 return true
             }
+        } else {
+            // General cookie capture (e.g., login session cookies)
+            val parsed = parseCookieMap(cookie)
+            if (parsed.isNotEmpty()) {
+                val reqCookiesStr = request.header("Cookie") ?: ""
+                val reqCookies = parseCookieMap(reqCookiesStr)
+                
+                // If CookieManager has cookies not in request, or different values, we got logged in
+                val hasNewCookies = parsed.any { (key, value) ->
+                    reqCookies[key] != value
+                }
+                if (hasNewCookies) {
+                    savedCookies[request.url.host] = parsed
+                    cookieTimestamps[host] = now
+                    return true
+                }
+            }
         }
         return false
     }
@@ -218,7 +235,9 @@ class CloudflareKiller : Interceptor {
             val name = it.className
             name.contains("UpdatesSyncWorker") || 
             name.contains("BookDownloader2") ||
-            name.contains("DownloadViewModel")
+            name.contains("DownloadViewModel") ||
+            name.contains("ForYou") ||
+            name.contains("Recommendation")
         }
     }
 
@@ -262,6 +281,17 @@ class CloudflareKiller : Interceptor {
         if (trySolveWithSavedCookies(request)) {
             val cookies = savedCookies[request.url.host] ?: return null
             return proceed(request, cookies)
+        } else {
+            // Fallback: if user closed it/clicked "I'm Done", capture current cookies anyway and try to proceed!
+            val cookie = getWebViewCookie(url)
+            if (!cookie.isNullOrBlank()) {
+                val parsed = parseCookieMap(cookie)
+                if (parsed.isNotEmpty()) {
+                    savedCookies[request.url.host] = parsed
+                    cookieTimestamps[request.url.host] = System.currentTimeMillis()
+                    return proceed(request, parsed)
+                }
+            }
         }
 
         return null

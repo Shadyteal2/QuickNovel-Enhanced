@@ -352,8 +352,7 @@ fun ThemeEditorCompose(
                 Slider(
                     value = textSize.toFloat(),
                     onValueChange = { textSize = it.roundToInt() },
-                    valueRange = 14f..28f,
-                    steps = 13
+                    valueRange = 8f..60f
                 )
 
                 // Line Height Slider

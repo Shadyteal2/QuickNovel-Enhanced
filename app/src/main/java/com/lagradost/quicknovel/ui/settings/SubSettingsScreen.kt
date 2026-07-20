@@ -48,6 +48,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.lagradost.quicknovel.util.GoogleDriveSyncManager
@@ -132,8 +133,10 @@ fun SubSettingsScreen(
     val crashLogSize by settingsViewModel.crashLogSize.collectAsStateWithLifecycle()
     val chapterCacheSize by settingsViewModel.chapterCacheSize.collectAsStateWithLifecycle()
     val webViewCacheSize by settingsViewModel.webViewCacheSize.collectAsStateWithLifecycle()
+    val wallpaperCacheSize by settingsViewModel.wallpaperCacheSize.collectAsStateWithLifecycle()
     var cacheTrigger by remember { mutableStateOf(0) }
     var isCacheExpanded by remember { mutableStateOf(false) }
+    var showWallpaperGallery by remember { mutableStateOf(false) }
 
     LaunchedEffect(cacheTrigger) {
         settingsViewModel.loadSizes(context)
@@ -248,6 +251,15 @@ fun SubSettingsScreen(
                                 summary = getString("background_image", "Tap to pick a custom background image"),
                                 iconRes = R.drawable.ic_baseline_public_24,
                                 onClick = { onPreferenceClick("background_image") }
+                            )
+                        }
+
+                        item {
+                            ActionPreferenceCard(
+                                title = "Browse Online Wallpapers",
+                                summary = "Discover curated wallpapers from WallWidgy",
+                                iconRes = R.drawable.ic_baseline_public_24,
+                                onClick = { showWallpaperGallery = true }
                             )
                         }
 
@@ -1190,6 +1202,22 @@ fun SubSettingsScreen(
                                                     }
                                                 }
                                             )
+                                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), thickness = 0.5.dp)
+                                            
+                                            NestedCacheActionRow(
+                                                title = "Clear Downloaded Wallpapers",
+                                                size = wallpaperCacheSize,
+                                                summary = "Deletes all downloaded online wallpapers except the active one.",
+                                                iconRes = R.drawable.ic_baseline_color_lens_24,
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        val clearedBytes = com.lagradost.quicknovel.util.StorageCacheHelper.clearWallpaperCache(context)
+                                                        cacheTrigger++
+                                                        val clearedMb = clearedBytes / (1024f * 1024f)
+                                                        com.lagradost.quicknovel.CommonActivity.showToast(String.format("Cleared %.2f MB of wallpapers", clearedMb))
+                                                    }
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -1379,6 +1407,15 @@ fun SubSettingsScreen(
 
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
+        }
+
+        if (showWallpaperGallery) {
+            BackHandler(enabled = showWallpaperGallery) {
+                showWallpaperGallery = false
+            }
+            WallpaperGalleryScreen(
+                onBack = { showWallpaperGallery = false }
+            )
         }
     }
 }
